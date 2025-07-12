@@ -1,0 +1,33 @@
+
+# Xcode
+#
+# gitignore contributors: remember to keep this file simple and straightforward
+# See https://github.com/github/gitignore/blob/main/Global/Xcode.gitignore
+# and https://github.com/github/gitignore/blob/main/Swift.gitignore
+# for a more comprehensive list of files to ignore.
+
+## User-specific
+*.xcuserdatad
+*.user
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xccheckout
+*.moved-aside
+DerivedData/
+.idea/
+.vscode/
+
+## Build generated
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+Packages/
+*.xcodeproj
+project.xcworkspace
