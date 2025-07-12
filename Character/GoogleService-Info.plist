@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>881831618841-6c6581ubbavfaobbl5qtt02hpafqffo6.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.881831618841-6c6581ubbavfaobbl5qtt02hpafqffo6</string>
+	<key>API_KEY</key>
+	<string>AIzaSyB2X0rprIkgXBM56zGRsx1nDlll0p3VcCA</string>
+	<key>GCM_SENDER_ID</key>
+	<string>881831618841</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.Derao.Character</string>
+	<key>PROJECT_ID</key>
+	<string>my-character-app</string>
+	<key>STORAGE_BUCKET</key>
+	<string>my-character-app.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:881831618841:ios:9dd0ad2b85c798c7f67d88</string>
+</dict>
+</plist>
