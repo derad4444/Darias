@@ -152,11 +152,15 @@ struct HomeView: View {
                 print("🔍 HomeView - onViewAppear完了")
             }
             
-            // BIG5進捗の読み込みは遅延実行
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                print("🔍 HomeView - BIG5進捗読み込み開始")
-                characterService.loadInitialBIG5Progress(characterId: characterId)
-                print("🔍 HomeView - BIG5進捗読み込み完了")
+            // BIG5進捗の読み込みは遅延実行（デバッグモードはスキップ）
+            if userId != "debug_user" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    print("🔍 HomeView - BIG5進捗読み込み開始")
+                    characterService.loadInitialBIG5Progress(characterId: characterId)
+                    print("🔍 HomeView - BIG5進捗読み込み完了")
+                }
+            } else {
+                print("🔴 デバッグモード: BIG5進捗読み込みをスキップ")
             }
             
             // キャラクターの自動アニメーション開始
@@ -201,6 +205,19 @@ struct HomeView: View {
     private func onViewAppear() {
         print("🔍 onViewAppear - 開始")
         
+        // 🔴 デバッグモード用の簡単なバイパス
+        if userId == "debug_user" && characterId == "debug_character" {
+            print("🔴 デバッグモード: データベース読み込みをスキップしてLive2D直接表示")
+            
+            if !hasLoadedInitialMessage {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.displayedMessage = "こんにちは！Live2Dキャラクターのテスト中です。"
+                    self.hasLoadedInitialMessage = true
+                }
+            }
+            return
+        }
+        
         if !hasLoadedInitialMessage {
             print("🔍 onViewAppear - キャラクター情報読み込み開始")
             loadCharacterInfo()
@@ -239,10 +256,14 @@ struct HomeView: View {
             }
         }
         
-        print("🔍 onViewAppear - ポイント読み込み開始")
-        // ポイント初期読み込み
-        pointsManager.loadPoints(for: characterId)
-        print("🔍 onViewAppear - ポイント読み込み完了")
+        // ポイント初期読み込み（デバッグモードはスキップ）
+        if userId != "debug_user" {
+            print("🔍 onViewAppear - ポイント読み込み開始")
+            pointsManager.loadPoints(for: characterId)
+            print("🔍 onViewAppear - ポイント読み込み完了")
+        } else {
+            print("🔴 デバッグモード: ポイント読み込みをスキップ")
+        }
     }
     
     // MARK: - Character Info Loading

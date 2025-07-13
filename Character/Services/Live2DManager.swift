@@ -38,114 +38,53 @@ class Live2DManager: ObservableObject {
     // MARK: - Initialization
     init() {
         // Live2D Cubism SDKの初期化
-        print("🔍 Live2DManager - init開始")
-        print("Live2D Manager: Cubism SDK初期化開始")
+        print("Live2DManager初期化開始")
         initializeCubismFramework()
-        print("🔍 Live2DManager - init完了")
+        print("Live2DManager初期化完了")
     }
     
     private func initializeCubismFramework() {
-        print("🔍 Live2DManager - initializeCubismFramework開始")
-        
-        // Live2D Cubism Frameworkの初期化
+        print("🔧 Live2D Framework初期化開始（同期）")
         initializationState = .inProgress
-        print("🔍 Live2DManager - 初期化状態をinProgressに設定")
         
-        // 安全な初期化処理
-        DispatchQueue.global(qos: .utility).async {
-            print("🔍 Live2DManager - バックグラウンドキューで初期化開始")
-            
-            // Live2Dアロケーターの作成
-            self.live2DAllocator = createLive2DAllocator()
-            print("🔍 Live2DManager - Live2Dアロケーター作成: \(self.live2DAllocator != nil ? "成功" : "失敗")")
-            
-            // Live2D Cubism Frameworkの初期化
-            initializeLive2DFramework(self.live2DAllocator)
-            print("🔍 Live2DManager - Live2D Cubism Framework初期化完了")
-            
-            // Metal初期化も同時に実行
-            self.initializeMetal()
-            
-            self.isInitialized = true
-            self.initializationState = .completed
-            print("✅ Live2DManager - 初期化状態をcompletedに設定")
-            
-            DispatchQueue.main.async {
-                print("✅ Live2DManager - メインキューで初期化完了通知")
-                print("Live2D Cubism Framework初期化完了")
-                
-                // 初期化完了後、自動的にデフォルトモデルを読み込み
-                self.loadDefaultModel()
-            }
-        }
+        // 同期的に初期化を実行
+        print("🔧 アロケーター作成開始")
+        self.live2DAllocator = createLive2DAllocator()
+        print("🔧 アロケーター作成完了: \(self.live2DAllocator)")
+        
+        print("🔧 Framework初期化開始")
+        initializeLive2DFramework(self.live2DAllocator)
+        print("🔧 Framework初期化完了")
+        
+        // Metal初期化
+        print("🔧 Metal初期化開始")
+        self.initializeMetal()
+        print("🔧 Metal初期化完了")
+        
+        self.isInitialized = true
+        self.initializationState = .completed
+        print("✅ Live2DFramework初期化完了（同期） - 状態: \(self.initializationState)")
+        
+        // デフォルトモデルを即座に読み込み
+        print("🔧 デフォルトモデル読み込み開始（即座）")
+        self.loadDefaultModel()
     }
     
     private func initializeMetal() {
         guard let device = MTLCreateSystemDefaultDevice() else {
-            print("❌ Live2DManager - Metal is not supported on this device")
+            print("ERROR: Metal not supported")
             return
         }
         
         self.metalDevice = device
         self.commandQueue = device.makeCommandQueue()
-        print("✅ Live2DManager - Metal初期化完了")
+        print("Metal初期化完了")
     }
     
     private func loadDefaultModel() {
-        print("🔍 Live2DManager - デフォルトモデル読み込み開始")
-        
-        // パス構築のテストを実行
-        testModelPaths()
-        
+        print("=== デフォルトモデル読み込み開始 ===")
         self.loadModel(modelName: "character_female")
-    }
-    
-    private func testModelPaths() {
-        print("🔍 Live2DManager - モデルパステスト開始")
-        
-        let testModelName = "character_female"
-        let constructedPath = getModelPath(for: testModelName)
-        
-        print("🔍 Live2DManager - 構築されたパス: \(constructedPath)")
-        
-        let fileManager = FileManager.default
-        let exists = fileManager.fileExists(atPath: constructedPath)
-        print("🔍 Live2DManager - ファイル存在: \(exists)")
-        
-        if exists {
-            // ファイルサイズを確認
-            do {
-                let attributes = try fileManager.attributesOfItem(atPath: constructedPath)
-                let fileSize = attributes[FileAttributeKey.size] as? Int ?? 0
-                print("✅ Live2DManager - ファイルサイズ: \(fileSize) bytes")
-                
-                // ファイル内容の簡易チェック
-                let data = try Data(contentsOf: URL(fileURLWithPath: constructedPath))
-                if data.count > 0 {
-                    print("✅ Live2DManager - ファイル読み込み成功: \(data.count) bytes")
-                }
-            } catch {
-                print("❌ Live2DManager - ファイル読み込みエラー: \(error)")
-            }
-        } else {
-            // プロジェクトディレクトリの確認
-            let projectDir = "/Users/onoderaryousuke/Desktop/development-D/Character"
-            print("🔍 Live2DManager - プロジェクトディレクトリ確認: \(projectDir)")
-            
-            if fileManager.fileExists(atPath: projectDir) {
-                do {
-                    let contents = try fileManager.contentsOfDirectory(atPath: projectDir)
-                    let live2dFiles = contents.filter { $0.contains("koharu") || $0.contains(".json") || $0.contains(".moc3") }
-                    print("🔍 Live2DManager - Live2D関連ファイル: \(live2dFiles)")
-                } catch {
-                    print("❌ Live2DManager - ディレクトリ読み取りエラー: \(error)")
-                }
-            } else {
-                print("❌ Live2DManager - プロジェクトディレクトリが存在しません")
-            }
-        }
-        
-        print("🔍 Live2DManager - モデルパステスト完了")
+        print("=== loadModel呼び出し完了 ===")
     }
     
     func initialize() {
@@ -161,12 +100,13 @@ class Live2DManager: ObservableObject {
     
     // MARK: - Model Loading
     func loadModel(modelName: String) {
-        print("🔍 Live2DManager - loadModel開始: \(modelName)")
-        print("🔍 Live2DManager - 初期化状態: \(initializationState)")
+        print("=== 🎯 Live2DManager loadModel開始: \(modelName) ===")
+        print("🔍 現在の初期化状態: \(initializationState)")
+        print("🔍 現在のlive2DModel: \(live2DModel != nil ? "有効" : "nil")")
         
         // 初期化が完了していない場合は待機してから実行
         guard initializationState == .completed else {
-            print("🔍 Live2DManager - 初期化未完了のため待機")
+            print("⚠️ Live2DManager - 初期化未完了のため待機")
             
             // 最大10回まで待機を試行
             waitForInitializationAndLoadModel(modelName: modelName, retryCount: 0)
@@ -178,11 +118,11 @@ class Live2DManager: ObservableObject {
         self.modelPath = modelPath
         print("🔍 Live2DManager - モデルパス: \(modelPath)")
         
-        // モデルの読み込みを非同期で実行
-        initializationQueue.async {
-            print("🔍 Live2DManager - モデル読み込み開始")
-            self.loadModelFromPath(modelPath)
-        }
+        // モデルの読み込みを同期的に実行
+        print("🔍 Live2DManager - 同期モデル読み込み開始")
+        self.loadModelFromPath(modelPath)
+        
+        print("=== Live2DManager loadModel終了 ===")
     }
     
     private func waitForInitializationAndLoadModel(modelName: String, retryCount: Int) {
@@ -226,48 +166,50 @@ class Live2DManager: ObservableObject {
     private func getModelFileName(for modelName: String) -> String {
         switch modelName {
         case "character_female":
-            return "koharu.model3.json"
+            return "koharu.model3"
         case "character_male":
-            return "haruto.model3.json"
+            return "haruto.model3"
         default:
-            return "model.model3.json"
+            return "koharu.model3"
         }
     }
     
     private func getModelPath(for modelName: String) -> String {
         let modelFileName = getModelFileName(for: modelName)
         
-        // プロジェクト直下に配置されたファイルを使用
-        let projectRootPath = "/Users/onoderaryousuke/Desktop/development-D/Character"
-        let directPath = "\(projectRootPath)/\(modelFileName)"
-        
-        print("🔍 Live2DManager - プロジェクト直下パス: \(directPath)")
-        
-        // ファイルの存在確認
-        let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: directPath) {
-            print("✅ Live2DManager - ファイル存在確認成功: \(directPath)")
-            return directPath
-        } else {
-            print("❌ Live2DManager - ファイルが見つかりません: \(directPath)")
+        // バンドル内のモデルファイルへのパスを取得
+        guard let bundlePath = Bundle.main.path(forResource: modelFileName, ofType: "json") else {
+            print("=== WARNING: モデルファイルが見つかりません: \(modelFileName).json ===")
+            print("=== モック実装を使用して進行します ===")
             
-            // バンドル内の確認も行う
-            if let bundlePath = Bundle.main.path(forResource: modelFileName.replacingOccurrences(of: ".model3.json", with: ""), ofType: "model3.json") {
-                print("✅ Live2DManager - バンドル内でファイル発見: \(bundlePath)")
-                return bundlePath
-            }
-            
-            return directPath
+            // Objective-C++ブリッジではファイルパスは不要なので、ダミーパスを返す
+            return "mock://\(modelFileName).json"
         }
+        
+        print("=== SUCCESS: モデルファイル発見: \(bundlePath) ===")
+        return bundlePath
     }
     
     private func loadModelFromPath(_ path: String) {
         print("🔍 Live2DManager - loadModelFromPath開始: \(path)")
         
-        // ファイル存在確認
-        let fileManager = FileManager.default
-        let fileExists = fileManager.fileExists(atPath: path)
-        print("🔍 Live2DManager - ファイル存在確認: \(fileExists) - \(path)")
+        // ファイルパスが有効か確認
+        if path.isEmpty {
+            print("❌ Live2DManager - モデルファイルのパスが無効です")
+            initializationState = .failed
+            return
+        }
+        
+        // モックパスまたは実際のファイルパスの処理
+        var fileExists = false
+        if path.hasPrefix("mock://") {
+            print("🔍 Live2DManager - モックパスを使用: \(path)")
+            fileExists = true // モックパスは常に存在として扱う
+        } else {
+            let fileManager = FileManager.default
+            fileExists = fileManager.fileExists(atPath: path)
+            print("🔍 Live2DManager - ファイル存在確認: \(fileExists) - \(path)")
+        }
         
         if !fileExists {
             print("❌ Live2DManager - モデルファイルが見つかりません: \(path)")
@@ -284,10 +226,19 @@ class Live2DManager: ObservableObject {
         print("🔍 Live2DManager - アロケーター: \(live2DAllocator != nil ? "作成済み" : "未作成")")
         
         // 実際のLive2D SDKを使用してモデルを読み込み
-        self.live2DModel = loadLive2DModel(path)
+        print("🔍 Live2DManager - loadLive2DModel呼び出し開始: \(path)")
+        
+        let modelPointer = loadLive2DModel(path)
+        print("🔍 Live2DManager - loadLive2DModel戻り値: \(modelPointer)")
+        
+        self.live2DModel = modelPointer
         
         print("🔍 Live2DManager - loadLive2DModel呼び出し完了")
-        print("🔍 Live2DManager - モデルポインター: \(live2DModel != nil ? "有効" : "無効")")
+        print("🔍 Live2DManager - self.live2DModel設定後: \(live2DModel != nil ? "有効" : "無効")")
+        
+        if let ptr = live2DModel {
+            print("🔍 Live2DManager - ポインター値: \(ptr)")
+        }
         
         if self.live2DModel != nil {
             print("✅ Live2DManager - Live2Dモデル読み込み成功")
@@ -322,7 +273,7 @@ class Live2DManager: ObservableObject {
             "Version": 3,
             "FileReferences": [
                 "Moc": "koharu.moc3",
-                "Textures": ["koharu.2048/texture_00_female.png"],
+                "Textures": ["texture_00_female.png"],
                 "Physics": "koharu.physics3.json",
                 "Motions": [
                     "Idle": [["File": "motion/idle_female.motion3.json"]],
@@ -528,7 +479,38 @@ extension Live2DManager {
     
     // MARK: - Getter Methods
     func getModel() -> Any? {
+        print("🔍 getModel呼び出し - live2DModel: \(live2DModel != nil ? "有効" : "nil")")
+        print("🔍 初期化状態: \(initializationState)")
+        print("🔍 アロケーター: \(live2DAllocator != nil ? "有効" : "nil")")
+        print("🔍 isInitialized: \(isInitialized)")
+        
+        // モデルがnilの場合、強制的にモデルを作成
+        if live2DModel == nil {
+            print("⚠️ モデルがnilのため強制作成を試行")
+            self.forceCreateModel()
+        }
+        
         return live2DModel
+    }
+    
+    private func forceCreateModel() {
+        print("🚨 強制モデル作成開始")
+        
+        // 初期化が未完了の場合は強制初期化
+        if initializationState != .completed {
+            print("🚨 強制初期化実行")
+            self.initializeCubismFramework()
+        }
+        
+        // モデルの強制読み込み
+        let mockPath = "mock://character_female.model3.json"
+        print("🚨 強制モデル読み込み: \(mockPath)")
+        
+        let modelPointer = loadLive2DModel(mockPath)
+        print("🚨 強制モデル作成結果: \(modelPointer)")
+        
+        self.live2DModel = modelPointer
+        print("🚨 強制モデル設定完了: \(live2DModel != nil ? "成功" : "失敗")")
     }
     
     func getRenderer() -> Any? {
@@ -537,10 +519,6 @@ extension Live2DManager {
     
     func isModelLoaded() -> Bool {
         guard let model = live2DModel else {
-            // モデルポインタがnilの場合
-            if Int.random(in: 0..<500) == 0 { // ログ出力頻度を削減
-                print("🔍 Live2DManager - isModelLoaded: false (model pointer is nil)")
-            }
             return false
         }
         
@@ -548,9 +526,9 @@ extension Live2DManager {
         let loadedStatus = isLive2DModelLoaded(model)
         let isLoaded = (loadedStatus == 1)
         
-        // ログ出力を大幅に削減（50秒に1回のみ）
-        if Int.random(in: 0..<500) == 0 {
-            print("🔍 Live2DManager - isModelLoaded: \(isLoaded), status code: \(loadedStatus)")
+        // ログ削減
+        if Int.random(in: 0..<1000) == 0 {
+            print("モデル状態: \(isLoaded)")
         }
         
         return isLoaded

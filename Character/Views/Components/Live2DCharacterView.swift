@@ -17,30 +17,22 @@ struct Live2DCharacterView: UIViewRepresentable {
     }
     
     func makeUIView(context: Context) -> Live2DMetalView {
-        print("🔍 Live2DCharacterView - makeUIView開始")
+        print("Live2DCharacterView作成開始")
         
         let metalView = Live2DMetalView()
-        print("🔍 Live2DCharacterView - Live2DMetalView作成完了")
         
         // 基本設定
         metalView.live2DDelegate = context.coordinator
         metalView.isAnimationPlaying = isAnimationPlaying
-        print("🔍 Live2DCharacterView - 基本設定完了")
         
-        // モデル読み込みを一度だけ実行
+        // モデル読み込み
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            print("🔍 Live2DCharacterView - モデル読み込み開始: \(modelName)")
-            
-            // 既に同じモデルが読み込まれている場合はスキップ
-            if metalView.modelName != modelName {
-                metalView.loadModel(modelName: modelName)
-                print("🔍 Live2DCharacterView - モデル読み込み呼び出し完了")
-            } else {
-                print("🔍 Live2DCharacterView - 既に同じモデルが読み込まれているためスキップ")
-            }
+            print("=== Live2DCharacterView モデル読み込み開始: \(modelName) ===")
+            metalView.loadModel(modelName: modelName)
+            print("=== Live2DCharacterView loadModel呼び出し完了 ===")
         }
         
-        print("🔍 Live2DCharacterView - makeUIView完了")
+        print("Live2DCharacterView作成完了")
         return metalView
     }
     

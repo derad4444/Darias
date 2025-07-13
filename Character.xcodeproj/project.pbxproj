@@ -7,16 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		280197042E1FDE3E008A8683 /* koharu.moc3 in Resources */ = {isa = PBXBuildFile; fileRef = 280197002E1FDE3E008A8683 /* koharu.moc3 */; };
-		280197052E1FDE3E008A8683 /* koharu.physics3.json in Resources */ = {isa = PBXBuildFile; fileRef = 280197032E1FDE3E008A8683 /* koharu.physics3.json */; };
-		280197062E1FDE3E008A8683 /* koharu.model3.json in Resources */ = {isa = PBXBuildFile; fileRef = 280197022E1FDE3E008A8683 /* koharu.model3.json */; };
-		280197072E1FDE3E008A8683 /* koharu.cdi3.json in Resources */ = {isa = PBXBuildFile; fileRef = 280197012E1FDE3E008A8683 /* koharu.cdi3.json */; };
-		280197082E1FDE3E008A8683 /* texture_00_female.png in Resources */ = {isa = PBXBuildFile; fileRef = 280196FE2E1FDE3E008A8683 /* texture_00_female.png */; };
 		280198D32E1FFB17008A8683 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 28C72BAF2E1A2A2700E53571 /* Metal.framework */; };
 		280198D52E1FFB29008A8683 /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 280198D42E1FFB29008A8683 /* MetalKit.framework */; };
 		280198D72E1FFB3C008A8683 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 280198D62E1FFB3C008A8683 /* Foundation.framework */; };
 		280198D92E1FFC7B008A8683 /* libLive2DCubismCore.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 280198D82E1FFC7B008A8683 /* libLive2DCubismCore.a */; };
-		280198DB2E2006AF008A8683 /* Live2DCubismBridge.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 280198DA2E2006AF008A8683 /* Live2DCubismBridge.cpp */; };
 		2801AC6C2E200AF5008A8683 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = 2829D69A2DF5C7AB0079E2B5 /* FirebaseAppCheck */; };
 		2829D6992DF5C7AB0079E2B5 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 2829D6982DF5C7AB0079E2B5 /* FirebaseAnalytics */; };
 		2829D69D2DF5C7AB0079E2B5 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 2829D69C2DF5C7AB0079E2B5 /* FirebaseAuth */; };
@@ -29,15 +23,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		280196FE2E1FDE3E008A8683 /* texture_00_female.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = texture_00_female.png; sourceTree = "<group>"; };
-		280197002E1FDE3E008A8683 /* koharu.moc3 */ = {isa = PBXFileReference; lastKnownFileType = file; path = koharu.moc3; sourceTree = "<group>"; };
-		280197012E1FDE3E008A8683 /* koharu.cdi3.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = koharu.cdi3.json; sourceTree = "<group>"; };
-		280197022E1FDE3E008A8683 /* koharu.model3.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = koharu.model3.json; sourceTree = "<group>"; };
-		280197032E1FDE3E008A8683 /* koharu.physics3.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = koharu.physics3.json; sourceTree = "<group>"; };
 		280198D42E1FFB29008A8683 /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		280198D62E1FFB3C008A8683 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		280198D82E1FFC7B008A8683 /* libLive2DCubismCore.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libLive2DCubismCore.a; path = "Live2D/Core/lib/ios/Release-iphoneos/libLive2DCubismCore.a"; sourceTree = "<group>"; };
-		280198DA2E2006AF008A8683 /* Live2DCubismBridge.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Live2DCubismBridge.cpp; sourceTree = "<group>"; };
 		2829D6872DF5C6630079E2B5 /* Character.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Character.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		28C72BAF2E1A2A2700E53571 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		28C72BB32E1A2A3C00E53571 /* OpenGLES.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = OpenGLES.framework; path = System/Library/Frameworks/OpenGLES.framework; sourceTree = SDKROOT; };
@@ -144,24 +132,10 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		280196FF2E1FDE3E008A8683 /* koharu.2048 */ = {
-			isa = PBXGroup;
-			children = (
-				280196FE2E1FDE3E008A8683 /* texture_00_female.png */,
-			);
-			path = koharu.2048;
-			sourceTree = "<group>";
-		};
 		2829D67E2DF5C6630079E2B5 = {
 			isa = PBXGroup;
 			children = (
-				280198DA2E2006AF008A8683 /* Live2DCubismBridge.cpp */,
 				2801970B2E1FF94E008A8683 /* Live2D */,
-				280196FF2E1FDE3E008A8683 /* koharu.2048 */,
-				280197002E1FDE3E008A8683 /* koharu.moc3 */,
-				280197012E1FDE3E008A8683 /* koharu.cdi3.json */,
-				280197022E1FDE3E008A8683 /* koharu.model3.json */,
-				280197032E1FDE3E008A8683 /* koharu.physics3.json */,
 				2829D6892DF5C6630079E2B5 /* Character */,
 				2829D6882DF5C6630079E2B5 /* Products */,
 				28C72BAE2E1A2A2700E53571 /* Frameworks */,
@@ -265,11 +239,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				280197042E1FDE3E008A8683 /* koharu.moc3 in Resources */,
-				280197052E1FDE3E008A8683 /* koharu.physics3.json in Resources */,
-				280197062E1FDE3E008A8683 /* koharu.model3.json in Resources */,
-				280197072E1FDE3E008A8683 /* koharu.cdi3.json in Resources */,
-				280197082E1FDE3E008A8683 /* texture_00_female.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,7 +249,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				280198DB2E2006AF008A8683 /* Live2DCubismBridge.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -569,3 +537,4 @@
 	};
 	rootObject = 2829D67F2DF5C6630079E2B5 /* Project object */;
 }
+

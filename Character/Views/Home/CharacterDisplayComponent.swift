@@ -24,7 +24,7 @@ struct CharacterDisplayComponent: View {
                     .clipped()
                     .allowsHitTesting(false)
                     .onAppear {
-                        print("🔍 CharacterDisplayComponent - 静的画像表示")
+                        print("静的画像表示")
                     }
             } else {
                 // ホーム画面で直接Live2Dを表示
@@ -35,8 +35,7 @@ struct CharacterDisplayComponent: View {
                 .clipped()
                 .allowsHitTesting(true)
                 .onAppear {
-                    print("🔍 CharacterDisplayComponent - Live2D表示開始")
-                    print("🔍 CharacterDisplayComponent - Live2D onAppear")
+                    print("Live2D表示開始")
                     if !displayedMessage.isEmpty {
                         startLipSyncIfNeeded()
                     }

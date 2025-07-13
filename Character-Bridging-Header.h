@@ -8,6 +8,10 @@
 #ifndef Character_Bridging_Header_h
 #define Character_Bridging_Header_h
 
+#import <Foundation/Foundation.h>
+#import <Metal/Metal.h>
+#import <MetalKit/MetalKit.h>
+
 // Objective-C++ compatibility
 #ifdef __cplusplus
 #define EXTERN_C extern "C"
@@ -15,8 +19,18 @@
 #define EXTERN_C extern
 #endif
 
-// Live2D Cubism Core
-#import "Live2D/Core/include/Live2DCubismCore.h"
+// Live2D Model Data Structure (C compatible)
+typedef struct {
+    void* modelPointer;
+    bool isLoaded;
+    float* vertices;
+    int vertexCount;
+    unsigned short* indices;
+    int indexCount;
+    void* texture;  // id<MTLTexture> as void*
+    float currentTime;
+    bool isAnimating;
+} Live2DModelData;
 
 // C++ wrapper functions for Swift
 EXTERN_C void* createLive2DAllocator(void);
@@ -30,5 +44,9 @@ EXTERN_C void playLive2DMotion(void* model, const char* groupName, int motionInd
 EXTERN_C void setLive2DExpression(void* model, const char* expressionName);
 EXTERN_C void setLive2DParameter(void* model, const char* paramName, float value);
 EXTERN_C int isLive2DModelLoaded(void* model);
+
+// New functions for texture access
+EXTERN_C Live2DModelData* getLive2DModelData(void* model);
+EXTERN_C void* getLive2DTexture(void);
 
 #endif /* Character_Bridging_Header_h */

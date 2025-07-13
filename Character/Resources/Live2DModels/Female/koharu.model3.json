@@ -3,7 +3,7 @@
 	"FileReferences": {
 		"Moc": "koharu.moc3",
 		"Textures": [
-			"koharu.2048/texture_00_female.png"
+			"texture_00_female.png"
 		],
 		"Physics": "koharu.physics3.json",
 		"DisplayInfo": "koharu.cdi3.json",

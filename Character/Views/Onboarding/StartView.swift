@@ -34,7 +34,8 @@ struct StartView1: View {
             }
         }
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            // 🔴 デバッグ用: すぐにLive2D画面に遷移
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 withAnimation {
                     showStartScreen = true
                 }
@@ -112,11 +113,19 @@ struct StartView2: View {
                 Spacer()
             }
         }
+        .onAppear {
+            // 🔴 デバッグ用: 自動的にHomeViewに遷移
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                showMainApp = true
+            }
+        }
         .onTapGesture {
             showMainApp = true
         }
         .fullScreenCover(isPresented: $showMainApp) {
-            RootView()
+            // 🔴 デバッグ用: 認証をバイパスして直接HomeViewに移動
+            HomeView(userId: "debug_user", characterId: "debug_character")
+                .environmentObject(authManager)
         }
     }
 }

@@ -88,22 +88,19 @@ class Live2DMetalView: MTKView {
         self.depthStencilPixelFormat = .depth32Float
         self.sampleCount = 1
         
-        // 透明背景の設定を復元
-        self.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 0.0)
+        // デバッグ用: 背景を白にしてLive2Dコンテンツが見えるようにする
+        self.clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
         
-        // 透明背景の設定
-        self.isOpaque = false
-        self.backgroundColor = UIColor.clear
-        
-        // デバッグ: 一時的に背景を見えるようにする
-        // self.backgroundColor = UIColor.blue.withAlphaComponent(0.3)
+        // 背景設定
+        self.isOpaque = true
+        self.backgroundColor = UIColor.white
         
         print("🔍 Live2DMetalView - 透明背景設定完了")
         
         // パフォーマンス最適化設定
         self.preferredFramesPerSecond = 30 // 60FPSから30FPSに削減
         self.enableSetNeedsDisplay = false
-        self.isPaused = true // 初期は停止状態
+        self.isPaused = false // 🔴 デバッグ用: アニメーションを開始
         
         print("🔍 Live2DMetalView - setupMetalView完了")
         print("🔍 Live2DMetalView - isPaused: \(isPaused)")
@@ -126,8 +123,9 @@ class Live2DMetalView: MTKView {
                 
                 // Live2D Manager の作成と強制初期化
                 if self.live2DManager == nil {
+                    print("=== Live2DManager作成開始 ===")
                     self.live2DManager = Live2DManager()
-                    print("🔍 Live2DMetalView - Live2DManager作成完了")
+                    print("=== Live2DManager作成完了 ===")
                 }
                 
                 // Live2DManagerを強制的に初期化
@@ -227,6 +225,7 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
     private var texturePipelineState: MTLRenderPipelineState? // テクスチャ用パイプライン
     private var depthStencilState: MTLDepthStencilState?
     private var uniformBuffer: MTLBuffer?
+    private var animationBuffer: MTLBuffer?
     private var vertexBuffer: MTLBuffer?
     private var indexBuffer: MTLBuffer?
     
@@ -330,58 +329,32 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
             return colorSample;
         }
 
-        fragment float4 simpleFragmentShader(VertexOut in [[stage_in]]) {
+        struct AnimationData {
+            float time;
+            float breathPhase;
+            float blinkPhase;
+            float padding;
+        };
+
+        fragment float4 simpleFragmentShader(VertexOut in [[stage_in]],
+                                           constant AnimationData& animation [[buffer(2)]],
+                                           texture2d<float> colorTexture [[texture(0)]]) {
+            constexpr sampler textureSampler(mag_filter::linear, min_filter::linear);
             float2 uv = in.texCoord;
             
-            // Live2D風キャラクター描画（フォールバック用）
-            float2 center = float2(0.5, 0.5);
-            float dist = distance(uv, center);
+            // Live2Dテクスチャをサンプリング
+            float4 colorSample = colorTexture.sample(textureSampler, uv);
             
-            // 顔の輪郭（楕円形）
-            float faceRadius = 0.35;
-            float face = smoothstep(faceRadius + 0.02, faceRadius, dist);
-            
-            // 肌の色
-            float3 skinColor = float3(1.0, 0.9, 0.8);
-            
-            // 目の描画
-            float2 leftEye = float2(0.4, 0.6);
-            float2 rightEye = float2(0.6, 0.6);
-            float eyeSize = 0.05;
-            
-            float leftEyeDist = distance(uv, leftEye);
-            float rightEyeDist = distance(uv, rightEye);
-            
-            float eyes = smoothstep(eyeSize, eyeSize - 0.01, leftEyeDist) + 
-                        smoothstep(eyeSize, eyeSize - 0.01, rightEyeDist);
-            
-            // 口の描画
-            float2 mouth = float2(0.5, 0.4);
-            float mouthDist = distance(uv, mouth);
-            float mouthShape = smoothstep(0.03, 0.025, mouthDist);
-            
-            // 髪の毛（上部）
-            float hair = 0.0;
-            if (uv.y > 0.6 && dist < 0.4) {
-                hair = 1.0;
+            // テクスチャが読み込まれていない場合はピンク色を表示（デバッグ用）
+            if (colorSample.a < 0.01) {
+                return float4(1.0, 0.5, 0.8, 1.0); // ピンク色
             }
             
-            // 最終的な色の合成
-            float3 finalColor = skinColor * face;
+            // 呼吸アニメーション（明度調整）
+            float breathIntensity = 0.95 + 0.05 * sin(animation.breathPhase);
+            colorSample.rgb *= breathIntensity;
             
-            // 目を黒く
-            finalColor = mix(finalColor, float3(0.1, 0.1, 0.1), eyes);
-            
-            // 口をピンクに
-            finalColor = mix(finalColor, float3(1.0, 0.7, 0.8), mouthShape);
-            
-            // 髪を茶色に
-            finalColor = mix(finalColor, float3(0.6, 0.4, 0.2), hair);
-            
-            // アルファ値（顔の部分のみ不透明）
-            float alpha = face + hair;
-            
-            return float4(finalColor, alpha);
+            return colorSample;
         }
         """
         
@@ -482,6 +455,9 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
         // Create uniform buffer
         uniformBuffer = device.makeBuffer(length: MemoryLayout<simd_float4x4>.size * 2, options: .storageModeShared)
         
+        // Create animation buffer
+        animationBuffer = device.makeBuffer(length: MemoryLayout<Float>.size * 4, options: .storageModeShared)
+        
         // Create vertex buffer for quad
         let vertices: [Float] = [
             -1.0, -1.0, 0.0, 1.0,  // Bottom left
@@ -560,6 +536,7 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
             // Set uniforms
             updateUniforms()
             renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+            renderEncoder.setFragmentBuffer(animationBuffer, offset: 0, index: 2)
             
             // Draw Live2D model if available
             if let live2DManager = live2DManager {
@@ -604,6 +581,15 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
             let uniforms = uniformBuffer.contents().bindMemory(to: simd_float4x4.self, capacity: 2)
             uniforms[0] = projectionMatrix
             uniforms[1] = modelViewMatrix
+        }
+        
+        // Update animation data
+        if let animationBuffer = animationBuffer {
+            let animationData = animationBuffer.contents().bindMemory(to: Float.self, capacity: 4)
+            animationData[0] = time // current time
+            animationData[1] = sin(time * 2.0) // breath phase
+            animationData[2] = (Int(time * 3.0) % 100 < 20) ? 1.0 : 0.0 // blink phase
+            animationData[3] = 0.0 // padding
         }
     }
     
@@ -697,65 +683,37 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
     }
     
     private func drawLive2DStyleCharacter(renderEncoder: MTLRenderCommandEncoder, breathPhase: Float, isBlinking: Bool) {
-        // 実際のLive2D風キャラクター描画
-        if Int(breathPhase * 10) % 180 == 0 { // 18秒おきにログ出力
-            print("✨ Live2DRenderer - drawLive2DStyleCharacter呼び出し: 呼吸=\(String(format: "%.2f", sin(breathPhase))), 瞬き=\(isBlinking)")
-        }
+        print("🎭 Live2DRenderer - Live2Dキャラクター描画開始")
         
         // 頂点バッファとインデックスバッファを設定
         guard let vertexBuffer = self.vertexBuffer,
-              let indexBuffer = self.indexBuffer else {
-            print("❌ Live2DRenderer - drawLive2DStyleCharacter: バッファが nil")
+              let indexBuffer = self.indexBuffer,
+              let pipelineState = self.pipelineState,
+              let depthStencilState = self.depthStencilState,
+              let uniformBuffer = self.uniformBuffer,
+              let animationBuffer = self.animationBuffer else {
+            print("❌ Live2DRenderer - 必要なリソースが不足")
             return
         }
         
-        // Live2DManagerからテクスチャを取得
-        var hasTexture = false
-        if let live2DManager = live2DManager,
-           let model = live2DManager.getModel() as? UnsafeMutableRawPointer {
-            
-            // Live2DModelDataからテクスチャを取得
-            let modelDataPointer = model.bindMemory(to: Live2DModelData.self, capacity: 1)
-            let modelData = modelDataPointer.pointee
-            
-            if !modelData.textures.isEmpty {
-                let texture = modelData.textures[0] // 最初のテクスチャを使用
-                renderEncoder.setFragmentTexture(texture, index: 0)
-                hasTexture = true
-                
-                if Int(breathPhase * 10) % 180 == 0 {
-                    print("✨ Live2DRenderer - Live2Dテクスチャ使用: \(texture.width)x\(texture.height)")
-                }
-            }
-        }
+        // レンダラーパイプライン状態を設定
+        renderEncoder.setRenderPipelineState(pipelineState)
+        renderEncoder.setDepthStencilState(depthStencilState)
         
-        // 頂点バッファを設定
+        // バッファを設定
         renderEncoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
+        renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
+        renderEncoder.setFragmentBuffer(animationBuffer, offset: 0, index: 2)
         
-        // テクスチャがある場合はテクスチャシェーダー、ない場合はフォールバックシェーダーを使用
-        if hasTexture && texturePipelineState != nil {
-            // テクスチャシェーダー用のパイプラインステートを使用
-            renderEncoder.setRenderPipelineState(texturePipelineState!)
-            renderEncoder.setDepthStencilState(depthStencilState!)
-            renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-            
-            if Int(breathPhase * 10) % 180 == 0 {
-                print("✅ Live2DRenderer - テクスチャパイプライン使用")
-            }
+        // Live2Dテクスチャを設定
+        if let texture = loadLive2DTexture() {
+            print("✅ Live2DRenderer - テクスチャ設定成功")
+            renderEncoder.setFragmentTexture(texture, index: 0)
         } else {
-            // フォールバックシェーダーを使用
-            if let pipelineState = pipelineState, let depthStencilState = depthStencilState {
-                renderEncoder.setRenderPipelineState(pipelineState)
-                renderEncoder.setDepthStencilState(depthStencilState)
-                renderEncoder.setVertexBuffer(uniformBuffer, offset: 0, index: 1)
-            }
-            
-            if Int(breathPhase * 10) % 180 == 0 {
-                print("⚠️ Live2DRenderer - フォールバックシェーダー使用")
-            }
+            print("⚠️ Live2DRenderer - テクスチャ読み込み失敗、フォールバック描画")
         }
         
-        // Live2Dキャラクターを描画
+        // 描画実行
         renderEncoder.drawIndexedPrimitives(
             type: .triangle,
             indexCount: 6,
@@ -764,8 +722,107 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
             indexBufferOffset: 0
         )
         
-        if Int(breathPhase * 10) % 180 == 0 {
-            print("✨ Live2DRenderer - Live2Dキャラクター描画完了 (テクスチャ: \(hasTexture ? "有り" : "無し"))")
+        print("✅ Live2DRenderer - Live2Dキャラクター描画完了")
+    }
+    
+    // MARK: - Live2D Texture Loading
+    private func loadLive2DTexture() -> MTLTexture? {
+        print("🔍 Live2DRenderer - テクスチャ読み込み開始")
+        
+        // 🎨 テンポラリ: プログラムで作成したテクスチャを使用
+        return createDebugTexture()
+    }
+    
+    private func createDebugTexture() -> MTLTexture? {
+        print("🎨 Live2DRenderer - デバッグテクスチャ作成開始")
+        
+        // 512x512の簡単なテクスチャを作成
+        let width = 512
+        let height = 512
+        
+        // カラフルなグラデーションテクスチャデータを作成
+        var textureData: [UInt8] = []
+        
+        for y in 0..<height {
+            for x in 0..<width {
+                let normalizedX = Float(x) / Float(width)
+                let normalizedY = Float(y) / Float(height)
+                
+                // Live2D風のキャラクター色（肌色ベース）
+                let r = UInt8(255 * (0.8 + 0.2 * normalizedX))  // 肌色ベース
+                let g = UInt8(255 * (0.6 + 0.3 * normalizedY))  // 肌色ベース  
+                let b = UInt8(255 * (0.5 + 0.2 * (normalizedX + normalizedY) / 2))  // 肌色ベース
+                let a = UInt8(255)  // 完全不透明
+                
+                textureData.append(r)
+                textureData.append(g)
+                textureData.append(b)
+                textureData.append(a)
+            }
+        }
+        
+        // MTLTextureDescriptorを作成
+        let textureDescriptor = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm,
+            width: width,
+            height: height,
+            mipmapped: false
+        )
+        textureDescriptor.usage = [.shaderRead]
+        
+        // テクスチャを作成
+        guard let texture = device.makeTexture(descriptor: textureDescriptor) else {
+            print("❌ Live2DRenderer - デバッグテクスチャ作成失敗")
+            return nil
+        }
+        
+        // テクスチャデータをコピー
+        let region = MTLRegionMake2D(0, 0, width, height)
+        texture.replace(region: region, mipmapLevel: 0, withBytes: textureData, bytesPerRow: width * 4)
+        
+        print("✅ Live2DRenderer - デバッグテクスチャ作成成功: \(width)x\(height)")
+        return texture
+    }
+    
+    private func createMetalTexture(from image: UIImage) -> MTLTexture? {
+        guard let cgImage = image.cgImage else {
+            print("❌ Live2DRenderer - CGImage変換失敗")
+            return nil
+        }
+        
+        let textureLoader = MTKTextureLoader(device: device)
+        
+        do {
+            let texture = try textureLoader.newTexture(cgImage: cgImage, options: [
+                .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+                .SRGB: false
+            ])
+            print("✅ Live2DRenderer - MTLTexture作成成功: \(texture.width)x\(texture.height)")
+            return texture
+        } catch {
+            print("❌ Live2DRenderer - MTLTexture作成失敗: \(error)")
+            return nil
+        }
+    }
+    
+    private func listBundleContents() {
+        print("🔍 Live2DRenderer - バンドル内容調査開始")
+        
+        guard let bundlePath = Bundle.main.resourcePath else {
+            print("❌ Live2DRenderer - バンドルパス取得失敗")
+            return
+        }
+        
+        print("📁 バンドルパス: \(bundlePath)")
+        
+        // バンドル内のすべてのpngファイルを検索
+        if let enumerator = FileManager.default.enumerator(atPath: bundlePath) {
+            print("🔍 Live2DRenderer - バンドル内のPNGファイル一覧:")
+            for case let file as String in enumerator {
+                if file.lowercased().hasSuffix(".png") {
+                    print("  📄 \(file)")
+                }
+            }
         }
     }
     
@@ -773,6 +830,7 @@ class Live2DRenderer: NSObject, MTKViewDelegate {
     func cleanup() {
         // Clean up resources
         uniformBuffer = nil
+        animationBuffer = nil
         vertexBuffer = nil
         indexBuffer = nil
     }

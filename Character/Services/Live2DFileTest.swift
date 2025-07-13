@@ -165,7 +165,7 @@ class Live2DFileTest {
         print("🔍 Live2DFileTest - テクスチャファイルテスト開始")
         
         let projectPath = "/Users/onoderaryousuke/Desktop/development-D/Character"
-        let texturePath = "\(projectPath)/koharu.2048/texture_00_female.png"
+        let texturePath = "\(projectPath)/Character/Resources/Live2DModels/Female/texture_00_female.png"
         
         if FileManager.default.fileExists(atPath: texturePath) {
             print("✅ Live2DFileTest - テクスチャファイル存在: \(texturePath)")
@@ -231,7 +231,7 @@ class Live2DFileTest {
             "koharu.model3.json",
             "koharu.moc3",
             "koharu.physics3.json",
-            "koharu.2048/texture_00_female.png"
+            "Character/Resources/Live2DModels/Female/texture_00_female.png"
         ]
         
         var integrationTest = true
