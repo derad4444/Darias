@@ -36,3 +36,9 @@ pglite-debug.log
 Pods/
 *.xcworkspace
 Podfile.lock
+
+# Firebase Functions
+functions/node_modules/
+functions/pglite-debug.log
+functions/.env
+functions/.DS_Store
