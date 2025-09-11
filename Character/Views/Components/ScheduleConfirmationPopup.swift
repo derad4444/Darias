@@ -134,14 +134,21 @@ struct ExtractedScheduleData {
         self.memo = dict["memo"] as? String ?? ""
         self.isAllDay = dict["isAllDay"] as? Bool ?? false
         
+        // Cloud Functionから返される日付データの処理
         if let startTimestamp = dict["startDate"] as? Timestamp {
             self.startDate = startTimestamp.dateValue()
+        } else if let startDateString = dict["startDate"] as? String {
+            let formatter = ISO8601DateFormatter()
+            self.startDate = formatter.date(from: startDateString)
         } else {
             self.startDate = nil
         }
         
         if let endTimestamp = dict["endDate"] as? Timestamp {
             self.endDate = endTimestamp.dateValue()
+        } else if let endDateString = dict["endDate"] as? String {
+            let formatter = ISO8601DateFormatter()
+            self.endDate = formatter.date(from: endDateString)
         } else {
             self.endDate = nil
         }

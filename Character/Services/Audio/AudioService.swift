@@ -16,7 +16,7 @@ class AudioService {
         
         // AVPlayerは直接音量を設定できないので、AVAudioMixを使う
         guard let audioTrack = playerItem.asset.tracks.first else {
-            print("⚠️ オーディオトラックが見つかりません")
+            // Audio track not found
             return
         }
         

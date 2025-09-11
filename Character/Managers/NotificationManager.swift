@@ -26,7 +26,7 @@ class NotificationManager: ObservableObject {
             DispatchQueue.main.async {
                 self.isAuthorized = granted
                 if let error = error {
-                    print("通知許可エラー: \(error.localizedDescription)")
+                    // Notification permission error handled silently
                 }
             }
         }
@@ -78,9 +78,7 @@ class NotificationManager: ObservableObject {
         // 通知を登録
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                print("通知登録エラー: \(error.localizedDescription)")
-            } else {
-                print("通知登録成功: \(schedule.title) at \(notificationDate)")
+                // Notification registration error handled silently
             }
         }
     }
@@ -112,9 +110,9 @@ class NotificationManager: ObservableObject {
     // 登録済み通知を確認（デバッグ用）
     func listPendingNotifications() {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-            print("登録済み通知数: \(requests.count)")
+            // Debug: Pending notification count: \(requests.count)
             for request in requests {
-                print("- \(request.identifier): \(request.content.title)")
+                // Debug: \(request.identifier): \(request.content.title)
             }
         }
     }

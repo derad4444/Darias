@@ -20,51 +20,75 @@ struct CharacterDetailView: View {
     @State private var hobby: String = ""
     @State private var aptitude: String = ""
     @State private var dream: String = ""
+    @State private var characterExpression: CharacterExpression = .normal
+    
+    // Big5解析関連
+    @StateObject private var big5AnalysisService = Big5AnalysisService()
+    @State private var currentAnalysisLevel: Big5AnalysisLevel?
+    @State private var showBig5AnalysisDetail = false
+    @State private var selectedAnalysisCategory: Big5AnalysisCategory?
+    
+    private var dynamicHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop: CGFloat = 47
+        let safeAreaBottom: CGFloat = 34
+        let navigationBarHeight: CGFloat = 44
+        
+        return screenHeight - safeAreaTop - navigationBarHeight - safeAreaBottom - 55
+    }
     
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                // 背景グラデーション
-                colorSettings.getCurrentBackgroundGradient()
-                    .ignoresSafeArea(.all)
+        ZStack {
+            // 背景グラデーション
+            colorSettings.getCurrentBackgroundGradient()
+                .ignoresSafeArea()
 
+            ScrollView {
                 VStack(spacing: 0) {
-                    // キャラクター画像（固定表示）
-                    Image("sample_character")
+                    // キャラクター画像（Assets内の画像を使用）
+                    Image(getCharacterImageName())
                         .resizable()
                         .aspectRatio(contentMode: .fit)
+                        .onTapGesture {
+                            triggerRandomExpression()
+                        }
                         .frame(width: 200, height: 200)
                         .padding(.top, 20)
                     
-                    // スクロール可能な情報エリア
-                    ScrollView {
-                        VStack(spacing: 20) {
-                            // 2〜11. 各項目
-                            Group {
-                                infoRow(label: "好きな色", value: favoriteColor)
-                                infoRow(label: "好きな場所", value: favoritePlace)
-                                infoRow(label: "好きな言葉", value: favoriteWord)
-                                infoRow(label: "言葉の傾向", value: wordTendency)
-                                infoRow(label: "短所", value: weakness)
-                                infoRow(label: "長所", value: strength)
-                                infoRow(label: "特技", value: skill)
-                                infoRow(label: "趣味", value: hobby)
-                                infoRow(label: "適正", value: aptitude)
-                                infoRow(label: "夢", value: dream)
-                            }
+                    // 情報エリア
+                    VStack(spacing: 0) {
+                        // 基本情報
+                        Group {
+                            infoRow(label: "好きな色", value: favoriteColor)
+                            infoRow(label: "好きな場所", value: favoritePlace)
+                            infoRow(label: "好きな言葉", value: favoriteWord)
+                            infoRow(label: "言葉の傾向", value: wordTendency)
+                            infoRow(label: "短所", value: weakness)
+                            infoRow(label: "長所", value: strength)
+                            infoRow(label: "特技", value: skill)
+                            infoRow(label: "趣味", value: hobby)
+                            infoRow(label: "適正", value: aptitude)
+                            infoRow(label: "夢", value: dream)
                         }
-                        .padding()
-                        .padding(.bottom, 100) // タブバー分のパディングを追加
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        
+                        // Big5性格解析セクション
+                        big5AnalysisSection
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
                     }
-                    .frame(height: max(200, geometry.size.height - geometry.safeAreaInsets.top - geometry.safeAreaInsets.bottom - 100)) // キャラクター画像とタブバー分を除外
                 }
             }
+            .frame(height: dynamicHeight)
+            .clipped()
         }
         .navigationTitle("キャラ詳細")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if !isPreview {
                 fetchCharacterDetail()
+                fetchBig5Analysis()
             }
             
             // ナビゲーションバーとタブバーを透明にする
@@ -85,11 +109,48 @@ struct CharacterDetailView: View {
             UITabBar.appearance().backgroundColor = UIColor.clear
             UITabBar.appearance().isTranslucent = true
         }
+        .sheet(isPresented: $showBig5AnalysisDetail) {
+            if let selectedCategory = selectedAnalysisCategory,
+               let analysisData = big5AnalysisService.currentAnalysisData,
+               let currentLevel = currentAnalysisLevel,
+               let categoryAnalysis = analysisData.getAvailableAnalysis(for: currentLevel),
+               let analysis = categoryAnalysis[selectedCategory] {
+                Big5AnalysisDetailView(analysis: analysis, analysisLevel: currentLevel)
+                    .environmentObject(fontSettings)
+            }
+        }
     }
+    
+    // MARK: - Character Expression Functions
+    private func getCharacterImageName() -> String {
+        let genderPrefix = "character_female" // 固定で女性キャラクター
+        switch characterExpression {
+        case .normal:
+            return genderPrefix
+        case .smile:
+            return "\(genderPrefix)_smile"
+        case .angry:
+            return "\(genderPrefix)_angry"
+        case .cry:
+            return "\(genderPrefix)_cry"
+        case .sleep:
+            return "\(genderPrefix)_sleep"
+        }
+    }
+    
+    private func triggerRandomExpression() {
+        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
+        let availableExpressions = expressions.filter { $0 != characterExpression }
+        characterExpression = availableExpressions.randomElement() ?? .smile
+    }
+    
     // Firestoreデータ取得処理
     private func fetchCharacterDetail() {
         let db = Firestore.firestore()
-        let docRef = db.collection("CharacterDetail").document(characterId)
+        // ユーザーのキャラクター詳細からデータを取得
+        let docRef = db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
 
         docRef.getDocument { document, error in
             if let data = document?.data() {
@@ -110,23 +171,272 @@ struct CharacterDetailView: View {
     // 情報表示用の共通View
     @ViewBuilder
     private func infoRow(label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .dynamicCaption()
-                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
-            Text(value)
-                .dynamicBody()
-                .foregroundColor(colorSettings.getCurrentTextColor())
-                .fontWeight(.medium)
+        // 空の値の場合は非表示にする
+        if !value.isEmpty && value != "未設定" && value.trimmingCharacters(in: .whitespacesAndNewlines) != "" {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .dynamicCaption()
+                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                Text(value)
+                    .dynamicBody()
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+                    .fontWeight(.medium)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(Color.white.opacity(0.15))
+            .cornerRadius(12)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12)
+                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding()
-        .background(Color.white.opacity(0.15))
+    }
+    
+    // MARK: - Big5 Analysis Section
+    
+    @ViewBuilder
+    private var big5AnalysisSection: some View {
+        if let analysisLevel = currentAnalysisLevel {
+            VStack(alignment: .leading, spacing: 12) {
+                // セクションヘッダー
+                HStack {
+                    Text("\(analysisLevel.icon) \(analysisLevel.displayName)")
+                        .dynamicTitle2()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                        .fontWeight(.bold)
+                    Spacer()
+                    Text("(\(analysisLevel.rawValue)/100)")
+                        .dynamicCaption()
+                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                }
+                .padding(.bottom, 4)
+                
+                // 進化の説明
+                Text(analysisLevel.description)
+                    .dynamicCaption()
+                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+                    .padding(.bottom, 8)
+                
+                // 解析カテゴリー一覧
+                if let analysisData = big5AnalysisService.currentAnalysisData {
+                    let availableCategories = big5AnalysisService.getAvailableCategories(for: analysisLevel)
+                    let categoryAnalysis = analysisData.getAvailableAnalysis(for: analysisLevel)
+                    
+                    ForEach(availableCategories, id: \.self) { category in
+                        if let analysis = categoryAnalysis?[category] {
+                            analysisRowButton(analysis: analysis)
+                        } else {
+                            analysisPlaceholderRow(category: category)
+                        }
+                    }
+                } else if big5AnalysisService.isLoading {
+                    loadingAnalysisRows(for: analysisLevel)
+                } else {
+                    noAnalysisDataRow()
+                }
+            }
+            .padding()
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(16)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
+            )
+        } else {
+            // 解析レベルに達していない場合
+            analysisNotAvailableSection
+        }
+    }
+    
+    @ViewBuilder
+    private func analysisRowButton(analysis: Big5DetailedAnalysis) -> some View {
+        Button {
+            selectedAnalysisCategory = analysis.category
+            showBig5AnalysisDetail = true
+        } label: {
+            HStack {
+                Text(analysis.category.icon)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(analysis.category.displayName)
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                        .fontWeight(.medium)
+                    
+                    Text(analysis.personalityType)
+                        .dynamicCaption()
+                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.5))
+                    .font(.caption)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(Color.white.opacity(0.1))
+            .cornerRadius(12)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    @ViewBuilder
+    private func analysisPlaceholderRow(category: Big5AnalysisCategory) -> some View {
+        HStack {
+            Text(category.icon)
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(category.displayName)
+                    .dynamicBody()
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+                    .fontWeight(.medium)
+                
+                Text("解析データが見つかりませんでした")
+                    .dynamicCaption()
+                    .foregroundColor(.red.opacity(0.7))
+            }
+            
+            Spacer()
+            
+            Image(systemName: "exclamationmark.circle")
+                .foregroundColor(.red.opacity(0.7))
+                .font(.caption)
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color.red.opacity(0.1))
         .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private func loadingAnalysisRows(for level: Big5AnalysisLevel) -> some View {
+        let categories = big5AnalysisService.getAvailableCategories(for: level)
+        ForEach(categories, id: \.self) { category in
+            HStack {
+                Text(category.icon)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(category.displayName)
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                        .fontWeight(.medium)
+                    
+                    Text("AI解析データ生成中...")
+                        .dynamicCaption()
+                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                }
+                
+                Spacer()
+                
+                ProgressView()
+                    .scaleEffect(0.8)
+            }
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+        }
+    }
+    
+    @ViewBuilder
+    private func noAnalysisDataRow() -> some View {
+        HStack {
+            Image(systemName: "exclamationmark.triangle")
+                .foregroundColor(.orange)
+                .font(.title2)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text("解析データを取得できませんでした")
+                    .dynamicBody()
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+                    .fontWeight(.medium)
+                
+                if let errorMessage = big5AnalysisService.errorMessage {
+                    Text(errorMessage)
+                        .dynamicCaption()
+                        .foregroundColor(.red.opacity(0.7))
+                }
+            }
+            
+            Spacer()
+        }
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color.orange.opacity(0.1))
+        .cornerRadius(12)
+    }
+    
+    @ViewBuilder
+    private var analysisNotAvailableSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("🤖 性格解析")
+                    .dynamicTitle2()
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+                    .fontWeight(.bold)
+                Spacer()
+            }
+            
+            Text("性格解析を行うには、最低20問のBig5質問に回答してください。\nチャットでキャラクターと会話を続けると、時々性格質問が表示されます。")
+                .dynamicBody()
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+                .multilineTextAlignment(.leading)
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(16)
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color.white.opacity(0.2), lineWidth: 1)
         )
+    }
+    
+    // MARK: - Big5 Analysis Data Fetching
+    
+    private func fetchBig5Analysis() {
+        // まず、Big5の進捗レベルを確認
+        checkBig5Progress { answeredCount in
+            if let analysisLevel = big5AnalysisService.determineAnalysisLevel(answeredCount: answeredCount) {
+                currentAnalysisLevel = analysisLevel
+                
+                // 解析データを取得
+                big5AnalysisService.fetchCharacterAnalysis(characterId: characterId, userId: userId) { result in
+                    switch result {
+                    case .success(_):
+                        // データは既にサービス内で設定済み
+                        break
+                    case .failure(let error):
+                        print("Big5 analysis fetch error: \(error.localizedDescription)")
+                    }
+                }
+            } else {
+                currentAnalysisLevel = nil
+            }
+        }
+    }
+    
+    private func checkBig5Progress(completion: @escaping (Int) -> Void) {
+        let db = Firestore.firestore()
+        db.collection("characters").document(characterId)
+            .collection("big5Progress").document("current")
+            .getDocument { document, error in
+                if let data = document?.data(),
+                   let answeredQuestions = data["answeredQuestions"] as? [[String: Any]] {
+                    DispatchQueue.main.async {
+                        completion(answeredQuestions.count)
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        completion(0)
+                    }
+                }
+            }
     }
 }
 

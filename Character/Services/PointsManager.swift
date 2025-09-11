@@ -10,78 +10,151 @@ class PointsManager: ObservableObject {
     
     // ポイント読み込み
     func loadPoints(for characterId: String) {
-        db.collection("CharacterDetail").document(characterId).getDocument { [weak self] document, error in
-            if let error = error {
-                print("❌ ポイント読み込みエラー: \(error.localizedDescription)")
-                return
-            }
-            
-            if let document = document, document.exists {
-                let points = document.data()?["points"] as? Int ?? 0
-                DispatchQueue.main.async {
-                    self?.currentPoints = points
-                }
-                print("✅ ポイント読み込み成功: \(points)")
-            } else {
-                print("⚠️ キャラクタードキュメントが見つかりません")
-            }
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ User not authenticated for points loading")
+            return
         }
+        
+        db.collection("users").document(currentUserId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current").getDocument { [weak self] document, error in
+                if let error = error {
+                    print("❌ Points loading error: \(error)")
+                    return
+                }
+                
+                if let document = document, document.exists {
+                    let points = document.data()?["points"] as? Int ?? 0
+                    DispatchQueue.main.async {
+                        self?.currentPoints = points
+                    }
+                }
+            }
     }
     
     // ポイント付与（チャット送信時）
     func addPoints(for characterId: String, completion: @escaping (Bool) -> Void = { _ in }) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ User not authenticated for points adding")
+            completion(false)
+            return
+        }
+        
         let newPoints = currentPoints + pointsPerMessage
         
-        db.collection("CharacterDetail").document(characterId).updateData([
-            "points": newPoints,
-            "updatedAt": Timestamp()
-        ]) { [weak self] error in
+        let detailsRef = db.collection("users").document(currentUserId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
+        
+        // ドキュメントの存在確認とデータ更新
+        detailsRef.getDocument { document, error in
             if let error = error {
-                print("❌ ポイント更新エラー: \(error.localizedDescription)")
+                print("❌ Points adding error: \(error)")
                 completion(false)
-            } else {
-                DispatchQueue.main.async {
-                    self?.currentPoints = newPoints
+                return
+            }
+            
+            if document?.exists == true {
+                // ドキュメントが存在する場合は更新
+                detailsRef.updateData([
+                    "points": newPoints,
+                    "updated_at": Timestamp()
+                ]) { [weak self] error in
+                    if let error = error {
+                        print("❌ Points update error: \(error)")
+                        completion(false)
+                    } else {
+                        DispatchQueue.main.async {
+                            self?.currentPoints = newPoints
+                        }
+                        completion(true)
+                    }
                 }
-                print("✅ ポイント追加成功: +\(self?.pointsPerMessage ?? 0) (総計: \(newPoints))")
-                completion(true)
+            } else {
+                // ドキュメントが存在しない場合は作成
+                detailsRef.setData([
+                    "points": newPoints,
+                    "created_at": Timestamp(),
+                    "updated_at": Timestamp()
+                ], merge: true) { [weak self] error in
+                    if let error = error {
+                        print("❌ Points creation error: \(error)")
+                        completion(false)
+                    } else {
+                        print("✅ Points document created with \(newPoints) points")
+                        DispatchQueue.main.async {
+                            self?.currentPoints = newPoints
+                        }
+                        completion(true)
+                    }
+                }
             }
         }
     }
     
     // ポイント消費（将来の機能拡張用）
     func consumePoints(for characterId: String, amount: Int, completion: @escaping (Bool) -> Void = { _ in }) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ User not authenticated for points consumption")
+            completion(false)
+            return
+        }
+        
         guard currentPoints >= amount else {
-            print("❌ ポイント不足: 必要 \(amount), 現在 \(currentPoints)")
             completion(false)
             return
         }
         
         let newPoints = currentPoints - amount
         
-        db.collection("CharacterDetail").document(characterId).updateData([
-            "points": newPoints,
-            "updatedAt": Timestamp()
-        ]) { [weak self] error in
+        let detailsRef = db.collection("users").document(currentUserId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
+        
+        // ドキュメントの存在確認とデータ更新
+        detailsRef.getDocument { document, error in
             if let error = error {
-                print("❌ ポイント消費エラー: \(error.localizedDescription)")
+                print("❌ Points consumption error: \(error)")
                 completion(false)
-            } else {
-                DispatchQueue.main.async {
-                    self?.currentPoints = newPoints
+                return
+            }
+            
+            if document?.exists == true {
+                // ドキュメントが存在する場合は更新
+                detailsRef.updateData([
+                    "points": newPoints,
+                    "updated_at": Timestamp()
+                ]) { [weak self] error in
+                    if let error = error {
+                        print("❌ Points consumption update error: \(error)")
+                        completion(false)
+                    } else {
+                        DispatchQueue.main.async {
+                            self?.currentPoints = newPoints
+                        }
+                        completion(true)
+                    }
                 }
-                print("✅ ポイント消費成功: -\(amount) (残り: \(newPoints))")
-                completion(true)
+            } else {
+                print("❌ Cannot consume points: details document does not exist")
+                completion(false)
             }
         }
     }
     
     // ポイント監視開始
     func startPointsListener(for characterId: String) {
-        db.collection("CharacterDetail").document(characterId)
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            print("❌ User not authenticated for points monitoring")
+            return
+        }
+        
+        db.collection("users").document(currentUserId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
             .addSnapshotListener { [weak self] documentSnapshot, error in
                 if let error = error {
-                    print("❌ ポイント監視エラー: \(error.localizedDescription)")
+                    print("❌ Points monitoring error: \(error)")
                     return
                 }
                 

@@ -123,8 +123,8 @@ struct StartView2: View {
             showMainApp = true
         }
         .fullScreenCover(isPresented: $showMainApp) {
-            // 🔴 デバッグ用: 認証をバイパスして直接HomeViewに移動
-            HomeView(userId: "debug_user", characterId: "debug_character")
+            // 正常な認証フローでMainTabViewを表示
+            RootView()
                 .environmentObject(authManager)
         }
     }

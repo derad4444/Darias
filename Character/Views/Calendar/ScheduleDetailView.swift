@@ -2,12 +2,30 @@ import SwiftUI
 
 struct ScheduleDetailView: View {
     let schedule: ScheduleItem
+    let userId: String
     
     @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @ObservedObject var tagSettings = TagSettingsManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
     @State private var navigateToEdit = false
+    @State private var showDeleteConfirmation = false
+    @StateObject private var firestoreManager = FirestoreManager()
+    
+    private var dynamicContentHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop: CGFloat = 47
+        let safeAreaBottom: CGFloat = 34
+        let headerHeight: CGFloat = 60
+        let adHeight: CGFloat = isPremium ? 0 : 50
+        return screenHeight - safeAreaTop - safeAreaBottom - headerHeight - adHeight - 20
+    }
+    
+    private var dynamicAdHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        return screenHeight * 0.06
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -47,25 +65,37 @@ struct ScheduleDetailView: View {
                             HStack {
                                 VStack(alignment: .center, spacing: 4) {
                                     Text(formatDate(schedule.startDate))
-                                        .font(.system(size: 18, weight: .medium))
+                                        .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(colorSettings.getCurrentTextColor())
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                        .frame(minWidth: 140)
                                     Text(formatTime(schedule.startDate))
-                                        .font(.system(size: 32, weight: .bold))
+                                        .font(.system(size: 28, weight: .bold))
                                         .foregroundColor(colorSettings.getCurrentTextColor())
+                                        .lineLimit(1)
                                 }
+                                .frame(maxWidth: 160)
+                                
                                 Spacer()
                                 Image(systemName: "chevron.right")
-                                    .font(.system(size: 24))
+                                    .font(.system(size: 20))
                                     .foregroundColor(colorSettings.getCurrentTextColor())
                                 Spacer()
+                                
                                 VStack(alignment: .center, spacing: 4) {
                                     Text(formatDate(schedule.endDate))
-                                        .font(.system(size: 18, weight: .medium))
+                                        .font(.system(size: 16, weight: .medium))
                                         .foregroundColor(colorSettings.getCurrentTextColor())
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
+                                        .frame(minWidth: 140)
                                     Text(formatTime(schedule.endDate))
-                                        .font(.system(size: 32, weight: .bold))
+                                        .font(.system(size: 28, weight: .bold))
                                         .foregroundColor(colorSettings.getCurrentTextColor())
+                                        .lineLimit(1)
                                 }
+                                .frame(maxWidth: 160)
                             }
                             .padding()
                             
@@ -78,7 +108,7 @@ struct ScheduleDetailView: View {
                                     detailRow(icon: "calendar", label: schedule.repeatOption)
                                 }
                                 if !schedule.tag.isEmpty {
-                                    detailRow(icon: "tag", label: schedule.tag)
+                                    tagDetailRow(tagName: schedule.tag)
                                 }
                                 if !schedule.location.isEmpty {
                                     detailRow(icon: "mappin.and.ellipse", label: schedule.location)
@@ -88,11 +118,26 @@ struct ScheduleDetailView: View {
                                 }
                             }
                             .padding(.horizontal)
+                            
+                            // 削除ボタン
+                            Button(action: {
+                                showDeleteConfirmation = true
+                            }) {
+                                Text("削除")
+                                    .font(.system(size: 18, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.red)
+                                    .cornerRadius(10)
+                            }
+                            .padding(.horizontal)
+                            .padding(.top, 20)
                         }
                         .padding(.horizontal, 8)
-                        .padding(.bottom, 120) // タブバー分の余白を確保
+                        .padding(.bottom, 115)
                     }
-                    .frame(height: 670) // より大きな高さを指定
+                    .frame(height: dynamicContentHeight)
                     .clipped() // 画面外をクリップ
                 }
             }
@@ -100,8 +145,16 @@ struct ScheduleDetailView: View {
         .navigationBarHidden(true) // NavigationBarを完全に隠す
         .sheet(isPresented: $showEdit) {
             NavigationView {
-                ScheduleEditView(schedule: schedule)
+                ScheduleEditView(schedule: schedule, userId: userId)
             }
+        }
+        .alert("予定を削除しますか？", isPresented: $showDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) { }
+            Button("削除", role: .destructive) {
+                deleteSchedule()
+            }
+        } message: {
+            Text("この操作は取り消せません。")
         }
         // 広告やAI用エリアを追加しやすい
         .safeAreaInset(edge: .bottom) {
@@ -112,7 +165,7 @@ struct ScheduleDetailView: View {
                 //     .padding(.bottom, 8)
                 Rectangle()
                     .fill(Color.clear)
-                    .frame(height: 50)
+                    .frame(height: dynamicAdHeight)
             }
         }
         .gesture(
@@ -147,10 +200,43 @@ struct ScheduleDetailView: View {
         )
     }
     
+    // タグ専用の詳細行（色付きで表示）
+    @ViewBuilder
+    private func tagDetailRow(tagName: String) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "tag")
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                .frame(width: 20)
+            
+            HStack {
+                if let selectedTag = tagSettings.getTag(by: tagName) {
+                    Circle()
+                        .fill(selectedTag.color)
+                        .frame(width: 16, height: 16)
+                    Text(selectedTag.name)
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                } else {
+                    Text(tagName)
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                }
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.15))
+        .cornerRadius(12)
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.white.opacity(0.3), lineWidth: 1)
+        )
+    }
+    
     private func formatDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "yyyy年M月d日(E)"
+        formatter.dateFormat = "yyyy/M/d(E)"
         return formatter.string(from: date)
     }
     
@@ -158,6 +244,20 @@ struct ScheduleDetailView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
+    }
+    
+    // 削除処理
+    private func deleteSchedule() {
+        firestoreManager.deleteSchedule(scheduleId: schedule.id) { success in
+            DispatchQueue.main.async {
+                if success {
+                    dismiss()
+                } else {
+                    // エラーハンドリング（必要に応じてアラートを表示）
+                    print("❌ 予定の削除に失敗しました")
+                }
+            }
+        }
     }
 }
 
@@ -177,7 +277,7 @@ struct ScheduleDetailView_Previews: PreviewProvider {
                 repeatOption: "繰り返さない",
                 remindValue: 5,
                 remindUnit: "分前"
-            ))
+            ), userId: "preview_user_id")
             .environmentObject(FontSettingsManager.shared)
         }
     }

@@ -5,6 +5,7 @@ struct ChatHistoryView: View {
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
+    @State private var currentDateString: String = ""
     
     let userId: String
     let characterId: String
@@ -16,12 +17,23 @@ struct ChatHistoryView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // 上部広告
-                // if !isPremium {
-                //     BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
-                //         .frame(maxWidth: .infinity, maxHeight: 50)
-                //         .padding(.top, 8)
-                // }
+                // 固定日付ヘッダー（中央揃え）
+                if !currentDateString.isEmpty {
+                    HStack {
+                        Spacer()
+                        Text(currentDateString)
+                            .dynamicCaption()
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                            .background(colorSettings.getCurrentAccentColor().opacity(0.8))
+                            .cornerRadius(16)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+                    .background(colorSettings.getCurrentBackgroundGradient())
+                }
                 
                 // チャット履歴
                 if chatHistoryService.isLoading {
@@ -47,26 +59,34 @@ struct ChatHistoryView: View {
                     ScrollView {
                         LazyVStack(spacing: 0) {
                             let messagesByDate = chatHistoryService.getChatMessagesByDate()
-                            let dateList = chatHistoryService.getDateList()
+                            let dateList = chatHistoryService.getDateList().reversed() // 古い順（時系列順）
                             
-                            ForEach(dateList, id: \.self) { dateString in
-                                // 日付ヘッダー
-                                DateHeaderView(dateString: dateString)
-                                    .padding(.vertical, 8)
-                                
-                                // その日のメッセージ
+                            ForEach(Array(dateList), id: \.self) { dateString in
+                                // その日のメッセージ（古い順）
                                 if let messages = messagesByDate[dateString] {
-                                    ForEach(messages) { message in
+                                    ForEach(messages.reversed()) { message in
                                         ChatMessageBubble(message: message)
                                             .padding(.horizontal, 16)
                                             .padding(.vertical, 2)
+                                            .onAppear {
+                                                // スクロール位置に基づいて日付を更新
+                                                updateCurrentDate(for: dateString)
+                                            }
                                     }
                                 }
                             }
                         }
-                        .padding(.bottom, 20)
                     }
-                    .scrollIndicators(.hidden)
+                    .defaultScrollAnchor(.bottom) // iOS 17以降で下から表示
+                    .padding(.bottom, 10) // タブバー分の下部パディングを調整
+                    .clipped() // 範囲外をクリップ
+                    .onAppear {
+                        // 初期表示時に最新の日付を設定
+                        let dateList = chatHistoryService.getDateList()
+                        if let firstDate = dateList.first {
+                            currentDateString = firstDate
+                        }
+                    }
                 }
             }
         }
@@ -86,6 +106,13 @@ struct ChatHistoryView: View {
         }
         .onAppear {
             chatHistoryService.fetchChatHistory(userId: userId, characterId: characterId)
+        }
+    }
+    
+    // スクロール位置に基づいて現在の日付を更新
+    private func updateCurrentDate(for dateString: String) {
+        DispatchQueue.main.async {
+            currentDateString = dateString
         }
     }
 }

@@ -12,10 +12,18 @@ class ChatHistoryService: ObservableObject {
         isLoading = true
         errorMessage = ""
         
-        db.collection("posts")
-            .whereField("user_id", isEqualTo: userId)
-            .whereField("character_id", isEqualTo: characterId)
-            .order(by: "timestamp", descending: true)
+        // 10秒後にタイムアウト処理
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10) {
+            if self.isLoading {
+                self.isLoading = false
+                self.errorMessage = "データの読み込みがタイムアウトしました"
+            }
+        }
+        
+        db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("posts")
+            .order(by: "timestamp", descending: true)  // 新しい順で取得
             .addSnapshotListener { [weak self] snapshot, error in
                 DispatchQueue.main.async {
                     self?.isLoading = false
@@ -30,9 +38,28 @@ class ChatHistoryService: ObservableObject {
                         return
                     }
                     
-                    self?.posts = documents.compactMap { document in
-                        try? document.data(as: Post.self)
+                    if documents.isEmpty {
+                        self?.posts = []
+                        return
                     }
+                    
+                    self?.posts = documents.compactMap { document in
+                        // サブコレクションの構造に合わせてPostオブジェクトを作成
+                        var data = document.data()
+                        data["user_id"] = userId
+                        data["character_id"] = characterId
+                        
+                        do {
+                            var post = try Firestore.Decoder().decode(Post.self, from: data)
+                            post.id = document.documentID  // ドキュメントIDを手動で設定
+                            return post
+                        } catch {
+                            return nil
+                        }
+                    }
+                    
+                    // 重要：データ処理完了後にisLoadingをfalseに設定
+                    self?.isLoading = false
                 }
             }
     }
@@ -68,9 +95,9 @@ class ChatHistoryService: ObservableObject {
             messagesByDate[dateString]?.append(characterMessage)
         }
         
-        // 各日付内でメッセージを時間順にソート
+        // 各日付内でメッセージを時間順にソート（新しい順）
         for dateKey in messagesByDate.keys {
-            messagesByDate[dateKey]?.sort { $0.timestamp < $1.timestamp }
+            messagesByDate[dateKey]?.sort { $0.timestamp > $1.timestamp }
         }
         
         return messagesByDate
@@ -86,7 +113,7 @@ class ChatHistoryService: ObservableObject {
                   let d2 = formatter.date(from: date2) else {
                 return false
             }
-            return d1 > d2
+            return d1 > d2  // 新しい順に変更
         }
     }
 }

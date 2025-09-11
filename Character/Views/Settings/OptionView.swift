@@ -14,6 +14,14 @@ struct OptionView: View {
     @State private var showColorSettings = false
     @State private var showTagSettings = false
     
+    private var dynamicListHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop: CGFloat = 47
+        let safeAreaBottom: CGFloat = 34
+        let navigationBarHeight: CGFloat = 44
+        return screenHeight - safeAreaTop - safeAreaBottom - navigationBarHeight - 20
+    }
+    
     var body: some View {
         ZStack {
             backgroundView
@@ -49,11 +57,12 @@ struct OptionView: View {
         List {
             volumeSettingsSection
             appearanceSettingsSection
+            instagramSection
             logoutSection
         }
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        .frame(height: 720)
+        .frame(height: dynamicListHeight)
         .clipped()
     }
     
@@ -149,6 +158,29 @@ struct OptionView: View {
         .listRowBackground(Color.clear)
     }
     
+    private var instagramSection: some View {
+        Section(header: sectionHeader("SNS")) {
+            Button {
+                openInstagram()
+            } label: {
+                HStack {
+                    Image(systemName: "camera.circle.fill")
+                        .foregroundColor(.purple)
+                        .font(.title2)
+                    Text("公式Instagram")
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                        .font(.caption)
+                }
+            }
+            .padding(.vertical, 8)
+        }
+        .listRowBackground(Color.clear)
+    }
+    
     private var logoutSection: some View {
         Section {
             Button {
@@ -194,6 +226,17 @@ struct OptionView: View {
             Image(systemName: "chevron.right")
                 .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
                 .font(FontSettingsManager.shared.font(size: 12, weight: .regular))
+        }
+    }
+    
+    private func openInstagram() {
+        let instagramURL = "instagram://user?username=ryosuke_4444"
+        let webURL = "https://www.instagram.com/ryosuke_4444"
+        
+        if let url = URL(string: instagramURL), UIApplication.shared.canOpenURL(url) {
+            UIApplication.shared.open(url)
+        } else if let url = URL(string: webURL) {
+            UIApplication.shared.open(url)
         }
     }
 }

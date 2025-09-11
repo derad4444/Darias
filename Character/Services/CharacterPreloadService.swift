@@ -106,7 +106,7 @@ class CharacterPreloadService: ObservableObject {
                     }
                 }
             } catch {
-                print("Failed to preload image for \(config.id) \(expression.rawValue): \(error)")
+                // Failed to preload image
             }
         }
     }

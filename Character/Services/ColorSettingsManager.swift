@@ -27,13 +27,6 @@ class ColorSettingsManager: ObservableObject {
         accentColor = Color(hex: accentColorHex)
         useGradient = isGradientBackground
         
-        // デバッグ用ログ
-        print("🎨 ColorSettings loaded:")
-        print("  背景開始色: \(backgroundStartColorHex)")
-        print("  背景終了色: \(backgroundEndColorHex)")
-        print("  テキスト色: \(textColorHex)")
-        print("  アクセント色: \(accentColorHex)")
-        print("  グラデーション: \(useGradient)")
     }
     
     func saveColors() {
@@ -56,7 +49,6 @@ class ColorSettingsManager: ObservableObject {
     
     func forceRefresh() {
         objectWillChange.send()
-        print("🔄 ColorSettings force refreshed")
     }
     
     // 現在の背景を取得（グラデーションまたは一色）
@@ -76,7 +68,6 @@ class ColorSettingsManager: ObservableObject {
     
     // 下位互換性のためのグラデーション関数
     func getCurrentBackgroundGradient() -> LinearGradient {
-        print("🎨 Creating gradient - start: \(backgroundStartColor), end: \(backgroundEndColor), useGradient: \(useGradient)")
         
         if useGradient {
             let gradient = LinearGradient(
@@ -84,7 +75,6 @@ class ColorSettingsManager: ObservableObject {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            print("📈 Gradient created with 2 colors")
             return gradient
         } else {
             let gradient = LinearGradient(
@@ -92,7 +82,6 @@ class ColorSettingsManager: ObservableObject {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            print("📊 Single color gradient created")
             return gradient
         }
     }

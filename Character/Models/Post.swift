@@ -1,8 +1,8 @@
 import Foundation
 import FirebaseFirestore
 
-struct Post: Identifiable, Codable {
-    @DocumentID var id: String?
+struct Post: Identifiable, Codable, Equatable {
+    var id: String = UUID().uuidString  // @DocumentIDを削除
     let userId: String
     let characterId: String
     let content: String
@@ -10,7 +10,6 @@ struct Post: Identifiable, Codable {
     let analysisResult: String
     
     enum CodingKeys: String, CodingKey {
-        case id
         case userId = "user_id"
         case characterId = "character_id"
         case content

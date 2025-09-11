@@ -20,7 +20,6 @@ class RewardedAdManager: NSObject, ObservableObject, FullScreenContentDelegate {
             request: request,
             completionHandler: { ad, error in
                 if let error = error {
-                    print("広告ロード失敗: \(error.localizedDescription)")
                     self.isReady = false
                     return
                 }
@@ -33,13 +32,12 @@ class RewardedAdManager: NSObject, ObservableObject, FullScreenContentDelegate {
 
     func showAd(from rootViewController: UIViewController, onReward: @escaping () -> Void) {
         guard let ad = rewardedAd else {
-            print("広告が読み込まれていません")
             return
         }
 
         ad.present(from: rootViewController) {
             let reward = ad.adReward
-            print("報酬受け取り: \(reward.amount)")
+            // Reward received
             onReward()
         }
     }

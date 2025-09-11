@@ -11,29 +11,32 @@ struct CharacterApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     init() {
+        // App Check設定を最初に実行
+        configureAppCheck()
+        
         // Firebase初期化
         FirebaseApp.configure()
-
-        // App Check設定（デバッグ・本番を自動切り替え）
-        configureAppCheck()
+        
+        print("Firebase and App Check configuration completed")
     }
     
     private func configureAppCheck() {
-        #if DEBUG
-        // 開発環境ではデバッグプロバイダーを使用
+        // 開発環境では常にデバッグプロバイダーを強制使用
         let providerFactory = AppCheckDebugProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
-        #else
-        // 本番環境ではApp Attestationプロバイダーを使用
-        if #available(iOS 14.0, *) {
-            let providerFactory = AppAttestProviderFactory()
-            AppCheck.setAppCheckProviderFactory(providerFactory)
-        } else {
-            // iOS 14未満の場合はデバイスチェックプロバイダーを使用
-            let providerFactory = DeviceCheckProviderFactory()
-            AppCheck.setAppCheckProviderFactory(providerFactory)
+        print("App Check: Forced debug provider for all environments")
+        
+        // デバッグトークンをログ出力
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            AppCheck.appCheck().token(forcingRefresh: false) { token, error in
+                if let token = token {
+                    print("🔥 App Check Debug Token: \(token.token)")
+                    print("🔥 Copy this token to Firebase Console")
+                } else if let error = error {
+                    print("🔥 App Check Token Error: \(error)")
+                }
+            }
         }
-        #endif
     }
 
     var body: some Scene {
@@ -81,7 +84,7 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
                                didReceive response: UNNotificationResponse,
                                withCompletionHandler completionHandler: @escaping () -> Void) {
         // 通知タップ時の処理を追加可能
-        print("通知がタップされました: \(response.notification.request.content.title)")
+        // Notification tapped
         completionHandler()
     }
 }

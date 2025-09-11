@@ -2,124 +2,68 @@ import SwiftUI
 
 struct CharacterDisplayComponent: View {
     @Binding var displayedMessage: String
-    let singleImageUrl: URL?
+    @Binding var currentExpression: CharacterExpression
     let characterConfig: CharacterConfig?
-    @State private var live2DCharacterViewModel: Live2DCharacterViewModel?
+    @State private var currentImageName: String = "character_female"
     
     init(
         displayedMessage: Binding<String>,
-        singleImageUrl: URL? = nil,
+        currentExpression: Binding<CharacterExpression>,
         characterConfig: CharacterConfig? = nil
     ) {
         self._displayedMessage = displayedMessage
-        self.singleImageUrl = singleImageUrl
+        self._currentExpression = currentExpression
         self.characterConfig = characterConfig
     }
     
     var body: some View {
         ZStack {
-            // キャラクター表示（背景レイヤー）
-            if singleImageUrl != nil {
-                CharacterView(singleImageUrl: singleImageUrl)
-                    .clipped()
-                    .allowsHitTesting(false)
-                    .onAppear {
-                        print("静的画像表示")
-                    }
-            } else {
-                // ホーム画面で直接Live2Dを表示
-                Live2DCharacterView(
-                    modelName: "character_\(characterConfig?.gender.rawValue ?? "female")",
-                    gender: characterConfig?.gender ?? .female
-                )
+            // キャラクター画像表示（Assets内の画像を使用）
+            Image(currentImageName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
                 .clipped()
-                .allowsHitTesting(true)
+                .allowsHitTesting(false) // HomeViewのタップ領域を使用
                 .onAppear {
-                    print("Live2D表示開始")
-                    if !displayedMessage.isEmpty {
-                        startLipSyncIfNeeded()
-                    }
+                    updateImageBasedOnGender()
                 }
-                .onChange(of: displayedMessage) { _, message in
-                    print("🔍 CharacterDisplayComponent - メッセージ変更: \(message)")
-                    if message.isEmpty {
-                        stopLipSync()
-                    } else {
-                        startLipSyncIfNeeded()
-                    }
+                .onChange(of: currentExpression) { _, newExpression in
+                    changeExpression(to: newExpression)
                 }
-                .onTapGesture {
-                    print("🔍 CharacterDisplayComponent - タップされました")
-                    // タップ時のモーション再生とランダム表情変更
-                    triggerTapMotion()
-                }
-                .gesture(
-                    DragGesture()
-                        .onEnded { value in
-                            let translation = value.translation
-                            print("🔍 CharacterDisplayComponent - ドラッグ終了: \(translation)")
-                            
-                            // ドラッグ方向に応じてモーション再生
-                            triggerDragMotion(translation: translation)
-                        }
-                )
-            }
-            
-            // 吹き出し（上部固定）
-            if !displayedMessage.isEmpty {
-                VStack {
-                    Text(displayedMessage)
-                        .padding()
-                        .background(Color.white.opacity(0.85))
-                        .foregroundColor(.black)
-                        .cornerRadius(16)
-                        .padding(.horizontal)
-                }
-                .frame(maxHeight: .infinity, alignment: .top)
-                .padding(.top, 10)
-            }
         }
     }
     
-    private func startLipSyncIfNeeded() {
-        // Live2Dキャラクターの話し始めアニメーション
-        if live2DCharacterViewModel == nil {
-            live2DCharacterViewModel = Live2DCharacterViewModel(gender: characterConfig?.gender ?? .female)
-        }
-        live2DCharacterViewModel?.startLipSync()
-        print("キャラクターが話し始めました")
-    }
-    
-    private func stopLipSync() {
-        // Live2Dキャラクターの話し終わりアニメーション
-        live2DCharacterViewModel?.stopLipSync()
-        print("キャラクターが話し終わりました")
+    private func updateImageBasedOnGender() {
+        let gender = characterConfig?.gender ?? .female
+        currentImageName = "character_\(gender.rawValue)"
     }
     
     func changeExpression(to expression: CharacterExpression) {
-        // Live2Dキャラクターの表情変更
-        live2DCharacterViewModel?.changeExpression(to: expression)
-        print("表情変更: \(expression)")
+        let gender = characterConfig?.gender ?? .female
+        let genderPrefix = "character_\(gender.rawValue)"
+        
+        switch expression {
+        case .normal:
+            currentImageName = genderPrefix
+        case .smile:
+            currentImageName = "\(genderPrefix)_smile"
+        case .angry:
+            currentImageName = "\(genderPrefix)_angry"
+        case .cry:
+            currentImageName = "\(genderPrefix)_cry"
+        case .sleep:
+            currentImageName = "\(genderPrefix)_sleep"
+        }
     }
     
     func switchCharacter(to config: CharacterConfig) {
-        // キャラクター切り替え
-        live2DCharacterViewModel?.switchGender()
-        print("キャラクター切り替え: \(config.name)")
+        let genderPrefix = "character_\(config.gender.rawValue)"
+        currentImageName = genderPrefix
     }
     
-    // MARK: - Interactive Motion Functions
+    // MARK: - Interactive Expression Functions
     
-    private func triggerTapMotion() {
-        // タップ時のモーション再生
-        let tapMotions = ["Tap"]
-        let randomMotion = tapMotions.randomElement() ?? "Tap"
-        
-        // Live2Dモデルでのモーション再生
-        if let viewModel = live2DCharacterViewModel {
-            viewModel.playMotion(randomMotion)
-        }
-        
+    private func triggerTapExpression() {
         // ランダムな表情変更
         let expressions: [CharacterExpression] = [.smile, .normal, .angry, .cry]
         let randomExpression = expressions.randomElement() ?? .normal
@@ -129,44 +73,26 @@ struct CharacterDisplayComponent: View {
         playTapFeedback()
     }
     
-    private func triggerDragMotion(translation: CGSize) {
-        let motionName: String
+    private func triggerDragExpression(translation: CGSize) {
+        // ドラッグ方向に応じた表情変更
+        let expression: CharacterExpression
         
-        // ドラッグ方向に応じたモーション決定
         if abs(translation.width) > abs(translation.height) {
             if translation.width > 50 {
-                motionName = "FlickRight"
+                expression = .smile  // 右フリック: 笑顔
             } else if translation.width < -50 {
-                motionName = "FlickLeft"
+                expression = .angry  // 左フリック: 怒り
             } else {
-                motionName = "Idle"
+                expression = .normal
             }
         } else {
             if translation.height > 50 {
-                motionName = "FlickDown"
+                expression = .cry    // 下フリック: 泣き
             } else if translation.height < -50 {
-                motionName = "FlickUp"
+                expression = .smile  // 上フリック: 笑顔
             } else {
-                motionName = "Idle"
+                expression = .normal
             }
-        }
-        
-        // Live2Dモデルでのモーション再生
-        if let viewModel = live2DCharacterViewModel {
-            viewModel.playMotion(motionName)
-        }
-        
-        // ドラッグ方向に応じた表情変更
-        let expression: CharacterExpression
-        switch motionName {
-        case "FlickLeft", "FlickRight":
-            expression = .angry
-        case "FlickUp":
-            expression = .smile
-        case "FlickDown":
-            expression = .cry
-        default:
-            expression = .normal
         }
         
         changeExpression(to: expression)
@@ -174,7 +100,6 @@ struct CharacterDisplayComponent: View {
     
     private func playTapFeedback() {
         // タップ時のフィードバック効果
-        print("🔍 CharacterDisplayComponent - タップフィードバック再生")
         
         // 触覚フィードバック
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -184,21 +109,16 @@ struct CharacterDisplayComponent: View {
         // AudioService.shared.playTapSound()
     }
     
-    func startIdleMotion() {
-        // アイドル状態のモーション開始
-        if let viewModel = live2DCharacterViewModel {
-            viewModel.playMotion("Idle")
-        }
+    func startIdleExpression() {
+        // 通常表情に戻す
+        changeExpression(to: .normal)
     }
     
-    func playRandomMotion() {
-        // ランダムモーションの再生
-        let motions = ["Idle", "Tap", "FlickLeft", "FlickRight", "FlickUp", "FlickDown"]
-        let randomMotion = motions.randomElement() ?? "Idle"
-        
-        if let viewModel = live2DCharacterViewModel {
-            viewModel.playMotion(randomMotion)
-        }
+    func playRandomExpression() {
+        // ランダムな表情変更
+        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
+        let randomExpression = expressions.randomElement() ?? .normal
+        changeExpression(to: randomExpression)
     }
 }
 

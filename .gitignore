@@ -1,33 +1,38 @@
-
 # Xcode
-#
-# gitignore contributors: remember to keep this file simple and straightforward
-# See https://github.com/github/gitignore/blob/main/Global/Xcode.gitignore
-# and https://github.com/github/gitignore/blob/main/Swift.gitignore
-# for a more comprehensive list of files to ignore.
-
-## User-specific
-*.xcuserdatad
-*.user
-*.mode1v3
-*.mode2v3
-*.perspectivev3
-*.xccheckout
-*.moved-aside
-DerivedData/
-.idea/
-.vscode/
-
-## Build generated
+*.xcuserdata/
+*.xcuserdatad/
+*.xcworkspace/
 build/
 DerivedData/
-*.hmap
-*.ipa
-*.dSYM.zip
-*.dSYM
 
-## Swift Package Manager
-.build/
-Packages/
-*.xcodeproj
-project.xcworkspace
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temporary files
+*.tmp
+*.log
+*.backup
+pglite-debug.log
+
+# IDE
+.vscode/
+.idea/
+
+# Swift Package Manager
+.swiftpm/
+
+# CocoaPods
+Pods/
+*.xcworkspace
+Podfile.lock

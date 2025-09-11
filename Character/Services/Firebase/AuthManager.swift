@@ -19,7 +19,6 @@ class AuthManager: ObservableObject {
     //現在ログイン済みかをチェック
     func checkLoginStatus() {
         if let user = Auth.auth().currentUser {
-            print("✅ ログイン済み: \(user.uid)")
             userId = user.uid
             isAuthenticated = true
             
@@ -76,19 +75,18 @@ class AuthManager: ObservableObject {
                     
                     self.characterId = characterId
                     
-                    // CharacterDetail に初期データを保存 (Android風キャラクター)
+                    // ユーザーのキャラクター詳細情報に初期データを保存
                     let characterDetailData: [String: Any] = [
-                        "id": characterId,
-                        "user_id": user.uid,
                         "gender": gender,
                         "personalityKey": "O5_C4_A2_E2_N2_\(gender)",
-                        "big5Scores": [
+                        "confirmedBig5Scores": [  // 確定スコアとして初期値を設定
                             "openness": 5,
                             "conscientiousness": 4,
                             "agreeableness": 2,
                             "extraversion": 2,
                             "neuroticism": 2
                         ],
+                        "analysis_level": 0, // 初期は未解析
                         "favorite_color": "グリーン",
                         "favorite_place": "データセンター",
                         "favorite_word": "プロセス完了",
@@ -100,17 +98,21 @@ class AuthManager: ObservableObject {
                         "aptitude": "論理的思考、パターン認識",
                         "dream": "完璧なシステム構築",
                         "points": 0,
-                        "updatedAt": Timestamp()
+                        "created_at": Timestamp(),
+                        "updated_at": Timestamp()
                     ]
 
-                    db.collection("CharacterDetail").document(characterId).setData(characterDetailData) { err in
-                        if err == nil {
-                            self.isAuthenticated = true
-                            completion(.success(()))
-                        } else {
-                            completion(.failure(err!))
+                    // ユーザーのキャラクターサブコレクション内に詳細情報を保存
+                    db.collection("users").document(user.uid)
+                        .collection("characters").document(characterId)
+                        .collection("details").document("current").setData(characterDetailData) { err in
+                            if err == nil {
+                                self.isAuthenticated = true
+                                completion(.success(()))
+                            } else {
+                                completion(.failure(err!))
+                            }
                         }
-                    }
                 } else {
                     completion(.failure(error!))
                 }
@@ -145,9 +147,8 @@ class AuthManager: ObservableObject {
             self.isAuthenticated = false
             self.userId = ""
             self.characterId = ""
-            print("🚪 サインアウトしました")
         } catch {
-            print("❌ サインアウトに失敗しました: \(error.localizedDescription)")
+            // Sign out failed
         }
     }
 }

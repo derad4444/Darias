@@ -1,0 +1,167 @@
+import SwiftUI
+import FirebaseFirestore
+
+struct CharacterGenerationPopupView: View {
+    let status: CharacterGenerationStatus
+    
+    var body: some View {
+        ZStack {
+            // 背景オーバーレイ
+            Color.black.opacity(0.4)
+                .ignoresSafeArea()
+                .onTapGesture {} // タップを無効化
+            
+            // ポップアップ本体
+            VStack(spacing: 20) {
+                // アニメーション付きアイコン
+                ZStack {
+                    Circle()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.blue.opacity(0.3)]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
+                        .frame(width: 80, height: 80)
+                    
+                    if status.isGenerating {
+                        // 生成中のアニメーション
+                        Image(systemName: "brain.head.profile")
+                            .font(.system(size: 32))
+                            .foregroundColor(.blue)
+                            .rotationEffect(.degrees(rotationAngle))
+                            .animation(
+                                Animation.linear(duration: 2.0)
+                                    .repeatForever(autoreverses: false),
+                                value: rotationAngle
+                            )
+                            .onAppear {
+                                rotationAngle = 360
+                            }
+                    } else if status.isCompleted {
+                        // 完了アイコン
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.green)
+                    } else if status.isFailed {
+                        // 失敗アイコン
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 32))
+                            .foregroundColor(.red)
+                    }
+                }
+                
+                // タイトル
+                Text(titleText)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.primary)
+                
+                // メッセージ
+                Text(status.displayMessage)
+                    .font(.body)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+                
+                // 進捗バー（生成中の場合のみ）
+                if status.isGenerating {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                        .scaleEffect(1.2)
+                }
+                
+                // 段階情報（生成中の場合のみ）
+                if status.isGenerating && status.stage > 0 {
+                    Text("段階 \(status.stage) の性格を生成中")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // 閉じるボタン（完了・失敗時のみ）
+                if status.isCompleted || status.isFailed {
+                    Button("OK") {
+                        // ポップアップを閉じる処理
+                        NotificationCenter.default.post(
+                            name: .dismissCharacterGenerationPopup,
+                            object: nil
+                        )
+                    }
+                    .buttonStyle(
+                        .borderedProminent
+                    )
+                    .controlSize(.regular)
+                }
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
+            )
+            .padding(.horizontal, 40)
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.9)))
+    }
+    
+    // MARK: - Private Properties
+    @State private var rotationAngle: Double = 0
+    
+    private var titleText: String {
+        switch status.status {
+        case .generating:
+            return "性格を生成中です"
+        case .completed:
+            return "生成完了！"
+        case .failed:
+            return "生成に失敗しました"
+        case .notStarted:
+            return ""
+        }
+    }
+}
+
+// MARK: - Notification Extension
+extension Notification.Name {
+    static let dismissCharacterGenerationPopup = Notification.Name("dismissCharacterGenerationPopup")
+}
+
+// MARK: - Preview
+struct CharacterGenerationPopupView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            // 生成中
+            CharacterGenerationPopupView(
+                status: CharacterGenerationStatus(
+                    stage: 1,
+                    status: .generating,
+                    message: "性格生成中です。画面を閉じずに少々お待ちください。",
+                    updatedAt: Timestamp()
+                )
+            )
+            .previewDisplayName("生成中")
+            
+            // 完了
+            CharacterGenerationPopupView(
+                status: CharacterGenerationStatus(
+                    stage: 1,
+                    status: .completed,
+                    message: nil,
+                    updatedAt: Timestamp()
+                )
+            )
+            .previewDisplayName("完了")
+            
+            // 失敗
+            CharacterGenerationPopupView(
+                status: CharacterGenerationStatus(
+                    stage: 1,
+                    status: .failed,
+                    message: "生成に失敗しました: ネットワークエラー",
+                    updatedAt: Timestamp()
+                )
+            )
+            .previewDisplayName("失敗")
+        }
+    }
+}

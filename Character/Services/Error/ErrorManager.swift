@@ -58,12 +58,10 @@ class ErrorManager: ObservableObject {
     }
     
     private func logError(_ error: Error) {
-        print("❌ [ErrorManager] \(error.localizedDescription)")
-        
-        // 本番環境では適切なログサービスに送信
+        // Error logging handled silently
+        // In production, this would send to appropriate logging service
         #if DEBUG
-        // デバッグ環境では詳細ログ
-        print("❌ [ErrorManager] Full error: \(error)")
+        // Debug environment detailed logging is disabled
         #endif
     }
     

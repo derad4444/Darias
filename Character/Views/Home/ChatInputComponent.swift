@@ -2,8 +2,9 @@ import SwiftUI
 
 struct ChatInputComponent: View {
     @Binding var userInput: String
+    let isWaitingForReply: Bool
     @State private var oldInput: String = ""
-    @State private var isInitialLoad: Bool = true
+    @State private var isPlaceholderVisible: Bool = true
     @State private var hasSetInitialText: Bool = false
     @EnvironmentObject var fontSettings: FontSettingsManager
     @ObservedObject var colorSettings = ColorSettingsManager.shared
@@ -13,52 +14,65 @@ struct ChatInputComponent: View {
     var body: some View {
         VStack(spacing: 8) {
             HStack(alignment: .bottom) {
-                AutoSizingTextEditor(text: $userInput)
-                    .padding(10)
-                    .scrollContentBackground(.hidden)
-                    .background(Color.white.opacity(0.2))
-                    .cornerRadius(16)
-                    .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.4), lineWidth: 1))
-                    .onTapGesture {
-                        // タップしたら初期テキストを削除
-                        if isInitialLoad && userInput == "話題ある？" {
-                            userInput = ""
-                            isInitialLoad = false
+                ZStack(alignment: .topLeading) {
+                    AutoSizingTextEditor(text: $userInput)
+                        .padding(10)
+                        .scrollContentBackground(.hidden)
+                        .background(Color.white.opacity(isWaitingForReply ? 0.1 : 0.2))
+                        .cornerRadius(16)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Color.white.opacity(0.4), lineWidth: 1))
+                        .disabled(isWaitingForReply)
+                        .onTapGesture {
+                            // 待機中はタップを無効化
+                            if !isWaitingForReply && isPlaceholderVisible {
+                                isPlaceholderVisible = false
+                                userInput = ""
+                            }
                         }
+                        .onChange(of: userInput) { _, newValue in
+                            // 入力があったらプレースホルダーを非表示
+                            if !newValue.isEmpty {
+                                isPlaceholderVisible = false
+                            } else {
+                                isPlaceholderVisible = true
+                            }
+                            
+                            if userInput.count > 100 {
+                                userInput = oldInput
+                            } else {
+                                oldInput = userInput
+                            }
+                        }
+                    
+                    // プレースホルダーテキスト
+                    if isPlaceholderVisible && userInput.isEmpty {
+                        Text(isWaitingForReply ? "返答を待っています..." : "話題ある？")
+                            .foregroundColor(.gray) // グレー色で見やすく
+                            .padding(.horizontal, 15)
+                            .padding(.vertical, 14)
+                            .allowsHitTesting(false) // タップを通す
                     }
-                    .onChange(of: userInput) { newValue in
-                        // 初期テキスト以外の入力があったら初期状態を解除
-                        if newValue != "話題ある？" && newValue != "" {
-                            isInitialLoad = false
-                        }
-                        
-                        if userInput.count > 100 {
-                            userInput = oldInput
-                        } else {
-                            oldInput = userInput
-                        }
-                    }
-                    .onAppear {
-                        // 初回表示時に「話題ある？」を設定
-                        if !hasSetInitialText {
-                            userInput = "話題ある？"
-                            hasSetInitialText = true
-                        }
-                    }
+                }
                 
-                Button(action: onSendMessage) {
-                    Image(systemName: "paperplane.fill")
+                Button(action: {
+                    // 待機中または無効な入力の場合は送信しない
+                    if !isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty {
+                        onSendMessage()
+                    }
+                }) {
+                    Image(systemName: isWaitingForReply ? "hourglass" : "paperplane.fill")
                         .foregroundColor(.white)
                         .padding(10)
-                        .background(colorSettings.getCurrentAccentColor())
+                        .background(!isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty ? colorSettings.getCurrentAccentColor() : Color.gray.opacity(0.5))
                         .clipShape(Circle())
-                        .shadow(radius: 4)
+                        .shadow(radius: !isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty ? 4 : 0)
+                        .disabled(isWaitingForReply)
                 }
             }
             .padding(.horizontal)
             
-            // 文字数カウント
-            Text("\(userInput.count)/100文字")
+            // 文字数カウント（プレースホルダー時は0文字表示）
+            Text("\(isPlaceholderVisible ? 0 : userInput.count)/100文字")
                 .dynamicCaption()
                 .foregroundColor(userInput.count >= 100 ? .red : colorSettings.getCurrentTextColor().opacity(0.7))
                 .frame(maxWidth: .infinity, alignment: .trailing)
