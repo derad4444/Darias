@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ScheduleAddView: View {
-    @AppStorage("userId") private var userId: String = ""
+    let userId: String
     @AppStorage("isPremium") var isPremium: Bool = false
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
@@ -23,11 +23,22 @@ struct ScheduleAddView: View {
     @State private var showTagSelection = false
     @State private var showRepeatSettings = false
     @State private var showNotificationSettings = false
+    @State private var showDateValidationAlert = false
+    
+    private var dynamicHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop = UIApplication.shared.windows.first?.safeAreaInsets.top ?? 47
+        let safeAreaBottom = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 34
+        let navigationBarHeight: CGFloat = 44
+        
+        return screenHeight - safeAreaTop - navigationBarHeight - safeAreaBottom - 60
+    }
     
     //開始終了日付の初期化
     let selectedDate: Date
-    init(selectedDate: Date) {
+    init(selectedDate: Date, userId: String) {
         self.selectedDate = selectedDate
+        self.userId = userId
         _startDate = State(initialValue: selectedDate)
         _endDate = State(initialValue: selectedDate.addingTimeInterval(3600))
     }
@@ -200,9 +211,9 @@ struct ScheduleAddView: View {
                                     }
                             }
                             .padding(.horizontal, 8)
-                            .padding(.bottom, 120) // タブバー分の余白を確保
+                            .padding(.bottom, 115)
                         }
-                        .frame(height: 670) // より大きな高さを指定
+                        .frame(height: dynamicHeight)
                         .clipped() // 画面外をクリップ
                     }
                 }
@@ -220,6 +231,11 @@ struct ScheduleAddView: View {
         }
         .sheet(isPresented: $showNotificationSettings) {
             NotificationSettingsView(notificationSettings: $notificationSettings)
+        }
+        .alert("日付エラー", isPresented: $showDateValidationAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("終了日は開始日の後に設定してください")
         }
         .navigationBarBackButtonHidden(true)
         // カレンダーを日本語表示に
@@ -249,13 +265,19 @@ struct ScheduleAddView: View {
     
     // 予定を追加する関数
     func addSchedule() {
+        // 🔸 日付検証
+        if endDate < startDate {
+            showDateValidationAlert = true
+            return
+        }
+        
         // 🔸 時刻補正
         var finalStartDate = startDate
         var finalEndDate = endDate
         
         if isAllDay {
             finalStartDate = Calendar.current.startOfDay(for: startDate)
-            finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: startDate) ?? startDate
+            finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: endDate) ?? endDate
         }
         
         let newSchedule = ScheduleItem(
@@ -292,10 +314,6 @@ struct ScheduleAddView: View {
         let topSafeArea = geometry.safeAreaInsets.top
         let bottomSafeArea = geometry.safeAreaInsets.bottom
         
-        // デバッグ用
-        print("📱 画面高さ: \(screenHeight)")
-        print("🔝 上部セーフエリア: \(topSafeArea)")
-        print("🔻 下部セーフエリア: \(bottomSafeArea)")
         
         // ツールバー + フッターの最小マージン
         let reservedSpace: CGFloat = isPremium ? 100 : 150
@@ -303,7 +321,6 @@ struct ScheduleAddView: View {
         // 利用可能な高さを最大化
         let availableHeight = screenHeight - reservedSpace
         
-        print("📏 計算された高さ: \(availableHeight)")
         
         return availableHeight
     }
@@ -322,7 +339,7 @@ struct ScheduleAddView: View {
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.white.opacity(0.4))   // ★ ここを 0.2 に変更
-                    .background(BlurView(style: .systemUltraThinMaterial))
+                    .background(.ultraThinMaterial)
                     .overlay(
                         RoundedRectangle(cornerRadius: 12)
                             .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
@@ -336,7 +353,7 @@ struct ScheduleAddView: View {
 struct ScheduleAddView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            ScheduleAddView(selectedDate: Date())
+            ScheduleAddView(selectedDate: Date(), userId: "preview_user_id")
                 .environmentObject(FirestoreManager())
                 .environmentObject(FontSettingsManager.shared)
         }

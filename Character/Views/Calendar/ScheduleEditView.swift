@@ -3,10 +3,10 @@ import FirebaseFirestore
 
 struct ScheduleEditView: View {
     let schedule: ScheduleItem  // ✅ ScheduleItemを受け取る
+    let userId: String
 
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
-    @AppStorage("userId") private var userId: String = ""
     @AppStorage("isPremium") var isPremium: Bool = false
     
     @State private var scheduleTitle: String
@@ -20,17 +20,37 @@ struct ScheduleEditView: View {
     @State private var notificationSettings = NotificationSettings()
 
     @State private var isLoading = false
-    @State private var showSaveSuccess = false
     @State private var showTagSelection = false
     @State private var showRepeatSettings = false
     @State private var showNotificationSettings = false
+    @State private var showDateValidationAlert = false
     @State private var errorMessage = ""
 
     @Environment(\.dismiss) private var dismiss
 
+    private var dynamicContentHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        let safeAreaTop: CGFloat = 47
+        let safeAreaBottom: CGFloat = 34
+        let headerHeight: CGFloat = 60
+        let adHeight: CGFloat = isPremium ? 0 : 50
+        return screenHeight - safeAreaTop - safeAreaBottom - headerHeight - adHeight - 20
+    }
+    
+    private var dynamicTextFieldHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        return screenHeight * 0.1
+    }
+    
+    private var dynamicAdHeight: CGFloat {
+        let screenHeight = UIScreen.main.bounds.height
+        return screenHeight * 0.06
+    }
+
     // ✅ 初期化でStateに代入
-    init(schedule: ScheduleItem) {
+    init(schedule: ScheduleItem, userId: String) {
         self.schedule = schedule
+        self.userId = userId
         _scheduleTitle = State(initialValue: schedule.title)
         _startDate = State(initialValue: schedule.startDate)
         _endDate = State(initialValue: schedule.endDate)
@@ -182,23 +202,25 @@ struct ScheduleEditView: View {
                                             .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
                                         TextEditor(text: $memo)
                                             .foregroundColor(colorSettings.getCurrentTextColor())
-                                            .frame(height: 80)
+                                            .frame(height: dynamicTextFieldHeight)
                                             .background(Color.clear)
                                             .scrollContentBackground(.hidden)
                                     }
                                 }
                             }
                             .padding(.horizontal, 8)
-                            .padding(.bottom, 120) // タブバー分の余白を確保
+                            .padding(.bottom, 115)
                         }
-                        .frame(height: 670) // より大きな高さを指定
+                        .frame(height: dynamicContentHeight)
                         .clipped() // 画面外をクリップ
                     }
                 }
             }
             .navigationBarHidden(true) // NavigationBarを完全に隠す
-            .alert("保存完了", isPresented: $showSaveSuccess) {
-                Button("OK") { dismiss() }
+            .alert("日付エラー", isPresented: $showDateValidationAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("終了日は開始日の後に設定してください")
             }
             .sheet(isPresented: $showTagSelection) {
                 TagSelectionView(selectedTag: $tag)
@@ -229,7 +251,7 @@ struct ScheduleEditView: View {
                 //     .padding(.bottom, 8)
                 Rectangle()
                     .fill(Color.clear)
-                    .frame(height: 50)
+                    .frame(height: dynamicAdHeight)
             }
         }
         .gesture(
@@ -261,6 +283,12 @@ struct ScheduleEditView: View {
 
     // Firestore保存
     func saveSchedule() {
+        // 日付検証
+        if endDate < startDate {
+            showDateValidationAlert = true
+            return
+        }
+        
         guard !userId.isEmpty else { return }
         let db = Firestore.firestore()
         let docRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
@@ -269,7 +297,7 @@ struct ScheduleEditView: View {
         var finalEndDate = endDate
         if isAllDay {
             finalStartDate = Calendar.current.startOfDay(for: startDate)
-            finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: startDate) ?? startDate
+            finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: endDate) ?? endDate
         }
 
         let data: [String: Any] = [
@@ -308,7 +336,16 @@ struct ScheduleEditView: View {
                     notificationSettings: notificationSettings
                 )
                 
-                showSaveSuccess = true
+                // カレンダー画面に予定更新を通知
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: .init("ScheduleAdded"),
+                        object: nil
+                    )
+                }
+                
+                // 保存完了後に直接画面を閉じる
+                dismiss()
             }
         }
     }
@@ -330,7 +367,7 @@ struct ScheduleEditView_Previews: PreviewProvider {
                 repeatOption: "繰り返さない",
                 remindValue: 5,
                 remindUnit: "分前"
-            ))
+            ), userId: "preview_user_id")
             .environmentObject(FontSettingsManager.shared)
         }
     }
