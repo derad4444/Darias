@@ -572,7 +572,7 @@ struct CustomCalendarView: View {
                         }
                     }
                     
-                    // 期間予定をオーバーレイとして表示
+                    // 期間予定をオーバーレイとして表示（連続バー表示用）
                     multiDaySchedulesOverlay(for: components)
                     
                     // ドラッグ中のドロップゾーンオーバーレイ（一時的に無効化）
@@ -608,10 +608,9 @@ struct CustomCalendarView: View {
         let dateString = formattedDateString(date)
         let holiday = firestoreManager.holidays.first(where: { $0.dateString == dateString })
         
-        ZStack {
-            // 日付部分を最上部に固定配置
-            VStack(spacing: 0) {
-                // 日付の丸枠を最上部に固定
+        GeometryReader { geometry in
+            ZStack {
+                // 日付部分を最上部に絶対位置で固定配置
                 Button {
                     // ハプティックフィードバック
                     let impactFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -652,29 +651,28 @@ struct CustomCalendarView: View {
                     // プレビュー用の選択状態更新
                     selectedDate = date
                 }
-                .frame(height: 32) // 日付円の高さを固定
+                .frame(width: 32, height: 32)
+                .position(x: geometry.size.width / 2, y: 16) // セル幅の中央、上から16px
                 
-                Spacer()
-            }
-            
-            // 祝日を上部に固定表示
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 27) // 日付の下
-                let holiday = firestoreManager.holidays.first(where: { $0.dateString == formattedDateString(date) })
-                if let holiday = holiday {
-                    holidayItemView(holiday: holiday)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                // 祝日を上部に固定表示
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer().frame(height: 27) // 日付の下
+                    let holiday = firestoreManager.holidays.first(where: { $0.dateString == formattedDateString(date) })
+                    if let holiday = holiday {
+                        holidayItemView(holiday: holiday)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Spacer()
                 }
-                Spacer()
-            }
-            .zIndex(15) // 最前面に表示
-            
-            // 予定表示エリア
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer().frame(height: 28) // 固定オフセット（調整）
-                regularScheduleView(for: date)
-                    .frame(maxWidth: .infinity)
-                Spacer()
+                .zIndex(15) // 最前面に表示
+                
+                // 予定表示エリア
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer().frame(height: 28) // 固定オフセット（調整）
+                    regularScheduleView(for: date)
+                        .frame(maxWidth: .infinity)
+                    Spacer()
+                }
             }
         }
         .frame(height: 80) // 固定高さで統一
@@ -733,18 +731,12 @@ struct CustomCalendarView: View {
         return calendar.date(byAdding: .day, value: offset, to: firstDayOfMonth)
     }
     
+    
     // 通常予定表示ビュー（祝日と予定を合わせて最大3件表示）
     @ViewBuilder
     private func regularScheduleView(for date: Date) -> some View {
         let dateString = formattedDateString(date)
         let holiday = firestoreManager.holidays.first(where: { $0.dateString == dateString })
-        
-        // デバッグログ出力（通常予定の位置）
-        let debugDateFormatter = DateFormatter()
-        debugDateFormatter.dateFormat = "M/d"
-        let debugDateString = debugDateFormatter.string(from: date)
-        
-        
         
         let regularSchedules = schedulesForDate(date)
             .filter { !$0.isMultiDay }
@@ -753,105 +745,117 @@ struct CustomCalendarView: View {
         // この日の表示制限を計算（祝日・期間予定・通常予定合計3件まで）
         let dateStr = formattedDateString(date)
         let hasHoliday = firestoreManager.holidays.contains { $0.dateString == dateStr }
-        let multiDaySchedulesForDate = firestoreManager.schedules.filter { schedule in
+        
+        // multiDaySchedulesOverlayと同じソート済みリストを使用して一貫性を保つ
+        let allMultiDaySchedules = firestoreManager.schedules
+            .filter { $0.isMultiDay }
+            .sorted { $0.startDate < $1.startDate }
+        
+        let multiDaySchedulesForDate = allMultiDaySchedules.filter { schedule in
             let scheduleStart = calendar.startOfDay(for: schedule.startDate)
             let scheduleEnd = calendar.startOfDay(for: schedule.endDate)
             let currentDay = calendar.startOfDay(for: date)
-            return schedule.isMultiDay && currentDay >= scheduleStart && currentDay <= scheduleEnd
-        }.sorted { $0.startDate < $1.startDate }
+            return currentDay >= scheduleStart && currentDay <= scheduleEnd
+        }
         
         // 終日予定と時間指定予定を分離
         let allDaySchedules = regularSchedules.filter { $0.isAllDay }
         let timedSchedules = regularSchedules.filter { !$0.isAllDay }.sorted { $0.startDate < $1.startDate }
         
-        // 利用可能スロット数を計算（全体3件から祝日と期間予定を引く）
+        // 利用可能スロット数を計算（全体2件から祝日と期間予定を引く）
         let holidayCount = hasHoliday ? 1 : 0
-        let multiDayCount = min(multiDaySchedulesForDate.count, 3 - holidayCount)
-        let fixedSlots = max(0, 3 - holidayCount - multiDayCount)
+        let multiDayCount = min(multiDaySchedulesForDate.count, 2 - holidayCount)
+        let fixedSlots = max(0, 2 - holidayCount - multiDayCount)
         
-        // 通常予定があるかデバッグ
         let totalRegularSchedules = allDaySchedules.count + timedSchedules.count
-        if totalRegularSchedules > 0 {
-            print("📍 通常予定位置[\(debugDateString)]: 固定オフセット28px位置（VStack内）")
-            print("   終日予定: \(allDaySchedules.count)件, 時間予定: \(timedSchedules.count)件")
-            
-            // 終日予定のタイトルと高さ
-            for (index, schedule) in allDaySchedules.enumerated() {
-                let height = 28 + CGFloat(index) * 18  // VStack内での相対位置
-                print("   📅 終日予定[\(index)]: \(schedule.title) - 高さ\(height)px")
-            }
-            
-            // 時間予定のタイトルと高さ
-            let timedStartIndex = allDaySchedules.count
-            for (index, schedule) in timedSchedules.enumerated() {
-                let height = 28 + CGFloat(timedStartIndex + index) * 18
-                print("   ⏰ 時間予定[\(timedStartIndex + index)]: \(schedule.title) - 高さ\(height)px")
-            }
-        }
         
-        return VStack(alignment: .center, spacing: 2) {
+        // 3行目の条件分岐表示用の計算
+        let actualMultiDayCount = multiDaySchedulesForDate.count
+        let totalItems = holidayCount + actualMultiDayCount + totalRegularSchedules
+        
+        
+        
+        return VStack(alignment: .leading, spacing: 2) {
             // ①祝日は別の場所で表示される（セル上部に固定表示）
             
-            // ②期間予定はバー表示のみ（VStack内では何も表示しない）
+            // ②期間予定はオーバーレイで表示されるため、その分のスペースを確保
+            let displayedMultiDayCount = min(multiDaySchedulesForDate.count, max(0, 2 - holidayCount))
             
-            // ③通常予定を表示
-            ForEach(0..<fixedSlots, id: \.self) { slotIndex in
-                if slotIndex < allDaySchedules.count {
-                    // ③終日予定表示
-                    regularScheduleItemView(schedule: allDaySchedules[slotIndex])
-                } else {
-                    let timedIndex = slotIndex - allDaySchedules.count
-                    if timedIndex >= 0 && timedIndex < timedSchedules.count {
-                        // ④時間指定予定表示
-                        regularScheduleItemView(schedule: timedSchedules[timedIndex])
-                    } else {
-                        // 空のスロット（位置を保持）
-                        Spacer().frame(height: 16) // regularScheduleItemViewの高さと統一
-                    }
+            // 期間予定の分だけSpacerで空間を確保
+            ForEach(0..<displayedMultiDayCount, id: \.self) { index in
+                Spacer().frame(height: 16)
+            }
+            
+            // ③通常予定を表示（期間予定で使用された分を除く）
+            let remainingSlots = max(0, 2 - displayedMultiDayCount)
+            let regularSchedulesToShow = allDaySchedules + timedSchedules
+            
+            // 祝日がある場合は終日予定の位置を調整
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(0..<min(remainingSlots, regularSchedulesToShow.count), id: \.self) { index in
+                    let schedule = regularSchedulesToShow[index]
+                    regularScheduleItemView(schedule: schedule)
+                        .padding(.top, hasHoliday ? 18 : 0) // 祝日がある場合は下にずらす
                 }
             }
             
-            // 追加の件数インジケーター
-            let totalRegularSchedules = allDaySchedules.count + timedSchedules.count
-            if totalRegularSchedules > fixedSlots {
-                Text("+\(totalRegularSchedules - fixedSlots)")
-                    .font(.system(size: 8, weight: .medium))
-                    .foregroundColor(.gray)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.gray.opacity(0.2))
-                    .cornerRadius(8)
+            // 空のスロットを埋める
+            let totalDisplayed = displayedMultiDayCount + min(remainingSlots, regularSchedulesToShow.count)
+            if totalDisplayed < 2 {
+                ForEach(totalDisplayed..<2, id: \.self) { _ in
+                    Spacer().frame(height: 16)
+                }
+            }
+            
+            // 3行目の条件分岐表示
+            if totalItems > 2 {
+                if totalItems == 3 {
+                    // 合計3件の場合、3件目の予定を表示
+                    
+                    // 3件目が期間予定の場合はSpacerで空間確保（オーバーレイで表示）
+                    // 3件目が通常予定の場合は直接表示
+                    if displayedMultiDayCount < multiDaySchedulesForDate.count {
+                        // 3件目が期間予定の場合
+                        Spacer().frame(height: 16)
+                    } else if remainingSlots < regularSchedulesToShow.count {
+                        // 3件目が通常予定の場合
+                        let thirdRegularIndex = remainingSlots
+                        if thirdRegularIndex < regularSchedulesToShow.count {
+                            regularScheduleItemView(schedule: regularSchedulesToShow[thirdRegularIndex])
+                        }
+                    }
+                } else {
+                    // 合計4件以上の場合、残り件数を表示
+                    
+                    Button {
+                        // ハプティックフィードバック
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+                        
+                        selectedDate = date
+                        showBottomSheet = true
+                    } label: {
+                        Text("+\(totalItems - 2)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.gray)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(Color.gray.opacity(0.2))
+                            .cornerRadius(8)
+                            .frame(height: 16)
+                    }
+                }
+            } else {
             }
         }
     }
     
-    // デバッグ用：予定位置のログ出力
-    private func debugSchedulePositions(date: Date, allDaySchedules: [Schedule], timedSchedules: [Schedule], fixedSlots: Int) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "M/d"
-        let dateString = dateFormatter.string(from: date)
-        print("📍 予定位置デバッグ [\(dateString)] 終日:\(allDaySchedules.count) 時間:\(timedSchedules.count)")
-        
-        for slotIndex in 0..<fixedSlots {
-            if slotIndex < allDaySchedules.count {
-                print("   スロット\(slotIndex): 終日予定「\(allDaySchedules[slotIndex].title)」")
-            } else {
-                let timedIndex = slotIndex - allDaySchedules.count
-                if timedIndex >= 0 && timedIndex < timedSchedules.count {
-                    print("   スロット\(slotIndex): 時間予定「\(timedSchedules[timedIndex].title)」")
-                } else {
-                    print("   スロット\(slotIndex): 空スロット")
-                }
-            }
-        }
-    }
     
     // デバッグ用：予定開始位置のログ出力
     private func debugScheduleOffset(date: Date, offset: CGFloat) {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "M/d"
         let dateString = dateFormatter.string(from: date)
-        print("🎯 [\(dateString)] 予定開始位置: \(offset)px")
     }
     
     // 予定表示アイテムの種類
@@ -1026,12 +1030,23 @@ struct CustomCalendarView: View {
         let firstDayOfMonth = calendar.date(from: components)!
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
         
-        // 期間予定を取得（各日ごとに動的制限をかける）
+        // カレンダーグリッドで実際に表示される日付範囲を計算（前月・翌月の日付も含む）
+        let startOffset = (firstWeekday - 1 + 7) % 7
+        let firstDisplayDate = calendar.date(byAdding: .day, value: -startOffset, to: firstDayOfMonth)!
+        let lastDisplayDate = calendar.date(byAdding: .day, value: 41, to: firstDisplayDate)!
+        
         let multiDaySchedules = firestoreManager.schedules
             .filter { $0.isMultiDay }
+            .filter { schedule in
+                // 期間予定が実際に表示される日付範囲と重複するかチェック
+                let scheduleStart = calendar.startOfDay(for: schedule.startDate)
+                let scheduleEnd = calendar.startOfDay(for: schedule.endDate)
+                let overlaps = (scheduleStart <= lastDisplayDate && scheduleEnd >= firstDisplayDate)
+                
+                
+                return overlaps
+            }
             .sorted { $0.startDate < $1.startDate }
-        
-        
         
         GeometryReader { geometry in
             let cellWidth = (geometry.size.width - 6 * 8) / 7 // spacing 8
@@ -1039,7 +1054,6 @@ struct CustomCalendarView: View {
             
             ForEach(Array(multiDaySchedules.enumerated()), id: \.element.id) { index, schedule in
                 let tagColor = tagSettings.getTag(by: schedule.tag)?.color ?? Color.blue
-                
                 
                 // 期間予定の各週での表示を計算（期間予定のみでの連番インデックスを使用）
                 let scheduleRows = getScheduleDisplayRows(
@@ -1217,18 +1231,20 @@ struct CustomCalendarView: View {
         allMultiDaySchedules: [Schedule],
         geometry: GeometryProxy
     ) -> [ScheduleDisplayRow] {
+        
         var rows: [ScheduleDisplayRow] = []
         let calendar = Calendar.current
         
-        // 月の範囲でのスケジュール期間
-        let monthStart = firstDayOfMonth
-        let monthEnd = calendar.date(byAdding: .month, value: 1, to: monthStart)!
+        // カレンダーグリッドで実際に表示される日付範囲を計算（firstDayOfMonthに依存せず）
+        let startOffset = (firstWeekday - 1 + 7) % 7
+        let firstDisplayDate = calendar.date(byAdding: .day, value: -startOffset, to: firstDayOfMonth)!
+        let lastDisplayDate = calendar.date(byAdding: .day, value: 41, to: firstDisplayDate)!
         
         // 期間予定では日付のみを考慮（時刻は無視）
         let scheduleStartDate = calendar.startOfDay(for: schedule.startDate)
         let scheduleEndDate = calendar.startOfDay(for: schedule.endDate)
-        let scheduleStart = max(scheduleStartDate, monthStart)
-        let scheduleEnd = min(scheduleEndDate, monthEnd)
+        let scheduleStart = max(scheduleStartDate, firstDisplayDate)
+        let scheduleEnd = min(scheduleEndDate, lastDisplayDate)
         
         var currentDate = scheduleStart
         
@@ -1289,34 +1305,65 @@ struct CustomCalendarView: View {
                 return otherStart <= currentWeekEnd && otherEnd >= currentWeekStart
             }.sorted { $0.startDate < $1.startDate }
             
-            // デバッグ: 週の期間予定を表示
-            let weekDateFormatter = DateFormatter()
-            weekDateFormatter.dateFormat = "M/d"
-            let weekStartStr = weekDateFormatter.string(from: currentWeekStart)
-            let weekEndStr = weekDateFormatter.string(from: currentWeekEnd)
-            print("🗓️ 週[\(weekStartStr)-\(weekEndStr)]の期間予定: \(schedulesInThisWeek.map { $0.title }.joined(separator: ", "))")
             
-            // その日の期間予定バーの表示順序を取得（日ごとに独立して配置）
-            let currentDatePeriodSchedules = schedulesOnThisDate
-            let periodScheduleIndex = currentDatePeriodSchedules.firstIndex(where: { $0.id == schedule.id }) ?? 0
+            // その日に表示される期間予定の中での順序を取得（開始日で並び替え済み）
+            let periodScheduleIndex = schedulesOnThisDate.firstIndex(where: { $0.id == schedule.id }) ?? 0
+            
+            // 2+1表示制限チェック: その日の総アイテム数を計算
+            let holidayCount = firestoreManager.holidays.contains { $0.dateString == formattedDateString(currentDate) } ? 1 : 0
+            let regularSchedules = firestoreManager.schedules.filter { schedule in
+                !schedule.isMultiDay && calendar.isDate(schedule.startDate, inSameDayAs: currentDate)
+            }
+            // その日にかかる期間予定の数（表示順序に関係なく、その日に表示される期間予定の実際の数）
+            let multiDayCount = schedulesOnThisDate.count
+            let totalItems = holidayCount + multiDayCount + regularSchedules.count
+            
+            // 期間予定の表示制限: 2+1パターンに従う
+            let shouldShowPeriodBar: Bool
+            if totalItems <= 2 {
+                // 総アイテム数が2以下：全て表示
+                shouldShowPeriodBar = true
+            } else if totalItems == 3 {
+                // 総アイテム数が3：全て表示（3件目も表示）
+                shouldShowPeriodBar = true
+            } else {
+                // 総アイテム数が4以上：期間予定は祝日を考慮して表示件数を制限
+                let maxPeriodBars = max(0, 2 - holidayCount)
+                // その日に表示される期間予定の中での順序で判定
+                shouldShowPeriodBar = periodScheduleIndex < maxPeriodBars
+            }
+            
+            
+            // 表示制限でスキップする場合
+            if !shouldShowPeriodBar {
+                currentDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? scheduleEnd
+                continue
+            }
             
             // 期間バーのY位置（週ごとの絶対位置で計算）
             let cellHeight = cellHeight // 週の高さ
             let weekHeaderHeight: CGFloat = 30 // 曜日ヘッダーの高さ
             let baseY = weekHeaderHeight + CGFloat(weekRow) * cellHeight // その週の開始Y座標
-            let scheduleOffsetY = 28 + CGFloat(periodScheduleIndex) * 18 // 週内での相対位置
+            
+            // 期間スケジュールの実際の表示位置を計算
+            // 期間予定全体が祝日をまたぐ場合は、全体を通して一貫した位置に配置
+            let scheduleOffsetY: CGFloat
+            if hasHolidayInPeriod {
+                // 期間中に祝日がある場合：祝日=予定0、期間予定=予定1から開始
+                // periodScheduleIndexをそのまま使用（0なら予定1、1なら予定2の位置）
+                let adjustedSlotIndex = periodScheduleIndex + 1 // 祝日の分だけシフト
+                let slotPosition = CGFloat(adjustedSlotIndex) * (16.0 + 2.0)
+                scheduleOffsetY = slotPosition + 5.0 // 基準位置から直接スロット位置を計算
+            } else {
+                // 期間中に祝日がない場合：通常の位置計算
+                let vStackItemOffset = CGFloat(periodScheduleIndex) * (16.0 + 2.0)
+                scheduleOffsetY = 28.0 - 5.0 - 18.0 + vStackItemOffset
+            }
             let y = baseY + scheduleOffsetY
             
-            // デバッグログ出力
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "M/d"
-            let dateString = dateFormatter.string(from: currentDate)
-            print("🎯 期間バー[\(dateString)]: \(schedule.title)")
-            print("   週行=\(weekRow), 日別順序=\(periodScheduleIndex)")
-            print("   baseY=\(baseY) (\(weekHeaderHeight) + \(weekRow) * \(cellHeight))")
-            print("   最終Y=\(y) (baseY + \(scheduleOffsetY))")
             
             let width = max(0, adjustedEndX - adjustedStartX) // 負の値を防ぐ
+            
             
             // 無効なフレームをスキップ
             if width <= 0 || x.isNaN || y.isNaN {
@@ -1345,11 +1392,8 @@ struct CustomCalendarView: View {
                 
             }
             
-            // 次の日に進める（1日ずつ）
-            let nextDate = calendar.date(byAdding: .day, value: 1, to: currentDate) ?? scheduleEnd
-            
-            
-            currentDate = nextDate
+            // 週の終了まで進める（週ごとにセグメントを作成）
+            currentDate = calendar.date(byAdding: .day, value: 1, to: segmentEnd) ?? scheduleEnd
         }
         
         return rows
@@ -1460,9 +1504,6 @@ struct CustomCalendarView: View {
         if schedule.title.contains("出張") {
             let formatter = DateFormatter()
             formatter.dateFormat = "M/d"
-            print("🎯 出張中央判定: \(formatter.string(from: currentDate))")
-            print("   actualDays=\(actualDays), middleOffset=\(middleDayOffset)")
-            print("   middleDate=\(formatter.string(from: middleDate)), isMiddle=\(isMiddle)")
         }
         
         return isMiddle
@@ -1479,7 +1520,6 @@ struct CustomCalendarView: View {
     ) -> CGRect? {
         
         // 期間予定の存在確認デバッグ
-        print("🔍 期間予定バー処理: \(schedule.title) (\(schedule.startDate) - \(schedule.endDate))")
         let calendar = Calendar.current
         let monthStart = firstDayOfMonth
         
@@ -1547,9 +1587,6 @@ struct CustomCalendarView: View {
         let isAugust11Related = scheduleStartDate <= august11 && scheduleEndDate >= august11
         
         if isAugust11Related {
-            print("🚧 8/11期間予定バー: \(schedule.title)")
-            print("   hasHolidayInPeriod=\(hasHolidayInPeriod)")
-            print("   baseIndex=\(baseIndex), adjustedIndex=\(adjustedIndex)")
         }
         
         // 画面サイズに応じた動的計算でレスポンシブ対応
@@ -1567,8 +1604,6 @@ struct CustomCalendarView: View {
         
         // Y座標デバッグ（8月11日関連のバー）
         if isAugust11Related {
-            print("   Y座標計算: cellTopY=\(cellTopY), dateCircleToBarDistance=\(dateCircleToBarDistance)")
-            print("   barSpacing=\(barSpacing), 最終Y=\(y)")
         }
         
         return CGRect(x: startX, y: y, width: width, height: height)
