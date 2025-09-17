@@ -3,6 +3,7 @@
 const {onCall} = require("firebase-functions/v2/https");
 const {getFirestore, admin} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
+const {OPENAI_API_KEY} = require("../src/config/config");
 
 const db = getFirestore();
 
@@ -69,7 +70,7 @@ exports.extractSchedule = onCall(
 重要: 回答は純粋なJSON形式のみで、マークダウンのコードブロック記号は使用しないでください。`;
 
         // OpenAIのAPIクライアントを取得
-        const openai = getOpenAIClient(process.env.OPENAI_API_KEY);
+        const openai = getOpenAIClient(OPENAI_API_KEY.value());
 
         // GPT-4o-miniにプロンプトを送信して予定抽出を実行
         const completion = await safeOpenAICall(

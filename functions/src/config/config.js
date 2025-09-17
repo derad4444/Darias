@@ -1,10 +1,10 @@
 // src/config/index.js
 
 const functions = require("firebase-functions");
+const {defineSecret} = require("firebase-functions/params");
 
 // 環境変数とシークレットの定義
-// const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const OPENAI_API_KEY = functions.config().openai?.api_key;
+const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 // アプリケーション設定
 const CONFIG = {

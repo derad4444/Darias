@@ -3,6 +3,7 @@ const {onCall} = require("firebase-functions/v2/https");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {getNextQuestion, calculateBIG5Scores, BIG5_QUESTIONS} =
   require("./big5Questions");
+const {OPENAI_API_KEY} = require("../src/config/config");
 
 // エンゲージメント重視の固定文パターン
 const ENGAGING_COMMENT_PATTERNS = {
@@ -477,7 +478,7 @@ exports.generateCharacterReply = onCall(
                     currentStage,
                     gender,
                     null,
-                    process.env.OPENAI_API_KEY,
+                    OPENAI_API_KEY.value(),
                 ).catch((error) => {
                   console.error(
                       `Staged character details generation failed ` +
@@ -547,7 +548,7 @@ exports.generateCharacterReply = onCall(
                   3,
                   gender,
                   calculatedScores,
-                  process.env.OPENAI_API_KEY,
+                  OPENAI_API_KEY.value(),
               ).catch((error) => {
                 console.error(
                     `Staged character details generation failed for stage 3:`,
@@ -632,7 +633,7 @@ exports.generateCharacterReply = onCall(
         const prompt = buildCharacterPrompt(
             currentBig5, gender, dreamText, userMessage);
 
-        const openai = getOpenAIClient(process.env.OPENAI_API_KEY);
+        const openai = getOpenAIClient(OPENAI_API_KEY.value());
 
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),

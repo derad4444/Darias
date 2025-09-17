@@ -1,6 +1,7 @@
 // functions/const/generateDiary.js
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
+const {OPENAI_API_KEY} = require("../src/config/config");
 
 // Firebaseの初期化
 if (!admin.apps.length) {
@@ -105,7 +106,7 @@ JSON出力:
 
   // OpenAI呼び出し
   const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: OPENAI_API_KEY.value(),
   });
 
   const response = await openai.chat.completions.create({
