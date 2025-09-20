@@ -59,8 +59,9 @@ class FirestoreManager: ObservableObject {
                         let repeatOption = data["repeatOption"] as? String ?? ""
                         let remindValue = data["remindValue"] as? Int ?? 0
                         let remindUnit = data["remindUnit"] as? String ?? ""
-                        
-                        return Schedule(
+                        let recurringGroupId = data["recurringGroupId"] as? String
+
+                        let schedule = Schedule(
                             id: doc.documentID,
                             title: title,
                             date: startDate, // 下位互換性のため
@@ -72,8 +73,12 @@ class FirestoreManager: ObservableObject {
                             memo: memo,
                             repeatOption: repeatOption,
                             remindValue: remindValue,
-                            remindUnit: remindUnit
+                            remindUnit: remindUnit,
+                            recurringGroupId: recurringGroupId
                         )
+
+
+                        return schedule
                     }
                 }
             }
@@ -133,7 +138,7 @@ class FirestoreManager: ObservableObject {
         let docRef = db.collection("users").document(userId).collection("schedules").document()
         
         // 🔽 ScheduleItem → [String: Any] に手動変換
-        let data: [String: Any] = [
+        var data: [String: Any] = [
             "title": schedule.title,
             "isAllDay": schedule.isAllDay,
             "startDate": Timestamp(date: schedule.startDate),
@@ -146,6 +151,11 @@ class FirestoreManager: ObservableObject {
             "remindUnit": schedule.remindUnit,
             "created_at": Timestamp()
         ]
+
+        // recurringGroupIdがある場合は追加
+        if let recurringGroupId = schedule.recurringGroupId {
+            data["recurringGroupId"] = recurringGroupId
+        }
         
         docRef.setData(data) { error in
             if let error = error {
@@ -212,13 +222,13 @@ class FirestoreManager: ObservableObject {
     
     // 予定を削除する
     func deleteSchedule(scheduleId: String, completion: @escaping (Bool) -> Void) {
-        guard let userId = userId else { 
+        guard let userId = userId else {
             completion(false)
-            return 
+            return
         }
-        
+
         let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
-        
+
         docRef.delete { error in
             if let error = error {
                 print("❌ Schedule delete error: \(error)")
@@ -238,5 +248,66 @@ class FirestoreManager: ObservableObject {
                 completion(true)
             }
         }
+    }
+
+    // 繰り返し予定グループを削除する
+    func deleteRecurringGroup(groupId: String, completion: @escaping (Bool) -> Void) {
+        guard let userId = userId else {
+            print("❌ deleteRecurringGroup: userId is nil")
+            completion(false)
+            return
+        }
+
+
+
+        // まず同じgroupIdを持つ全ての予定を取得
+        db.collection("users").document(userId).collection("schedules")
+            .whereField("recurringGroupId", isEqualTo: groupId)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    print("❌ Failed to fetch recurring group: \(error)")
+                    completion(false)
+                    return
+                }
+
+                guard let documents = snapshot?.documents else {
+                    print("❌ No documents found for group: \(groupId)")
+                    completion(false)
+                    return
+                }
+
+
+                if documents.isEmpty {
+                    print("❌ No schedules found with recurringGroupId: \(groupId)")
+                    completion(false)
+                    return
+                }
+
+                // バッチ削除を実行
+                let batch = self.db.batch()
+                for document in documents {
+                    batch.deleteDocument(document.reference)
+                }
+                batch.commit { error in
+                    if let error = error {
+                        print("❌ Batch delete error: \(error)")
+                        completion(false)
+                    } else {
+                        print("✅ Recurring group deleted: \(groupId), count: \(documents.count)")
+                        // ローカルの予定リストからも削除
+                        DispatchQueue.main.async {
+                            self.schedules.removeAll { $0.recurringGroupId == groupId }
+
+                            // 削除完了の通知を送信
+                            NotificationCenter.default.post(
+                                name: .init("ScheduleDeleted"),
+                                object: nil,
+                                userInfo: ["recurringGroupId": groupId]
+                            )
+                        }
+                        completion(true)
+                    }
+                }
+            }
     }
 }

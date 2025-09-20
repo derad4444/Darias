@@ -11,6 +11,9 @@ struct ScheduleDetailView: View {
     @State private var showEdit = false
     @State private var navigateToEdit = false
     @State private var showDeleteConfirmation = false
+    @State private var showRecurringDeleteOptions = false
+    @State private var showRecurringEditOptions = false
+    @State private var editSingleOnly = false
     @StateObject private var firestoreManager = FirestoreManager()
     
     private var dynamicContentHeight: CGFloat {
@@ -44,7 +47,11 @@ struct ScheduleDetailView: View {
                         }
                         Spacer()
                         Button("編集") {
-                            showEdit = true
+                            if schedule.recurringGroupId != nil {
+                                showRecurringEditOptions = true
+                            } else {
+                                showEdit = true
+                            }
                         }
                         .foregroundColor(colorSettings.getCurrentAccentColor())
                     }
@@ -121,7 +128,11 @@ struct ScheduleDetailView: View {
                             
                             // 削除ボタン
                             Button(action: {
-                                showDeleteConfirmation = true
+                                if schedule.recurringGroupId != nil {
+                                    showRecurringDeleteOptions = true
+                                } else {
+                                    showDeleteConfirmation = true
+                                }
                             }) {
                                 Text("削除")
                                     .font(.system(size: 18, weight: .medium))
@@ -145,17 +156,190 @@ struct ScheduleDetailView: View {
         .navigationBarHidden(true) // NavigationBarを完全に隠す
         .sheet(isPresented: $showEdit) {
             NavigationView {
-                ScheduleEditView(schedule: schedule, userId: userId)
+                ScheduleEditView(schedule: schedule, userId: userId, editSingleOnly: editSingleOnly)
             }
         }
         .alert("予定を削除しますか？", isPresented: $showDeleteConfirmation) {
             Button("キャンセル", role: .cancel) { }
             Button("削除", role: .destructive) {
-                deleteSchedule()
+                deleteSingleSchedule()
             }
         } message: {
             Text("この操作は取り消せません。")
         }
+        .overlay(
+            // カスタムダイアログ
+            Group {
+                if showRecurringDeleteOptions {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                showRecurringDeleteOptions = false
+                            }
+
+                        VStack(spacing: 0) {
+                            // タイトル部分
+                            VStack(spacing: 12) {
+                                Text("繰り返し予定の削除")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.primary)
+
+                                Text("どの予定を削除しますか？")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.top, 24)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
+
+                            Divider()
+
+                            // ボタン部分
+                            VStack(spacing: 0) {
+                                Button(action: {
+                                    showRecurringDeleteOptions = false
+                                    deleteSingleSchedule()
+                                }) {
+                                    Text("この予定のみ削除")
+                                        .font(.system(size: 17))
+                                        .foregroundColor(.red)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                }
+
+                                Divider()
+
+                                Button(action: {
+                                    showRecurringDeleteOptions = false
+                                    deleteAllRecurringSchedules()
+                                }) {
+                                    Text("すべての繰り返し予定を削除")
+                                        .font(.system(size: 17))
+                                        .foregroundColor(.red)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                }
+
+                                Divider()
+
+                                Button(action: {
+                                    showRecurringDeleteOptions = false
+                                }) {
+                                    Text("キャンセル")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(.blue)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                }
+                            }
+                        }
+                        .background(Color(.systemBackground))
+                        .cornerRadius(14)
+                        .frame(width: 300)
+                        .shadow(radius: 20)
+                    }
+                }
+            }
+        )
+        .overlay(
+            // 編集選択肢のカスタムダイアログ
+            Group {
+                if showRecurringEditOptions {
+                    ZStack {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture {
+                                showRecurringEditOptions = false
+                            }
+
+                        VStack(spacing: 0) {
+                            // タイトル部分
+                            VStack(spacing: 12) {
+                                // アイコン追加で視覚的により分かりやすく
+                                Image(systemName: "repeat.circle")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(.blue)
+
+                                Text("繰り返し予定の編集")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(.primary)
+
+                                Text("どの予定を編集しますか？")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                            }
+                            .padding(.top, 24)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 20)
+
+                            Divider()
+
+                            // ボタン部分
+                            VStack(spacing: 0) {
+                                Button(action: {
+                                    showRecurringEditOptions = false
+                                    editSingleOnly = true
+                                    showEdit = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "calendar")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(.blue)
+                                        Text("この予定のみ編集")
+                                            .font(.system(size: 17))
+                                            .foregroundColor(.blue)
+                                        Spacer()
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 50)
+                                    .padding(.horizontal, 20)
+                                }
+
+                                Divider()
+
+                                Button(action: {
+                                    showRecurringEditOptions = false
+                                    editSingleOnly = false
+                                    showEdit = true
+                                }) {
+                                    HStack {
+                                        Image(systemName: "repeat")
+                                            .font(.system(size: 16))
+                                            .foregroundColor(.blue)
+                                        Text("すべての繰り返し予定を編集")
+                                            .font(.system(size: 17))
+                                            .foregroundColor(.blue)
+                                        Spacer()
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 50)
+                                    .padding(.horizontal, 20)
+                                }
+
+                                Divider()
+
+                                Button(action: {
+                                    showRecurringEditOptions = false
+                                }) {
+                                    Text("キャンセル")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(.red)
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: 50)
+                                }
+                            }
+                        }
+                        .background(Color(.systemBackground))
+                        .cornerRadius(14)
+                        .frame(width: 300)
+                        .shadow(radius: 20)
+                    }
+                }
+            }
+        )
         // 広告やAI用エリアを追加しやすい
         .safeAreaInset(edge: .bottom) {
             if !isPremium {
@@ -246,15 +430,35 @@ struct ScheduleDetailView: View {
         return formatter.string(from: date)
     }
     
-    // 削除処理
-    private func deleteSchedule() {
+    // 単一予定のみ削除
+    private func deleteSingleSchedule() {
         firestoreManager.deleteSchedule(scheduleId: schedule.id) { success in
             DispatchQueue.main.async {
                 if success {
                     dismiss()
                 } else {
-                    // エラーハンドリング（必要に応じてアラートを表示）
                     print("❌ 予定の削除に失敗しました")
+                }
+            }
+        }
+    }
+
+    // すべての繰り返し予定を削除
+    private func deleteAllRecurringSchedules() {
+        guard let recurringGroupId = schedule.recurringGroupId else {
+            print("❌ recurringGroupIdがありません")
+            return
+        }
+
+        print("🔍 繰り返し予定グループ削除開始 - \(schedule.title)")
+
+        firestoreManager.deleteRecurringGroup(groupId: recurringGroupId) { success in
+            DispatchQueue.main.async {
+                if success {
+                    print("✅ 繰り返し予定削除成功")
+                    self.dismiss()
+                } else {
+                    print("❌ 繰り返し予定の削除に失敗しました")
                 }
             }
         }

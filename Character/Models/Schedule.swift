@@ -13,6 +13,7 @@ struct Schedule: Identifiable, Equatable {
     var repeatOption: String = ""
     var remindValue: Int = 0
     var remindUnit: String = ""
+    var recurringGroupId: String? = nil // 繰り返し予定のグループID
     
     // 期間が複数日にわたるかどうかを判定
     var isMultiDay: Bool {
@@ -49,4 +50,5 @@ struct ScheduleItem: Identifiable {
     var repeatOption: String
     var remindValue: Int
     var remindUnit: String
+    var recurringGroupId: String? // 繰り返し予定のグループID
 }

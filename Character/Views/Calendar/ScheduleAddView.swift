@@ -39,8 +39,26 @@ struct ScheduleAddView: View {
     init(selectedDate: Date, userId: String) {
         self.selectedDate = selectedDate
         self.userId = userId
-        _startDate = State(initialValue: selectedDate)
-        _endDate = State(initialValue: selectedDate.addingTimeInterval(3600))
+
+        // 現在時間の次の時間の0分を計算
+        let calendar = Calendar.current
+        let now = Date()
+
+        // 現在の時間を取得し、次の時間に設定
+        let currentHour = calendar.component(.hour, from: now)
+        let nextHour = currentHour + 1
+
+        // 選択された日付と次の時間の0分を組み合わせ
+        let dateComponents = calendar.dateComponents([.year, .month, .day], from: selectedDate)
+        var startComponents = dateComponents
+        startComponents.hour = nextHour
+        startComponents.minute = 0
+        startComponents.second = 0
+
+        let calculatedStartDate = calendar.date(from: startComponents) ?? selectedDate
+
+        _startDate = State(initialValue: calculatedStartDate)
+        _endDate = State(initialValue: calculatedStartDate.addingTimeInterval(3600))
     }
     
     var body: some View {
@@ -270,40 +288,108 @@ struct ScheduleAddView: View {
             showDateValidationAlert = true
             return
         }
-        
+
         // 🔸 時刻補正
         var finalStartDate = startDate
         var finalEndDate = endDate
-        
+
         if isAllDay {
             finalStartDate = Calendar.current.startOfDay(for: startDate)
             finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: endDate) ?? endDate
         }
-        
-        let newSchedule = ScheduleItem(
-            id: UUID().uuidString,   // 🔸 idを自動生成
-            title: title,
-            isAllDay: isAllDay,
-            startDate: finalStartDate,
-            endDate: finalEndDate,
-            location: location,
-            tag: tag,
-            memo: memo,
-            repeatOption: repeatSettings.getDescription(for: finalStartDate),
-            remindValue: Int(remindValue) ?? 0,  // 🔸 String → Int変換
-            remindUnit: remindUnit
-        )
-        
-        firestoreManager.addSchedule(newSchedule, for: userId) { success in
-            if success {
-                // 通知を設定
-                NotificationManager.shared.scheduleNotification(
-                    for: newSchedule,
-                    notificationSettings: notificationSettings
-                )
-                dismiss()
-            } else {
-                // エラー処理
+
+        // 繰り返し予定の場合は複数の予定を生成
+        if repeatSettings.type != .none {
+            createRecurringSchedules(
+                baseStartDate: finalStartDate,
+                baseEndDate: finalEndDate
+            )
+        } else {
+            // 単発予定の場合
+            let newSchedule = ScheduleItem(
+                id: UUID().uuidString,
+                title: title,
+                isAllDay: isAllDay,
+                startDate: finalStartDate,
+                endDate: finalEndDate,
+                location: location,
+                tag: tag,
+                memo: memo,
+                repeatOption: repeatSettings.getDescription(for: finalStartDate),
+                remindValue: Int(remindValue) ?? 0,
+                remindUnit: remindUnit,
+                recurringGroupId: nil
+            )
+
+            firestoreManager.addSchedule(newSchedule, for: userId) { success in
+                if success {
+                    NotificationManager.shared.scheduleNotification(
+                        for: newSchedule,
+                        notificationSettings: notificationSettings
+                    )
+                    dismiss()
+                } else {
+                    // エラー処理
+                }
+            }
+        }
+    }
+
+    // 繰り返し予定を複数作成する関数
+    private func createRecurringSchedules(baseStartDate: Date, baseEndDate: Date) {
+        let duration = baseEndDate.timeIntervalSince(baseStartDate)
+        let recurringDates = repeatSettings.generateDates(from: baseStartDate)
+        let groupId = UUID().uuidString // 繰り返し予定グループの共通ID
+
+        var successCount = 0
+        let totalCount = recurringDates.count
+
+        for (index, date) in recurringDates.enumerated() {
+            let scheduleStartDate = date
+            let scheduleEndDate = Date(timeInterval: duration, since: date)
+
+            let schedule = ScheduleItem(
+                id: UUID().uuidString,
+                title: title,
+                isAllDay: isAllDay,
+                startDate: scheduleStartDate,
+                endDate: scheduleEndDate,
+                location: location,
+                tag: tag,
+                memo: memo,
+                repeatOption: repeatSettings.getDescription(for: baseStartDate),
+                remindValue: Int(remindValue) ?? 0,
+                remindUnit: remindUnit,
+                recurringGroupId: groupId
+            )
+
+            firestoreManager.addSchedule(schedule, for: userId) { success in
+                if success {
+                    successCount += 1
+
+                    // 通知を設定
+                    NotificationManager.shared.scheduleNotification(
+                        for: schedule,
+                        notificationSettings: notificationSettings
+                    )
+
+                    // 全ての予定の保存が完了したら画面を閉じる
+                    if successCount == totalCount {
+                        DispatchQueue.main.async {
+                            dismiss()
+                        }
+                    }
+                } else {
+                    // エラー処理 - 部分的に失敗した場合の処理
+                    print("予定の保存に失敗しました: \(index + 1)/\(totalCount)")
+                    successCount += 1 // エラーでもカウントを増やして進行
+
+                    if successCount == totalCount {
+                        DispatchQueue.main.async {
+                            dismiss()
+                        }
+                    }
+                }
             }
         }
     }

@@ -417,11 +417,20 @@ struct CalendarView: View {
             firestoreManager.fetchSchedules()
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("ScheduleDeleted"))) { notification in
-            // 削除された予定IDを取得
+            // 単一予定削除の場合
             if let scheduleId = notification.userInfo?["scheduleId"] as? String {
-                print("✅ Calendar received schedule deletion notification: \(scheduleId)")
-                // 即座にローカルから削除（既にFirestoreManagerで削除済みだが、確実にするため）
+                print("✅ Calendar received single schedule deletion: \(scheduleId)")
                 firestoreManager.schedules.removeAll { $0.id == scheduleId }
+            }
+            // 繰り返し予定グループ削除の場合
+            else if let recurringGroupId = notification.userInfo?["recurringGroupId"] as? String {
+                print("✅ Calendar received recurring group deletion: \(recurringGroupId)")
+                firestoreManager.schedules.removeAll { $0.recurringGroupId == recurringGroupId }
+            }
+            // 安全のため、全体を再取得
+            else {
+                print("✅ Calendar refreshing all schedules")
+                firestoreManager.fetchSchedules()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("CalendarTabTapped"))) { _ in
@@ -1422,7 +1431,8 @@ struct CustomCalendarView: View {
             memo: schedule.memo,
             repeatOption: schedule.repeatOption,
             remindValue: schedule.remindValue,
-            remindUnit: schedule.remindUnit
+            remindUnit: schedule.remindUnit,
+            recurringGroupId: schedule.recurringGroupId
         )
     }
     
@@ -1809,7 +1819,7 @@ struct BottomSheetView: View {
     @ViewBuilder
     private func scheduleRow(for schedule: Schedule) -> some View {
         let tagColor = tagSettings.getTag(by: schedule.tag)?.color ?? Color.blue
-        
+
         NavigationLink(destination: ScheduleDetailView(schedule: ScheduleItem(
             id: schedule.id,
             title: schedule.title,
@@ -1821,7 +1831,8 @@ struct BottomSheetView: View {
             memo: schedule.memo,
             repeatOption: schedule.repeatOption,
             remindValue: schedule.remindValue,
-            remindUnit: schedule.remindUnit
+            remindUnit: schedule.remindUnit,
+            recurringGroupId: schedule.recurringGroupId
         ), userId: userId)) {
             VStack(alignment: .center, spacing: 2) {
                 if schedule.isAllDay || schedule.isMultiDay {
