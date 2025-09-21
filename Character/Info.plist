@@ -11,5 +11,7 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<key>NSUserNotificationsUsageDescription</key>
+	<string>DARIASアプリでは、設定された予定やイベントの重要な通知をお送りするために通知機能を使用します。通知により、大切な予定を見逃すことなく効率的なスケジュール管理が可能になります。</string>
 </dict>
 </plist>
