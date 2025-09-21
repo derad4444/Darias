@@ -22,8 +22,12 @@ class FirestoreManager: ObservableObject {
     
     //Firestoreからスケジュール一覧を取得して schedules に反映
     func fetchSchedules() {
-        guard let userId = userId else { return }
-        
+        guard let userId = userId else {
+            Logger.debug("fetchSchedules: userId is nil", category: Logger.firestore)
+            return
+        }
+
+        Logger.debug("fetchSchedules: userId = \(userId)", category: Logger.firestore)
         db.collection("users").document(userId).collection("schedules")
             .getDocuments { snapshot, error in
                 if let error = error {

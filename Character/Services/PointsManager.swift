@@ -10,8 +10,13 @@ class PointsManager: ObservableObject {
     
     // ポイント読み込み
     func loadPoints(for characterId: String) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for points loading")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for points loading", category: Logger.authentication)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for points loading", category: Logger.general)
             return
         }
         
@@ -34,8 +39,14 @@ class PointsManager: ObservableObject {
     
     // ポイント付与（チャット送信時）
     func addPoints(for characterId: String, completion: @escaping (Bool) -> Void = { _ in }) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for points adding")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for points adding", category: Logger.authentication)
+            completion(false)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for points adding", category: Logger.general)
             completion(false)
             return
         }
@@ -94,8 +105,14 @@ class PointsManager: ObservableObject {
     
     // ポイント消費（将来の機能拡張用）
     func consumePoints(for characterId: String, amount: Int, completion: @escaping (Bool) -> Void = { _ in }) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for points consumption")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for points consumption", category: Logger.authentication)
+            completion(false)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for points consumption", category: Logger.general)
             completion(false)
             return
         }
@@ -144,8 +161,13 @@ class PointsManager: ObservableObject {
     
     // ポイント監視開始
     func startPointsListener(for characterId: String) {
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for points monitoring")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for points monitoring", category: Logger.authentication)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for points monitoring", category: Logger.general)
             return
         }
         
