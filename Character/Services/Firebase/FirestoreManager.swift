@@ -24,7 +24,7 @@ class FirestoreManager: ObservableObject {
         db.collection("users").document(userId).collection("schedules")
             .getDocuments { snapshot, error in
                 if let error = error {
-                    Logger.error("Schedule fetch failed", category: .firestore, error: error)
+                    Logger.error("Schedule fetch failed", category: Logger.firestore, error: error)
                     return
                 }
                 
@@ -156,10 +156,10 @@ class FirestoreManager: ObservableObject {
         
         docRef.setData(data) { error in
             if let error = error {
-                Logger.error("Schedule add failed", category: .firestore, error: error)
+                Logger.error("Schedule add failed", category: Logger.firestore, error: error)
                 completion(false)
             } else {
-                Logger.success("Schedule added successfully", category: .firestore)
+                Logger.success("Schedule added successfully", category: Logger.firestore)
                 // CalendarViewに予定追加を通知
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)

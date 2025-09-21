@@ -63,27 +63,27 @@ extension Logger {
     /// Firestore操作のログ
     static func firestoreOperation(_ message: String, success: Bool = true) {
         if success {
-            Logger.success(message, category: .firestore)
+            Logger.success(message, category: Logger.firestore)
         } else {
-            Logger.error(message, category: .firestore)
+            Logger.error(message, category: Logger.firestore)
         }
     }
 
     /// 予定操作のログ
     static func scheduleOperation(_ message: String, success: Bool = true) {
         if success {
-            Logger.success(message, category: .schedule)
+            Logger.success(message, category: Logger.schedule)
         } else {
-            Logger.error(message, category: .schedule)
+            Logger.error(message, category: Logger.schedule)
         }
     }
 
     /// 通知操作のログ
     static func notificationOperation(_ message: String, success: Bool = true) {
         if success {
-            Logger.success(message, category: .notification)
+            Logger.success(message, category: Logger.notification)
         } else {
-            Logger.error(message, category: .notification)
+            Logger.error(message, category: Logger.notification)
         }
     }
 }

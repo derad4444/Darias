@@ -5,7 +5,11 @@
 	<key>APP_CHECK_DEBUG_TOKEN</key>
 	<string>D313A951-B496-4976-80DB-A99FABE03665</string>
 	<key>GADApplicationIdentifier</key>
-	<string>ca-app-pub-3940256099942544~1458002511</string>
+	<string>ca-app-pub-5851550594315289~6221721976</string>
+	<key>ADMOB_BANNER_AD_UNIT_ID</key>
+	<string>ca-app-pub-5851550594315289/2448545222</string>
+	<key>ADMOB_REWARDED_AD_UNIT_ID</key>
+	<string>ca-app-pub-5851550594315289/8581126154</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
