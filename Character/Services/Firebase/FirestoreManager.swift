@@ -7,7 +7,10 @@ class FirestoreManager: ObservableObject {
     private let db = Firestore.firestore()
     //現在ログイン中のFirebaseユーザーのIDを取得（認証が前提）
     private var userId: String? {
-        Auth.auth().currentUser?.uid
+        guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+            return nil
+        }
+        return uid
     }
     
     //Firestoreから取得した予定データ（一覧）を保存する

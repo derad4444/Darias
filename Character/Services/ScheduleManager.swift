@@ -6,8 +6,8 @@ class ScheduleManager: ObservableObject {
     private let db = Firestore.firestore()
     
     func saveSchedule(from scheduleData: ExtractedScheduleData) {
-        guard let userId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated")
+        guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else {
+            Logger.error("User not authenticated or invalid userId", category: Logger.authentication)
             return
         }
         

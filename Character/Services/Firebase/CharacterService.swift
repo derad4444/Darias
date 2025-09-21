@@ -183,8 +183,8 @@ class CharacterService: ObservableObject {
     // MARK: - BIG5 Progress Monitoring
     func monitorBIG5Progress(characterId: String) {
         // ユーザーIDを取得（認証済みユーザーから）
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for BIG5 progress monitoring")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for BIG5 progress monitoring", category: Logger.authentication)
             return
         }
         

@@ -18,16 +18,23 @@ class AuthManager: ObservableObject {
     
     //現在ログイン済みかをチェック
     func checkLoginStatus() {
-        if let user = Auth.auth().currentUser {
+        if let user = Auth.auth().currentUser, !user.uid.isEmpty {
             userId = user.uid
             isAuthenticated = true
-            
+
             // 🔥 characterId も復元
             db.collection("users").document(user.uid).getDocument { document, error in
-                if let data = document?.data() {
+                if let error = error {
+                    Logger.error("Failed to get user document", category: Logger.authentication, error: error)
+                } else if let data = document?.data() {
                     self.characterId = data["character_id"] as? String ?? ""
                 }
             }
+        } else {
+            // ユーザーが存在しないか、UIDが空の場合
+            userId = ""
+            characterId = ""
+            isAuthenticated = false
         }
         isLoading = false
     }
