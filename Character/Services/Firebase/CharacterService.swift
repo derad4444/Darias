@@ -187,6 +187,11 @@ class CharacterService: ObservableObject {
             Logger.error("User not authenticated for BIG5 progress monitoring", category: Logger.authentication)
             return
         }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for BIG5 progress monitoring", category: Logger.general)
+            return
+        }
         
         db.collection("users").document(currentUserId)
             .collection("characters").document(characterId)
@@ -232,8 +237,13 @@ class CharacterService: ObservableObject {
         generationStatusListener?.remove()
         
         // ユーザーIDを取得
-        guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for generation status monitoring")
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for generation status monitoring", category: Logger.authentication)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for generation status monitoring", category: Logger.general)
             return
         }
         
@@ -352,7 +362,8 @@ class CharacterService: ObservableObject {
     }
     
     private func initializeCharacterDetailsIfNeeded(characterId: String) {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else { return }
+        guard !characterId.isEmpty else { return }
         
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
@@ -398,8 +409,13 @@ class CharacterService: ObservableObject {
         guard let _ = currentBIG5Question else { return }
         
         // ユーザーIDを取得
-        guard let userId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for BIG5 answer submission")
+        guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else {
+            Logger.error("User not authenticated for BIG5 answer submission", category: Logger.authentication)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for BIG5 answer submission", category: Logger.general)
             return
         }
         
