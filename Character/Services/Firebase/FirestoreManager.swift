@@ -61,6 +61,18 @@ class FirestoreManager: ObservableObject {
                         let remindUnit = data["remindUnit"] as? String ?? ""
                         let recurringGroupId = data["recurringGroupId"] as? String
 
+                        // 通知設定を復元
+                        var notificationSettings: NotificationSettings? = nil
+                        if let notificationJSON = data["notificationSettings"] as? String {
+                            do {
+                                if let jsonData = notificationJSON.data(using: .utf8) {
+                                    notificationSettings = try JSONDecoder().decode(NotificationSettings.self, from: jsonData)
+                                }
+                            } catch {
+                                print("❌ Notification settings decoding error: \(error)")
+                            }
+                        }
+
                         let schedule = Schedule(
                             id: doc.documentID,
                             title: title,
@@ -74,7 +86,8 @@ class FirestoreManager: ObservableObject {
                             repeatOption: repeatOption,
                             remindValue: remindValue,
                             remindUnit: remindUnit,
-                            recurringGroupId: recurringGroupId
+                            recurringGroupId: recurringGroupId,
+                            notificationSettings: notificationSettings
                         )
 
 
@@ -137,25 +150,9 @@ class FirestoreManager: ObservableObject {
         // ユーザーサブコレクションに保存
         let docRef = db.collection("users").document(userId).collection("schedules").document()
         
-        // 🔽 ScheduleItem → [String: Any] に手動変換
-        var data: [String: Any] = [
-            "title": schedule.title,
-            "isAllDay": schedule.isAllDay,
-            "startDate": Timestamp(date: schedule.startDate),
-            "endDate": Timestamp(date: schedule.endDate),
-            "location": schedule.location,
-            "tag": schedule.tag,
-            "memo": schedule.memo,
-            "repeatOption": schedule.repeatOption,
-            "remindValue": schedule.remindValue,
-            "remindUnit": schedule.remindUnit,
-            "created_at": Timestamp()
-        ]
-
-        // recurringGroupIdがある場合は追加
-        if let recurringGroupId = schedule.recurringGroupId {
-            data["recurringGroupId"] = recurringGroupId
-        }
+        // 共通データ変換メソッドを使用
+        var data = createScheduleData(from: schedule)
+        data["created_at"] = Timestamp()
         
         docRef.setData(data) { error in
             if let error = error {
@@ -219,7 +216,70 @@ class FirestoreManager: ObservableObject {
             }
         }
     }
-    
+
+    // 共通データ変換メソッド - ScheduleItemから保存用データを作成
+    private func createScheduleData(from schedule: ScheduleItem) -> [String: Any] {
+        var data: [String: Any] = [
+            "title": schedule.title,
+            "isAllDay": schedule.isAllDay,
+            "startDate": Timestamp(date: schedule.startDate),
+            "endDate": Timestamp(date: schedule.endDate),
+            "location": schedule.location,
+            "tag": schedule.tag,
+            "memo": schedule.memo,
+            "repeatOption": schedule.repeatOption,
+            "remindValue": schedule.remindValue,
+            "remindUnit": schedule.remindUnit
+        ]
+
+        // recurringGroupIdがある場合は追加
+        if let recurringGroupId = schedule.recurringGroupId {
+            data["recurringGroupId"] = recurringGroupId
+        }
+
+        // 通知設定がある場合は追加
+        if let notificationSettings = schedule.notificationSettings {
+            do {
+                let jsonData = try JSONEncoder().encode(notificationSettings)
+                if let jsonString = String(data: jsonData, encoding: .utf8) {
+                    data["notificationSettings"] = jsonString
+                }
+            } catch {
+                print("❌ Notification settings encoding error: \(error)")
+            }
+        }
+
+        return data
+    }
+
+    // 予定の全情報を更新する
+    func updateSchedule(_ schedule: ScheduleItem, completion: @escaping (Bool) -> Void) {
+        guard let userId = userId else {
+            completion(false)
+            return
+        }
+
+        let docRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
+
+        // 共通データ変換メソッドを使用
+        var data = createScheduleData(from: schedule)
+        data["updated_at"] = Timestamp()
+
+        docRef.updateData(data) { error in
+            if let error = error {
+                print("❌ Schedule update error: \(error)")
+                completion(false)
+            } else {
+                print("✅ Schedule updated: \(schedule.id)")
+                // CalendarViewに予定更新を通知
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
     // 予定を削除する
     func deleteSchedule(scheduleId: String, completion: @escaping (Bool) -> Void) {
         guard let userId = userId else {

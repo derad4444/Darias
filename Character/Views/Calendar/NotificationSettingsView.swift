@@ -207,6 +207,14 @@ struct NotificationSettingsView: View {
         notificationSettings.isEnabled = isEnabled && notificationManager.isAuthorized
         notificationSettings.value = selectedValue
         notificationSettings.unit = selectedUnit
+
+        // 新しい通知システム用の設定も更新
+        if isEnabled && notificationManager.isAuthorized {
+            let timing = NotificationTiming(value: selectedValue, unit: selectedUnit)
+            notificationSettings.notifications = [timing]
+        } else {
+            notificationSettings.notifications = []
+        }
     }
 }
 

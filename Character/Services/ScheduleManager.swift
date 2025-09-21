@@ -60,10 +60,10 @@ class ScheduleManager: ObservableObject {
         }
         
         let notificationManager = NotificationManager.shared
+        let timing = NotificationTiming(value: 15, unit: .minutes)
         let notificationSettings = NotificationSettings(
             isEnabled: true,
-            value: 15,
-            unit: .minutes
+            notifications: [timing]
         )
         
         // 仮のScheduleItemを作成（通知設定用）

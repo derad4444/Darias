@@ -14,6 +14,7 @@ struct Schedule: Identifiable, Equatable {
     var remindValue: Int = 0
     var remindUnit: String = ""
     var recurringGroupId: String? = nil // 繰り返し予定のグループID
+    var notificationSettings: NotificationSettings? = nil // 通知設定
     
     // 期間が複数日にわたるかどうかを判定
     var isMultiDay: Bool {
@@ -51,4 +52,21 @@ struct ScheduleItem: Identifiable {
     var remindValue: Int
     var remindUnit: String
     var recurringGroupId: String? // 繰り返し予定のグループID
+    var notificationSettings: NotificationSettings? // 通知設定
+}
+
+// 通知タイミングの構造体
+struct NotificationTiming: Codable, Identifiable, Equatable {
+    let id = UUID()
+    var value: Int
+    var unit: NotificationUnit
+
+    init(value: Int, unit: NotificationUnit) {
+        self.value = value
+        self.unit = unit
+    }
+
+    func getDescription() -> String {
+        return "\(value)\(unit.displayName)"
+    }
 }

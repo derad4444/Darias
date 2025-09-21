@@ -306,7 +306,7 @@ struct ScheduleAddView: View {
             )
         } else {
             // 単発予定の場合
-            let newSchedule = ScheduleItem(
+            var newSchedule = ScheduleItem(
                 id: UUID().uuidString,
                 title: title,
                 isAllDay: isAllDay,
@@ -321,12 +321,13 @@ struct ScheduleAddView: View {
                 recurringGroupId: nil
             )
 
+            // 通知設定をScheduleItemに設定
+            newSchedule.notificationSettings = notificationSettings
+
             firestoreManager.addSchedule(newSchedule, for: userId) { success in
                 if success {
-                    NotificationManager.shared.scheduleNotification(
-                        for: newSchedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
                     dismiss()
                 } else {
                     // エラー処理
@@ -348,7 +349,7 @@ struct ScheduleAddView: View {
             let scheduleStartDate = date
             let scheduleEndDate = Date(timeInterval: duration, since: date)
 
-            let schedule = ScheduleItem(
+            var schedule = ScheduleItem(
                 id: UUID().uuidString,
                 title: title,
                 isAllDay: isAllDay,
@@ -363,15 +364,15 @@ struct ScheduleAddView: View {
                 recurringGroupId: groupId
             )
 
+            // 通知設定をScheduleItemに設定
+            schedule.notificationSettings = notificationSettings
+
             firestoreManager.addSchedule(schedule, for: userId) { success in
                 if success {
                     successCount += 1
 
-                    // 通知を設定
-                    NotificationManager.shared.scheduleNotification(
-                        for: schedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.scheduleNotifications(for: schedule)
 
                     // 全ての予定の保存が完了したら画面を閉じる
                     if successCount == totalCount {

@@ -32,55 +32,76 @@ class NotificationManager: ObservableObject {
         }
     }
     
-    // 予定の通知を設定
-    func scheduleNotification(for schedule: ScheduleItem, notificationSettings: NotificationSettings) {
+    // 予定の通知を設定（新しいバージョン）
+    func scheduleNotifications(for schedule: ScheduleItem) {
         guard isAuthorized else { return }
-        
+
         // 既存の通知を削除
-        removeNotification(for: schedule.id)
-        
-        // 通知が無効の場合は何もしない
-        guard notificationSettings.isEnabled else { return }
-        
-        // 通知時刻を計算
-        let notificationDate = calculateNotificationDate(
-            scheduleDate: schedule.startDate,
-            value: notificationSettings.value,
-            unit: notificationSettings.unit
-        )
-        
-        // 過去の時刻の場合は通知しない
-        guard notificationDate > Date() else { return }
-        
-        // 通知コンテンツを作成
-        let content = UNMutableNotificationContent()
-        content.title = "予定の通知"
-        content.body = schedule.title
-        content.sound = .default
-        
-        // 場所がある場合は追加
-        if !schedule.location.isEmpty {
-            content.body += "\n場所: \(schedule.location)"
-        }
-        
-        // 通知時刻を設定
-        let calendar = Calendar.current
-        let dateComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: notificationDate)
-        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
-        
-        // 通知リクエストを作成
-        let request = UNNotificationRequest(
-            identifier: "schedule_\(schedule.id)",
-            content: content,
-            trigger: trigger
-        )
-        
-        // 通知を登録
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                // Notification registration error handled silently
+        removeNotifications(for: schedule.id)
+
+        // 通知設定がない、または無効の場合は何もしない
+        guard let notificationSettings = schedule.notificationSettings,
+              notificationSettings.isEnabled,
+              !notificationSettings.notifications.isEmpty else { return }
+
+        // 各通知タイミングに対して通知を設定
+        for (index, notification) in notificationSettings.notifications.enumerated() {
+            let notificationDate = calculateNotificationDate(
+                scheduleDate: schedule.startDate,
+                value: notification.value,
+                unit: notification.unit
+            )
+
+            // 過去の時刻の場合はスキップ
+            guard notificationDate > Date() else { continue }
+
+            // 通知コンテンツを作成
+            let content = UNMutableNotificationContent()
+            content.title = "予定の通知"
+            content.body = schedule.title
+            content.sound = .default
+            content.userInfo = [
+                "scheduleId": schedule.id,
+                "notificationIndex": index
+            ]
+
+            // 場所がある場合は追加
+            if !schedule.location.isEmpty {
+                content.body += "\n場所: \(schedule.location)"
+            }
+
+            // メモがある場合は追加
+            if !schedule.memo.isEmpty {
+                content.subtitle = schedule.memo
+            }
+
+            // 通知時刻を設定
+            let calendar = Calendar.current
+            let dateComponents = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: notificationDate)
+            let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
+
+            // 通知リクエストを作成（ユニークなIDを使用）
+            let request = UNNotificationRequest(
+                identifier: "schedule_\(schedule.id)_\(index)",
+                content: content,
+                trigger: trigger
+            )
+
+            // 通知を登録
+            UNUserNotificationCenter.current().add(request) { error in
+                if let error = error {
+                    print("通知登録エラー: \(error.localizedDescription)")
+                }
             }
         }
+    }
+
+    // 既存のバージョン（下位互換性のため保持）
+    func scheduleNotification(for schedule: ScheduleItem, notificationSettings: NotificationSettings) {
+        // 新しいバージョンを使用
+        var updatedSchedule = schedule
+        updatedSchedule.notificationSettings = notificationSettings
+        scheduleNotifications(for: updatedSchedule)
     }
     
     // 通知時刻を計算
@@ -97,9 +118,20 @@ class NotificationManager: ObservableObject {
         }
     }
     
-    // 特定の予定の通知を削除
+    // 特定の予定の通知を削除（新しいバージョン）
+    func removeNotifications(for scheduleId: String) {
+        // 予定IDで始まる全ての通知を取得して削除
+        UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
+            let identifiersToRemove = requests.compactMap { request in
+                return request.identifier.hasPrefix("schedule_\(scheduleId)") ? request.identifier : nil
+            }
+            UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: identifiersToRemove)
+        }
+    }
+
+    // 既存のバージョン（下位互換性のため保持）
     func removeNotification(for scheduleId: String) {
-        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: ["schedule_\(scheduleId)"])
+        removeNotifications(for: scheduleId)
     }
     
     // 全ての通知を削除
@@ -107,35 +139,101 @@ class NotificationManager: ObservableObject {
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
     }
     
+    // 繰り返し予定の通知を一括設定
+    func scheduleRecurringNotifications(for schedules: [ScheduleItem]) {
+        guard isAuthorized else { return }
+
+        // iOSの通知制限（64件）を考慮
+        let maxNotifications = 60 // 余裕を持って設定
+        var totalNotifications = 0
+
+        for schedule in schedules {
+            guard let notificationSettings = schedule.notificationSettings,
+                  notificationSettings.isEnabled,
+                  !notificationSettings.notifications.isEmpty else { continue }
+
+            // 制限に達した場合は停止
+            if totalNotifications + notificationSettings.notifications.count > maxNotifications {
+                print("通知制限に達しました。一部の予定の通知が設定されませんでした。")
+                break
+            }
+
+            scheduleNotifications(for: schedule)
+            totalNotifications += notificationSettings.notifications.count
+        }
+    }
+
+    // 予定の更新時の通知管理
+    func updateNotifications(for schedule: ScheduleItem) {
+        removeNotifications(for: schedule.id)
+        scheduleNotifications(for: schedule)
+    }
+
     // 登録済み通知を確認（デバッグ用）
     func listPendingNotifications() {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-            // Debug: Pending notification count: \(requests.count)
+            print("登録済み通知数: \(requests.count)")
             for request in requests {
-                // Debug: \(request.identifier): \(request.content.title)
+                if let trigger = request.trigger as? UNCalendarNotificationTrigger {
+                    print("ID: \(request.identifier), タイトル: \(request.content.title), 日時: \(trigger.dateComponents)")
+                }
             }
         }
     }
 }
 
 // 通知単位の列挙型
-enum NotificationUnit: String, CaseIterable {
+enum NotificationUnit: String, CaseIterable, Codable {
     case minutes = "分前"
     case hours = "時間前"
     case days = "日前"
-    
+
     var displayName: String {
         return self.rawValue
     }
 }
 
 // 通知設定の構造体
-struct NotificationSettings {
+struct NotificationSettings: Codable, Equatable {
     var isEnabled: Bool = false
+    var notifications: [NotificationTiming] = []
+
+    // 下位互換性のため保持（UI用）
     var value: Int = 15
     var unit: NotificationUnit = .minutes
-    
+
+    init() {
+        self.isEnabled = false
+        self.notifications = []
+        self.value = 15
+        self.unit = .minutes
+    }
+
+    init(isEnabled: Bool, notifications: [NotificationTiming]) {
+        self.isEnabled = isEnabled
+        self.notifications = notifications
+        // 最初の通知を下位互換用に設定
+        if let first = notifications.first {
+            self.value = first.value
+            self.unit = first.unit
+        } else {
+            self.value = 15
+            self.unit = .minutes
+        }
+    }
+
     func getDescription() -> String {
+        if !isEnabled || notifications.isEmpty {
+            return "通知しない"
+        }
+        if notifications.count == 1 {
+            return notifications[0].getDescription()
+        }
+        return "\(notifications.count)件の通知"
+    }
+
+    // 既存UIとの互換性のため
+    func getSingleDescription() -> String {
         if !isEnabled {
             return "通知しない"
         }

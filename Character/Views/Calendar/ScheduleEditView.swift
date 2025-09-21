@@ -387,7 +387,7 @@ struct ScheduleEditView: View {
                     }
 
                     NotificationManager.shared.removeNotification(for: schedule.id)
-                    let updatedSchedule = ScheduleItem(
+                    var updatedSchedule = ScheduleItem(
                         id: schedule.id,
                         title: scheduleTitle,
                         isAllDay: isAllDay,
@@ -401,10 +401,11 @@ struct ScheduleEditView: View {
                         remindUnit: "",
                         recurringGroupId: nil
                     )
-                    NotificationManager.shared.scheduleNotification(
-                        for: updatedSchedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 通知設定をScheduleItemに設定
+                    updatedSchedule.notificationSettings = notificationSettings
+
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.updateNotifications(for: updatedSchedule)
                     self.notifyScheduleUpdate()
                     DispatchQueue.main.async { dismiss() }
                 }
@@ -427,8 +428,28 @@ struct ScheduleEditView: View {
             } else {
                 print("🔄 単発→繰り返し: 元の予定を更新してから追加予定作成")
                 // 単発→繰り返しの場合、元の予定を更新してから追加予定を作成
-                docRef.setData(data) { error in
-                    if error == nil {
+
+                // FirestoreManagerの統一メソッドを使用
+                var updatedSchedule = ScheduleItem(
+                    id: schedule.id,
+                    title: scheduleTitle,
+                    isAllDay: isAllDay,
+                    startDate: startDate,
+                    endDate: endDate,
+                    location: location,
+                    tag: tag,
+                    memo: memo,
+                    repeatOption: repeatSettings.getDescription(for: startDate),
+                    remindValue: 0,
+                    remindUnit: "",
+                    recurringGroupId: nil
+                )
+                // 通知設定をScheduleItemに設定
+                updatedSchedule.notificationSettings = notificationSettings
+
+                let firestoreManager = FirestoreManager()
+                firestoreManager.updateSchedule(updatedSchedule) { success in
+                    if success {
                         NotificationManager.shared.removeNotification(for: schedule.id)
                         self.createAdditionalRecurringSchedules(
                             baseStartDate: startDate,
@@ -447,27 +468,30 @@ struct ScheduleEditView: View {
                 deleteOtherRecurringSchedules(groupId: groupId, keepScheduleId: schedule.id)
             }
 
-            docRef.setData(data) { error in
-                if error == nil {
-                    NotificationManager.shared.removeNotification(for: schedule.id)
-                    let updatedSchedule = ScheduleItem(
-                        id: schedule.id,
-                        title: scheduleTitle,
-                        isAllDay: isAllDay,
-                        startDate: startDate,
-                        endDate: endDate,
-                        location: location,
-                        tag: tag,
-                        memo: memo,
-                        repeatOption: repeatSettings.getDescription(for: startDate),
-                        remindValue: 0,
-                        remindUnit: "",
-                        recurringGroupId: nil
-                    )
-                    NotificationManager.shared.scheduleNotification(
-                        for: updatedSchedule,
-                        notificationSettings: notificationSettings
-                    )
+            // FirestoreManagerの統一メソッドを使用
+            var updatedSchedule = ScheduleItem(
+                id: schedule.id,
+                title: scheduleTitle,
+                isAllDay: isAllDay,
+                startDate: startDate,
+                endDate: endDate,
+                location: location,
+                tag: tag,
+                memo: memo,
+                repeatOption: repeatSettings.getDescription(for: startDate),
+                remindValue: 0,
+                remindUnit: "",
+                recurringGroupId: nil
+            )
+            // 通知設定をScheduleItemに設定
+            updatedSchedule.notificationSettings = notificationSettings
+
+            // FirestoreManagerの統一メソッドを使用（通知設定も含めて保存される）
+            let firestoreManager = FirestoreManager()
+            firestoreManager.updateSchedule(updatedSchedule) { success in
+                if success {
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.updateNotifications(for: updatedSchedule)
                     self.notifyScheduleUpdate()
                     DispatchQueue.main.async { dismiss() }
                 }
@@ -568,7 +592,7 @@ struct ScheduleEditView: View {
             let scheduleEndDate = Date(timeInterval: duration, since: date)
             let scheduleId = UUID().uuidString // 全て新しいIDを使用
 
-            let newSchedule = ScheduleItem(
+            var newSchedule = ScheduleItem(
                 id: scheduleId,
                 title: scheduleTitle,
                 isAllDay: isAllDay,
@@ -582,6 +606,9 @@ struct ScheduleEditView: View {
                 remindUnit: "",
                 recurringGroupId: newGroupId
             )
+
+            // 通知設定をScheduleItemに設定
+            newSchedule.notificationSettings = notificationSettings
 
             let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
 
@@ -603,10 +630,8 @@ struct ScheduleEditView: View {
                 if error == nil {
                     print("✅ 新規予定作成成功: \(scheduleId)")
                     successCount += 1
-                    NotificationManager.shared.scheduleNotification(
-                        for: newSchedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
 
                     if successCount == totalCount {
                         print("✅ 全ての新規繰り返し予定作成完了")
@@ -650,7 +675,7 @@ struct ScheduleEditView: View {
             // 最初の予定は既存のIDを使用、それ以外は新しいIDを生成
             let scheduleId = (index == 0) ? updatedScheduleId : UUID().uuidString
 
-            let newSchedule = ScheduleItem(
+            var newSchedule = ScheduleItem(
                 id: scheduleId,
                 title: scheduleTitle,
                 isAllDay: isAllDay,
@@ -664,6 +689,9 @@ struct ScheduleEditView: View {
                 remindUnit: "",
                 recurringGroupId: newGroupId
             )
+
+            // 通知設定をScheduleItemに設定
+            newSchedule.notificationSettings = notificationSettings
 
             let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
 
@@ -685,10 +713,8 @@ struct ScheduleEditView: View {
                 if error == nil {
                     print("✅ 予定作成成功: \(scheduleId)")
                     successCount += 1
-                    NotificationManager.shared.scheduleNotification(
-                        for: newSchedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
 
                     if successCount == totalCount {
                         print("✅ 全ての繰り返し予定作成完了")
@@ -717,7 +743,7 @@ struct ScheduleEditView: View {
             let scheduleStartDate = date
             let scheduleEndDate = Date(timeInterval: duration, since: date)
 
-            let newSchedule = ScheduleItem(
+            var newSchedule = ScheduleItem(
                 id: UUID().uuidString,
                 title: scheduleTitle,
                 isAllDay: isAllDay,
@@ -731,6 +757,9 @@ struct ScheduleEditView: View {
                 remindUnit: "",
                 recurringGroupId: groupId
             )
+
+            // 通知設定をScheduleItemに設定
+            newSchedule.notificationSettings = notificationSettings
 
             let newDocRef = db.collection("users").document(userId).collection("schedules").document(newSchedule.id)
 
@@ -748,10 +777,8 @@ struct ScheduleEditView: View {
 
             newDocRef.setData(data) { error in
                 if error == nil {
-                    NotificationManager.shared.scheduleNotification(
-                        for: newSchedule,
-                        notificationSettings: notificationSettings
-                    )
+                    // 新しい通知システムを使用
+                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
                 }
             }
         }

@@ -434,10 +434,15 @@ struct CalendarView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("CalendarTabTapped"))) { _ in
+            print("📨 CalendarTabTapped notification received")
+            print("🔍 isCalendarViewActive: \(isCalendarViewActive)")
             // カレンダータブがタップされた際の処理
             // カレンダー画面がアクティブな状態でカレンダータブがタップされた場合のみジャンプ
             if isCalendarViewActive {
+                print("🎯 Jumping to current month")
                 jumpToCurrentMonth()
+            } else {
+                print("❌ Calendar view not active - skipping jump")
             }
         }
     }
@@ -795,16 +800,16 @@ struct CustomCalendarView: View {
                 Spacer().frame(height: 16)
             }
             
-            // ③通常予定を表示（期間予定で使用された分を除く）
-            let remainingSlots = max(0, 2 - displayedMultiDayCount)
+            // ③通常予定を表示（期間予定と祝日で使用された分を除く）
+            let remainingSlots = max(0, 2 - displayedMultiDayCount - holidayCount)
             let regularSchedulesToShow = allDaySchedules + timedSchedules
             
-            // 祝日がある場合は終日予定の位置を調整
+            // 祝日がある場合は1個目の予定のみ位置を調整
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(0..<min(remainingSlots, regularSchedulesToShow.count), id: \.self) { index in
                     let schedule = regularSchedulesToShow[index]
                     regularScheduleItemView(schedule: schedule)
-                        .padding(.top, hasHoliday ? 18 : 0) // 祝日がある場合は下にずらす
+                        .offset(y: hasHoliday && index == 0 ? 18 : 0) // 祝日がある場合は1個目のみ下にずらして重複を避ける
                 }
             }
             
