@@ -199,13 +199,13 @@ struct NotificationSettings: Codable, Equatable {
     var notifications: [NotificationTiming] = []
 
     // 下位互換性のため保持（UI用）
-    var value: Int = 15
+    var value: Int = 5
     var unit: NotificationUnit = .minutes
 
     init() {
         self.isEnabled = false
         self.notifications = []
-        self.value = 15
+        self.value = 5
         self.unit = .minutes
     }
 
@@ -217,7 +217,7 @@ struct NotificationSettings: Codable, Equatable {
             self.value = first.value
             self.unit = first.unit
         } else {
-            self.value = 15
+            self.value = 5
             self.unit = .minutes
         }
     }

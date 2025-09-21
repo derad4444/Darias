@@ -49,8 +49,8 @@ struct ScheduleItem: Identifiable {
     var tag: String
     var memo: String
     var repeatOption: String
-    var remindValue: Int
-    var remindUnit: String
+    var remindValue: Int = 0
+    var remindUnit: String = ""
     var recurringGroupId: String? // 繰り返し予定のグループID
     var notificationSettings: NotificationSettings? // 通知設定
 }

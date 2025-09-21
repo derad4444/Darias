@@ -35,6 +35,11 @@ Object.defineProperty(exports, "generateMonthlyReviewHttp", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "sendRegistrationEmail", {
+  get: () => require("./src/functions/sendRegistrationEmail").sendRegistrationEmail,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

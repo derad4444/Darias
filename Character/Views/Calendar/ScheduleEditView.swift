@@ -1,5 +1,4 @@
 import SwiftUI
-import FirebaseFirestore
 
 struct ScheduleEditView: View {
     let schedule: ScheduleItem  // ✅ ScheduleItemを受け取る
@@ -26,6 +25,9 @@ struct ScheduleEditView: View {
     @State private var showNotificationSettings = false
     @State private var showDateValidationAlert = false
     @State private var errorMessage = ""
+    @State private var isCreatingRecurringSchedules = false
+    @State private var recurringProgress = 0
+    @State private var recurringTotal = 0
 
     @Environment(\.dismiss) private var dismiss
 
@@ -63,6 +65,9 @@ struct ScheduleEditView: View {
 
         // 既存の繰り返し設定を復元
         _repeatSettings = State(initialValue: Self.parseRepeatOption(schedule.repeatOption))
+
+        // 既存の通知設定を復元
+        _notificationSettings = State(initialValue: schedule.notificationSettings ?? NotificationSettings())
     }
 
     // 繰り返し設定の文字列から RepeatSettings を復元
@@ -312,6 +317,36 @@ struct ScheduleEditView: View {
                     }
                 }
         )
+        .overlay(
+            // 繰り返し予定作成中のローディングポップアップ
+            Group {
+                if isCreatingRecurringSchedules {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+
+                            Text("繰り返し予定を作成中...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            Text("\(recurringTotal)件の予定を作成中")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black.opacity(0.8))
+                        )
+                    }
+                }
+            }
+        )
     }
 
     @ViewBuilder
@@ -353,61 +388,37 @@ struct ScheduleEditView: View {
     }
 
     private func updateExistingSchedule(startDate: Date, endDate: Date) {
-        let db = Firestore.firestore()
-        let docRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
-
-        let data: [String: Any] = [
-            "title": scheduleTitle,
-            "startDate": Timestamp(date: startDate),
-            "endDate": Timestamp(date: endDate),
-            "isAllDay": isAllDay,
-            "location": location,
-            "tag": tag,
-            "memo": memo,
-            "repeatOption": repeatSettings.getDescription(for: startDate)
-        ]
-
-        print("📋 繰り返し設定: \(repeatSettings.type)")
-        print("📋 既存groupId: \(schedule.recurringGroupId ?? "なし")")
 
         // editSingleOnlyフラグに基づく処理分岐
         if editSingleOnly {
-            // 単一予定のみ編集：まず通常の更新を行い、その後recurringGroupIdを削除
-            docRef.setData(data) { error in
-                if let error = error {
-                    print("❌ 単一予定更新エラー: \(error)")
-                    return
-                }
+            // 単一予定のみ編集：FirestoreManagerを使用して更新、その後グループから分離
+            var updatedSchedule = ScheduleItem(
+                id: schedule.id,
+                title: scheduleTitle,
+                isAllDay: isAllDay,
+                startDate: startDate,
+                endDate: endDate,
+                location: location,
+                tag: tag,
+                memo: memo,
+                repeatOption: repeatSettings.getDescription(for: startDate),
+                recurringGroupId: nil
+            )
+            // 通知設定をScheduleItemに設定
+            updatedSchedule.notificationSettings = notificationSettings
 
-                // 更新成功後、recurringGroupIdを削除
-                docRef.updateData(["recurringGroupId": FieldValue.delete()]) { deleteError in
-                    if let deleteError = deleteError {
-                        print("❌ recurringGroupId削除エラー: \(deleteError)")
-                        return
+            let firestoreManager = FirestoreManager()
+            firestoreManager.updateSchedule(updatedSchedule) { success in
+                if success {
+                    // 更新成功後、recurringGroupIdを削除してグループから分離
+                    firestoreManager.removeSingleFromGroup(scheduleId: schedule.id) { removeSuccess in
+                        if removeSuccess {
+                            // 新しい通知システムを使用
+                            NotificationManager.shared.updateNotifications(for: updatedSchedule)
+                            self.notifyScheduleUpdate()
+                            DispatchQueue.main.async { dismiss() }
+                        }
                     }
-
-                    NotificationManager.shared.removeNotification(for: schedule.id)
-                    var updatedSchedule = ScheduleItem(
-                        id: schedule.id,
-                        title: scheduleTitle,
-                        isAllDay: isAllDay,
-                        startDate: startDate,
-                        endDate: endDate,
-                        location: location,
-                        tag: tag,
-                        memo: memo,
-                        repeatOption: repeatSettings.getDescription(for: startDate),
-                        remindValue: 0,
-                        remindUnit: "",
-                        recurringGroupId: nil
-                    )
-                    // 通知設定をScheduleItemに設定
-                    updatedSchedule.notificationSettings = notificationSettings
-
-                    // 新しい通知システムを使用
-                    NotificationManager.shared.updateNotifications(for: updatedSchedule)
-                    self.notifyScheduleUpdate()
-                    DispatchQueue.main.async { dismiss() }
                 }
             }
             return
@@ -479,8 +490,6 @@ struct ScheduleEditView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: startDate),
-                remindValue: 0,
-                remindUnit: "",
                 recurringGroupId: nil
             )
             // 通知設定をScheduleItemに設定
@@ -499,67 +508,21 @@ struct ScheduleEditView: View {
         }
     }
 
-    // 既存の繰り返しグループを削除
+    // 既存の繰り返しグループを削除 (FirestoreManagerの統一メソッドを使用)
     private func deleteRecurringGroup(groupId: String, completion: @escaping () -> Void) {
-        print("🔄 削除処理開始: groupId=\(groupId)")
-        let db = Firestore.firestore()
-        let schedulesRef = db.collection("users").document(userId).collection("schedules")
-
-        schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
-            if let error = error {
-                print("❌ 削除クエリエラー: \(error)")
-                completion()
-                return
-            }
-
-            guard let documents = snapshot?.documents else {
-                print("📝 削除対象の予定が見つかりません")
-                completion()
-                return
-            }
-
-            print("🔍 削除対象予定数: \(documents.count)")
-            let group = DispatchGroup()
-
-            for document in documents {
-                print("🗑️ 削除中: \(document.documentID)")
-                group.enter()
-                document.reference.delete { error in
-                    if let error = error {
-                        print("❌ 予定削除エラー: \(document.documentID) - \(error)")
-                    } else {
-                        print("✅ 予定削除成功: \(document.documentID)")
-                        // 通知も削除
-                        NotificationManager.shared.removeNotification(for: document.documentID)
-                    }
-                    group.leave()
-                }
-            }
-
-            group.notify(queue: .main) {
-                print("✅ 削除処理完了")
+        let firestoreManager = FirestoreManager()
+        firestoreManager.deleteRecurringGroup(groupId: groupId) { success in
+            DispatchQueue.main.async {
                 completion()
             }
         }
     }
 
-    // 他の関連予定のみ削除（指定した予定は残す）
+    // 他の関連予定のみ削除（指定した予定は残す） (FirestoreManagerの統一メソッドを使用)
     private func deleteOtherRecurringSchedules(groupId: String, keepScheduleId: String) {
-        let db = Firestore.firestore()
-        let schedulesRef = db.collection("users").document(userId).collection("schedules")
-
-        schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
-            guard let documents = snapshot?.documents else { return }
-
-            for document in documents {
-                if document.documentID != keepScheduleId {
-                    document.reference.delete { error in
-                        if error == nil {
-                            NotificationManager.shared.removeNotification(for: document.documentID)
-                        }
-                    }
-                }
-            }
+        let firestoreManager = FirestoreManager()
+        firestoreManager.deleteOthersInGroup(groupId: groupId, keepScheduleId: keepScheduleId) { success in
+            // 削除完了
         }
     }
 
@@ -573,21 +536,16 @@ struct ScheduleEditView: View {
         }
     }
 
-    // 新しい繰り返し予定群を作成（完全に新規作成、元予定のIDは使用しない）
+    // 新しい繰り返し予定群を作成（完全に新規作成、元予定のIDは使用しない）(FirestoreManagerの統一メソッドを使用)
     private func createNewRecurringSchedulesOnly(baseStartDate: Date, baseEndDate: Date) {
-        print("🔄 完全新規で繰り返し予定群を作成開始")
         let duration = baseEndDate.timeIntervalSince(baseStartDate)
         let recurringDates = repeatSettings.generateDates(from: baseStartDate)
         let newGroupId = UUID().uuidString
 
-        print("📅 生成される日付数: \(recurringDates.count)")
-
-        let db = Firestore.firestore()
-        var successCount = 0
-        let totalCount = recurringDates.count
+        var schedules: [ScheduleItem] = []
 
         // 全ての予定を完全に新規作成
-        for (index, date) in recurringDates.enumerated() {
+        for date in recurringDates {
             let scheduleStartDate = date
             let scheduleEndDate = Date(timeInterval: duration, since: date)
             let scheduleId = UUID().uuidString // 全て新しいIDを使用
@@ -602,70 +560,34 @@ struct ScheduleEditView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: baseStartDate),
-                remindValue: 0,
-                remindUnit: "",
                 recurringGroupId: newGroupId
             )
 
             // 通知設定をScheduleItemに設定
             newSchedule.notificationSettings = notificationSettings
+            schedules.append(newSchedule)
+        }
 
-            let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
-
-            let data: [String: Any] = [
-                "title": newSchedule.title,
-                "startDate": Timestamp(date: newSchedule.startDate),
-                "endDate": Timestamp(date: newSchedule.endDate),
-                "isAllDay": newSchedule.isAllDay,
-                "location": newSchedule.location,
-                "tag": newSchedule.tag,
-                "memo": newSchedule.memo,
-                "repeatOption": newSchedule.repeatOption,
-                "recurringGroupId": newGroupId
-            ]
-
-            print("📝 新規予定作成中: \(index + 1)/\(totalCount) - \(scheduleId)")
-
-            docRef.setData(data) { error in
-                if error == nil {
-                    print("✅ 新規予定作成成功: \(scheduleId)")
-                    successCount += 1
-                    // 新しい通知システムを使用
-                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
-
-                    if successCount == totalCount {
-                        print("✅ 全ての新規繰り返し予定作成完了")
-                        self.notifyScheduleUpdate()
-                        DispatchQueue.main.async {
-                            dismiss()
-                        }
-                    }
-                } else {
-                    print("❌ 新規予定作成エラー: \(scheduleId) - \(error!)")
-                    successCount += 1
-                    if successCount == totalCount {
-                        self.notifyScheduleUpdate()
-                        DispatchQueue.main.async {
-                            dismiss()
-                        }
-                    }
-                }
+        // FirestoreManagerの統一メソッドを使用して一括作成
+        isCreatingRecurringSchedules = true
+        recurringTotal = schedules.count
+        let firestoreManager = FirestoreManager()
+        firestoreManager.createRecurringSchedules(schedules) { success in
+            DispatchQueue.main.async {
+                self.isCreatingRecurringSchedules = false
+                self.notifyScheduleUpdate()
+                dismiss()
             }
         }
     }
 
-    // 新しい繰り返し予定群を作成（全て新規作成）
+    // 新しい繰り返し予定群を作成（全て新規作成） (FirestoreManagerの統一メソッドを使用)
     private func createNewRecurringSchedules(baseStartDate: Date, baseEndDate: Date, updatedScheduleId: String) {
-        print("🔄 新しい繰り返し予定群を作成開始")
         let duration = baseEndDate.timeIntervalSince(baseStartDate)
         let recurringDates = repeatSettings.generateDates(from: baseStartDate)
         let newGroupId = UUID().uuidString
 
-        print("📅 生成される日付数: \(recurringDates.count)")
-
-        let db = Firestore.firestore()
-        var successCount = 0
-        let totalCount = recurringDates.count
+        var schedules: [ScheduleItem] = []
 
         // 全ての予定を新規作成（元の予定も含めて）
         for (index, date) in recurringDates.enumerated() {
@@ -685,61 +607,35 @@ struct ScheduleEditView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: baseStartDate),
-                remindValue: 0,
-                remindUnit: "",
                 recurringGroupId: newGroupId
             )
 
             // 通知設定をScheduleItemに設定
             newSchedule.notificationSettings = notificationSettings
+            schedules.append(newSchedule)
+        }
 
-            let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
-
-            let data: [String: Any] = [
-                "title": newSchedule.title,
-                "startDate": Timestamp(date: newSchedule.startDate),
-                "endDate": Timestamp(date: newSchedule.endDate),
-                "isAllDay": newSchedule.isAllDay,
-                "location": newSchedule.location,
-                "tag": newSchedule.tag,
-                "memo": newSchedule.memo,
-                "repeatOption": newSchedule.repeatOption,
-                "recurringGroupId": newGroupId
-            ]
-
-            print("📝 予定作成中: \(index + 1)/\(totalCount) - \(scheduleId)")
-
-            docRef.setData(data) { error in
-                if error == nil {
-                    print("✅ 予定作成成功: \(scheduleId)")
-                    successCount += 1
-                    // 新しい通知システムを使用
-                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
-
-                    if successCount == totalCount {
-                        print("✅ 全ての繰り返し予定作成完了")
-                    }
-                } else {
-                    print("❌ 予定作成エラー: \(scheduleId) - \(error!)")
-                    successCount += 1
-                }
+        // FirestoreManagerの統一メソッドを使用して一括作成
+        isCreatingRecurringSchedules = true
+        recurringTotal = schedules.count
+        let firestoreManager = FirestoreManager()
+        firestoreManager.createRecurringSchedules(schedules) { success in
+            DispatchQueue.main.async {
+                self.isCreatingRecurringSchedules = false
             }
         }
     }
 
-    // 編集時に追加の繰り返し予定を作成（単発→繰り返し）
+    // 編集時に追加の繰り返し予定を作成（単発→繰り返し） (FirestoreManagerの統一メソッドを使用)
     private func createAdditionalRecurringSchedules(baseStartDate: Date, baseEndDate: Date) {
         let duration = baseEndDate.timeIntervalSince(baseStartDate)
         let recurringDates = repeatSettings.generateDates(from: baseStartDate)
         let groupId = UUID().uuidString
 
-        // 元の予定にグループIDを設定
-        let db = Firestore.firestore()
-        let originalDocRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
-        originalDocRef.updateData(["recurringGroupId": groupId])
+        var schedules: [ScheduleItem] = []
 
-        // 最初の予定（既に更新済み）を除いて、残りの予定を作成
-        for date in recurringDates.dropFirst() {
+        // 全ての予定を作成（元の予定も含めて新しいグループIDで再作成）
+        for date in recurringDates {
             let scheduleStartDate = date
             let scheduleEndDate = Date(timeInterval: duration, since: date)
 
@@ -753,33 +649,21 @@ struct ScheduleEditView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: baseStartDate),
-                remindValue: 0,
-                remindUnit: "",
                 recurringGroupId: groupId
             )
 
             // 通知設定をScheduleItemに設定
             newSchedule.notificationSettings = notificationSettings
+            schedules.append(newSchedule)
+        }
 
-            let newDocRef = db.collection("users").document(userId).collection("schedules").document(newSchedule.id)
-
-            let data: [String: Any] = [
-                "title": newSchedule.title,
-                "startDate": Timestamp(date: newSchedule.startDate),
-                "endDate": Timestamp(date: newSchedule.endDate),
-                "isAllDay": newSchedule.isAllDay,
-                "location": newSchedule.location,
-                "tag": newSchedule.tag,
-                "memo": newSchedule.memo,
-                "repeatOption": newSchedule.repeatOption,
-                "recurringGroupId": groupId
-            ]
-
-            newDocRef.setData(data) { error in
-                if error == nil {
-                    // 新しい通知システムを使用
-                    NotificationManager.shared.scheduleNotifications(for: newSchedule)
-                }
+        // FirestoreManagerの統一メソッドを使用して一括作成
+        isCreatingRecurringSchedules = true
+        recurringTotal = schedules.count
+        let firestoreManager = FirestoreManager()
+        firestoreManager.createRecurringSchedules(schedules) { success in
+            DispatchQueue.main.async {
+                self.isCreatingRecurringSchedules = false
             }
         }
     }
@@ -799,8 +683,6 @@ struct ScheduleEditView_Previews: PreviewProvider {
                 tag: "忙しいなぁ",
                 memo: "プライベート",
                 repeatOption: "繰り返さない",
-                remindValue: 5,
-                remindUnit: "分前"
             ), userId: "preview_user_id")
             .environmentObject(FontSettingsManager.shared)
         }

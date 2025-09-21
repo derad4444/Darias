@@ -108,8 +108,14 @@ struct ScheduleDetailView: View {
                             
                             // 各項目リスト
                             VStack(spacing: 16) {
-                                if schedule.remindValue > 0 {
-                                    detailRow(icon: "alarm", label: "\(schedule.remindValue)\(schedule.remindUnit)前")
+                                // 通知設定の表示
+                                if let notificationSettings = schedule.notificationSettings,
+                                   notificationSettings.isEnabled,
+                                   !notificationSettings.notifications.isEmpty {
+                                    detailRow(icon: "bell", label: notificationSettings.getDescription())
+                                } else if schedule.remindValue > 0 {
+                                    // 従来の通知設定がある場合（下位互換性）
+                                    detailRow(icon: "bell", label: "\(schedule.remindValue)\(schedule.remindUnit)前")
                                 }
                                 if !schedule.repeatOption.isEmpty {
                                     detailRow(icon: "calendar", label: schedule.repeatOption)
@@ -479,8 +485,6 @@ struct ScheduleDetailView_Previews: PreviewProvider {
                 tag: "仕事",
                 memo: "定期検診のため",
                 repeatOption: "繰り返さない",
-                remindValue: 5,
-                remindUnit: "分前"
             ), userId: "preview_user_id")
             .environmentObject(FontSettingsManager.shared)
         }

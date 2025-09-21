@@ -23,8 +23,6 @@ class ScheduleManager: ObservableObject {
             "tag": "", // デフォルト値
             "memo": scheduleData.memo,
             "repeatOption": "none", // デフォルト値
-            "remindValue": 0, // デフォルト値
-            "remindUnit": "none", // デフォルト値
             "created_at": Timestamp(date: Date())
         ]
         
@@ -52,15 +50,15 @@ class ScheduleManager: ObservableObject {
     private func scheduleNotification(for scheduleData: ExtractedScheduleData) {
         guard let startDate = scheduleData.startDate else { return }
         
-        // 15分前に通知を設定
-        let notificationDate = Calendar.current.date(byAdding: .minute, value: -15, to: startDate)
+        // 5分前に通知を設定
+        let notificationDate = Calendar.current.date(byAdding: .minute, value: -5, to: startDate)
         
         guard let notificationDate = notificationDate, notificationDate > Date() else {
             return
         }
         
         let notificationManager = NotificationManager.shared
-        let timing = NotificationTiming(value: 15, unit: .minutes)
+        let timing = NotificationTiming(value: 5, unit: .minutes)
         let notificationSettings = NotificationSettings(
             isEnabled: true,
             notifications: [timing]
@@ -77,8 +75,6 @@ class ScheduleManager: ObservableObject {
             tag: "", // デフォルト値
             memo: scheduleData.memo,
             repeatOption: "none",
-            remindValue: 15,
-            remindUnit: "minutes"
         )
         
         notificationManager.scheduleNotification(for: scheduleItem, notificationSettings: notificationSettings)

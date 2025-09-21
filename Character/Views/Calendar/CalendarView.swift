@@ -1435,9 +1435,8 @@ struct CustomCalendarView: View {
             tag: schedule.tag,
             memo: schedule.memo,
             repeatOption: schedule.repeatOption,
-            remindValue: schedule.remindValue,
-            remindUnit: schedule.remindUnit,
-            recurringGroupId: schedule.recurringGroupId
+            recurringGroupId: schedule.recurringGroupId,
+            notificationSettings: schedule.notificationSettings
         )
     }
     
@@ -1835,9 +1834,8 @@ struct BottomSheetView: View {
             tag: schedule.tag,
             memo: schedule.memo,
             repeatOption: schedule.repeatOption,
-            remindValue: schedule.remindValue,
-            remindUnit: schedule.remindUnit,
-            recurringGroupId: schedule.recurringGroupId
+            recurringGroupId: schedule.recurringGroupId,
+            notificationSettings: schedule.notificationSettings
         ), userId: userId)) {
             VStack(alignment: .center, spacing: 2) {
                 if schedule.isAllDay || schedule.isMultiDay {

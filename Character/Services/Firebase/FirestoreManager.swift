@@ -227,9 +227,7 @@ class FirestoreManager: ObservableObject {
             "location": schedule.location,
             "tag": schedule.tag,
             "memo": schedule.memo,
-            "repeatOption": schedule.repeatOption,
-            "remindValue": schedule.remindValue,
-            "remindUnit": schedule.remindUnit
+            "repeatOption": schedule.repeatOption
         ]
 
         // recurringGroupIdがある場合は追加
@@ -310,64 +308,155 @@ class FirestoreManager: ObservableObject {
         }
     }
 
-    // 繰り返し予定グループを削除する
-    func deleteRecurringGroup(groupId: String, completion: @escaping (Bool) -> Void) {
+
+    // 繰り返し予定の一括作成
+    func createRecurringSchedules(_ schedules: [ScheduleItem], completion: @escaping (Bool) -> Void) {
         guard let userId = userId else {
-            print("❌ deleteRecurringGroup: userId is nil")
             completion(false)
             return
         }
 
+        let totalCount = schedules.count
+        var successCount = 0
+        var hasError = false
 
+        for schedule in schedules {
+            var data = createScheduleData(from: schedule)
+            data["created_at"] = Timestamp()
 
-        // まず同じgroupIdを持つ全ての予定を取得
-        db.collection("users").document(userId).collection("schedules")
-            .whereField("recurringGroupId", isEqualTo: groupId)
-            .getDocuments { snapshot, error in
+            let docRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
+            docRef.setData(data) { error in
                 if let error = error {
-                    print("❌ Failed to fetch recurring group: \(error)")
-                    completion(false)
-                    return
+                    print("❌ 繰り返し予定作成エラー: \(error)")
+                    hasError = true
+                } else {
+                    print("✅ 繰り返し予定作成成功: \(schedule.id)")
                 }
 
-                guard let documents = snapshot?.documents else {
-                    print("❌ No documents found for group: \(groupId)")
-                    completion(false)
-                    return
+                successCount += 1
+                if successCount == totalCount {
+                    DispatchQueue.main.async {
+                        NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
+                    }
+                    completion(!hasError)
                 }
+            }
+        }
+    }
 
+    // 繰り返し予定グループの削除
+    func deleteRecurringGroup(groupId: String, completion: @escaping (Bool) -> Void) {
+        guard let userId = userId else {
+            completion(false)
+            return
+        }
 
-                if documents.isEmpty {
-                    print("❌ No schedules found with recurringGroupId: \(groupId)")
-                    completion(false)
-                    return
-                }
+        let schedulesRef = db.collection("users").document(userId).collection("schedules")
+        schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
+            if let error = error {
+                print("❌ グループ削除クエリエラー: \(error)")
+                completion(false)
+                return
+            }
 
-                // バッチ削除を実行
-                let batch = self.db.batch()
-                for document in documents {
-                    batch.deleteDocument(document.reference)
-                }
-                batch.commit { error in
+            guard let documents = snapshot?.documents else {
+                completion(true) // 削除対象がない場合は成功
+                return
+            }
+
+            let totalCount = documents.count
+            var successCount = 0
+
+            if totalCount == 0 {
+                completion(true)
+                return
+            }
+
+            for document in documents {
+                document.reference.delete { error in
                     if let error = error {
-                        print("❌ Batch delete error: \(error)")
-                        completion(false)
+                        print("❌ 予定削除エラー: \(document.documentID) - \(error)")
                     } else {
-                        print("✅ Recurring group deleted: \(groupId), count: \(documents.count)")
-                        // ローカルの予定リストからも削除
-                        DispatchQueue.main.async {
-                            self.schedules.removeAll { $0.recurringGroupId == groupId }
+                        // 通知も削除
+                        NotificationManager.shared.removeNotifications(for: document.documentID)
+                    }
 
-                            // 削除完了の通知を送信
-                            NotificationCenter.default.post(
-                                name: .init("ScheduleDeleted"),
-                                object: nil,
-                                userInfo: ["recurringGroupId": groupId]
-                            )
+                    successCount += 1
+                    if successCount == totalCount {
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: .init("ScheduleDeleted"), object: nil)
                         }
                         completion(true)
                     }
                 }
             }
+        }
+    }
+
+    // 単一予定のrecurringGroupIdを削除
+    func removeSingleFromGroup(scheduleId: String, completion: @escaping (Bool) -> Void) {
+        guard let userId = userId else {
+            completion(false)
+            return
+        }
+
+        let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
+        docRef.updateData(["recurringGroupId": FieldValue.delete()]) { error in
+            if let error = error {
+                print("❌ recurringGroupId削除エラー: \(error)")
+                completion(false)
+            } else {
+                print("✅ 予定をグループから分離: \(scheduleId)")
+                completion(true)
+            }
+        }
+    }
+
+    // 繰り返しグループから特定の予定以外を削除
+    func deleteOthersInGroup(groupId: String, keepScheduleId: String, completion: @escaping (Bool) -> Void) {
+        guard let userId = userId else {
+            completion(false)
+            return
+        }
+
+        let schedulesRef = db.collection("users").document(userId).collection("schedules")
+        schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
+            if let error = error {
+                print("❌ グループ取得エラー: \(error)")
+                completion(false)
+                return
+            }
+
+            guard let documents = snapshot?.documents else {
+                completion(true)
+                return
+            }
+
+            let documentsToDelete = documents.filter { $0.documentID != keepScheduleId }
+
+            if documentsToDelete.isEmpty {
+                completion(true)
+                return
+            }
+
+            let totalCount = documentsToDelete.count
+            var successCount = 0
+
+            for document in documentsToDelete {
+                document.reference.delete { error in
+                    if error == nil {
+                        NotificationManager.shared.removeNotifications(for: document.documentID)
+                    }
+
+                    successCount += 1
+                    if successCount == totalCount {
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: .init("ScheduleDeleted"), object: nil)
+                        }
+                        completion(true)
+                    }
+                }
+            }
+        }
     }
 }

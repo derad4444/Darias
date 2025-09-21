@@ -5,6 +5,8 @@ const {defineSecret} = require("firebase-functions/params");
 
 // 環境変数とシークレットの定義
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+const GMAIL_USER = defineSecret("GMAIL_USER");
+const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
 
 // アプリケーション設定
 const CONFIG = {
@@ -44,4 +46,6 @@ const CONFIG = {
 module.exports = {
   CONFIG,
   OPENAI_API_KEY,
+  GMAIL_USER,
+  GMAIL_APP_PASSWORD,
 };

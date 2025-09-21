@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct NotificationSettingsView: View {
     @ObservedObject var colorSettings = ColorSettingsManager.shared
@@ -10,12 +11,14 @@ struct NotificationSettingsView: View {
     @State private var isEnabled: Bool
     @State private var selectedValue: Int
     @State private var selectedUnit: NotificationUnit
+    @State private var valueText: String
     
     init(notificationSettings: Binding<NotificationSettings>) {
         self._notificationSettings = notificationSettings
         self._isEnabled = State(initialValue: notificationSettings.wrappedValue.isEnabled)
         self._selectedValue = State(initialValue: notificationSettings.wrappedValue.value)
         self._selectedUnit = State(initialValue: notificationSettings.wrappedValue.unit)
+        self._valueText = State(initialValue: String(notificationSettings.wrappedValue.value))
     }
     
     var body: some View {
@@ -131,75 +134,142 @@ struct NotificationSettingsView: View {
             Text("通知タイミング")
                 .dynamicHeadline()
                 .foregroundColor(colorSettings.getCurrentTextColor())
-            
-            // 数値選択
-            VStack(alignment: .leading, spacing: 8) {
-                Text("時間")
-                    .dynamicCallout()
-                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
-                
-                HStack {
-                    Button(action: {
-                        if selectedValue > 1 {
-                            selectedValue -= 1
-                        }
-                    }) {
-                        Image(systemName: "minus.circle")
-                            .foregroundColor(colorSettings.getCurrentAccentColor())
-                            .font(.title2)
-                    }
-                    
-                    Spacer()
-                    
-                    Text("\(selectedValue)")
-                        .dynamicTitle2()
-                        .foregroundColor(colorSettings.getCurrentTextColor())
-                        .frame(minWidth: 50)
-                    
-                    Spacer()
-                    
-                    Button(action: {
-                        if selectedValue < 999 {
-                            selectedValue += 1
-                        }
-                    }) {
-                        Image(systemName: "plus.circle")
-                            .foregroundColor(colorSettings.getCurrentAccentColor())
-                            .font(.title2)
-                    }
-                }
-                .padding()
-                .background(Color.white.opacity(0.1))
-                .cornerRadius(8)
-            }
-            
-            // 単位選択
-            VStack(alignment: .leading, spacing: 8) {
-                Text("単位")
-                    .dynamicCallout()
-                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
-                
-                HStack(spacing: 8) {
-                    ForEach(NotificationUnit.allCases, id: \.self) { unit in
-                        Button(action: {
-                            selectedUnit = unit
-                        }) {
-                            Text(unit.displayName)
-                                .dynamicCallout()
-                                .foregroundColor(selectedUnit == unit ? .white : colorSettings.getCurrentTextColor())
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 8)
-                                .background(selectedUnit == unit ? colorSettings.getCurrentAccentColor() : Color.white.opacity(0.15))
-                                .cornerRadius(20)
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                    }
-                }
-            }
+
+            valueInputSection()
+            unitSelectionSection()
         }
         .padding()
         .background(Color.white.opacity(0.15))
         .cornerRadius(12)
+    }
+
+    @ViewBuilder
+    private func valueInputSection() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("時間")
+                .dynamicCallout()
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+
+            valueInputControls()
+        }
+    }
+
+    @ViewBuilder
+    private func valueInputControls() -> some View {
+        HStack {
+            minusButton()
+            Spacer()
+            valueTextField()
+            Spacer()
+            plusButton()
+        }
+        .padding()
+        .background(Color.white.opacity(0.1))
+        .cornerRadius(8)
+    }
+
+    @ViewBuilder
+    private func minusButton() -> some View {
+        Button(action: {
+            if selectedValue > 1 {
+                selectedValue -= 1
+                valueText = String(selectedValue)
+            }
+        }) {
+            Image(systemName: "minus.circle")
+                .foregroundColor(colorSettings.getCurrentAccentColor())
+                .font(.title2)
+        }
+    }
+
+    @ViewBuilder
+    private func valueTextField() -> some View {
+        TextField("", text: $valueText)
+            .font(.title2.weight(.bold))
+            .foregroundColor(colorSettings.getCurrentTextColor())
+            .multilineTextAlignment(.center)
+            .frame(minWidth: 60, minHeight: 40)
+            .background(Color.white.opacity(0.2))
+            .cornerRadius(8)
+#if os(iOS)
+            .keyboardType(.numberPad)
+#endif
+            .onChange(of: valueText) { newValue in
+                handleValueTextChange(newValue)
+            }
+            .onSubmit {
+                handleValueTextSubmit()
+            }
+    }
+
+    @ViewBuilder
+    private func plusButton() -> some View {
+        Button(action: {
+            if selectedValue < 999 {
+                selectedValue += 1
+                valueText = String(selectedValue)
+            }
+        }) {
+            Image(systemName: "plus.circle")
+                .foregroundColor(colorSettings.getCurrentAccentColor())
+                .font(.title2)
+        }
+    }
+
+    @ViewBuilder
+    private func unitSelectionSection() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("単位")
+                .dynamicCallout()
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+
+            HStack(spacing: 8) {
+                ForEach(NotificationUnit.allCases, id: \.self) { unit in
+                    unitButton(for: unit)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func unitButton(for unit: NotificationUnit) -> some View {
+        Button(action: {
+            selectedUnit = unit
+        }) {
+            Text(unit.displayName)
+                .dynamicCallout()
+                .foregroundColor(selectedUnit == unit ? .white : colorSettings.getCurrentTextColor())
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(selectedUnit == unit ? colorSettings.getCurrentAccentColor() : Color.white.opacity(0.15))
+                .cornerRadius(20)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func handleValueTextChange(_ newValue: String) {
+        // 数字のみを許可し、範囲をチェック
+        let filtered = newValue.filter { $0.isNumber }
+        if filtered != newValue {
+            valueText = filtered
+        }
+
+        if let intValue = Int(filtered), intValue >= 1, intValue <= 999 {
+            selectedValue = intValue
+        } else if filtered.isEmpty {
+            // 空の場合は一時的に許可
+            // 値は前回のまま保持
+        } else {
+            // 範囲外の場合は前の値に戻す
+            valueText = String(selectedValue)
+        }
+    }
+
+    private func handleValueTextSubmit() {
+        // 入力完了時の処理
+        if valueText.isEmpty || Int(valueText) == nil {
+            valueText = String(selectedValue)
+        }
     }
     
     

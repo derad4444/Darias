@@ -13,8 +13,6 @@ struct ScheduleAddView: View {
     @State private var isAllDay = false
     @State private var startDate = Date()
     @State private var endDate = Date()
-    @State private var remindValue = ""
-    @State private var remindUnit = "分前"
     @State private var location = ""
     @State private var repeatSettings = RepeatSettings()
     @State private var notificationSettings = NotificationSettings()
@@ -24,6 +22,9 @@ struct ScheduleAddView: View {
     @State private var showRepeatSettings = false
     @State private var showNotificationSettings = false
     @State private var showDateValidationAlert = false
+    @State private var isCreatingRecurringSchedules = false
+    @State private var recurringProgress = 0
+    @State private var recurringTotal = 0
     
     private var dynamicHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -279,6 +280,41 @@ struct ScheduleAddView: View {
                 }
         )
 #endif
+        .overlay(
+            // 繰り返し予定作成中のローディングポップアップ
+            Group {
+                if isCreatingRecurringSchedules {
+                    ZStack {
+                        Color.black.opacity(0.4)
+                            .ignoresSafeArea()
+
+                        VStack(spacing: 20) {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(1.5)
+
+                            Text("繰り返し予定を作成中...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+
+                            Text("\(recurringProgress) / \(recurringTotal)")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.8))
+
+                            // プログレスバー
+                            ProgressView(value: Double(recurringProgress), total: Double(recurringTotal))
+                                .progressViewStyle(LinearProgressViewStyle(tint: .white))
+                                .frame(width: 200)
+                        }
+                        .padding(30)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16)
+                                .fill(Color.black.opacity(0.8))
+                        )
+                    }
+                }
+            }
+        )
     }
     
     // 予定を追加する関数
@@ -300,6 +336,7 @@ struct ScheduleAddView: View {
 
         // 繰り返し予定の場合は複数の予定を生成
         if repeatSettings.type != .none {
+            isCreatingRecurringSchedules = true
             createRecurringSchedules(
                 baseStartDate: finalStartDate,
                 baseEndDate: finalEndDate
@@ -316,8 +353,6 @@ struct ScheduleAddView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: finalStartDate),
-                remindValue: Int(remindValue) ?? 0,
-                remindUnit: remindUnit,
                 recurringGroupId: nil
             )
 
@@ -345,6 +380,12 @@ struct ScheduleAddView: View {
         var successCount = 0
         let totalCount = recurringDates.count
 
+        // 進捗状況を初期化
+        DispatchQueue.main.async {
+            self.recurringTotal = totalCount
+            self.recurringProgress = 0
+        }
+
         for (index, date) in recurringDates.enumerated() {
             let scheduleStartDate = date
             let scheduleEndDate = Date(timeInterval: duration, since: date)
@@ -359,8 +400,6 @@ struct ScheduleAddView: View {
                 tag: tag,
                 memo: memo,
                 repeatOption: repeatSettings.getDescription(for: baseStartDate),
-                remindValue: Int(remindValue) ?? 0,
-                remindUnit: remindUnit,
                 recurringGroupId: groupId
             )
 
@@ -368,25 +407,27 @@ struct ScheduleAddView: View {
             schedule.notificationSettings = notificationSettings
 
             firestoreManager.addSchedule(schedule, for: userId) { success in
-                if success {
-                    successCount += 1
+                DispatchQueue.main.async {
+                    if success {
+                        successCount += 1
+                        self.recurringProgress = successCount
 
-                    // 新しい通知システムを使用
-                    NotificationManager.shared.scheduleNotifications(for: schedule)
+                        // 新しい通知システムを使用
+                        NotificationManager.shared.scheduleNotifications(for: schedule)
 
-                    // 全ての予定の保存が完了したら画面を閉じる
-                    if successCount == totalCount {
-                        DispatchQueue.main.async {
+                        // 全ての予定の保存が完了したら画面を閉じる
+                        if successCount == totalCount {
+                            self.isCreatingRecurringSchedules = false
                             dismiss()
                         }
-                    }
-                } else {
-                    // エラー処理 - 部分的に失敗した場合の処理
-                    print("予定の保存に失敗しました: \(index + 1)/\(totalCount)")
-                    successCount += 1 // エラーでもカウントを増やして進行
+                    } else {
+                        // エラー処理 - 部分的に失敗した場合の処理
+                        print("予定の保存に失敗しました: \(index + 1)/\(totalCount)")
+                        successCount += 1 // エラーでもカウントを増やして進行
+                        self.recurringProgress = successCount
 
-                    if successCount == totalCount {
-                        DispatchQueue.main.async {
+                        if successCount == totalCount {
+                            self.isCreatingRecurringSchedules = false
                             dismiss()
                         }
                     }
