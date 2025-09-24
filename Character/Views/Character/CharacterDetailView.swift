@@ -423,7 +423,8 @@ struct CharacterDetailView: View {
     
     private func checkBig5Progress(completion: @escaping (Int) -> Void) {
         let db = Firestore.firestore()
-        db.collection("characters").document(characterId)
+        db.collection("users").document(userId)
+            .collection("characters").document(characterId)
             .collection("big5Progress").document("current")
             .getDocument { document, error in
                 if let data = document?.data(),

@@ -181,14 +181,22 @@ struct CalendarView: View {
     
     // 月次コメントを取得する関数
     private func fetchMonthlyComment() {
-        guard !characterId.isEmpty, !userId.isEmpty else { return }
-        
+        guard !characterId.isEmpty, !userId.isEmpty else {
+            print("⚠️ fetchMonthlyComment: characterId or userId is empty (characterId: '\(characterId)', userId: '\(userId)')")
+            // デフォルトメッセージを設定
+            self.monthlyComment = "今月もあなたらしく、素敵な時間を過ごしてくださいね！新しい発見や楽しい出来事があることを願っています。"
+            self.isLoadingComment = false
+            return
+        }
+
         let year = selectedYear
         let month = String(format: "%02d", selectedMonth)
         let monthId = "\(year)-\(month)"
-        
+
         isLoadingComment = true
-        
+
+        print("✅ fetchMonthlyComment: Fetching comment for user: \(userId), character: \(characterId), month: \(monthId)")
+
         let db = Firestore.firestore()
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
@@ -196,20 +204,22 @@ struct CalendarView: View {
             .getDocument { document, error in
                 DispatchQueue.main.async {
                     self.isLoadingComment = false
-                    
+
                     if let error = error {
                         print("❌ 月次コメント取得エラー: \(error)")
                         self.monthlyComment = "今月のひとことを取得できませんでした。"
                         return
                     }
-                    
+
                     if let document = document, document.exists,
                        let data = document.data(),
                        let comment = data["comment"] as? String {
                         self.monthlyComment = comment
+                        print("✅ 月次コメント取得成功: \(comment.prefix(30))...")
                     } else {
                         // フォールバック用デフォルトメッセージ
                         self.monthlyComment = "今月もあなたらしく、素敵な時間を過ごしてくださいね！新しい発見や楽しい出来事があることを願っています。"
+                        print("⚠️ 月次コメントが見つかりません - デフォルトメッセージを使用")
                     }
                 }
             }
@@ -241,10 +251,17 @@ struct CalendarView: View {
         // 祝日を最初に読み込む
         firestoreManager.fetchHolidays { [self] in
             isHolidaysLoaded = true
-            
+
             // 他のデータを読み込み
             firestoreManager.fetchSchedules()
-            firestoreManager.fetchDiaries(characterId: characterId)
+
+            // characterIdが空でない場合のみ日記を取得
+            if !characterId.isEmpty {
+                firestoreManager.fetchDiaries(characterId: characterId)
+            } else {
+                print("⚠️ loadInitialData: characterId is empty, skipping fetchDiaries")
+            }
+
             fetchMonthlyComment()
         }
     }
@@ -1907,40 +1924,42 @@ struct BottomSheetView: View {
     
     //日記取得
     private func queryDiary(for date: Date, completion: @escaping (_ documentID: String?) -> Void) {
+        guard !characterId.isEmpty, !userId.isEmpty else {
+            print("⚠️ queryDiary: characterId or userId is empty (characterId: '\(characterId)', userId: '\(userId)')")
+            completion(nil)
+            return
+        }
+
         let db = Firestore.firestore()
-        
+
         // yyyy-MM-dd 形式の文字列を生成
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         dateFormatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
         let dateString = dateFormatter.string(from: date)
-        
-        // デバッグ: まずcharacter_idで絞り込んで全件確認
-        db.collection("Diary")
-            .whereField("character_id", isEqualTo: characterId)
+
+        print("✅ queryDiary: Searching diary for user: \(userId), character: \(characterId), date: \(dateString)")
+
+        // 正しい構造で日記検索を実行: users/{userId}/characters/{characterId}/diary
+        db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("diary")
+            .whereField("created_date", isEqualTo: dateString)
+            .limit(to: 1)
             .getDocuments { snapshot, error in
                 if let error = error {
+                    print("❌ queryDiary error: \(error)")
                     completion(nil)
                     return
                 }
-                
-                // 次に、元の検索を実行
-                db.collection("Diary")
-                    .whereField("character_id", isEqualTo: characterId)
-                    .whereField("created_date", isEqualTo: dateString)
-                    .limit(to: 1)
-                    .getDocuments { snapshot, error in
-                        if let error = error {
-                            completion(nil)
-                            return
-                        }
-                        
-                        if let doc = snapshot?.documents.first {
-                            completion(doc.documentID)
-                        } else {
-                            completion(nil)
-                        }
-                    }
+
+                if let doc = snapshot?.documents.first {
+                    print("✅ queryDiary: Found diary document: \(doc.documentID)")
+                    completion(doc.documentID)
+                } else {
+                    print("⚠️ queryDiary: No diary found for date: \(dateString)")
+                    completion(nil)
+                }
             }
     }
 }

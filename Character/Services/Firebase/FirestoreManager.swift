@@ -106,12 +106,28 @@ class FirestoreManager: ObservableObject {
     
     //Firestoreから日記一覧を取得して diaries に反映
     func fetchDiaries(characterId: String) {
-        guard let userId = userId else { return }
+        guard let userId = userId else {
+            Logger.debug("fetchDiaries: userId is nil", category: Logger.firestore)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.debug("fetchDiaries: characterId is empty", category: Logger.firestore)
+            return
+        }
+
+        Logger.debug("fetchDiaries: userId = \(userId), characterId = \(characterId)", category: Logger.firestore)
+
         // キャラクター別のサブコレクションから取得
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
             .collection("diary")
             .getDocuments { snapshot, error in
+                if let error = error {
+                    Logger.error("Diary fetch failed", category: Logger.firestore, error: error)
+                    return
+                }
+
                 if let documents = snapshot?.documents {
                     self.diaries = documents.compactMap { doc in
                         let data = doc.data()
@@ -119,6 +135,7 @@ class FirestoreManager: ObservableObject {
                               let title = data["title"] as? String else { return nil }
                         return Diary(id: doc.documentID, title: title, date: timestamp.dateValue())
                     }
+                    Logger.debug("fetchDiaries: Found \(self.diaries.count) diaries", category: Logger.firestore)
                 }
             }
     }

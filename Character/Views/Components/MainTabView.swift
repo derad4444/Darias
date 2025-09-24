@@ -24,37 +24,65 @@ struct MainTabView: View {
                 ProgressView("読み込み中...")
                     .font(FontSettingsManager.shared.font(size: 17, weight: .regular))
             } else {
-                TabView(selection: $selectedTab) {
-                    HomeView(userId: userId, characterId: characterId)
-                        .tabItem {
-                            Image(systemName: "house")
-                            Text("ホーム")
-                        }
-                        .tag(0)
+                if !characterId.isEmpty {
+                    TabView(selection: $selectedTab) {
+                        HomeView(userId: userId, characterId: characterId)
+                            .tabItem {
+                                Image(systemName: "house")
+                                Text("ホーム")
+                            }
+                            .tag(0)
 
-                    CalendarView(userId: userId, characterId: characterId, isPremium: false)
-                        .environmentObject(FirestoreManager())
-                        .tabItem {
-                            Image(systemName: "calendar")
-                            Text("カレンダー")
-                        }
-                        .tag(1)
+                        CalendarView(userId: userId, characterId: characterId, isPremium: false)
+                            .environmentObject(FirestoreManager())
+                            .tabItem {
+                                Image(systemName: "calendar")
+                                Text("カレンダー")
+                            }
+                            .tag(1)
 
-                    CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
-                        .tabItem {
-                            Image(systemName: "person.crop.circle")
-                            Text("キャラクター詳細")
-                        }
-                        .tag(2)
+                        CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
+                            .tabItem {
+                                Image(systemName: "person.crop.circle")
+                                Text("キャラクター詳細")
+                            }
+                            .tag(2)
 
-                    OptionView()
-                        .tabItem {
-                            Image(systemName: "gearshape")
-                            Text("設定")
+                        OptionView()
+                            .tabItem {
+                                Image(systemName: "gearshape")
+                                Text("設定")
+                            }
+                            .tag(3)
+                    }
+                    .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
+                } else {
+                    // characterIdが空の場合のエラー画面
+                    VStack(spacing: 20) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 50))
+                            .foregroundColor(.orange)
+
+                        Text("キャラクター情報を取得できません")
+                            .font(.title2)
+                            .fontWeight(.bold)
+
+                        Text("アプリを再起動するか、再ログインしてください")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+
+                        Button("再取得") {
+                            isLoading = true
+                            fetchUserAndCharacter()
                         }
-                        .tag(3)
+                        .padding()
+                        .background(colorSettings.getCurrentAccentColor())
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding()
                 }
-                .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
                 
                 // フッター上に線を自然に配置
                 VStack {
@@ -81,24 +109,43 @@ struct MainTabView: View {
         }
     }
     private func fetchUserAndCharacter() {
-        guard let uid = Auth.auth().currentUser?.uid else {
+        guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
+            print("❌ User ID is nil or empty")
+            self.isLoading = false
             return
         }
-        
+
         self.userId = uid
-        
+        print("✅ Fetching character for userId: \(uid)")
+
         let db = Firestore.firestore()
-        db.collection("characters")
-            .whereField("user_id", isEqualTo: uid)
-            .limit(to: 1)
-            .getDocuments { snapshot, error in
+
+        // usersコレクションから character_id を取得（AuthManagerと同じパターン）
+        db.collection("users").document(uid).getDocument { document, error in
+            DispatchQueue.main.async {
                 if let error = error {
-                    // Character ID fetch error handled silently
-                } else if let document = snapshot?.documents.first {
-                    self.characterId = document.documentID
+                    print("❌ User document fetch error: \(error)")
+                    self.characterId = ""
+                    self.isLoading = false
+                } else if let document = document, document.exists {
+                    let data = document.data() ?? [:]
+                    if let characterId = data["character_id"] as? String, !characterId.isEmpty {
+                        self.characterId = characterId
+                        print("✅ Character ID fetched from users collection: \(self.characterId)")
+                        self.isLoading = false
+                    } else {
+                        print("⚠️ character_id not found or empty in user document")
+                        print("⚠️ User data: \(data)")
+                        self.characterId = ""
+                        self.isLoading = false
+                    }
+                } else {
+                    print("⚠️ User document does not exist for uid: \(uid)")
+                    self.characterId = ""
+                    self.isLoading = false
                 }
-                self.isLoading = false
             }
+        }
     }
     
 }

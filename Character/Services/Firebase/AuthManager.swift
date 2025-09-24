@@ -64,22 +64,12 @@ class AuthManager: ObservableObject {
             ]
             db.collection("users").document(user.uid).setData(userData)
             
-            // キャラクター情報保存
-            let characterRef = db.collection("characters").document() // 🔸 IDを先に取得
-            let characterId = characterRef.documentID
-            
-            let characterData: [String: Any] = [
-                "id": characterId,
-                "user_id": user.uid,
-                "gender": gender,
-                "created_at": Timestamp()
-            ]
-            
-            // 🔸 characters に登録 → users に character_id 紐づけ → dreamScope 作成 （setDataの実行でDBにデータ登録されるそう）
-            characterRef.setData(characterData) { error in
+            // キャラクターIDを生成（UUIDベース）
+            let characterId = UUID().uuidString
+
+            // usersドキュメントにcharacter_idを保存
+            db.collection("users").document(user.uid).updateData(["character_id": characterId]) { error in
                 if error == nil {
-                    db.collection("users").document(user.uid).updateData(["character_id": characterId])
-                    
                     self.characterId = characterId
                     
                     // ユーザーのキャラクター詳細情報に初期データを保存
