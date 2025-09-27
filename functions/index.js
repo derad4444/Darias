@@ -40,6 +40,11 @@ Object.defineProperty(exports, "sendRegistrationEmail", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "sendContactEmail", {
+  get: () => require("./sendContactEmail").sendContactEmail,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

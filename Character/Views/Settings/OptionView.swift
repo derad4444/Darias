@@ -1,4 +1,5 @@
 import SwiftUI
+import MessageUI
 
 struct OptionView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -13,6 +14,9 @@ struct OptionView: View {
     @State private var showFontSettings = false
     @State private var showColorSettings = false
     @State private var showTagSettings = false
+    @State private var showContactView = false
+    @State private var showMailCompose = false
+    @State private var showMailUnavailableAlert = false
     
     private var dynamicListHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -39,6 +43,22 @@ struct OptionView: View {
         }
         .sheet(isPresented: $showTagSettings) {
             TagSettingsView()
+        }
+        .sheet(isPresented: $showContactView) {
+            NavigationStack {
+                ContactView()
+            }
+        }
+        .sheet(isPresented: $showMailCompose) {
+            MailComposeView(
+                recipients: ["darias.app4@gmail.com"],
+                subject: "Dariasアプリについて"
+            )
+        }
+        .alert("メール送信不可", isPresented: $showMailUnavailableAlert) {
+            Button("OK") { }
+        } message: {
+            Text("お使いのデバイスでメール送信が利用できません。設定からメールアカウントをご確認ください。")
         }
     }
     
@@ -114,12 +134,12 @@ struct OptionView: View {
     }
     
     private var fontSettingsRow: some View {
-        Section(header: sectionHeader("フォント設定")) {
+        Section() {
             Button(action: {
                 showFontSettings = true
             }) {
                 settingsRowContent(
-                    title: "フォント",
+                    title: "フォント設定",
                     subtitle: "\(fontSettings.fontFamily.displayName) - \(fontSettings.fontSize.displayName)"
                 )
             }
@@ -129,7 +149,7 @@ struct OptionView: View {
     }
     
     private var tagSettingsRow: some View {
-        Section(header: sectionHeader("タグ設定")) {
+        Section() {
             Button(action: {
                 showTagSettings = true
             }) {
@@ -144,7 +164,7 @@ struct OptionView: View {
     }
     
     private var colorSettingsRow: some View {
-        Section(header: sectionHeader("カラー設定")) {
+        Section() {
             Button(action: {
                 showColorSettings = true
             }) {
@@ -159,7 +179,27 @@ struct OptionView: View {
     }
     
     private var instagramSection: some View {
-        Section(header: sectionHeader("SNS")) {
+        Section(header: sectionHeader("問い合わせ")) {
+            // お問い合わせ
+            Button {
+                showContactView = true
+            } label: {
+                HStack {
+                    Image(systemName: "envelope.fill")
+                        .foregroundColor(.blue)
+                        .font(.title2)
+                    Text("お問い合わせ")
+                        .dynamicBody()
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                        .font(.caption)
+                }
+            }
+            .padding(.vertical, 8)
+
+            // Instagram
             Button {
                 openInstagram()
             } label: {
@@ -229,10 +269,18 @@ struct OptionView: View {
         }
     }
     
+    private func sendEmail() {
+        if MFMailComposeViewController.canSendMail() {
+            showMailCompose = true
+        } else {
+            showMailUnavailableAlert = true
+        }
+    }
+
     private func openInstagram() {
         let instagramURL = "instagram://user?username=ryosuke_4444"
         let webURL = "https://www.instagram.com/ryosuke_4444"
-        
+
         if let url = URL(string: instagramURL), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
         } else if let url = URL(string: webURL) {
