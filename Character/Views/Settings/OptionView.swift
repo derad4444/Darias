@@ -76,8 +76,9 @@ struct OptionView: View {
     private var settingsListView: some View {
         List {
             volumeSettingsSection
-            appearanceSettingsSection
-            instagramSection
+            colorSettingsSection
+            tagSettingsSection
+            socialAndSupportSection
             logoutSection
         }
         .scrollContentBackground(.hidden)
@@ -92,9 +93,19 @@ struct OptionView: View {
                 bgmVolumeControl
                 characterVolumeControl
             }
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 16)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.9))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                    )
+            )
         }
         .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
     private var bgmVolumeControl: some View {
@@ -125,30 +136,8 @@ struct OptionView: View {
         }
     }
     
-    private var appearanceSettingsSection: some View {
-        Group {
-            fontSettingsRow
-            tagSettingsRow
-            colorSettingsRow
-        }
-    }
     
-    private var fontSettingsRow: some View {
-        Section() {
-            Button(action: {
-                showFontSettings = true
-            }) {
-                settingsRowContent(
-                    title: "フォント設定",
-                    subtitle: "\(fontSettings.fontFamily.displayName) - \(fontSettings.fontSize.displayName)"
-                )
-            }
-            .buttonStyle(PlainButtonStyle())
-        }
-        .listRowBackground(Color.clear)
-    }
-    
-    private var tagSettingsRow: some View {
+    private var tagSettingsSection: some View {
         Section() {
             Button(action: {
                 showTagSettings = true
@@ -157,13 +146,24 @@ struct OptionView: View {
                     title: "タグ管理",
                     subtitle: "予定のタグを作成・編集"
                 )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                        )
+                )
             }
             .buttonStyle(PlainButtonStyle())
         }
         .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
-    private var colorSettingsRow: some View {
+    private var colorSettingsSection: some View {
         Section() {
             Button(action: {
                 showColorSettings = true
@@ -172,53 +172,82 @@ struct OptionView: View {
                     title: "背景色・文字色",
                     subtitle: colorSettings.useGradient ? "グラデーション" : "一色"
                 )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                        )
+                )
             }
             .buttonStyle(PlainButtonStyle())
         }
         .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
-    private var instagramSection: some View {
-        Section(header: sectionHeader("問い合わせ")) {
-            // お問い合わせ
-            Button {
-                showContactView = true
-            } label: {
-                HStack {
-                    Image(systemName: "envelope.fill")
-                        .foregroundColor(.blue)
-                        .font(.title2)
-                    Text("お問い合わせ")
-                        .dynamicBody()
-                        .foregroundColor(colorSettings.getCurrentTextColor())
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
-                        .font(.caption)
+    private var socialAndSupportSection: some View {
+        Section() {
+            VStack(spacing: 0) {
+                // Instagram
+                Button {
+                    openInstagram()
+                } label: {
+                    HStack {
+                        Image(systemName: "camera.circle.fill")
+                            .foregroundColor(.purple)
+                            .font(.title2)
+                        Text("公式Instagram")
+                            .dynamicBody()
+                            .foregroundColor(colorSettings.getCurrentTextColor())
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                            .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-            }
-            .padding(.vertical, 8)
+                .buttonStyle(PlainButtonStyle())
 
-            // Instagram
-            Button {
-                openInstagram()
-            } label: {
-                HStack {
-                    Image(systemName: "camera.circle.fill")
-                        .foregroundColor(.purple)
-                        .font(.title2)
-                    Text("公式Instagram")
-                        .dynamicBody()
-                        .foregroundColor(colorSettings.getCurrentTextColor())
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
-                        .font(.caption)
+                Divider()
+                    .background(colorSettings.getCurrentTextColor().opacity(0.2))
+
+                // お問い合わせ
+                Button {
+                    showContactView = true
+                } label: {
+                    HStack {
+                        Image(systemName: "envelope.fill")
+                            .foregroundColor(.blue)
+                            .font(.title2)
+                        Text("お問い合わせ")
+                            .dynamicBody()
+                            .foregroundColor(colorSettings.getCurrentTextColor())
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
+                .buttonStyle(PlainButtonStyle())
             }
-            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.white.opacity(0.9))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                    )
+            )
         }
         .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
     private var logoutSection: some View {
@@ -230,10 +259,22 @@ struct OptionView: View {
                 Text("ログアウト")
                     .dynamicBody()
                     .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                    )
             }
-            .padding()
+            .buttonStyle(PlainButtonStyle())
         }
         .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
     private var toolbarContent: some ToolbarContent {
