@@ -5,6 +5,65 @@ const {getNextQuestion, calculateBIG5Scores, BIG5_QUESTIONS} =
   require("./big5Questions");
 const {OPENAI_API_KEY} = require("../src/config/config");
 
+// 感情判定関数
+async function detectEmotion(openai, messageText) {
+  try {
+    // メッセージが空や短すぎる場合はnormalを返す
+    if (!messageText || messageText.trim().length < 3) {
+      return "";
+    }
+
+    const emotionPrompt = `
+以下のメッセージから感情を分析して、最も適切な感情を1つ選んで答えてください。
+
+感情の選択肢:
+- normal: 通常・中立的
+- smile: 嬉しい・楽しい・ポジティブ
+- angry: 怒り・不満・イライラ
+- cry: 悲しい・落ち込み・心配
+- sleep: 眠い・リラックス・のんびり
+
+メッセージ: "${messageText.substring(0, 200)}"
+
+回答は感情名のみ（例: smile）で答えてください。
+`;
+
+    const completion = await safeOpenAICall(
+        openai.chat.completions.create.bind(openai.chat.completions),
+        {
+          model: "gpt-4o-mini",
+          messages: [{role: "user", content: emotionPrompt}],
+          temperature: 0.3,
+          max_tokens: 20,
+        },
+    );
+
+    if (!completion || !completion.choices || !completion.choices[0]) {
+      console.warn("Invalid emotion detection response");
+      return "";
+    }
+
+    const emotion = completion.choices[0].message.content.trim().toLowerCase();
+
+    // 有効な感情のみを返す
+    const validEmotions = ["normal", "smile", "angry", "cry", "sleep"];
+    if (validEmotions.includes(emotion)) {
+      return emotion === "normal" ? "" : `_${emotion}`;
+    }
+
+    console.warn(`Invalid emotion detected: ${emotion}, using normal`);
+    return ""; // normalの場合は空文字
+  } catch (error) {
+    console.error("Emotion detection error:", error);
+    console.error("Error details:", {
+      message: error.message,
+      code: error.code,
+      status: error.status,
+    });
+    return ""; // エラー時はnormal（空文字）
+  }
+}
+
 // エンゲージメント重視の固定文パターン
 const ENGAGING_COMMENT_PATTERNS = {
   1: { // AI段階（1-20問）
@@ -340,7 +399,7 @@ exports.generateCharacterReply = onCall(
       memory: "1GiB",
       timeoutSeconds: 300,
       minInstances: 0,
-      enforceAppCheck: true, // App Checkトークンを強制
+      enforceAppCheck: false, // App Checkを無効化
       secrets: ["OPENAI_API_KEY"],
     },
     async (request) => {
@@ -478,7 +537,7 @@ exports.generateCharacterReply = onCall(
                     currentStage,
                     gender,
                     null,
-                    OPENAI_API_KEY.value(),
+                    OPENAI_API_KEY.value().trim(),
                 ).catch((error) => {
                   console.error(
                       `Staged character details generation failed ` +
@@ -504,11 +563,21 @@ exports.generateCharacterReply = onCall(
                   lastAskedAt: admin.firestore.FieldValue.serverTimestamp(),
                 }, {merge: true});
 
+            // BIG5回答時の感情も判定（エラー時はnormalにフォールバック）
+            let big5Emotion = "";
+            try {
+              big5Emotion = await detectEmotion(openai, aiResponse);
+            } catch (emotionError) {
+              console.warn("BIG5 emotion detection failed, using normal:", emotionError);
+              big5Emotion = ""; // normal表情
+            }
+
             return {
               reply: aiResponse,
               isBig5Question: true,
               questionId: nextQuestion.id,
               progress: `${updatedAnsweredQuestions.length + 1}/100`,
+              emotion: big5Emotion,
             };
           } else {
             // 全質問完了 - BIG5スコアを計算
@@ -538,6 +607,9 @@ exports.generateCharacterReply = onCall(
             // 最終完了時は固定メッセージを使用
             const aiResponse = getStageCompletionMessage(3, gender);
 
+            // 完了時の感情判定（100問完了は嬉しい感情で固定）
+            const completionEmotion = "_smile";
+
             // Stage 3 キャラクター詳細生成を実行 (非同期で実行)
             try {
               const {generateStagedCharacterDetails} =
@@ -548,7 +620,7 @@ exports.generateCharacterReply = onCall(
                   3,
                   gender,
                   calculatedScores,
-                  OPENAI_API_KEY.value(),
+                  OPENAI_API_KEY.value().trim(),
               ).catch((error) => {
                 console.error(
                     `Staged character details generation failed for stage 3:`,
@@ -581,6 +653,7 @@ exports.generateCharacterReply = onCall(
               isBig5Question: false,
               big5Completed: true,
               newScores: calculatedScores,
+              emotion: completionEmotion,
             };
           }
         }
@@ -611,11 +684,13 @@ exports.generateCharacterReply = onCall(
               isBig5Question: true,
               questionId: nextQuestion.id,
               progress: `${answeredQuestions.length + 1}/100`,
+              emotion: "", // 質問時は通常表情
             };
           } else {
             return {
               reply: "性格診断は完了しているよ！他に何か話したいことはある？",
               isBig5Question: false,
+              emotion: "_smile", // 完了済み時は笑顔
             };
           }
         }
@@ -633,7 +708,7 @@ exports.generateCharacterReply = onCall(
         const prompt = buildCharacterPrompt(
             currentBig5, gender, dreamText, userMessage);
 
-        const openai = getOpenAIClient(OPENAI_API_KEY.value());
+        const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),
@@ -646,8 +721,21 @@ exports.generateCharacterReply = onCall(
 
         const reply = completion.choices[0].message.content.trim();
 
+        // 感情判定を実行（エラー時はnormalにフォールバック）
+        let emotion = "";
+        try {
+          emotion = await detectEmotion(openai, reply);
+        } catch (emotionError) {
+          console.warn("Emotion detection failed, using normal:", emotionError);
+          emotion = ""; // normal表情
+        }
+
         // リリース対応：音声生成を一時的に無効化してテキストのみで返却
-        return {reply, voiceUrl: ""};
+        return {
+          reply,
+          voiceUrl: "",
+          emotion: emotion
+        };
       } catch (e) {
         console.error("🔥 Error in generateCharacterReply:", e);
         console.error("🔥 Error stack:", e.stack);

@@ -106,7 +106,7 @@ JSON出力:
 
   // OpenAI呼び出し
   const openai = new OpenAI({
-    apiKey: OPENAI_API_KEY.value(),
+    apiKey: OPENAI_API_KEY.value().trim(),
   });
 
   const response = await openai.chat.completions.create({

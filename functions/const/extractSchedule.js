@@ -13,7 +13,7 @@ exports.extractSchedule = onCall(
       memory: "512MiB",
       timeoutSeconds: 120,
       minInstances: 0,
-      enforceAppCheck: true, // App Checkトークンを強制
+      enforceAppCheck: false, // App Checkを無効化
       secrets: ["OPENAI_API_KEY"],
     },
     async (request) => {
@@ -70,7 +70,7 @@ exports.extractSchedule = onCall(
 重要: 回答は純粋なJSON形式のみで、マークダウンのコードブロック記号は使用しないでください。`;
 
         // OpenAIのAPIクライアントを取得
-        const openai = getOpenAIClient(OPENAI_API_KEY.value());
+        const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 
         // GPT-4o-miniにプロンプトを送信して予定抽出を実行
         const completion = await safeOpenAICall(
