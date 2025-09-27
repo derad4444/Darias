@@ -183,13 +183,13 @@ struct HomeView: View {
             .onAppear {
                 // UI設定は即座に実行
                 colorSettings.forceRefresh()
-                
+
                 // NavigationStackの背景を透明にする
                 let appearance = UINavigationBarAppearance()
                 appearance.configureWithTransparentBackground()
                 UINavigationBar.appearance().standardAppearance = appearance
                 UINavigationBar.appearance().scrollEdgeAppearance = appearance
-                
+
                 // 重い処理は非同期で実行
                 DispatchQueue.main.async {
                     onViewAppear()
@@ -420,7 +420,7 @@ struct HomeView: View {
         fullCharacterMessage = reply.message
         displayedMessage = ""
         isSpeaking = true
-        
+
         // レベルアップメッセージの検出（サーバー側の段階完了メッセージ）
         detectLevelUpMessage(reply.message)
         

@@ -33,15 +33,24 @@ class CharacterService: ObservableObject {
     }
     
     private func getTimeBasedMessage() -> String {
-        let now = Calendar.current.component(.hour, from: Date())
-        
-        if now >= 5 && now < 12 {
-            return "おはよう！今日は何するの？"
-        } else if now >= 18 || now < 5 {
-            return "今日は何があったの？"
-        } else {
-            return ""
-        }
+        let messages = [
+            "性格解析は全部で100問あるよ。好きなタイミングで「話題ある？」と話しかけてくれれば質問するから答えてね！",
+            "「何日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！",
+            "アプリでわからないことや欲しい機能があれば設定画面の問い合わせから開発者に連絡してね！",
+            "性格解析が終わったらキャラクター詳細画面でどんな性格か確認してみてね",
+            "画面の背景の色は自由に変えられるから設定画面から好みの色に変えてね！",
+            "BGMの大きさは設定画面で変えられるよ",
+            "{user_name}に興味があるからあなたの性格が写っちゃいそうだよ。もう1人の自分だと思って接してね！",
+            "私の夢は{user_name}の夢にもなるのかな？"
+        ]
+
+        let selectedMessage = messages.randomElement() ?? messages[0]
+        return replacePlaceholders(in: selectedMessage)
+    }
+
+    private func replacePlaceholders(in message: String) -> String {
+        let userName = UserDefaults.standard.string(forKey: "user_name") ?? "あなた"
+        return message.replacingOccurrences(of: "{user_name}", with: userName)
     }
     
     // MARK: - Message Sending

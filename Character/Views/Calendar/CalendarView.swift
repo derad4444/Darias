@@ -641,49 +641,52 @@ struct CustomCalendarView: View {
         
         GeometryReader { geometry in
             ZStack {
+                // 背景全体をタップ可能にする
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        // ハプティックフィードバック
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
+
+                        selectedDate = date
+                        showBottomSheet = true
+                    }
+                    .onLongPressGesture {
+                        // 長押しでハプティックフィードバック
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+
+                        // プレビュー用の選択状態更新
+                        selectedDate = date
+                    }
+
                 // 日付部分を最上部に絶対位置で固定配置
-                Button {
-                    // ハプティックフィードバック
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                    
-                    selectedDate = date
-                    showBottomSheet = true
-                } label: {
-                    let isToday = calendar.isDate(date, inSameDayAs: Date())
-                    let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
-                    
-                    Circle()
-                        .fill(isSelected ? colorSettings.getCurrentAccentColor() : .clear)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Text("\(calendar.component(.day, from: date))")
-                                .font(.system(size: 12))
-                                .foregroundColor(
-                                    isSelected ? .white : colorForDate(date: date)
-                                )
-                                .fontWeight(isToday ? .bold : .regular)
-                        )
-                        .overlay(
-                            // 今日の日付に枠線を追加
-                            Circle()
-                                .stroke(
-                                    isToday ? colorSettings.getCurrentAccentColor() : Color.clear,
-                                    lineWidth: isToday ? 1.5 : 0
-                                )
-                                .frame(width: 34, height: 34)
-                        )
-                }
-                .onLongPressGesture {
-                    // 長押しでハプティックフィードバック
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    
-                    // プレビュー用の選択状態更新
-                    selectedDate = date
-                }
-                .frame(width: 32, height: 32)
-                .position(x: geometry.size.width / 2, y: 16) // セル幅の中央、上から16px
+                let isToday = calendar.isDate(date, inSameDayAs: Date())
+                let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+
+                Circle()
+                    .fill(isSelected ? colorSettings.getCurrentAccentColor() : .clear)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Text("\(calendar.component(.day, from: date))")
+                            .font(.system(size: 12))
+                            .foregroundColor(
+                                isSelected ? .white : colorForDate(date: date)
+                            )
+                            .fontWeight(isToday ? .bold : .regular)
+                    )
+                    .overlay(
+                        // 今日の日付に枠線を追加
+                        Circle()
+                            .stroke(
+                                isToday ? colorSettings.getCurrentAccentColor() : Color.clear,
+                                lineWidth: isToday ? 1.5 : 0
+                            )
+                            .frame(width: 34, height: 34)
+                    )
+                    .position(x: geometry.size.width / 2, y: 16) // セル幅の中央、上から16px
+                    .allowsHitTesting(false) // タップを透過
                 
                 // 祝日を上部に固定表示
                 VStack(alignment: .leading, spacing: 0) {
@@ -696,7 +699,8 @@ struct CustomCalendarView: View {
                     Spacer()
                 }
                 .zIndex(15) // 最前面に表示
-                
+                .allowsHitTesting(false) // タップを透過
+
                 // 予定表示エリア
                 VStack(alignment: .leading, spacing: 0) {
                     Spacer().frame(height: 28) // 固定オフセット（調整）
@@ -704,6 +708,7 @@ struct CustomCalendarView: View {
                         .frame(maxWidth: .infinity)
                     Spacer()
                 }
+                .allowsHitTesting(false) // タップを透過
             }
         }
         .frame(height: 80) // 固定高さで統一
@@ -945,9 +950,9 @@ struct CustomCalendarView: View {
     @ViewBuilder
     private func regularScheduleItemView(schedule: Schedule) -> some View {
         let tagColor = tagSettings.getTag(by: schedule.tag)?.color ?? Color.blue
-        
-        // 通常タップ：詳細表示、長押し：移動モード
-        NavigationLink(destination: ScheduleDetailView(schedule: convertToScheduleItem(schedule), userId: self.userId)) {
+
+        // NavigationLinkを削除してタップ無効化
+        Group {
             if schedule.isAllDay {
                 // 終日予定：タイトルのみ、背景あり（セル全幅固定）
                 Text(schedule.title.prefix(30))
@@ -969,26 +974,7 @@ struct CustomCalendarView: View {
             }
         }
         .frame(height: 16) // コンパクトな高さに調整
-        .simultaneousGesture(
-            TapGesture()
-                .onEnded { _ in
-                    // 予定タップ時のハプティックフィードバック
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
-                }
-        )
-        // ドラッグ&ドロップ機能（一時的に無効化）
-        // .scaleEffect(draggingSchedule?.id == schedule.id ? 1.1 : 1.0)
-        // .offset(draggingSchedule?.id == schedule.id ? dragOffset : .zero)
-        // .zIndex(draggingSchedule?.id == schedule.id ? 1 : 0)
-        .onLongPressGesture(minimumDuration: 0.5) {
-            // 長押しで移動モード開始（ハプティックフィードバック）
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            // TODO: ドラッグ&ドロップ機能の実装
-            print("移動モード開始: \(schedule.title)")
-        }
+        .allowsHitTesting(false) // タップを無効化
         // .simultaneousGesture(
         //     DragGesture()
         //         .onChanged { value in
@@ -1201,53 +1187,30 @@ struct CustomCalendarView: View {
     // 期間予定行表示ビュー
     @ViewBuilder
     private func multiDayScheduleRowView(schedule: Schedule, row: ScheduleDisplayRow, tagColor: Color) -> some View {
-        NavigationLink(destination: ScheduleDetailView(schedule: convertToScheduleItem(schedule), userId: userId)) {
-            // 週またぎでの角丸を統一するため、カスタムshapeを使用
-            ScheduleBarShape(isStart: row.isStart, isEnd: row.isEnd)
-                .fill(tagColor)
-                .overlay(
-                    Group {
-                        if row.showTitle {
-                            VStack(alignment: .center, spacing: 0) {
-                                Text(schedule.title.prefix(30))
-                                    .dynamicCaption2() // フォントサイズを元に戻す
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .frame(maxWidth: .infinity, alignment: .center)
-                                    .multilineTextAlignment(.center)
-                                Spacer(minLength: 0)
-                            }
+        // NavigationLinkを削除してタップ無効化
+        ScheduleBarShape(isStart: row.isStart, isEnd: row.isEnd)
+            .fill(tagColor)
+            .overlay(
+                Group {
+                    if row.showTitle {
+                        VStack(alignment: .center, spacing: 0) {
+                            Text(schedule.title.prefix(30))
+                                .dynamicCaption2() // フォントサイズを元に戻す
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .multilineTextAlignment(.center)
+                            Spacer(minLength: 0)
                         }
                     }
-                    .padding(.horizontal, 2)
-                    .padding(.top, -8) // バー外に押し出すため負の値を大きくする
-                    .padding(.bottom, 14)
-                )
-        }
-        .simultaneousGesture(
-            TapGesture()
-                .onEnded { _ in
-                    // 期間予定タップ時のハプティックフィードバック
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
                 }
-        )
-        // ドラッグ&ドロップ機能（一時的に無効化）
-        // .scaleEffect(draggingSchedule?.id == schedule.id ? 1.05 : 1.0)
-        .onLongPressGesture(minimumDuration: 0.5) {
-            // 長押しで移動モード開始（ハプティックフィードバック）
-            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-            impactFeedback.impactOccurred()
-            
-            // TODO: ドラッグ&ドロップ機能の実装
-            print("期間予定移動モード開始: \(schedule.title)")
-        }
-        // .onDrag {
-        //     // ドラッグ可能なアイテムとして提供
-        //     NSItemProvider(object: schedule.title as NSString)
-        // }
-        .frame(width: row.width, height: 16)
-        .position(x: row.x, y: row.y)
+                .padding(.horizontal, 2)
+                .padding(.top, -8) // バー外に押し出すため負の値を大きくする
+                .padding(.bottom, 14)
+            )
+            .frame(width: row.width, height: 16)
+            .position(x: row.x, y: row.y)
+            .allowsHitTesting(false) // タップを完全に無効化
     }
     
     // 期間予定の表示情報を計算
