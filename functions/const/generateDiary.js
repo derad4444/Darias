@@ -2,6 +2,7 @@
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {OPENAI_API_KEY} = require("../src/config/config");
+const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
 // Firebaseの初期化
 if (!admin.apps.length) {
@@ -78,31 +79,20 @@ async function generateDiary(characterId, userId) {
 
   if (isAndroid) {
     characterType = "AI";
-    diaryStyle = "システム視点。処理完了,アップデート,最適化等用語使用。やり取りをセッション,通信表現。論理的親しみやすい文体";
-    tagStyle = "システムキーワード3-5個";
+    diaryStyle = "sys view,process complete,update,optimize terms,session/comm style,logical friendly";
+    tagStyle = "sys keywords 3-5";
   } else if (isHuman) {
-    characterType = "人間";
-    diaryStyle = "感情視点。楽しかった,嬉しかった,心配等感情表現使用。やり取りを会話,お話表現。感情豊か文体";
-    tagStyle = "感情出来事キーワード3-5個";
+    characterType = "Human";
+    diaryStyle = "emotion view,happy,worried feelings,chat/talk style,emotion rich";
+    tagStyle = "emotion event keywords 3-5";
   } else {
-    characterType = "学習中";
-    diaryStyle = "論理性+感情両視点。技術用語+感情表現混在。セッション→会話学習表現。論理的→感情的文体";
-    tagStyle = "システム用語+感情表現混合3-5個";
+    characterType = "Learning";
+    diaryStyle = "logic+emotion view,tech+feeling mix,session→chat learning,logical→emotional";
+    tagStyle = "sys+emotion mix 3-5";
   }
 
-  // AIプロンプト作成（動的に変化するキャラクター用）
-  const prompt = `${characterType}日記代筆。Big5(開放性:${big5.openness},` +
-    `誠実性:${big5.conscientiousness},外向性:${big5.extraversion},` +
-    `協調性:${big5.agreeableness},神経症傾向:${big5.neuroticism})性別:${gender}
-
-予定:${scheduleSummary || "なし"}
-やり取り:${chatSummary || "なし"}
-
-${diaryStyle}
-200-400文字で記述。${tagStyle}
-
-JSON出力:
-{"content":"日記本文","summary_tags":["タグ1","タグ2","タグ3"]}`;
+  // 最適化されたプロンプト作成
+  const prompt = OPTIMIZED_PROMPTS.diary(characterType, big5, gender, scheduleSummary, chatSummary, diaryStyle, tagStyle);
 
   // OpenAI呼び出し
   const openai = new OpenAI({

@@ -83,7 +83,8 @@ struct MainTabView: View {
                     }
                     .padding()
                 }
-                
+
+
                 // フッター上に線を自然に配置
                 VStack {
                     Spacer()

@@ -3,10 +3,10 @@ import SwiftUI
 struct ChatHistoryView: View {
     @StateObject private var chatHistoryService = ChatHistoryService()
     @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
-    @State private var currentDateString: String = ""
-    
+
     let userId: String
     let characterId: String
     
@@ -17,24 +17,6 @@ struct ChatHistoryView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // 固定日付ヘッダー（中央揃え）
-                if !currentDateString.isEmpty {
-                    HStack {
-                        Spacer()
-                        Text(currentDateString)
-                            .dynamicCaption()
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
-                            .background(colorSettings.getCurrentAccentColor().opacity(0.8))
-                            .cornerRadius(16)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .background(colorSettings.getCurrentBackgroundGradient())
-                }
-                
                 // チャット履歴
                 if chatHistoryService.isLoading {
                     Spacer()
@@ -56,39 +38,95 @@ struct ChatHistoryView: View {
                     }
                     Spacer()
                 } else {
-                    ScrollView {
-                        LazyVStack(spacing: 0) {
-                            let messagesByDate = chatHistoryService.getChatMessagesByDate()
-                            let dateList = chatHistoryService.getDateList().reversed() // 古い順（時系列順）
-                            
-                            ForEach(Array(dateList), id: \.self) { dateString in
-                                // その日のメッセージ（古い順）
-                                if let messages = messagesByDate[dateString] {
-                                    ForEach(messages.reversed()) { message in
-                                        ChatMessageBubble(message: message)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 2)
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                let messagesByDate = chatHistoryService.getChatMessagesByDate()
+                                let dateList = chatHistoryService.getDateList().reversed() // 古い順（時系列順）
+
+                                ForEach(Array(dateList), id: \.self) { dateString in
+                                    // 日付ヘッダー
+                                    HStack {
+                                        Spacer()
+                                        DateHeaderView(dateString: dateString)
+                                            .id("header-\(dateString)")
+                                        Spacer()
+                                    }
+                                    .padding(.vertical, 16)
+                                    .padding(.top, dateList.first == dateString ? 8 : 0) // 最初の日付は上部マージン追加
+
+                                    // その日のメッセージ（古い順）
+                                    if let messages = messagesByDate[dateString] {
+                                        ForEach(Array(messages.reversed().enumerated()), id: \.offset) { index, message in
+                                            ChatMessageBubble(message: message)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 2)
+                                                .id("\(dateString)-\(index)")
+                                        }
+
+                                        // 各日付の最後に少し余白を追加
+                                        Spacer()
+                                            .frame(height: 8)
+                                    }
+                                }
+
+                                // バナー広告（全チャット履歴の最下部に配置）
+                                if subscriptionManager.shouldDisplayBannerAd() {
+                                    VStack(spacing: 16) {
+                                        // 区切り線
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(height: 1)
+                                            .padding(.horizontal, 32)
+
+                                        // バナー広告
+                                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                            .frame(height: 50)
+                                            .background(Color.clear)
+                                            .id("banner-ad")
                                             .onAppear {
-                                                // スクロール位置に基づいて日付を更新
-                                                updateCurrentDate(for: dateString)
+                                                subscriptionManager.trackBannerAdImpression()
                                             }
+                                            .padding(.horizontal, 16)
+
+                                        // 下部余白
+                                        Spacer()
+                                            .frame(height: 20)
+                                    }
+                                    .padding(.top, 16)
+                                }
+                            }
+                        }
+                        .padding(.bottom, 10) // 元の設定に戻す
+                        .clipped() // 範囲外をクリップ
+                        .onAppear {
+                            // データロード後に最下部にスクロール
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                if subscriptionManager.shouldDisplayBannerAd() {
+                                    // バナー広告がある場合は広告まで
+                                    withAnimation(.easeOut(duration: 0.5)) {
+                                        proxy.scrollTo("banner-ad", anchor: .bottom)
+                                    }
+                                } else {
+                                    // バナー広告がない場合は最新メッセージまで
+                                    let messagesByDate = chatHistoryService.getChatMessagesByDate()
+                                    let dateList = chatHistoryService.getDateList()
+
+                                    if let latestDate = dateList.first,
+                                       let latestMessages = messagesByDate[latestDate],
+                                       !latestMessages.isEmpty {
+                                        let latestIndex = 0 // reversed()で最新が最初
+                                        withAnimation(.easeOut(duration: 0.5)) {
+                                            proxy.scrollTo("\(latestDate)-\(latestIndex)", anchor: .bottom)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                    .defaultScrollAnchor(.bottom) // iOS 17以降で下から表示
-                    .padding(.bottom, 10) // タブバー分の下部パディングを調整
-                    .clipped() // 範囲外をクリップ
-                    .onAppear {
-                        // 初期表示時に最新の日付を設定
-                        let dateList = chatHistoryService.getDateList()
-                        if let firstDate = dateList.first {
-                            currentDateString = firstDate
-                        }
-                    }
                 }
             }
+
         }
         .navigationTitle("チャット履歴")
         .navigationBarTitleDisplayMode(.inline)
@@ -106,13 +144,10 @@ struct ChatHistoryView: View {
         }
         .onAppear {
             chatHistoryService.fetchChatHistory(userId: userId, characterId: characterId)
+            subscriptionManager.startMonitoring()
         }
-    }
-    
-    // スクロール位置に基づいて現在の日付を更新
-    private func updateCurrentDate(for dateString: String) {
-        DispatchQueue.main.async {
-            currentDateString = dateString
+        .onDisappear {
+            subscriptionManager.stopMonitoring()
         }
     }
 }
@@ -120,15 +155,39 @@ struct ChatHistoryView: View {
 // 日付ヘッダービュー
 struct DateHeaderView: View {
     let dateString: String
-    
+    @ObservedObject var colorSettings = ColorSettingsManager.shared
+
     var body: some View {
-        Text(dateString)
-            .dynamicCaption()
-            .foregroundColor(.gray)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.white.opacity(0.7))
-            .cornerRadius(12)
+        HStack {
+            // 左の線
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 1)
+
+            // 日付テキスト
+            Text(dateString)
+                .dynamicCaption()
+                .foregroundColor(.gray)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 4)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.gray.opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.gray.opacity(0.3), lineWidth: 1)
+                        )
+                )
+
+            // 右の線
+            Rectangle()
+                .fill(Color.gray.opacity(0.3))
+                .frame(height: 1)
+        }
+        .padding(.horizontal, 32)
     }
 }
 

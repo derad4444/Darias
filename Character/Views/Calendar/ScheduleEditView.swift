@@ -7,6 +7,7 @@ struct ScheduleEditView: View {
 
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     
     @State private var scheduleTitle: String
@@ -142,6 +143,17 @@ struct ScheduleEditView: View {
                         // スクロール可能な情報エリア
                         ScrollView {
                             VStack(spacing: 20) {
+                                // 1つ目のバナー広告（タイトルの上）
+                                if subscriptionManager.shouldDisplayBannerAd() {
+                                    BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                        .frame(height: 50)
+                                        .background(Color.clear)
+                                        .onAppear {
+                                            subscriptionManager.trackBannerAdImpression()
+                                        }
+                                        .padding(.horizontal, 16)
+                                }
+
                                 glassSection(title: "タイトル") {
                                     TextField("予定のタイトル", text: $scheduleTitle)
                                         .foregroundColor(colorSettings.getCurrentTextColor())
@@ -262,6 +274,18 @@ struct ScheduleEditView: View {
                                             .scrollContentBackground(.hidden)
                                     }
                                 }
+
+                                // 2つ目のバナー広告（メモ欄の下）
+                                if subscriptionManager.shouldDisplayBannerAd() {
+                                    BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                        .frame(height: 50)
+                                        .background(Color.clear)
+                                        .onAppear {
+                                            subscriptionManager.trackBannerAdImpression()
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 10)
+                                }
                             }
                             .padding(.horizontal, 8)
                             .padding(.bottom, 115)
@@ -272,6 +296,12 @@ struct ScheduleEditView: View {
                 }
             }
             .navigationBarHidden(true) // NavigationBarを完全に隠す
+            .onAppear {
+                subscriptionManager.startMonitoring()
+            }
+            .onDisappear {
+                subscriptionManager.stopMonitoring()
+            }
             .alert("日付エラー", isPresented: $showDateValidationAlert) {
                 Button("OK", role: .cancel) { }
             } message: {

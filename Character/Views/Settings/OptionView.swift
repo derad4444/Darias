@@ -5,6 +5,7 @@ struct OptionView: View {
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var fontSettings = FontSettingsManager.shared
     @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.dismiss) var dismiss
     
     @AppStorage("isPremium") var isPremium: Bool = false
@@ -55,6 +56,12 @@ struct OptionView: View {
                 subject: "Dariasアプリについて"
             )
         }
+        .onAppear {
+            subscriptionManager.startMonitoring()
+        }
+        .onDisappear {
+            subscriptionManager.stopMonitoring()
+        }
         .alert("メール送信不可", isPresented: $showMailUnavailableAlert) {
             Button("OK") { }
         } message: {
@@ -75,10 +82,21 @@ struct OptionView: View {
     
     private var settingsListView: some View {
         List {
+            // 1つ目のバナー広告（音量設定の上）
+            if subscriptionManager.shouldDisplayBannerAd() {
+                firstBannerAdSection
+            }
+
             volumeSettingsSection
             colorSettingsSection
             tagSettingsSection
             socialAndSupportSection
+
+            // 2つ目のバナー広告（ログアウトボタンの上）
+            if subscriptionManager.shouldDisplayBannerAd() {
+                secondBannerAdSection
+            }
+
             logoutSection
         }
         .scrollContentBackground(.hidden)
@@ -86,7 +104,39 @@ struct OptionView: View {
         .frame(height: dynamicListHeight)
         .clipped()
     }
-    
+
+    // MARK: - バナー広告セクション
+
+    private var firstBannerAdSection: some View {
+        Section {
+            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                .frame(height: 50)
+                .background(Color.clear)
+                .onAppear {
+                    subscriptionManager.trackBannerAdImpression()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
+
+    private var secondBannerAdSection: some View {
+        Section {
+            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                .frame(height: 50)
+                .background(Color.clear)
+                .onAppear {
+                    subscriptionManager.trackBannerAdImpression()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+    }
+
     private var volumeSettingsSection: some View {
         Section(header: sectionHeader("音量設定")) {
             VStack(spacing: 20) {

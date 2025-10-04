@@ -1,6 +1,7 @@
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
+const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -30,16 +31,7 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
 
     const openai = new OpenAI({apiKey});
 
-    const prompt = `Big5(開放性:${big5Scores.openness},誠実性:${
-      big5Scores.conscientiousness},外向性:${big5Scores.extraversion},` +
-      `協調性:${big5Scores.agreeableness},神経症傾向:${
-        big5Scores.neuroticism})性別:${gender}からキャラ詳細設定。
-
-JSON出力:
-{"favorite_color":"色名","favorite_place":"場所","favorite_word":"言葉",` +
-    `"word_tendency":"口調","strength":"長所","weakness":"短所","skill":"特技",` +
-    `"hobby":"趣味","aptitude":"適性","dream":"夢",` +
-    `"favorite_entertainment_genre":"ジャンル"}`;
+    const prompt = OPTIMIZED_PROMPTS.characterDetails(big5Scores, gender);
 
     // OpenAIリクエスト送信
     const res = await openai.chat.completions.create({

@@ -1,6 +1,7 @@
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
+const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -32,22 +33,8 @@ async function generateBig5Analysis(big5Scores, gender, apiKey) {
     // OpenAI クライアント作成
     const openai = new OpenAI({apiKey});
 
-    // プロンプト作成
-    const prompt = `Big5性格分析(開放性:${big5Scores.openness}, ` +
-      `誠実性:${big5Scores.conscientiousness}, 外向性:${big5Scores.extraversion}, ` +
-      `協調性:${big5Scores.agreeableness}, 神経症傾向:${big5Scores.neuroticism}) ` +
-      `性別:${gender}
-
-以下5つの分野で300-500文字ずつ分析してください。性別による内容の差は不要です。
-
-JSON出力:
-{
-  "career_analysis": "仕事・キャリアの特徴を300-500文字で詳しく分析...",
-  "romance_analysis": "恋愛・人間関係の特徴を300-500文字で詳しく分析...",
-  "stress_analysis": "ストレス対処法を300-500文字で詳しく分析...",
-  "learning_analysis": "学習スタイルを300-500文字で詳しく分析...",
-  "decision_analysis": "意思決定パターンを300-500文字で詳しく分析..."
-}`;
+    // 最適化されたプロンプト作成
+    const prompt = OPTIMIZED_PROMPTS.big5Analysis(big5Scores, gender);
 
     // OpenAI API呼び出し（リトライ付き）
     let analysisResult;

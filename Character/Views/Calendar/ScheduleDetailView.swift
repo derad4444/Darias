@@ -6,6 +6,7 @@ struct ScheduleDetailView: View {
     
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
@@ -21,7 +22,7 @@ struct ScheduleDetailView: View {
         let safeAreaTop: CGFloat = 47
         let safeAreaBottom: CGFloat = 34
         let headerHeight: CGFloat = 60
-        let adHeight: CGFloat = isPremium ? 0 : 50
+        let adHeight: CGFloat = subscriptionManager.shouldDisplayBannerAd() ? 50 : 0
         return screenHeight - safeAreaTop - safeAreaBottom - headerHeight - adHeight - 20
     }
     
@@ -150,6 +151,18 @@ struct ScheduleDetailView: View {
                             }
                             .padding(.horizontal)
                             .padding(.top, 20)
+
+                            // バナー広告（画面最下部）
+                            if subscriptionManager.shouldDisplayBannerAd() {
+                                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                    .frame(height: 50)
+                                    .background(Color.clear)
+                                    .onAppear {
+                                        subscriptionManager.trackBannerAdImpression()
+                                    }
+                                    .padding(.horizontal, 16)
+                                    .padding(.top, 20)
+                            }
                         }
                         .padding(.horizontal, 8)
                         .padding(.bottom, 115)
@@ -160,6 +173,12 @@ struct ScheduleDetailView: View {
             }
         }
         .navigationBarHidden(true) // NavigationBarを完全に隠す
+        .onAppear {
+            subscriptionManager.startMonitoring()
+        }
+        .onDisappear {
+            subscriptionManager.stopMonitoring()
+        }
         .sheet(isPresented: $showEdit) {
             NavigationView {
                 ScheduleEditView(schedule: schedule, userId: userId, editSingleOnly: editSingleOnly)

@@ -25,6 +25,7 @@ struct HomeView: View {
     // 広告表示
     @StateObject private var rewardedAd = RewardedAdManager()
     @StateObject private var chatLimitManager = ChatLimitManager()
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     
     // 予定確認ポップアップ
     @State private var showScheduleConfirmation = false
@@ -53,13 +54,22 @@ struct HomeView: View {
     
     private var dynamicChatInputHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
-        return screenHeight * 0.15
+        let baseChatHeight = screenHeight * 0.15
+
+        // バナー広告が表示される場合は、大幅に高さを追加して完全に分離
+        if subscriptionManager.shouldDisplayBannerAd() {
+            // バナー広告 + 十分なマージンを確保（さらに増加）
+            return baseChatHeight + 160 // さらに大幅に増加
+        } else {
+            return baseChatHeight + 20 // 通常のスペーサー
+        }
     }
     
     private var dynamicHeaderHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
         return screenHeight * 0.075
     }
+
     
     var body: some View {
         NavigationStack {
@@ -93,8 +103,19 @@ struct HomeView: View {
                         
                         Spacer()
                         
-                        // 下部：履歴ボタンとチャット入力/BIG5選択肢（固定高さ）
+                        // 下部：BIG5進捗バー、履歴ボタンとチャット入力/BIG5選択肢（固定高さ）
                         VStack(spacing: 8) {
+                            // BIG5進捗バー（チャット入力と連動）
+                            HStack {
+                                BIG5ProgressView(
+                                    answeredCount: characterService.big5AnsweredCount,
+                                    levelUpMessage: levelUpMessage
+                                )
+                                .padding(.leading, 16)
+
+                                Spacer()
+                            }
+
                             // 履歴ボタン
                             HStack {
                                 Spacer()
@@ -141,24 +162,23 @@ struct HomeView: View {
                             }
                         }
                         .frame(height: dynamicChatInputHeight)
-                        .padding(.bottom, 20)
+
+                        // バナー広告（無料ユーザーのみ、チャット入力とタブの間に配置）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 8)
+                        }
+
+                        Spacer()
+                            .frame(height: subscriptionManager.shouldDisplayBannerAd() ? 12 : 20)
                     }
                     
-                    // BIG5進捗表示（チャット入力の直上に配置）
-                    HStack {
-                        VStack {
-                            Spacer()
-                            BIG5ProgressView(
-                                answeredCount: characterService.big5AnsweredCount,
-                                levelUpMessage: levelUpMessage
-                            )
-                            .padding(.leading, 16)
-                            .padding(.bottom, dynamicChatInputHeight - 15) // チャット入力の少し上に配置
-                        }
-                        
-                        Spacer()
-                            .allowsHitTesting(false) // 右側空間はタップ無効
-                    }
                     
                     // 吹き出し表示（中央配置）
                     if !displayedMessage.isEmpty || (characterService.showBIG5Question && characterService.currentBIG5Question != nil) {
@@ -184,6 +204,9 @@ struct HomeView: View {
                 // UI設定は即座に実行
                 colorSettings.forceRefresh()
 
+                // サブスクリプション監視開始
+                subscriptionManager.startMonitoring()
+
                 // NavigationStackの背景を透明にする
                 let appearance = UINavigationBarAppearance()
                 appearance.configureWithTransparentBackground()
@@ -194,24 +217,25 @@ struct HomeView: View {
                 DispatchQueue.main.async {
                     onViewAppear()
                 }
-                
+
                 // BIG5進捗の読み込みは遅延実行（デバッグモードはスキップ）
                 if userId != "debug_user" {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         characterService.loadInitialBIG5Progress(characterId: characterId)
-                        
+
                         // キャラクター生成状態の監視開始
                         characterService.monitorCharacterGenerationStatus(characterId: characterId)
                     }
                 } else {
                 }
-                
+
                 // 自動アニメーションは無効化
                 // startCharacterAnimations()
             }
             .onDisappear {
                 // リスナーのクリーンアップ
                 characterService.stopMonitoringGenerationStatus()
+                subscriptionManager.stopMonitoring()
             }
             .errorAlert(errorManager)
             .navigationDestination(isPresented: $showChatHistory) {
@@ -404,13 +428,20 @@ struct HomeView: View {
     }
     
     private func handleChatLimit() {
+        // プレミアムユーザーは制限なし
+        if subscriptionManager.isPremium {
+            return
+        }
+
         chatLimitManager.consumeChat()
-        
-        if chatLimitManager.remainingChats == 0 {
+
+        // 5回毎に動画広告表示チェック
+        let currentChatCount = chatLimitManager.totalChatsToday
+        if subscriptionManager.shouldShowVideoAd(chatCount: currentChatCount) {
             if let root = UIApplication.shared.connectedScenes
                 .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController {
                 rewardedAd.showAd(from: root) {
-                    chatLimitManager.refillChats()
+                    chatLimitManager.addChatsFromAd(count: 5)
                 }
             }
         }

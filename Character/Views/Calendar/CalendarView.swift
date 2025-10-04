@@ -60,6 +60,7 @@ struct CalendarView: View {
     @StateObject private var firestoreManager = FirestoreManager()
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @State private var selectedYear: Int
     @State private var selectedMonth: Int
     @State private var showPicker = false
@@ -1618,9 +1619,10 @@ struct BottomSheetView: View {
     var characterId: String
     let userId: String
     var closeAction: () -> Void
-    
+
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
+    @ObservedObject var subscriptionManager = SubscriptionManager.shared
     @State private var selectedDiaryId: String = ""
     @State private var navigateToDiaryDetail = false
     @State private var selectedDiaryDate = Date()
@@ -1728,6 +1730,17 @@ struct BottomSheetView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 4)
             }
+
+            // バナー広告
+            if subscriptionManager.shouldDisplayBannerAd() {
+                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                    .frame(height: 50)
+                    .background(Color.clear)
+                    .onAppear {
+                        subscriptionManager.trackBannerAdImpression()
+                    }
+            }
+
             Spacer()
         }
         .frame(maxWidth: .infinity)

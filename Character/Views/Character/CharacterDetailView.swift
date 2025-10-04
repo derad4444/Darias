@@ -8,6 +8,7 @@ struct CharacterDetailView: View {
 
     @EnvironmentObject var fontSettings: FontSettingsManager
     @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     
     @State private var favoriteColor: String = ""
@@ -45,6 +46,18 @@ struct CharacterDetailView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    // 1つ目のバナー広告（キャラクター画像の上）
+                    if subscriptionManager.shouldDisplayBannerAd() {
+                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                            .frame(height: 50)
+                            .background(Color.clear)
+                            .onAppear {
+                                subscriptionManager.trackBannerAdImpression()
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.top, 16)
+                    }
+
                     // キャラクター画像（Assets内の画像を使用）
                     Image(getCharacterImageName())
                         .resizable()
@@ -77,6 +90,19 @@ struct CharacterDetailView: View {
                         big5AnalysisSection
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
+
+                        // 2つ目のバナー広告（性格表示の一番下）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.horizontal, 16)
+                                .padding(.top, 16)
+                                .padding(.bottom, 20)
+                        }
                     }
                 }
             }
@@ -90,24 +116,30 @@ struct CharacterDetailView: View {
                 fetchCharacterDetail()
                 fetchBig5Analysis()
             }
-            
+
+            // サブスクリプション監視開始
+            subscriptionManager.startMonitoring()
+
             // ナビゲーションバーとタブバーを透明にする
             let navAppearance = UINavigationBarAppearance()
             navAppearance.configureWithTransparentBackground()
             UINavigationBar.appearance().standardAppearance = navAppearance
             UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
-            
+
             let tabAppearance = UITabBarAppearance()
             tabAppearance.configureWithTransparentBackground()
             tabAppearance.backgroundColor = UIColor.clear
             tabAppearance.backgroundEffect = nil
-            
+
             UITabBar.appearance().standardAppearance = tabAppearance
             UITabBar.appearance().scrollEdgeAppearance = tabAppearance
-            
+
             // 強制的に透明化
             UITabBar.appearance().backgroundColor = UIColor.clear
             UITabBar.appearance().isTranslucent = true
+        }
+        .onDisappear {
+            subscriptionManager.stopMonitoring()
         }
         .sheet(isPresented: $showBig5AnalysisDetail) {
             if let selectedCategory = selectedAnalysisCategory,

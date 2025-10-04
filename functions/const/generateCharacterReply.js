@@ -4,6 +4,7 @@ const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {getNextQuestion, calculateBIG5Scores, BIG5_QUESTIONS} =
   require("./big5Questions");
 const {OPENAI_API_KEY} = require("../src/config/config");
+const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
 // 感情判定関数
 async function detectEmotion(openai, messageText) {
@@ -13,20 +14,7 @@ async function detectEmotion(openai, messageText) {
       return "";
     }
 
-    const emotionPrompt = `
-以下のメッセージから感情を分析して、最も適切な感情を1つ選んで答えてください。
-
-感情の選択肢:
-- normal: 通常・中立的
-- smile: 嬉しい・楽しい・ポジティブ
-- angry: 怒り・不満・イライラ
-- cry: 悲しい・落ち込み・心配
-- sleep: 眠い・リラックス・のんびり
-
-メッセージ: "${messageText.substring(0, 200)}"
-
-回答は感情名のみ（例: smile）で答えてください。
-`;
+    const emotionPrompt = OPTIMIZED_PROMPTS.emotionDetect(messageText);
 
     const completion = await safeOpenAICall(
         openai.chat.completions.create.bind(openai.chat.completions),
@@ -332,7 +320,7 @@ function generateEngagingComment(questionId, answerValue, currentStage) {
   return patterns[randomIndex];
 }
 
-// 共通のプロンプト生成関数（条件分岐を事前処理）
+// 最適化されたプロンプト生成関数
 function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -343,25 +331,21 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
   if (androidScore >= 9) {
     type = "AI";
     style = gender === "female" ?
-        "論理的親しみやすくシステム用語使用" : "論理的システマティック手順明確化";
-    question = gender === "female" ? "情報収集質問付加" : "パラメータ確認質問付加";
+        "logical,friendly,sys terms" : "logical,systematic,clear steps";
+    question = gender === "female" ? "info gather Q+" : "param check Q+";
   } else if (androidScore <= 6) {
-    type = "人間";
+    type = "Human";
     style = gender === "female" ?
-        "共感寄り添い感情受け止め" : "問題解決アドバイス前向き背中押し";
-    question = "気持ち聞き出し疑問文付加";
+        "empathy,support,feelings" : "solve,advise,encourage";
+    question = "feelings Q+";
   } else {
-    type = "学習中";
+    type = "Learning";
     style = gender === "female" ?
-        "論理性保持+感情理解システム用語感情表現混在" : "効率性保持+温かさ論理提案感情配慮";
-    question = "情報収集感情理解両方質問付加";
+        "logic+emotion,sys+feel mix" : "efficient+warm,logic+care";
+    question = "info+emotion Q+";
   }
 
-  return `${type}(${gender[0]})Big5(${big5.openness},${
-    big5.conscientiousness},${big5.extraversion},${big5.agreeableness},${
-    big5.neuroticism})${dreamText}
-U:${userMessage}
-${style}${question}1文返答`;
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question);
 }
 
 // 段階判定ロジック
