@@ -1,49 +1,6 @@
 import SwiftUI
 import FirebaseCore
 
-struct StartView1: View {
-    @ObservedObject var colorSettings = ColorSettingsManager.shared
-    @State private var showStartScreen = false
-
-    var body: some View {
-        ZStack {
-            if showStartScreen {
-                StartView2()
-            } else {
-                ZStack {
-                    // スプラッシュ②：明るいグラデ背景
-                    colorSettings.getCurrentBackgroundGradient()
-                        .ignoresSafeArea()
-
-                    //企業ロゴ
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 180, height: 120)
-                        
-                        VStack {
-                            Image(systemName: "building.2")
-                                .font(.largeTitle)
-                                .foregroundColor(.gray)
-                            Text("Company Logo")
-                                .font(.caption)
-                                .foregroundColor(.gray)
-                        }
-                    }
-                }
-            }
-        }
-        .onAppear {
-            // 🔴 デバッグ用: すぐにLive2D画面に遷移
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                withAnimation {
-                    showStartScreen = true
-                }
-            }
-        }
-    }
-}
-
 struct StartView2: View {
     @EnvironmentObject var authManager: AuthManager
     @ObservedObject var colorSettings = ColorSettingsManager.shared
@@ -60,26 +17,16 @@ struct StartView2: View {
     
     var body: some View {
         ZStack {
-            // スプラッシュ②：明るいグラデ背景
-            colorSettings.getCurrentBackgroundGradient()
+            // 白固定背景
+            Color.white
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 24) {
                 Spacer()
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color.gray.opacity(0.3))
-                        .frame(width: 180, height: 120)
-                    
-                    VStack {
-                        Image(systemName: "app.badge")
-                            .font(.largeTitle)
-                            .foregroundColor(.gray)
-                        Text("App Logo")
-                            .font(.caption)
-                            .foregroundColor(.gray)
-                    }
-                }
+                Image("AppLogo")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 280, height: 200)
 
                 Text("画面をタップしてはじめる")
                     .font(.title3)
@@ -113,12 +60,6 @@ struct StartView2: View {
                 Spacer()
             }
         }
-        .onAppear {
-            // 🔴 デバッグ用: 自動的にHomeViewに遷移
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                showMainApp = true
-            }
-        }
         .onTapGesture {
             showMainApp = true
         }
@@ -131,8 +72,8 @@ struct StartView2: View {
 }
 
 // プレビュー画面表示
-struct StartView1_Previews: PreviewProvider {
+struct StartView2_Previews: PreviewProvider {
     static var previews: some View {
-        StartView1()
+        StartView2()
     }
 }
