@@ -158,12 +158,12 @@ struct DiaryDetailView: View {
             fetchDiary()
         // 広告やAI用エリアを追加しやすい
         }.safeAreaInset(edge: .bottom) {
-            // if !isPremium {
-            //     // テスト用ID（本番時は差し替え）
-            //     BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
-            //         .frame(width: 320, height: 50)
-            //         .padding(.bottom, 8)
-            // }
+            if !isPremium {
+                // テスト用ID（本番時は差し替え）
+                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                    .frame(width: 320, height: 50)
+                    .padding(.bottom, 8)
+            }
         }
     }
 

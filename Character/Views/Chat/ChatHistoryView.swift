@@ -6,6 +6,7 @@ struct ChatHistoryView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
+    @State private var showPremiumUpgrade = false
 
     let userId: String
     let characterId: String
@@ -67,6 +68,67 @@ struct ChatHistoryView: View {
                                         // 各日付の最後に少し余白を追加
                                         Spacer()
                                             .frame(height: 8)
+                                    }
+                                }
+
+                                // プレミアム履歴アップグレードプロンプト
+                                if chatHistoryService.hasMoreHistory && !subscriptionManager.isPremium {
+                                    VStack(spacing: 16) {
+                                        // 区切り線
+                                        Rectangle()
+                                            .fill(Color.gray.opacity(0.3))
+                                            .frame(height: 1)
+                                            .padding(.horizontal, 32)
+
+                                        // アップグレードプロンプト
+                                        VStack(spacing: 12) {
+                                            Image(systemName: "clock.arrow.circlepath")
+                                                .font(.system(size: 40))
+                                                .foregroundColor(.orange)
+
+                                            Text("さらに古い履歴があります")
+                                                .dynamicTitle3()
+                                                .fontWeight(.semibold)
+                                                .foregroundColor(colorSettings.getCurrentTextColor())
+
+                                            Text("プレミアムにアップグレードして\n無制限のチャット履歴をご利用ください")
+                                                .dynamicBody()
+                                                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+                                                .multilineTextAlignment(.center)
+
+                                            Button(action: {
+                                                showPremiumUpgrade = true
+                                            }) {
+                                                HStack {
+                                                    Image(systemName: "crown.fill")
+                                                    Text("プレミアムにアップグレード")
+                                                        .fontWeight(.semibold)
+                                                }
+                                                .foregroundColor(.white)
+                                                .frame(maxWidth: .infinity)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    LinearGradient(
+                                                        colors: [.orange, .red],
+                                                        startPoint: .leading,
+                                                        endPoint: .trailing
+                                                    )
+                                                )
+                                                .cornerRadius(10)
+                                            }
+                                            .padding(.horizontal, 40)
+                                        }
+                                        .padding(.vertical, 20)
+                                        .padding(.horizontal, 20)
+                                        .background(
+                                            RoundedRectangle(cornerRadius: 16)
+                                                .fill(colorSettings.getCurrentTextColor().opacity(0.05))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 16)
+                                                        .stroke(.orange.opacity(0.3), lineWidth: 1)
+                                                )
+                                        )
+                                        .padding(.horizontal, 20)
                                     }
                                 }
 
@@ -148,6 +210,9 @@ struct ChatHistoryView: View {
         }
         .onDisappear {
             subscriptionManager.stopMonitoring()
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView()
         }
     }
 }

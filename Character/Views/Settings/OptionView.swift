@@ -18,6 +18,7 @@ struct OptionView: View {
     @State private var showContactView = false
     @State private var showMailCompose = false
     @State private var showMailUnavailableAlert = false
+    @State private var showPremiumUpgrade = false
     
     private var dynamicListHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -49,6 +50,9 @@ struct OptionView: View {
             NavigationStack {
                 ContactView()
             }
+        }
+        .sheet(isPresented: $showPremiumUpgrade) {
+            PremiumUpgradeView()
         }
         .sheet(isPresented: $showMailCompose) {
             MailComposeView(
@@ -82,9 +86,14 @@ struct OptionView: View {
     
     private var settingsListView: some View {
         List {
-            // 1つ目のバナー広告（音量設定の上）
+            // 1つ目のバナー広告（一番上）
             if subscriptionManager.shouldDisplayBannerAd() {
                 firstBannerAdSection
+            }
+
+            // プレミアムセクション（広告の下に表示）
+            if subscriptionManager.shouldDisplayBannerAd() {
+                premiumUpgradeSection
             }
 
             volumeSettingsSection
@@ -103,6 +112,91 @@ struct OptionView: View {
         .background(Color.clear)
         .frame(height: dynamicListHeight)
         .clipped()
+    }
+
+    // MARK: - プレミアムアップグレードセクション
+
+    private var premiumUpgradeSection: some View {
+        Section {
+            Button(action: { showPremiumUpgrade = true }) {
+                HStack(spacing: 16) {
+                    // プレミアムアイコン
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [.yellow, .orange],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 50, height: 50)
+
+                        Image(systemName: "crown.fill")
+                            .font(.title2)
+                            .foregroundColor(.white)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("プレミアムにアップグレード")
+                            .dynamicHeadline()
+                            .fontWeight(.semibold)
+                            .foregroundColor(colorSettings.getCurrentTextColor())
+
+                        Text("広告なし・無制限チャット・特別機能")
+                            .dynamicCaption()
+                            .foregroundColor(.gray)
+                            .lineLimit(1)
+                    }
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("月額980円")
+                            .dynamicBody()
+                            .fontWeight(.bold)
+                            .foregroundColor(colorSettings.getCurrentAccentColor())
+
+                        Text("7日間無料")
+                            .dynamicCaption()
+                            .foregroundColor(.green)
+                    }
+
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
+                        .font(.caption)
+                }
+                .padding(.vertical, 12)
+                .padding(.horizontal, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    colorSettings.getCurrentAccentColor().opacity(0.05),
+                                    colorSettings.getCurrentAccentColor().opacity(0.1)
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [.yellow.opacity(0.6), .orange.opacity(0.6)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 1.5
+                                )
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
     }
 
     // MARK: - バナー広告セクション

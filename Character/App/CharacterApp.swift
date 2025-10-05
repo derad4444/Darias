@@ -41,7 +41,7 @@ struct CharacterApp: App {
 
     var body: some Scene {
         WindowGroup {
-            StartView1()  // ← 起動ビュー名に合わせてください
+            StartView2()  // アプリロゴ画面のみ表示
                 .environmentObject(authManager)
                 .environmentObject(fontSettings)
                 .onReceive(fontSettings.$fontFamily) { _ in

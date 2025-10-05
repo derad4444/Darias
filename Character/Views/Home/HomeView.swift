@@ -28,6 +28,8 @@ struct HomeView: View {
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     
     // 予定確認ポップアップ
+    @State private var showChatLimitUpgrade = false
+    @State private var showPremiumUpgrade = false
     @State private var showScheduleConfirmation = false
     @State private var pendingScheduleData: ExtractedScheduleData?
     @StateObject private var scheduleManager = ScheduleManager()
@@ -238,6 +240,16 @@ struct HomeView: View {
                 subscriptionManager.stopMonitoring()
             }
             .errorAlert(errorManager)
+            .sheet(isPresented: $showChatLimitUpgrade) {
+                ChatLimitUpgradeView(
+                    onUpgrade: {
+                        showPremiumUpgrade = true
+                    }
+                )
+            }
+            .sheet(isPresented: $showPremiumUpgrade) {
+                PremiumUpgradeView()
+            }
             .navigationDestination(isPresented: $showChatHistory) {
                 ChatHistoryView(userId: userId, characterId: characterId)
             }
@@ -428,20 +440,21 @@ struct HomeView: View {
     }
     
     private func handleChatLimit() {
-        // プレミアムユーザーは制限なし
-        if subscriptionManager.isPremium {
+        // プレミアムユーザーは広告なし
+        if subscriptionManager.subscriptionStatus == .premium {
             return
         }
 
+        // チャット回数をカウント（制限なし）
         chatLimitManager.consumeChat()
 
-        // 5回毎に動画広告表示チェック
+        // 5回に1回動画広告表示チェック
         let currentChatCount = chatLimitManager.totalChatsToday
-        if subscriptionManager.shouldShowVideoAd(chatCount: currentChatCount) {
+        if currentChatCount % 5 == 0 {
             if let root = UIApplication.shared.connectedScenes
                 .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController {
                 rewardedAd.showAd(from: root) {
-                    chatLimitManager.addChatsFromAd(count: 5)
+                    // 広告視聴完了時の処理（特になし）
                 }
             }
         }

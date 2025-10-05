@@ -5,6 +5,7 @@ import FirebaseFunctions
 class Big5AnalysisService: ObservableObject {
     private let db = Firestore.firestore()
     private let cache = Big5AnalysisCache.shared
+    private let subscriptionManager = SubscriptionManager.shared
     
     @Published var currentAnalysisData: Big5AnalysisData?
     @Published var isLoading = false
@@ -193,10 +194,16 @@ class Big5AnalysisService: ObservableObject {
     private func generateAnalysisData(personalityKey: String, completion: @escaping (Result<Big5AnalysisData, Error>) -> Void) {
         // Cloud Functionを呼び出してAIで解析データを生成
         let functions = Functions.functions(region: "asia-northeast1")
-        
-        functions.httpsCallable("generateBig5Analysis").call([
-            "personalityKey": personalityKey
-        ]) { [weak self] result, error in
+
+        // isPremiumフラグでFirebase Functions側でモデル選択
+        // 無料: GPT-4o-mini, 有料: GPT-4o-2024-11-20
+        Task { @MainActor in
+            let isPremiumValue = subscriptionManager.isPremium
+
+            functions.httpsCallable("generateBig5Analysis").call([
+                "personalityKey": personalityKey,
+                "isPremium": isPremiumValue
+            ]) { [weak self] result, error in
             if let error = error {
                 DispatchQueue.main.async {
                     self?.isLoading = false
@@ -234,6 +241,7 @@ class Big5AnalysisService: ObservableObject {
                     self?.errorMessage = "生成されたデータの解析に失敗しました"
                     completion(.failure(error))
                 }
+            }
             }
         }
     }

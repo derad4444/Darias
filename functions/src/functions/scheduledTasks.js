@@ -3,7 +3,7 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 
 // 遅延インポートで軽量化
-let CONFIG; let Logger; let generateHolidays;
+let CONFIG; let Logger; let generateHolidays; let generateDiary; let admin; let errorHandler;
 let logger;
 
 function initializeDependencies() {
@@ -11,6 +11,9 @@ function initializeDependencies() {
     CONFIG = require("../config/config").CONFIG;
     Logger = require("../utils/logger").Logger;
     generateHolidays = require("../../const/generateHolidays").generateHolidays;
+    generateDiary = require("../../const/generateDiary").generateDiary;
+    admin = require("firebase-admin");
+    errorHandler = require("../utils/errorHandler");
 
     logger = new Logger("ScheduledTasks");
   }
@@ -19,64 +22,68 @@ function initializeDependencies() {
 /**
  * 日記自動生成（毎日23:50 JST）
  */
-// const scheduledDiaryGeneration = onSchedule(
-//     {
-//       schedule: CONFIG.schedules.diaryGeneration,
-//       timeZone: CONFIG.firebase.timeZone,
-//       region: CONFIG.firebase.region,
-//       // secrets: [OPENAI_API_KEY], // 一時的にコメントアウト
-//       timeoutSeconds: CONFIG.timeouts.default,
-//     },
-//     errorHandler.wrapAsync(async () => {
-//       const db = admin.firestore();
-//       const snapshot = await db.collection("CharacterDetail").get();
+const scheduledDiaryGeneration = onSchedule(
+    {
+      schedule: "50 23 * * *", // 毎日23:50 JST
+      timeZone: "Asia/Tokyo",
+      region: "asia-northeast1",
+      memory: "1GiB",
+      timeoutSeconds: 540,
+      secrets: ["OPENAI_API_KEY"],
+    },
+    async (event) => {
+      // 実行時に依存関係を初期化
+      initializeDependencies();
 
-//       logger.info("Starting daily diary generation", {
-//         characterCount: snapshot.docs.length,
-//       });
+      const db = admin.firestore();
+      const snapshot = await db.collection("CharacterDetail").get();
 
-//       let successCount = 0;
-//       let errorCount = 0;
+      logger.info("Starting daily diary generation", {
+        characterCount: snapshot.docs.length,
+      });
 
-//       // 並行制御: 同時に5件まで処理
-//       const pLimit = (await import("p-limit")).default;
-//       const limit = pLimit(5);
+      let successCount = 0;
+      let errorCount = 0;
 
-//       const processCharacter = async (doc) => {
-//         const characterId = doc.id;
-//         try {
-//           await generateDiary(characterId);
-//           successCount++;
-//           logger.info("Diary generated successfully", {characterId});
-//           return {success: true, characterId};
-//         } catch (error) {
-//           errorCount++;
-//           logger.error("Failed to generate diary", error, {characterId});
-//           return {success: false, characterId, error};
-//         }
-//       };
+      // 並行制御: 同時に5件まで処理
+      const pLimit = (await import("p-limit")).default;
+      const limit = pLimit(5);
 
-//       const promises = snapshot.docs.map((doc) =>
-//         limit(() => processCharacter(doc)),
-//       );
+      const processCharacter = async (doc) => {
+        const characterId = doc.id;
+        try {
+          await generateDiary(characterId);
+          successCount++;
+          logger.info("Diary generated successfully", {characterId});
+          return {success: true, characterId};
+        } catch (error) {
+          errorCount++;
+          logger.error("Failed to generate diary", error, {characterId});
+          return {success: false, characterId, error};
+        }
+      };
 
-//       const results = await Promise.allSettled(promises);
+      const promises = snapshot.docs.map((doc) =>
+        limit(() => processCharacter(doc)),
+      );
 
-//       // 失敗した処理を集計
-//       const failures = results
-//           .filter((result) => result.status === "rejected" ||
-//               !result.value?.success)
-//           .map((result) => result.value || result.reason);
+      const results = await Promise.allSettled(promises);
 
-//       logger.success("Daily diary generation completed", {
-//         total: snapshot.docs.length,
-//         success: successCount,
-//         errors: errorCount,
-//         // 最初の5件のみログ
-//         failures: failures.length > 0 ? failures.slice(0, 5) : undefined,
-//       });
-//     }, "scheduledDiaryGeneration"),
-// );
+      // 失敗した処理を集計
+      const failures = results
+          .filter((result) => result.status === "rejected" ||
+              !result.value?.success)
+          .map((result) => result.value || result.reason);
+
+      logger.success("Daily diary generation completed", {
+        total: snapshot.docs.length,
+        success: successCount,
+        errors: errorCount,
+        // 最初の5件のみログ
+        failures: failures.length > 0 ? failures.slice(0, 5) : undefined,
+      });
+    },
+);
 
 
 // キャラクター詳細生成は段階的生成に統合されました
@@ -113,6 +120,6 @@ const scheduledHolidays = onSchedule(
 );
 
 module.exports = {
-  // scheduledDiaryGeneration,
+  scheduledDiaryGeneration,
   scheduledHolidays,
 };

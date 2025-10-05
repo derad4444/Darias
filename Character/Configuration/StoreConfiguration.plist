@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Products</key>
+    <array>
+        <dict>
+            <key>ProductIdentifier</key>
+            <string>com.character.premium.monthly</string>
+            <key>ProductType</key>
+            <string>AutoRenewableSubscription</string>
+            <key>Price</key>
+            <string>980</string>
+            <key>Currency</key>
+            <string>JPY</string>
+            <key>LocalizedTitle</key>
+            <string>プレミアムプラン</string>
+            <key>LocalizedDescription</key>
+            <string>広告なし・無制限チャット・プレミアム機能をお楽しみください</string>
+            <key>SubscriptionPeriod</key>
+            <string>P1M</string>
+            <key>IntroductoryOffer</key>
+            <dict>
+                <key>PaymentMode</key>
+                <string>FreeTrial</string>
+                <key>Period</key>
+                <string>P7D</string>
+            </dict>
+        </dict>
+    </array>
+</dict>
+</plist>

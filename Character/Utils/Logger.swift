@@ -13,6 +13,7 @@ struct Logger {
     static let authentication = OSLog(subsystem: subsystem, category: "Authentication")
     static let schedule = OSLog(subsystem: subsystem, category: "Schedule")
     static let character = OSLog(subsystem: subsystem, category: "Character")
+    static let subscription = OSLog(subsystem: subsystem, category: "Subscription")
     static let general = OSLog(subsystem: subsystem, category: "General")
 
     /// デバッグ情報のログ（デバッグビルドでのみ出力）

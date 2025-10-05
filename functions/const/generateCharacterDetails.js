@@ -29,13 +29,33 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
     const big5Scores = data.confirmedBig5Scores || data.big5Scores;
     const gender = data.gender || "neutral";
 
+    // ユーザーのサブスクリプション状態を取得
+    let isPremium = false;
+    try {
+      const userSnap = await db.collection("users").doc(userId).get();
+      if (userSnap.exists) {
+        const userData = userSnap.data();
+        if (userData.subscription && userData.subscription.status === "premium") {
+          const expiresAt = userData.subscription.expires_at;
+          if (!expiresAt || expiresAt.toDate() > new Date()) {
+            isPremium = true;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn("Failed to check subscription status, using free tier:", error);
+    }
+
     const openai = new OpenAI({apiKey});
 
     const prompt = OPTIMIZED_PROMPTS.characterDetails(big5Scores, gender);
 
+    // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
+    const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
+
     // OpenAIリクエスト送信
     const res = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: model,
       messages: [{role: "user", content: prompt}],
       temperature: 0.7,
     });

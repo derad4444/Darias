@@ -17,8 +17,14 @@ class SubscriptionManager: ObservableObject {
 
     private let db = Firestore.firestore()
     private var userListener: ListenerRegistration?
+    private let purchaseManager = PurchaseManager.shared
 
-    private init() {}
+    private init() {
+        // PurchaseManagerの状態変化を監視
+        Task {
+            await purchaseManager.loadProducts()
+        }
+    }
 
     enum SubscriptionStatus {
         case free
@@ -93,22 +99,38 @@ class SubscriptionManager: ObservableObject {
 
         isLoading = true
 
+        // PurchaseManagerの状態もチェック
+        let isPremiumFromPurchase = await purchaseManager.isPremiumUser()
+
         do {
-            let document = try await db.collection("users").document(userId).getDocument()
+            let document = try await db.collection("users").document(userId)
+                .collection("subscription").document("current").getDocument()
 
             if document.exists, let data = document.data() {
                 updateSubscriptionFromDocument(data: data)
+            } else if isPremiumFromPurchase {
+                // Firestoreにサブスクリプション情報がない場合、PurchaseManagerの情報を使用
+                subscriptionStatus = .premium
+                shouldShowBannerAd = false
             } else {
                 subscriptionStatus = .free
                 shouldShowBannerAd = true
             }
         } catch {
             print("❌ Failed to refresh subscription: \(error)")
-            subscriptionStatus = .free
-            shouldShowBannerAd = true
+            // エラー時はPurchaseManagerの状態を使用
+            subscriptionStatus = isPremiumFromPurchase ? .premium : .free
+            shouldShowBannerAd = !isPremiumFromPurchase
         }
 
         isLoading = false
+    }
+
+    /// PurchaseManagerから呼び出される同期版メソッド
+    func refreshSubscriptionStatus() {
+        Task {
+            await refreshSubscriptionStatus()
+        }
     }
 
     /// バナー広告を表示すべきかチェック
@@ -196,13 +218,13 @@ class SubscriptionManager: ObservableObject {
 
         return UpgradeRecommendation(
             title: "プレミアムにアップグレード",
-            message: "広告なしで快適に利用できます",
+            message: "最新AIで高品質なキャラクター体験",
             benefits: [
-                "バナー広告非表示",
-                "動画広告なしで無制限チャット",
-                "高品質AI応答 (GPT-4o)",
-                "音声生成機能",
-                "優先サポート"
+                "広告完全非表示",
+                "最新AIモデル (GPT-4o-2024-11-20)",
+                "無制限チャット履歴",
+                "より高度な解析",
+                "音声生成機能"
             ]
         )
     }

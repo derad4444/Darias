@@ -18,6 +18,11 @@ Object.defineProperty(exports, "generateVoice", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "generateBig5Analysis", {
+  get: () => require("./const/generateBig5Analysis").generateBig5AnalysisCallable,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "scheduledHolidays", {
   get: () => require("./src/functions/scheduledTasks").scheduledHolidays,
   enumerable: true,

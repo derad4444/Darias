@@ -12,6 +12,7 @@ extension Notification.Name {
 class CharacterService: ObservableObject {
     private let db = Firestore.firestore()
     private let functions = Functions.functions(region: "asia-northeast1")
+    private let subscriptionManager = SubscriptionManager.shared
     
     @Published var big5AnsweredCount: Int = 0
     @Published var currentBIG5Question: BIG5Question? = nil
@@ -76,6 +77,7 @@ class CharacterService: ObservableObject {
         
         
         // 先に予定抽出をチェック
+        // 予定抽出は無料・有料問わずGPT-3.5-turboを使用（isPremiumパラメータなし）
         functions.httpsCallable("extractSchedule").call([
             "userId": userId,
             "userMessage": trimmed
@@ -135,11 +137,17 @@ class CharacterService: ObservableObject {
         completion: @escaping (Result<CharacterReply, AppError>) -> Void
     ) {
         // キャラクター返答Cloud Function呼び出し
-        functions.httpsCallable("generateCharacterReply").call([
-            "characterId": characterId,
-            "userMessage": userMessage,
-            "userId": userId
-        ]) { result, error in
+        // isPremiumフラグでFirebase Functions側でモデル選択
+        // 無料: GPT-4o-mini, 有料: GPT-4o-2024-11-20
+        Task { @MainActor in
+            let isPremiumValue = subscriptionManager.isPremium
+
+            functions.httpsCallable("generateCharacterReply").call([
+                "characterId": characterId,
+                "userMessage": userMessage,
+                "userId": userId,
+                "isPremium": isPremiumValue
+            ]) { result, error in
             if let error = error {
                 completion(.failure(.cloudFunctionError(error.localizedDescription)))
                 return
@@ -171,6 +179,7 @@ class CharacterService: ObservableObject {
             self.saveUserPost(userId: userId, characterId: characterId, content: userMessage, reply: reply)
             
             completion(.success(characterReply))
+            }
         }
     }
     
@@ -429,13 +438,17 @@ class CharacterService: ObservableObject {
         }
         
         // Cloud Functionに回答を送信
-        let data: [String: Any] = [
-            "characterId": characterId,
-            "userMessage": "\(answerValue)",
-            "userId": userId
-        ]
-        
-        functions.httpsCallable("generateCharacterReply").call(data) { [weak self] result, error in
+        Task { @MainActor in
+            let isPremiumValue = subscriptionManager.isPremium
+
+            let data: [String: Any] = [
+                "characterId": characterId,
+                "userMessage": "\(answerValue)",
+                "userId": userId,
+                "isPremium": isPremiumValue
+            ]
+
+            functions.httpsCallable("generateCharacterReply").call(data) { [weak self] result, error in
             if let error = error {
                 print("❌ BIG5 answer submission error: \(error)")
                 return
@@ -467,6 +480,7 @@ class CharacterService: ObservableObject {
                 }
             } else {
                 print("❌ Invalid response data format")
+            }
             }
         }
     }

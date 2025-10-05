@@ -13,9 +13,10 @@ const db = admin.firestore();
  * @param {Object} big5Scores - Big5スコア
  * @param {string} gender - 性別
  * @param {string} apiKey - OpenAI APIキー
+ * @param {boolean} isPremium - プレミアムユーザーかどうか
  * @return {Promise<Object>} - 生成された分析データ
  */
-async function generateBig5Analysis(big5Scores, gender, apiKey) {
+async function generateBig5Analysis(big5Scores, gender, apiKey, isPremium = false) {
   try {
     // personalityKey生成
     const personalityKey = generatePersonalityKey(big5Scores);
@@ -42,8 +43,11 @@ async function generateBig5Analysis(big5Scores, gender, apiKey) {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
+        const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
+
         const response = await openai.chat.completions.create({
-          model: "gpt-4o",
+          model: model,
           messages: [{role: "user", content: prompt}],
           temperature: 0.7,
         });
@@ -103,4 +107,72 @@ async function generateBig5Analysis(big5Scores, gender, apiKey) {
   }
 }
 
-module.exports = {generateBig5Analysis};
+// HTTP callable関数のラッパー
+const {onCall} = require("firebase-functions/v2/https");
+
+/**
+ * HTTP Callable版 - Big5性格分析生成
+ */
+const generateBig5AnalysisCallable = onCall(
+  {
+    region: "asia-northeast1",
+    memory: "1GiB",
+    timeoutSeconds: 300,
+    secrets: ["OPENAI_API_KEY"],
+  },
+  async (request) => {
+    const {data} = request;
+    try {
+      const { personalityKey, isPremium } = data;
+
+      if (!personalityKey) {
+        throw new Error("personalityKey is required");
+      }
+
+      // personalityKeyから Big5Scores と gender を解析
+      const { big5Scores, gender } = parsePersonalityKey(personalityKey);
+
+      // OpenAI APIキーを取得
+      const {OPENAI_API_KEY} = require("../src/config/config");
+      const apiKey = OPENAI_API_KEY.value().trim();
+      if (!apiKey) {
+        throw new Error("OpenAI API key not configured");
+      }
+
+      // 分析データ生成
+      const result = await generateBig5Analysis(big5Scores, gender, apiKey, isPremium);
+
+      return result;
+    } catch (error) {
+      console.error("❌ generateBig5AnalysisCallable error:", error);
+      throw new Error("Big5分析生成に失敗しました");
+    }
+  }
+);
+
+/**
+ * personalityKeyから Big5Scores と gender を解析
+ * @param {string} personalityKey - "O3_C4_E2_A5_N1_male" 形式
+ * @return {Object} - {big5Scores, gender}
+ */
+function parsePersonalityKey(personalityKey) {
+  const parts = personalityKey.split("_");
+
+  if (parts.length !== 6) {
+    throw new Error("Invalid personalityKey format");
+  }
+
+  const big5Scores = {
+    openness: parseInt(parts[0].substring(1)),
+    conscientiousness: parseInt(parts[1].substring(1)),
+    extraversion: parseInt(parts[2].substring(1)),
+    agreeableness: parseInt(parts[3].substring(1)),
+    neuroticism: parseInt(parts[4].substring(1))
+  };
+
+  const gender = parts[5];
+
+  return { big5Scores, gender };
+}
+
+module.exports = {generateBig5Analysis, generateBig5AnalysisCallable};

@@ -29,6 +29,23 @@ async function generateDiary(characterId, userId) {
   const big5 = charData.confirmedBig5Scores || charData.big5Scores;
   const gender = charData.gender || "neutral";
 
+  // ユーザーのサブスクリプション状態を取得
+  let isPremium = false;
+  try {
+    const userSnap = await db.collection("users").doc(userId).get();
+    if (userSnap.exists) {
+      const userData = userSnap.data();
+      if (userData.subscription && userData.subscription.status === "premium") {
+        const expiresAt = userData.subscription.expires_at;
+        if (!expiresAt || expiresAt.toDate() > new Date()) {
+          isPremium = true;
+        }
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to check subscription status, using free tier:", error);
+  }
+
   // 今日の日付
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -99,8 +116,11 @@ async function generateDiary(characterId, userId) {
     apiKey: OPENAI_API_KEY.value().trim(),
   });
 
+  // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
+  const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o",
+    model: model,
     messages: [{role: "user", content: prompt}],
     temperature: 0.8,
   });

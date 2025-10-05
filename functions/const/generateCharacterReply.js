@@ -389,7 +389,7 @@ exports.generateCharacterReply = onCall(
     async (request) => {
       const {data} = request;
       try {
-        const {characterId, userMessage, userId} = data;
+        const {characterId, userMessage, userId, isPremium} = data;
         if (!characterId || !userMessage || !userId) {
           return {error: "Missing characterId or userMessage"};
         }
@@ -694,10 +694,13 @@ exports.generateCharacterReply = onCall(
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 
+        // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
+        const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
+
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),
             {
-              model: "gpt-4o",
+              model: model,
               messages: [{role: "user", content: prompt}],
               temperature: 0.8,
             },

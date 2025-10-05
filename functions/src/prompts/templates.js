@@ -23,81 +23,94 @@ function getGenderCode(gender) {
 
 const OPTIMIZED_PROMPTS = {
   /**
-   * Big5 Analysis Generation
-   * Original: ~150 tokens → Optimized: ~45 tokens (70% reduction)
-   * Note: Do not include numerical scores in user-facing output
+   * Big5 Analysis Generation - GPT-4o-mini optimized
+   * Enhanced for better JSON output and Japanese processing
    */
   big5Analysis: (big5Scores, gender) => {
-    return `B5:${formatBig5Short(big5Scores)} G:${getGenderCode(gender)}
-Analyze 5 areas 300-500 chars each. IMPORTANT: Do not mention numerical scores in output.
-{"career_analysis":"","romance_analysis":"","stress_analysis":"","learning_analysis":"","decision_analysis":""}`;
+    return `Big5:${formatBig5Short(big5Scores)} 性別:${getGenderCode(gender)}
+
+以下の性格分析を300-500文字で生成。数値は出力に含めない。
+1.適職分析 2.恋愛傾向 3.ストレス対処 4.学習スタイル 5.意思決定
+
+出力形式:
+{"career_analysis":"適職について","romance_analysis":"恋愛について","stress_analysis":"ストレスについて","learning_analysis":"学習について","decision_analysis":"意思決定について"}`;
   },
 
   /**
-   * Character Reply Generation
-   * Original: ~120 tokens → Optimized: ~35 tokens (71% reduction)
+   * Character Reply Generation - GPT-4o-mini optimized
+   * Enhanced for better Japanese conversation flow
    */
   characterReply: (type, gender, big5, dreamText, userMessage, style, question) => {
-    const dream = dreamText ? ` D:${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
-    return `${type}(${getGenderCode(gender)})B5:${formatBig5Short(big5)}${dream}
-U:${userMessage}
-${style}${question}1sent`;
+    const dream = dreamText ? ` 夢:${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
+    return `キャラ設定:${type}(${getGenderCode(gender)}) 性格:${formatBig5Short(big5)}${dream}
+
+ユーザー発言:"${userMessage}"
+
+${style}で${question}
+自然な日本語で150文字以内で返答。`;
   },
 
   /**
-   * Diary Generation
-   * Original: ~110 tokens → Optimized: ~40 tokens (64% reduction)
+   * Diary Generation - GPT-4o-mini optimized
+   * Enhanced for stable JSON output
    */
   diary: (characterType, big5, gender, scheduleSummary, chatSummary, diaryStyle, tagStyle) => {
-    return `${characterType} diary B5:${formatBig5Short(big5)} G:${getGenderCode(gender)}
-Sched:${scheduleSummary || "none"}
-Chat:${chatSummary || "none"}
-${diaryStyle} 200-400chars ${tagStyle}
-{"content":"","summary_tags":[]}`;
+    return `キャラクター:${characterType} 性格:${formatBig5Short(big5)} 性別:${getGenderCode(gender)}
+予定:${scheduleSummary || "なし"}
+会話:${chatSummary || "なし"}
+
+${diaryStyle}で日記を200-400文字で作成。${tagStyle}
+
+出力形式:
+{"content":"日記内容","summary_tags":["タグ1","タグ2","タグ3"]}`;
   },
 
   /**
-   * Schedule Extraction
-   * Original: ~200 tokens → Optimized: ~85 tokens (58% reduction)
+   * Schedule Extraction - GPT-4o-mini optimized
+   * Enhanced for better Japanese date/time understanding
    */
   scheduleExtract: (currentDate, currentTime, userMessage) => {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24*60*60*1000).toLocaleDateString('ja-JP');
     const today = now.toLocaleDateString('ja-JP');
 
-    return `Date:${currentDate} ${currentTime}
-Extract:"${userMessage}"
+    return `現在:${currentDate} ${currentTime}
+入力:"${userMessage}"
 
-Rules:
-- Tomorrow=${tomorrow}
-- Today=${today}
-- No time specified→00:00-23:59,isAllDay:true
-- Time specified→1h duration,isAllDay:false
+ルール:
+・今日=${today} 明日=${tomorrow}
+・時間未指定→終日(00:00-23:59,isAllDay:true)
+・時間指定→1時間継続(isAllDay:false)
 
-Output:
-No schedule:{"hasSchedule":false}
-Has schedule:{"hasSchedule":true,"title":"","isAllDay":false,"startDate":"ISO8601","endDate":"ISO8601","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}
-JSON only.`;
+出力:
+予定なし:{"hasSchedule":false}
+予定あり:{"hasSchedule":true,"title":"予定名","isAllDay":false,"startDate":"ISO8601形式","endDate":"ISO8601形式","location":"場所","tag":"タグ","memo":"メモ","repeatOption":"none","remindValue":0,"remindUnit":"none"}
+
+JSONのみ出力。`;
   },
 
   /**
-   * Character Details Generation
-   * Original: ~80 tokens → Optimized: ~25 tokens (69% reduction)
+   * Character Details Generation - GPT-4o-mini optimized
+   * Enhanced for consistent character generation
    */
   characterDetails: (big5Scores, gender) => {
-    return `B5:${formatBig5Short(big5Scores)} G:${getGenderCode(gender)}
-Generate character details:
-{"favorite_color":"","favorite_place":"","favorite_word":"","word_tendency":"","strength":"","weakness":"","skill":"","hobby":"","aptitude":"","dream":"","favorite_entertainment_genre":""}`;
+    return `性格:${formatBig5Short(big5Scores)} 性別:${getGenderCode(gender)}
+
+以下の項目でキャラクター詳細を生成:
+
+出力形式:
+{"favorite_color":"好きな色","favorite_place":"好きな場所","favorite_word":"口癖","word_tendency":"話し方の特徴","strength":"長所","weakness":"短所","skill":"特技","hobby":"趣味","aptitude":"適性","dream":"夢","favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
   },
 
   /**
-   * Emotion Detection
-   * Original: ~90 tokens → Optimized: ~25 tokens (72% reduction)
+   * Emotion Detection - GPT-4o-mini optimized
+   * Enhanced for Japanese emotion recognition
    */
   emotionDetect: (messageText) => {
-    return `Detect emotion:"${messageText.substring(0, 100)}"
-Options:normal,smile,angry,cry,sleep
-Output emotion name only.`;
+    return `文章:"${messageText.substring(0, 100)}"
+
+感情を判定:normal,smile,angry,cry,sleep
+感情名のみ出力。`;
   }
 };
 
