@@ -1,6 +1,7 @@
 import Foundation
 import FirebaseAuth
 import FirebaseFirestore
+import SwiftUI
 
 @MainActor
 class SubscriptionManager: ObservableObject {
@@ -14,6 +15,9 @@ class SubscriptionManager: ObservableObject {
     // テスト用の手動オーバーライド
     @Published var isTestModeEnabled = false
     @Published var testSubscriptionStatus: SubscriptionStatus = .free
+
+    // デバッグ用のAppStorage参照
+    @AppStorage("isPremium") private var debugIsPremium: Bool = false
 
     private let db = Firestore.firestore()
     private var userListener: ListenerRegistration?
@@ -135,6 +139,13 @@ class SubscriptionManager: ObservableObject {
 
     /// バナー広告を表示すべきかチェック
     func shouldDisplayBannerAd() -> Bool {
+        // DEBUGビルドの場合、AppStorageの値を優先
+        #if DEBUG
+        if debugIsPremium {
+            return false
+        }
+        #endif
+
         let currentStatus = isTestModeEnabled ? testSubscriptionStatus : subscriptionStatus
 
         switch currentStatus {
@@ -240,6 +251,13 @@ class SubscriptionManager: ObservableObject {
 
 extension SubscriptionManager {
     var isPremium: Bool {
+        // DEBUGビルドの場合、AppStorageの値を優先
+        #if DEBUG
+        if debugIsPremium {
+            return true
+        }
+        #endif
+
         let currentStatus = isTestModeEnabled ? testSubscriptionStatus : subscriptionStatus
         return currentStatus == .premium
     }

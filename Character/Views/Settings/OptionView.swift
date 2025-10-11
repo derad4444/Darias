@@ -96,6 +96,11 @@ struct OptionView: View {
                 premiumUpgradeSection
             }
 
+            // 開発用：プレミアム切り替えスイッチ
+            #if DEBUG
+            debugPremiumToggleSection
+            #endif
+
             volumeSettingsSection
             colorSettingsSection
             tagSettingsSection
@@ -112,6 +117,56 @@ struct OptionView: View {
         .background(Color.clear)
         .frame(height: dynamicListHeight)
         .clipped()
+    }
+
+    // MARK: - デバッグ用プレミアム切り替え
+
+    private var debugPremiumToggleSection: some View {
+        Section(header: sectionHeader("🛠️ 開発用")) {
+            VStack(spacing: 12) {
+                HStack {
+                    Image(systemName: isPremium ? "crown.fill" : "crown")
+                        .foregroundColor(isPremium ? .yellow : .gray)
+                        .font(.title2)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("プレミアム機能テスト")
+                            .dynamicBody()
+                            .fontWeight(.semibold)
+                            .foregroundColor(colorSettings.getCurrentTextColor())
+
+                        Text(isPremium ? "プレミアムモード（広告なし）" : "無料モード（広告あり）")
+                            .dynamicCaption()
+                            .foregroundColor(.gray)
+                    }
+
+                    Spacer()
+
+                    Toggle("", isOn: $isPremium)
+                        .labelsHidden()
+                        .onChange(of: isPremium) { newValue in
+                            // 変更を即座に反映させる
+                            subscriptionManager.objectWillChange.send()
+                            print("🛠️ DEBUG: isPremium changed to \(newValue)")
+                        }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(isPremium ? Color.yellow.opacity(0.1) : Color.white.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(
+                                    isPremium ? Color.yellow.opacity(0.5) : colorSettings.getCurrentTextColor().opacity(0.2),
+                                    lineWidth: 1.5
+                                )
+                        )
+                )
+            }
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
     // MARK: - プレミアムアップグレードセクション

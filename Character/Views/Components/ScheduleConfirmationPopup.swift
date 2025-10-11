@@ -5,7 +5,8 @@ struct ScheduleConfirmationPopup: View {
     let scheduleData: ExtractedScheduleData
     let onConfirm: (ExtractedScheduleData) -> Void
     let onCancel: () -> Void
-    
+    let onEdit: (ExtractedScheduleData) -> Void
+
     @Environment(\.colorScheme) var colorScheme
     @EnvironmentObject var fontSettings: FontSettingsManager
     
@@ -34,15 +35,32 @@ struct ScheduleConfirmationPopup: View {
                     if !scheduleData.title.isEmpty {
                         ScheduleInfoRow(icon: "textformat", title: "予定", content: scheduleData.title)
                     }
-                    
-                    if !scheduleData.date.isEmpty {
+
+                    // 詳細な日時表示
+                    if let startDate = scheduleData.startDate {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ScheduleInfoRow(
+                                icon: "calendar",
+                                title: "開始日時",
+                                content: formatDateTime(startDate, isAllDay: scheduleData.isAllDay)
+                            )
+
+                            if let endDate = scheduleData.endDate {
+                                ScheduleInfoRow(
+                                    icon: "calendar",
+                                    title: "終了日時",
+                                    content: formatDateTime(endDate, isAllDay: scheduleData.isAllDay)
+                                )
+                            }
+                        }
+                    } else if !scheduleData.date.isEmpty {
                         ScheduleInfoRow(icon: "calendar", title: "日時", content: scheduleData.date)
                     }
-                    
+
                     if !scheduleData.location.isEmpty {
                         ScheduleInfoRow(icon: "location", title: "場所", content: scheduleData.location)
                     }
-                    
+
                     if !scheduleData.memo.isEmpty {
                         ScheduleInfoRow(icon: "note.text", title: "メモ", content: scheduleData.memo)
                     }
@@ -54,27 +72,57 @@ struct ScheduleConfirmationPopup: View {
                 )
                 
                 // ボタン
-                HStack(spacing: 16) {
+                VStack(spacing: 12) {
+                    // 編集と追加ボタン
+                    HStack(spacing: 12) {
+                        Button {
+                            onEdit(scheduleData)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "pencil")
+                                    .font(.system(size: 14 * fontSettings.fontSize.scale))
+                                Text("編集")
+                                    .font(.system(size: 16 * fontSettings.fontSize.scale, weight: .medium))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.orange)
+                            )
+                        }
+
+                        Button {
+                            onConfirm(scheduleData)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14 * fontSettings.fontSize.scale))
+                                Text("追加する")
+                                    .font(.system(size: 16 * fontSettings.fontSize.scale, weight: .medium))
+                            }
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(Color.blue)
+                            )
+                        }
+                    }
+
+                    // キャンセルボタン
                     Button("キャンセル") {
                         onCancel()
                     }
+                    .font(.system(size: 16 * fontSettings.fontSize.scale))
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray4))
-                    )
-                    
-                    Button("追加する") {
-                        onConfirm(scheduleData)
-                    }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.blue)
+                            .fill(Color(.systemGray5))
                     )
                 }
             }
@@ -85,6 +133,21 @@ struct ScheduleConfirmationPopup: View {
                     .shadow(radius: 20)
             )
             .padding(.horizontal, 32)
+        }
+    }
+
+    // 日時フォーマット用ヘルパー関数
+    private func formatDateTime(_ date: Date, isAllDay: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.timeZone = TimeZone.current
+
+        if isAllDay {
+            formatter.dateFormat = "yyyy年M月d日(E)"
+            return formatter.string(from: date)
+        } else {
+            formatter.dateFormat = "yyyy年M月d日(E) HH:mm"
+            return formatter.string(from: date)
         }
     }
 }
@@ -165,7 +228,8 @@ struct ExtractedScheduleData {
             "isAllDay": false
         ]),
         onConfirm: { _ in },
-        onCancel: { }
+        onCancel: { },
+        onEdit: { _ in }
     )
     .environmentObject(FontSettingsManager())
 }

@@ -377,6 +377,47 @@ function getStageCompletionMessage(stage, gender) {
          "診断が進んでいます。ありがとう！";
 }
 
+// 無意味な入力を検出する関数
+function isMeaninglessInput(message) {
+  const text = message.trim();
+
+  // 3文字未満
+  if (text.length < 3) return true;
+
+  // 同じ文字の繰り返し (あああ、うう、www等)
+  if (/^(.)\1+$/.test(text)) return true;
+
+  // 記号のみ
+  if (/^[!?！？。、\s]+$/.test(text)) return true;
+
+  // 母音のみの繰り返し (あいうえお等)
+  if (/^[あいうえおアイウエオ]+$/.test(text) && text.length <= 5) return true;
+
+  return false;
+}
+
+// フォールバック返答をランダムに取得
+function getRandomFallbackReply(gender) {
+  const fallbackReplies = gender === "female" ? [
+    "ん？どうしたの？",
+    "何か言いたいことある？",
+    "うーん、よく聞こえなかったかも",
+    "もう少し詳しく教えて？",
+    "どうしたの？何かあった？",
+    "え、なになに？",
+  ] : [
+    "ん？どうした？",
+    "何か言いたいことある？",
+    "うーん、よく聞こえなかったかも",
+    "もう少し詳しく教えて？",
+    "どうした？何かあった？",
+    "え、なになに？",
+  ];
+
+  const randomIndex = Math.floor(Math.random() * fallbackReplies.length);
+  return fallbackReplies[randomIndex];
+}
+
 exports.generateCharacterReply = onCall(
     {
       region: "asia-northeast1",
@@ -393,6 +434,41 @@ exports.generateCharacterReply = onCall(
         if (!characterId || !userMessage || !userId) {
           return {error: "Missing characterId or userMessage"};
         }
+
+        // 無意味な入力を検出してフォールバック返答を返す
+        if (isMeaninglessInput(userMessage)) {
+          console.log(`🚫 Meaningless input detected: "${userMessage}"`);
+
+          // キャラクター情報を取得（genderのみ必要）
+          const charDetailSnap = await db.collection("users").doc(userId)
+              .collection("characters").doc(characterId)
+              .collection("details").doc("current").get();
+
+          const gender = charDetailSnap.exists ?
+            charDetailSnap.data().gender || "neutral" : "neutral";
+
+          const fallbackReply = getRandomFallbackReply(gender);
+
+          return {
+            reply: fallbackReply,
+            isBig5Question: false,
+            emotion: "", // 通常表情
+          };
+        }
+
+        // 予定問い合わせパターンの検出
+        const scheduleQueryPatterns = [
+          /今日.*予定/,
+          /今日.*何.*ある[？?]/,
+          /明日.*予定/,
+          /明日.*何.*ある[？?]/,
+          /予定.*教えて/,
+          /予定.*ある[？?]/,
+        ];
+
+        const isScheduleQuery = scheduleQueryPatterns.some((pattern) =>
+          pattern.test(userMessage.replace(/\s/g, "")),
+        );
 
         // 「話題ある？」パターンの検出
         const topicRequestPatterns = [
@@ -428,6 +504,79 @@ exports.generateCharacterReply = onCall(
         const charData = charDetailSnap.data();
         let big5ProgressData = big5ProgressSnap.exists ?
           big5ProgressSnap.data() : null;
+
+        // 予定問い合わせの処理
+        if (isScheduleQuery) {
+          console.log("📅 Schedule query detected");
+
+          // 今日・明日を判定
+          const isToday = /今日/.test(userMessage);
+          const isTomorrow = /明日/.test(userMessage);
+
+          const now = new Date();
+          let targetDate = now;
+
+          if (isTomorrow) {
+            targetDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          }
+
+          // 対象日の開始と終了（00:00-23:59）
+          const startOfDay = new Date(targetDate);
+          startOfDay.setHours(0, 0, 0, 0);
+
+          const endOfDay = new Date(targetDate);
+          endOfDay.setHours(23, 59, 59, 999);
+
+          // Firestoreから予定を取得
+          const schedulesSnapshot = await db.collection("users").doc(userId)
+              .collection("schedules")
+              .where("startDate", ">=", admin.firestore.Timestamp.fromDate(startOfDay))
+              .where("startDate", "<=", admin.firestore.Timestamp.fromDate(endOfDay))
+              .orderBy("startDate", "asc")
+              .get();
+
+          const gender = charData.gender || "neutral";
+          const dateLabel = isToday ? "今日" : isTomorrow ? "明日" : "その日";
+
+          if (schedulesSnapshot.empty) {
+            const noScheduleReply = gender === "female" ?
+              `${dateLabel}は予定が入ってないみたい！何か予定を立てる？` :
+              `${dateLabel}は予定が入ってないみたいだね！何か予定を立てる？`;
+
+            return {
+              reply: noScheduleReply,
+              isBig5Question: false,
+              emotion: "",
+            };
+          }
+
+          // 予定をフォーマット
+          const schedules = schedulesSnapshot.docs.map((doc) => {
+            const data = doc.data();
+            const startDate = data.startDate.toDate();
+
+            // 日本時間（JST）で表示するため、toLocaleStringを使用
+            const timeStr = data.isAllDay ? "終日" :
+              startDate.toLocaleTimeString("ja-JP", {
+                timeZone: "Asia/Tokyo",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+              });
+            return `${timeStr} ${data.title}`;
+          });
+
+          const scheduleList = schedules.join("、");
+          const scheduleReply = gender === "female" ?
+            `${dateLabel}の予定は${schedules.length}件あるよ！\n${scheduleList}` :
+            `${dateLabel}の予定は${schedules.length}件あるね！\n${scheduleList}`;
+
+          return {
+            reply: scheduleReply,
+            isBig5Question: false,
+            emotion: "",
+          };
+        }
 
         // 既存のansweredQuestionsにserverTimestamp()が含まれている場合はクリアする
         if (big5ProgressData && big5ProgressData.answeredQuestions) {

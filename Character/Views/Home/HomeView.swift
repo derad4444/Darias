@@ -32,6 +32,8 @@ struct HomeView: View {
     @State private var showPremiumUpgrade = false
     @State private var showScheduleConfirmation = false
     @State private var pendingScheduleData: ExtractedScheduleData?
+    @State private var showScheduleEdit = false
+    @State private var scheduleToEdit: ScheduleItem?
     @StateObject private var scheduleManager = ScheduleManager()
     
     // ポイントシステム
@@ -63,7 +65,8 @@ struct HomeView: View {
             // バナー広告 + 十分なマージンを確保（さらに増加）
             return baseChatHeight + 160 // さらに大幅に増加
         } else {
-            return baseChatHeight + 20 // 通常のスペーサー
+            // プレミアム時：広告スペース不要なので小さく
+            return baseChatHeight - 20
         }
     }
     
@@ -99,13 +102,9 @@ struct HomeView: View {
                     
                     // UI要素（最前面レイヤー）
                     VStack(spacing: 0) {
-                        // 上部：空白スペース
                         Spacer()
-                            .frame(height: dynamicHeaderHeight)
-                        
-                        Spacer()
-                        
-                        // 下部：BIG5進捗バー、履歴ボタンとチャット入力/BIG5選択肢（固定高さ）
+
+                        // 下部：BIG5進捗バー、履歴ボタンとチャット入力/BIG5選択肢
                         VStack(spacing: 8) {
                             // BIG5進捗バー（チャット入力と連動）
                             HStack {
@@ -163,7 +162,7 @@ struct HomeView: View {
                                 .animation(.spring(response: 0.6, dampingFraction: 0.8), value: characterService.showBIG5Question)
                             }
                         }
-                        .frame(height: dynamicChatInputHeight)
+                        .padding(.bottom, subscriptionManager.shouldDisplayBannerAd() ? 5 : 10)
 
                         // バナー広告（無料ユーザーのみ、チャット入力とタブの間に配置）
                         if subscriptionManager.shouldDisplayBannerAd() {
@@ -174,11 +173,8 @@ struct HomeView: View {
                                     subscriptionManager.trackBannerAdImpression()
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.top, 8)
+                                .padding(.bottom, 12)
                         }
-
-                        Spacer()
-                            .frame(height: subscriptionManager.shouldDisplayBannerAd() ? 12 : 20)
                     }
                     
                     
@@ -250,6 +246,13 @@ struct HomeView: View {
             .sheet(isPresented: $showPremiumUpgrade) {
                 PremiumUpgradeView()
             }
+            .sheet(isPresented: $showScheduleEdit) {
+                if let schedule = scheduleToEdit {
+                    NavigationStack {
+                        ScheduleEditView(schedule: schedule, userId: userId)
+                    }
+                }
+            }
             .navigationDestination(isPresented: $showChatHistory) {
                 ChatHistoryView(userId: userId, characterId: characterId)
             }
@@ -266,6 +269,12 @@ struct HomeView: View {
                     onCancel: {
                         showScheduleConfirmation = false
                         pendingScheduleData = nil
+                    },
+                    onEdit: { scheduleData in
+                        // ExtractedScheduleDataからScheduleItemを作成
+                        scheduleToEdit = createScheduleItem(from: scheduleData)
+                        showScheduleConfirmation = false
+                        showScheduleEdit = true
                     }
                 )
                 .animation(.easeInOut(duration: 0.3), value: showScheduleConfirmation)
@@ -442,6 +451,7 @@ struct HomeView: View {
     private func handleChatLimit() {
         // プレミアムユーザーは広告なし
         if subscriptionManager.subscriptionStatus == .premium {
+            print("🔵 プレミアムユーザーのため広告スキップ")
             return
         }
 
@@ -450,11 +460,37 @@ struct HomeView: View {
 
         // 5回に1回動画広告表示チェック
         let currentChatCount = chatLimitManager.totalChatsToday
+        print("💬 現在のチャット回数: \(currentChatCount), リワード広告準備状態: \(rewardedAd.isReady)")
+
         if currentChatCount % 5 == 0 {
-            if let root = UIApplication.shared.connectedScenes
-                .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController {
-                rewardedAd.showAd(from: root) {
-                    // 広告視聴完了時の処理（特になし）
+            print("🎬 5の倍数でリワード広告表示を試みます")
+            // 他のビューが表示されている可能性があるため、少し遅延させる
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                if let root = UIApplication.shared.connectedScenes
+                    .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController {
+                    // 既に他のビューを表示中でないか確認
+                    if root.presentedViewController == nil {
+                        self.rewardedAd.showAd(from: root) {
+                            // 広告視聴完了時の処理（特になし）
+                            print("✅ リワード広告視聴完了")
+                        }
+                    } else {
+                        print("⚠️ 他のビューが表示中のため、広告表示をスキップします")
+                        // さらに遅延して再試行
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            if let root = UIApplication.shared.connectedScenes
+                                .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController,
+                               root.presentedViewController == nil {
+                                self.rewardedAd.showAd(from: root) {
+                                    print("✅ リワード広告視聴完了")
+                                }
+                            } else {
+                                print("⚠️ 再試行でも他のビューが表示中のため、広告表示をスキップします")
+                            }
+                        }
+                    }
+                } else {
+                    print("❌ rootViewControllerが見つかりませんでした")
                 }
             }
         }
@@ -553,7 +589,7 @@ struct HomeView: View {
     private func triggerBIG5Question() {
         // Cloud Functionを呼び出してBIG5質問を取得
         isWaitingForReply = true
-        
+
         characterService.sendMessage(
             characterId: characterId,
             userMessage: "話題ある？",
@@ -561,7 +597,7 @@ struct HomeView: View {
         ) { [self] result in
             DispatchQueue.main.async {
                 self.isWaitingForReply = false
-                
+
                 switch result {
                 case .success(let reply):
                     self.handleCharacterReply(reply)
@@ -571,5 +607,32 @@ struct HomeView: View {
             }
         }
     }
-    
+
+    // MARK: - Schedule Helper
+    private func createScheduleItem(from scheduleData: ExtractedScheduleData) -> ScheduleItem {
+        let startDate = scheduleData.startDate ?? Date()
+        let endDate = scheduleData.endDate ?? startDate.addingTimeInterval(3600) // デフォルト1時間後
+
+        return ScheduleItem(
+            id: UUID().uuidString,
+            title: scheduleData.title,
+            isAllDay: scheduleData.isAllDay,
+            startDate: startDate,
+            endDate: endDate,
+            location: scheduleData.location,
+            tag: "",
+            memo: scheduleData.memo,
+            repeatOption: "",
+            remindValue: 10,
+            remindUnit: "分前",
+            recurringGroupId: nil,
+            notificationSettings: NotificationSettings(
+                isEnabled: true,
+                notifications: [
+                    NotificationTiming(value: 10, unit: .minutes)
+                ]
+            )
+        )
+    }
+
 }

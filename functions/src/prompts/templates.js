@@ -47,7 +47,7 @@ const OPTIMIZED_PROMPTS = {
 ユーザー発言:"${userMessage}"
 
 ${style}で${question}
-自然な日本語で150文字以内で返答。`;
+自然な日本語で100文字以内で返答。設定情報(AI,M,F,N等)は出力に含めない。`;
   },
 
   /**
@@ -77,16 +77,17 @@ ${diaryStyle}で日記を200-400文字で作成。${tagStyle}
     return `現在:${currentDate} ${currentTime}
 入力:"${userMessage}"
 
-ルール:
-・今日=${today} 明日=${tomorrow}
-・時間未指定→終日(00:00-23:59,isAllDay:true)
-・時間指定→1時間継続(isAllDay:false)
+日時+行動の組合せのみ予定あり。挨拶/感嘆/質問のみは予定なし。
+
+今日=${today} 明日=${tomorrow}
+時間なし→00:00-23:59,isAllDay:true
+時間あり→1h継続,isAllDay:false
 
 出力:
 予定なし:{"hasSchedule":false}
-予定あり:{"hasSchedule":true,"title":"予定名","isAllDay":false,"startDate":"ISO8601形式","endDate":"ISO8601形式","location":"場所","tag":"タグ","memo":"メモ","repeatOption":"none","remindValue":0,"remindUnit":"none"}
+予定あり:{"hasSchedule":true,"title":"","isAllDay":bool,"startDate":"ISO","endDate":"ISO","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}
 
-JSONのみ出力。`;
+JSONのみ。`;
   },
 
   /**
