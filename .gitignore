@@ -42,3 +42,9 @@ functions/node_modules/
 functions/pglite-debug.log
 functions/.env
 functions/.DS_Store
+
+# Apple Developer Keys (Security)
+*.p8
+*.mobileprovision
+*.cer
+*.p12
