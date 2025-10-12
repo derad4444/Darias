@@ -17,16 +17,16 @@ const db = admin.firestore();
  * @return {Promise<object>} - 生成された日記データ
  */
 async function generateDiary(characterId, userId) {
-  // キャラ情報取得
+  // キャラ情報取得（users/{userId}/characters/{characterId}/details/currentから）
   const charSnap = await db.collection("users").doc(userId)
       .collection("characters").doc(characterId)
       .collection("details").doc("current").get();
   if (!charSnap.exists) {
-    console.log("Character not found:", characterId);
+    console.log("Character details not found:", characterId, userId);
     return null;
   }
   const charData = charSnap.data();
-  const big5 = charData.confirmedBig5Scores || charData.big5Scores;
+  const big5 = charData.confirmedBig5Scores;
   const gender = charData.gender || "neutral";
 
   // ユーザーのサブスクリプション状態を取得
@@ -55,7 +55,6 @@ async function generateDiary(characterId, userId) {
   // 今日のスケジュール取得 (ユーザー固有のスケジュール)
   const scheduleSnap = await db.collection("users").doc(userId)
       .collection("schedules")
-      .where("character_id", "==", characterId)
       .where("startDate", ">=", today)
       .where("startDate", "<", tomorrow)
       .get();
@@ -146,10 +145,14 @@ async function generateDiary(characterId, userId) {
 
   // 🔽 日付文字列を生成（YYYY-MM-DD形式、日本時間で）
   const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
+  // 日本時間（UTC+9）で日付を取得
+  const jstDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+  const yyyy = jstDate.getFullYear();
+  const mm = String(jstDate.getMonth() + 1).padStart(2, "0");
+  const dd = String(jstDate.getDate()).padStart(2, "0");
   const createdDate = `${yyyy}-${mm}-${dd}`;
+
+  console.log(`📅 Creating diary with created_date: ${createdDate} (JST)`);
 
   // Firestore登録用データ構築
   const diaryDoc = {

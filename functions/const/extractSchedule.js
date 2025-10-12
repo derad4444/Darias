@@ -25,18 +25,23 @@ exports.extractSchedule = onCall(
           return {error: "Missing userId or userMessage"};
         }
 
-        // 現在の日付情報を取得
+        // 現在の日付情報を取得（日本時間）
         const now = new Date();
         const currentDate = now.toLocaleDateString('ja-JP', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
-          weekday: 'long'
+          weekday: 'long',
+          timeZone: 'Asia/Tokyo'
         });
         const currentTime = now.toLocaleTimeString('ja-JP', {
           hour: '2-digit',
-          minute: '2-digit'
+          minute: '2-digit',
+          timeZone: 'Asia/Tokyo'
         });
+
+        console.log("🕐 Current date/time (JST):", currentDate, currentTime);
+        console.log("📝 User message:", userMessage);
 
         // 最適化されたプロンプト作成
         const prompt = OPTIMIZED_PROMPTS.scheduleExtract(currentDate, currentTime, userMessage);

@@ -67,7 +67,13 @@ struct CharacterDetailView: View {
                         }
                         .frame(width: 200, height: 200)
                         .padding(.top, 20)
-                    
+
+                    // Big5性格解析セクション（キャラクター画像の直下）
+                    big5AnalysisSection
+                        .padding(.horizontal, 16)
+                        .padding(.top, 16)
+                        .padding(.bottom, 8)
+
                     // 情報エリア
                     VStack(spacing: 0) {
                         // 基本情報
@@ -85,11 +91,6 @@ struct CharacterDetailView: View {
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 8)
-                        
-                        // Big5性格解析セクション
-                        big5AnalysisSection
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 8)
 
                         // 2つ目のバナー広告（性格表示の一番下）
                         if subscriptionManager.shouldDisplayBannerAd() {

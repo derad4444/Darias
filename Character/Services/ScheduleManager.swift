@@ -5,12 +5,12 @@ import FirebaseAuth
 class ScheduleManager: ObservableObject {
     private let db = Firestore.firestore()
     
-    func saveSchedule(from scheduleData: ExtractedScheduleData) {
+    func saveSchedule(from scheduleData: ExtractedScheduleData, tag: String = "") {
         guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else {
             Logger.error("User not authenticated or invalid userId", category: Logger.authentication)
             return
         }
-        
+
         // Firestoreに予定を保存
         let scheduleRef = db.collection("users").document(userId).collection("schedules").document()
         let scheduleDoc: [String: Any] = [
@@ -20,7 +20,7 @@ class ScheduleManager: ObservableObject {
             "startDate": Timestamp(date: scheduleData.startDate ?? Date()),
             "endDate": Timestamp(date: scheduleData.endDate ?? Date()),
             "location": scheduleData.location,
-            "tag": "", // デフォルト値
+            "tag": tag, // ポップアップで選択されたタグ
             "memo": scheduleData.memo,
             "repeatOption": "none", // デフォルト値
             "created_at": Timestamp(date: Date())

@@ -1782,11 +1782,13 @@ struct BottomSheetView: View {
             loadDiary(for: newDate)
         }
         .transition(.move(edge: .bottom))
-        NavigationLink(
-            destination: DiaryDetailView(diaryId: selectedDiaryId, characterId: characterId),
-            isActive: $navigateToDiaryDetail
-        ) {
-            EmptyView()
+        if !selectedDiaryId.isEmpty {
+            NavigationLink(
+                destination: DiaryDetailView(diaryId: selectedDiaryId, characterId: characterId, userId: userId),
+                isActive: $navigateToDiaryDetail
+            ) {
+                EmptyView()
+            }
         }
     }
     
@@ -1921,6 +1923,7 @@ struct BottomSheetView: View {
             .collection("characters").document(characterId)
             .collection("diary")
             .whereField("created_date", isEqualTo: dateString)
+            .order(by: "created_at", descending: true)
             .limit(to: 1)
             .getDocuments { snapshot, error in
                 if let error = error {

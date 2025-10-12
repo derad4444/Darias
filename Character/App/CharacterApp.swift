@@ -21,11 +21,12 @@ struct CharacterApp: App {
     }
     
     private func configureAppCheck() {
-        // 開発環境では常にデバッグプロバイダーを強制使用
+        #if DEBUG
+        // デバッグビルド：デバッグプロバイダーを使用
         let providerFactory = AppCheckDebugProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
-        print("App Check: Forced debug provider for all environments")
-        
+        print("App Check: Debug provider enabled for development")
+
         // デバッグトークンをログ出力
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             AppCheck.appCheck().token(forcingRefresh: false) { token, error in
@@ -37,11 +38,18 @@ struct CharacterApp: App {
                 }
             }
         }
+        #else
+        // 本番リリース：DeviceCheck/App Attestを使用（自動）
+        let providerFactory = AppAttestProviderFactory()
+        AppCheck.setAppCheckProviderFactory(providerFactory)
+        print("App Check: Production provider (App Attest) enabled")
+        #endif
     }
 
     var body: some Scene {
         WindowGroup {
             StartView2()  // アプリロゴ画面のみ表示
+                .preferredColorScheme(.light)  // ライトモード固定（ダークモード無効化）
                 .environmentObject(authManager)
                 .environmentObject(fontSettings)
                 .onReceive(fontSettings.$fontFamily) { _ in

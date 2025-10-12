@@ -28,6 +28,11 @@ Object.defineProperty(exports, "scheduledHolidays", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "scheduledDiaryGeneration", {
+  get: () => require("./src/functions/scheduledTasks").scheduledDiaryGeneration,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "generateMonthlyReview", {
   get: () =>
     require("./src/functions/generateMonthlyReview").generateMonthlyReview,

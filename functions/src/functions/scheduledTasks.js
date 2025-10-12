@@ -36,36 +36,64 @@ const scheduledDiaryGeneration = onSchedule(
       initializeDependencies();
 
       const db = admin.firestore();
-      const snapshot = await db.collection("CharacterDetail").get();
+
+      // 全ユーザーを取得
+      const usersSnapshot = await db.collection("users").get();
 
       logger.info("Starting daily diary generation", {
-        characterCount: snapshot.docs.length,
+        userCount: usersSnapshot.docs.length,
       });
 
       let successCount = 0;
       let errorCount = 0;
+      let totalCharacters = 0;
 
       // 並行制御: 同時に5件まで処理
       const pLimit = (await import("p-limit")).default;
       const limit = pLimit(5);
 
-      const processCharacter = async (doc) => {
-        const characterId = doc.id;
+      const processCharacter = async (userId, characterId) => {
         try {
-          await generateDiary(characterId);
+          await generateDiary(characterId, userId);
           successCount++;
-          logger.info("Diary generated successfully", {characterId});
-          return {success: true, characterId};
+          logger.info("Diary generated successfully", {userId, characterId});
+          return {success: true, userId, characterId};
         } catch (error) {
           errorCount++;
-          logger.error("Failed to generate diary", error, {characterId});
-          return {success: false, characterId, error};
+          logger.error("Failed to generate diary", error, {userId, characterId});
+          return {success: false, userId, characterId, error};
         }
       };
 
-      const promises = snapshot.docs.map((doc) =>
-        limit(() => processCharacter(doc)),
-      );
+      const promises = [];
+
+      // 各ユーザーのキャラクターを取得して処理
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+        const userData = userDoc.data();
+        const characterId = userData.character_id;
+
+        logger.info("Checking user", {userId, characterId});
+
+        // character_idが存在し、details/currentドキュメントがあるか確認
+        if (!characterId) {
+          logger.info("User has no character_id", {userId});
+          continue;
+        }
+
+        // キャラクター詳細が存在するか確認
+        const detailsDoc = await db.collection("users").doc(userId)
+            .collection("characters").doc(characterId)
+            .collection("details").doc("current").get();
+
+        if (!detailsDoc.exists) {
+          logger.info("Character details not found", {userId, characterId});
+          continue;
+        }
+
+        totalCharacters++;
+        promises.push(limit(() => processCharacter(userId, characterId)));
+      }
 
       const results = await Promise.allSettled(promises);
 
@@ -76,7 +104,8 @@ const scheduledDiaryGeneration = onSchedule(
           .map((result) => result.value || result.reason);
 
       logger.success("Daily diary generation completed", {
-        total: snapshot.docs.length,
+        totalUsers: usersSnapshot.docs.length,
+        totalCharacters: totalCharacters,
         success: successCount,
         errors: errorCount,
         // 最初の5件のみログ

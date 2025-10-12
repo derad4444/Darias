@@ -33,7 +33,10 @@ struct SecondaryButtonStyle: ButtonStyle {
             .background(
                 RoundedRectangle(cornerRadius: 20)
                     .fill(Color.AppTheme.creamWhite)
-                    .stroke(Color.AppTheme.primaryPink.opacity(0.3), lineWidth: 1)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 20)
+                            .stroke(Color.AppTheme.primaryPink.opacity(0.3), lineWidth: 1)
+                    )
                     .shadow(color: Color.AppTheme.cardShadow, radius: 4, x: 0, y: 2)
             )
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
@@ -85,16 +88,19 @@ struct CardButtonStyle: ButtonStyle {
             .padding(16)
             .background(
                 RoundedRectangle(cornerRadius: 16)
-                    .fill(isSelected ? 
-                          LinearGradient.AppGradients.primaryButton : 
+                    .fill(isSelected ?
+                          LinearGradient.AppGradients.primaryButton :
                           LinearGradient.AppGradients.cardShine)
-                    .stroke(
-                        isSelected ? Color.clear : Color.AppTheme.primaryPink.opacity(0.2),
-                        lineWidth: 1
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(
+                                isSelected ? Color.clear : Color.AppTheme.primaryPink.opacity(0.2),
+                                lineWidth: 1
+                            )
                     )
                     .shadow(
-                        color: isSelected ? 
-                            Color.AppTheme.primaryPink.opacity(0.3) : 
+                        color: isSelected ?
+                            Color.AppTheme.primaryPink.opacity(0.3) :
                             Color.AppTheme.cardShadow,
                         radius: isSelected ? 8 : 4,
                         x: 0,

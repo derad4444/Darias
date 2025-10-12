@@ -71,8 +71,8 @@ ${diaryStyle}で日記を200-400文字で作成。${tagStyle}
    */
   scheduleExtract: (currentDate, currentTime, userMessage) => {
     const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24*60*60*1000).toLocaleDateString('ja-JP');
-    const today = now.toLocaleDateString('ja-JP');
+    const tomorrow = new Date(now.getTime() + 24*60*60*1000).toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
+    const today = now.toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
 
     return `現在:${currentDate} ${currentTime}
 入力:"${userMessage}"
@@ -83,11 +83,16 @@ ${diaryStyle}で日記を200-400文字で作成。${tagStyle}
 時間なし→00:00-23:59,isAllDay:true
 時間あり→1h継続,isAllDay:false
 
+抽出ルール:
+・title: 行動内容(例:「お昼寝」「会議」「買い物」)。必ず入力から抽出すること
+・startDate/endDate: 必ずタイムゾーン+09:00を付けること(例:2025-10-13T05:00:00+09:00)
+・location: 場所が明記されていれば抽出
+
 出力:
 予定なし:{"hasSchedule":false}
-予定あり:{"hasSchedule":true,"title":"","isAllDay":bool,"startDate":"ISO","endDate":"ISO","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}
+予定あり:{"hasSchedule":true,"title":"行動内容","isAllDay":bool,"startDate":"ISO+09:00","endDate":"ISO+09:00","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}
 
-JSONのみ。`;
+JSONのみ出力。`;
   },
 
   /**

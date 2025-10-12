@@ -29,7 +29,7 @@ struct ChatInputComponent: View {
                                 userInput = ""
                             }
                         }
-                        .onChange(of: userInput) { _, newValue in
+                        .onChange(of: userInput) { newValue in
                             // 入力があったらプレースホルダーを非表示
                             if !newValue.isEmpty {
                                 isPlaceholderVisible = false

@@ -261,8 +261,8 @@ struct HomeView: View {
             if showScheduleConfirmation, let scheduleData = pendingScheduleData {
                 ScheduleConfirmationPopup(
                     scheduleData: scheduleData,
-                    onConfirm: { confirmedScheduleData in
-                        scheduleManager.saveSchedule(from: confirmedScheduleData)
+                    onConfirm: { confirmedScheduleData, selectedTag in
+                        scheduleManager.saveSchedule(from: confirmedScheduleData, tag: selectedTag)
                         showScheduleConfirmation = false
                         pendingScheduleData = nil
                     },

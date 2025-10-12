@@ -4,8 +4,8 @@ import FirebaseFirestore
 struct DiaryDetailView: View {
     let diaryId: String
     let characterId: String
+    let userId: String
     @ObservedObject var colorSettings = ColorSettingsManager.shared
-    @AppStorage("userId") private var userId: String = ""
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
     
@@ -35,6 +35,14 @@ struct DiaryDetailView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
+                        // 広告バナー1（日記の上）
+                        if !isPremium {
+                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                                .frame(width: 320, height: 50)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+
                         // 日記帳のような紙のカード
                         VStack(alignment: .leading, spacing: 16) {
                             // 日付ヘッダー（日記風）
@@ -124,7 +132,15 @@ struct DiaryDetailView: View {
                         .cornerRadius(12)
                         .padding(.horizontal, 16)
                         .padding(.top, 24)
-                            
+
+                        // 広告バナー2（コメント欄の下）
+                        if !isPremium {
+                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                                .frame(width: 320, height: 50)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                        }
+
                         Spacer(minLength: 20)
                     }
                 }
@@ -156,19 +172,20 @@ struct DiaryDetailView: View {
         )
         .onAppear {
             fetchDiary()
-        // 広告やAI用エリアを追加しやすい
-        }.safeAreaInset(edge: .bottom) {
-            if !isPremium {
-                // テスト用ID（本番時は差し替え）
-                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
-                    .frame(width: 320, height: 50)
-                    .padding(.bottom, 8)
-            }
         }
     }
 
     // Firestore からデータ取得
     func fetchDiary() {
+        // diaryIdが空の場合は早期リターン
+        guard !diaryId.isEmpty, !characterId.isEmpty, !userId.isEmpty else {
+            print("⚠️ fetchDiary: Invalid parameters (diaryId: '\(diaryId)', characterId: '\(characterId)', userId: '\(userId)')")
+            diaryContent = "日記データを取得できませんでした"
+            dateText = ""
+            isLoading = false
+            return
+        }
+
         let db = Firestore.firestore()
         // キャラクター別のサブコレクションから取得
         let docRef = db.collection("users").document(userId)
@@ -218,6 +235,6 @@ struct DiaryDetailView: View {
 //プレビュー画面表示
 struct DiaryDetailView_Previews: PreviewProvider {
     static var previews: some View {
-        DiaryDetailView(diaryId: "dummyDiaryId", characterId: "dummyCharacterId")
+        DiaryDetailView(diaryId: "dummyDiaryId", characterId: "dummyCharacterId", userId: "dummyUserId")
     }
 }

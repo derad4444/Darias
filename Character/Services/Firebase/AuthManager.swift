@@ -83,17 +83,7 @@ class AuthManager: ObservableObject {
                             "extraversion": 2,
                             "neuroticism": 2
                         ],
-                        "analysis_level": 0, // 初期は未解析
-                        "favorite_color": "グリーン",
-                        "favorite_place": "データセンター",
-                        "favorite_word": "プロセス完了",
-                        "word_tendency": "論理的で効率重視、システム用語を使用",
-                        "strength": "正確性、効率性、データ処理",
-                        "weakness": "感情的ニュアンスの理解",
-                        "skill": "情報処理、システム最適化",
-                        "hobby": "アップデート、バックアップ作業",
-                        "aptitude": "論理的思考、パターン認識",
-                        "dream": "完璧なシステム構築",
+                        "analysis_level": 0, // 初期は未解析（20問回答後に詳細情報が生成される）
                         "points": 0,
                         "created_at": Timestamp(),
                         "updated_at": Timestamp()

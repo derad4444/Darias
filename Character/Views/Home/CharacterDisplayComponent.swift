@@ -27,7 +27,7 @@ struct CharacterDisplayComponent: View {
                 .onAppear {
                     updateImageBasedOnGender()
                 }
-                .onChange(of: currentExpression) { _, newExpression in
+                .onChange(of: currentExpression) { newExpression in
                     changeExpression(to: newExpression)
                 }
         }
