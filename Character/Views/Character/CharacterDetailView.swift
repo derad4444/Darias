@@ -436,6 +436,7 @@ struct CharacterDetailView: View {
                         // データは既にサービス内で設定済み
                         break
                     case .failure(let error):
+                        break
                     }
                 }
             } else {
