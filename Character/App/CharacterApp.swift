@@ -24,19 +24,10 @@ struct CharacterApp: App {
         // デバッグビルド：デバッグプロバイダーを使用
         let providerFactory = AppCheckDebugProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
-
-        // デバッグトークンをログ出力
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            AppCheck.appCheck().token(forcingRefresh: false) { token, error in
-                if let token = token {
-                } else if let error = error {
-                }
-            }
-        }
         #else
-        // 本番リリース：DeviceCheck/App Attestを使用（自動）
-        let providerFactory = AppAttestProviderFactory()
-        AppCheck.setAppCheckProviderFactory(providerFactory)
+        // 本番リリース：デフォルトプロバイダー（DeviceCheck/App Attest）を使用
+        // iOS 14+ では自動的に App Attest が使用される
+        // 明示的な設定は不要（Firebaseが自動処理）
         #endif
     }
 
