@@ -55,35 +55,15 @@ struct HomeView: View {
     
     let userId: String
     let characterId: String
-    
-    private var dynamicChatInputHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        let baseChatHeight = screenHeight * 0.15
 
-        // バナー広告が表示される場合は、大幅に高さを追加して完全に分離
-        if subscriptionManager.shouldDisplayBannerAd() {
-            // バナー広告 + 十分なマージンを確保（さらに増加）
-            return baseChatHeight + 160 // さらに大幅に増加
-        } else {
-            // プレミアム時：広告スペース不要なので小さく
-            return baseChatHeight - 20
-        }
-    }
-    
-    private var dynamicHeaderHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        return screenHeight * 0.075
-    }
-
-    
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            GeometryReader { geometry in
                 ZStack {
                     // 背景
                     colorSettings.getCurrentBackgroundGradient()
                         .ignoresSafeArea()
-                    
+
                     // キャラクター画像表示（背景レイヤー）
                     CharacterDisplayComponent(
                         displayedMessage: $displayedMessage,
@@ -96,10 +76,13 @@ struct HomeView: View {
                             isDefault: true
                         )
                     )
-                    .frame(width: 600, height: 600)
-                    .position(x: UIScreen.main.bounds.width / 2, y: UIScreen.main.bounds.height / 2)
+                    .frame(
+                        width: min(geometry.size.width * 1.3, 800),
+                        height: min(geometry.size.height * 0.8, 800)
+                    )
+                    .position(x: geometry.size.width / 2, y: geometry.size.height * 0.6)
                     .allowsHitTesting(false) // UIの邪魔にならないよう無効化
-                    
+
                     // UI要素（最前面レイヤー）
                     VStack(spacing: 0) {
                         Spacer()
@@ -137,7 +120,7 @@ struct HomeView: View {
                                 }
                                 .padding(.trailing, 16)
                             }
-                            
+
                             // BIG5質問の選択肢またはチャット入力
                             if characterService.showBIG5Question {
                                 if let question = characterService.currentBIG5Question {
@@ -176,8 +159,8 @@ struct HomeView: View {
                                 .padding(.bottom, 12)
                         }
                     }
-                    
-                    
+
+
                     // 吹き出し表示（中央配置）
                     if !displayedMessage.isEmpty || (characterService.showBIG5Question && characterService.currentBIG5Question != nil) {
                         VStack {
@@ -192,10 +175,13 @@ struct HomeView: View {
                                 .font(.body)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        .frame(maxWidth: UIScreen.main.bounds.width * 0.7) // 画面幅の70%
-                        .position(x: UIScreen.main.bounds.width / 2, y: 80) // 吹き出しをより上に配置
+                        .frame(maxWidth: min(geometry.size.width * 0.8, 280))
+                        .position(
+                            x: geometry.size.width / 2,
+                            y: geometry.safeAreaInsets.top + 80
+                        )
                     }
-                    
+
                 }
             }
             .onAppear {

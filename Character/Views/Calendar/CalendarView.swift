@@ -86,11 +86,11 @@ struct CalendarView: View {
         self.userId = userId
         self.characterId = characterId
         self.isPremium = isPremium
-        
+
         // UserDefaultsから前回表示していた年月を復元、なければ現在の年月
         let savedYear = UserDefaults.standard.object(forKey: "CalendarLastViewedYear") as? Int
         let savedMonth = UserDefaults.standard.object(forKey: "CalendarLastViewedMonth") as? Int
-        
+
         if let year = savedYear, let month = savedMonth {
             self._selectedYear = State(initialValue: year)
             self._selectedMonth = State(initialValue: month)
@@ -100,14 +100,9 @@ struct CalendarView: View {
             self._selectedMonth = State(initialValue: Calendar.current.component(.month, from: now))
         }
     }
-    
-    private var dynamicHeaderHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
+
+    private func dynamicHeaderHeight(for screenHeight: CGFloat) -> CGFloat {
         return screenHeight * 0.075
-    }
-    
-    private var dynamicCellHeight: CGFloat {
-        return 80 // 固定値に変更して全ての週で統一
     }
     
     // ある日の予定一覧取得（期間予定に対応）
@@ -268,24 +263,19 @@ struct CalendarView: View {
     }
     
     var body: some View {
-        let screenHeight = UIScreen.main.bounds.height
-        // カレンダーの高さをさらに狭く調整
-        let calendarHeight = screenHeight * 0.35
-        
         NavigationStack {
-            VStack(spacing: 0) {
-                // 上部広告
-                // if !isPremium {
-                //     BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
-                //         .frame(maxWidth: .infinity, maxHeight: 50)
-                //         .padding(.top, 8)
-                // }
-                
+            GeometryReader { geometry in
+                // 画面高さに応じてカレンダー高さを調整（小さい画面では固定値で制限）
+                let calendarHeight: CGFloat = geometry.size.height < 700 ? min(geometry.size.height * 0.36, 520) : geometry.size.height * 0.45
+                let headerHeight = dynamicHeaderHeight(for: geometry.size.height)
+
+                VStack(spacing: 0) {
+
                 ZStack {
                     //背景
                     colorSettings.getCurrentBackgroundGradient()
                         .ignoresSafeArea()
-                    
+
                     VStack(spacing: 0) {
                             // ヘッダーを完全固定
                             HStack {
@@ -313,10 +303,14 @@ struct CalendarView: View {
                                         .padding(.trailing, 16)
                                 }
                             }
-                            .frame(height: dynamicHeaderHeight)
+                            .frame(height: headerHeight)
                             .padding(.top, -20)
                             .background(Color.clear)
                             .padding(.horizontal)
+                            .offset(
+                                x: geometry.size.height < 700 ? -25 : -10,
+                                y: geometry.size.height < 700 ? 10 : 0
+                            )
                             .zIndex(1)
                             
                             // カレンダー本体
@@ -327,9 +321,13 @@ struct CalendarView: View {
                                 schedulesForDate: self.schedulesForDate,
                                 firestoreManager: firestoreManager,
                                 userId: userId,
-                                showBottomSheet: $showBottomSheet
+                                showBottomSheet: $showBottomSheet,
+                                screenHeight: geometry.size.height
                             )
+                            .scaleEffect(geometry.size.height < 700 ? 0.85 : 1.0, anchor: .center)
+                            .offset(x: geometry.size.height < 700 ? -30 : -10)
                             .frame(height: calendarHeight)
+                            .frame(maxWidth: .infinity)
                             
                         Spacer()
                     }
@@ -340,7 +338,7 @@ struct CalendarView: View {
                                 YearMonthInlinePickerView(selectedYear: $selectedYear, selectedMonth: $selectedMonth) {
                                     showPicker = false
                                 }
-                                .padding(.top, dynamicHeaderHeight)
+                                .padding(.top, headerHeight)
                                 .transition(.move(edge: .top))
                             }
                         }, alignment: .top
@@ -371,13 +369,13 @@ struct CalendarView: View {
                                 .onTapGesture {
                                     triggerRandomExpression()
                                 }
-                            
+
                             // 当月コメントの吹き出し
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("今月のひとこと")
                                     .font(.caption)
                                     .foregroundColor(.gray)
-                                
+
                                 if isLoadingComment {
                                     Text("今月のひとことを読み込み中...")
                                         .font(.body)
@@ -404,14 +402,15 @@ struct CalendarView: View {
                             )
                             .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                             .frame(width: 260)
-                            
+
                             Spacer()
                         }
-                        .padding(.leading, 0) // 左端に配置
+                        .padding(.leading, -20) // 左に20pxずらす
                         .padding(.bottom, 10)
                     }
                     .allowsHitTesting(false) // タッチイベントを無効化
                 }
+            }
             }
         }
         .onAppear {
@@ -476,53 +475,53 @@ struct CustomCalendarView: View {
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
     let userId: String
-    
+
     @State private var dragOffsetX: CGFloat = 0
     @State private var isDragging: Bool = false
-    
+
     @Binding var showBottomSheet: Bool
-    
+    let screenHeight: CGFloat
+
     let calendar = Calendar.current
     let today = Date()
-    
-    private var dynamicHeaderHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        return screenHeight * 0.075
-    }
-    
+
     private var dynamicCellHeight: CGFloat {
-        return 80 // 固定値に変更して全ての週で統一
+        return 80 // 固定に戻す
     }
     
     var body: some View {
         let components = DateComponents(year: selectedYear, month: selectedMonth)
         let firstDayOfMonth = calendar.date(from: components)!
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
-        
-        ZStack {
-            monthView(for: currentComponents())
-                .offset(x: dragOffsetX)
-            monthView(for: nextComponents())
-                .offset(x: dragOffsetX + (dragOffsetX > 0 ? -UIScreen.main.bounds.width : UIScreen.main.bounds.width))
-        }
-        .gesture(
-            DragGesture()
-                .onChanged { value in
-                    dragOffsetX = value.translation.width
-                    isDragging = true
-                }
-                .onEnded { value in
-                    withAnimation(.spring()) {
-                        if value.translation.width < -100 {
-                            moveToNextMonth()
-                        } else if value.translation.width > 100 {
-                            moveToPreviousMonth()
-                        }
-                        dragOffsetX = 0
-                        isDragging = false
+
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
+
+            ZStack {
+                monthView(for: currentComponents())
+                    .offset(x: dragOffsetX)
+                monthView(for: nextComponents())
+                    .offset(x: dragOffsetX + (dragOffsetX > 0 ? -screenWidth : screenWidth))
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        dragOffsetX = value.translation.width
+                        isDragging = true
                     }
-                }
-        )
+                    .onEnded { value in
+                        withAnimation(.spring()) {
+                            if value.translation.width < -100 {
+                                moveToNextMonth()
+                            } else if value.translation.width > 100 {
+                                moveToPreviousMonth()
+                            }
+                            dragOffsetX = 0
+                            isDragging = false
+                        }
+                    }
+            )
+        }
     }
     
     // 日付の色を変更
@@ -712,7 +711,7 @@ struct CustomCalendarView: View {
                 .allowsHitTesting(false) // タップを透過
             }
         }
-        .frame(height: 80) // 固定高さで統一
+        .frame(height: dynamicCellHeight) // 画面サイズに応じた高さ
         .frame(maxWidth: .infinity, maxHeight: .infinity) // セル全体を埋める
     }
     
@@ -1583,9 +1582,7 @@ struct CustomCalendarView: View {
         
         if isAugust11Related {
         }
-        
-        // 画面サイズに応じた動的計算でレスポンシブ対応
-        let screenHeight = UIScreen.main.bounds.height
+
         // 祝日表示エリア分を考慮してバーの開始位置を下に移動
         let holidayAreaHeight: CGFloat = hasHolidayInPeriod ? 22 : 0 // 期間内に祝日がある場合のエリア高さ
         let dateCircleToBarDistance = cellHeight * 0.4 + holidayAreaHeight // 祝日エリア分さらに下に移動
@@ -1627,12 +1624,9 @@ struct BottomSheetView: View {
     @State private var navigateToDiaryDetail = false
     @State private var selectedDiaryDate = Date()
     @State private var hasDiary = false
-    // アニメーション用のオフセット
-    @State private var offsetY: CGFloat = 300
-    // ドラッグ量保持
-    @GestureState private var dragOffset: CGFloat = 0
     @State private var characterExpression: CharacterExpression = .normal
-    
+    @State private var loadDiaryTask: Task<Void, Never>?
+
     @EnvironmentObject var firestoreManager: FirestoreManager
     
     // 並び替えされた表示アイテムを取得
@@ -1667,127 +1661,144 @@ struct BottomSheetView: View {
     }
     
     var body: some View {
-        VStack {
-            Capsule()
-                .frame(width: 40, height: 6)
-                .foregroundColor(.gray.opacity(0.5))
-                .padding(.top, 8)
-            
-            HStack {
-                Text(formattedDate(date))
-                    .dynamicHeadline()
-                    .foregroundColor(colorSettings.getCurrentTextColor())
-                    .padding(.leading, 20)
-                
-                Spacer()
-                
-                NavigationLink(destination: ScheduleAddView(selectedDate: date, userId: self.userId)
-                    .environmentObject(firestoreManager)) {
-                    Image(systemName: "plus.circle.fill")
-                        .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
-                        .foregroundColor(colorSettings.getCurrentAccentColor())
-                        .padding(.trailing, 20)
-                }
-            }
-            .padding(.top, 8)
-            
-            // 常に本マーク＋予定表示の構成にする
-            HStack(alignment: .top) {
-                // 左：本マークボタン（常に表示）
-                Button(action: {
-                    if !selectedDiaryId.isEmpty {
-                        self.navigateToDiaryDetail = true
+        GeometryReader { geometry in
+            ZStack {
+                VStack {
+                    Capsule()
+                        .frame(width: 40, height: 6)
+                        .foregroundColor(.gray.opacity(0.5))
+                        .padding(.top, 8)
+
+                    HStack {
+                        Text(formattedDate(date))
+                            .dynamicHeadline()
+                            .foregroundColor(colorSettings.getCurrentTextColor())
+                            .padding(.leading, 20)
+
+                        Spacer()
+
+                        NavigationLink(destination: ScheduleAddView(selectedDate: date, userId: self.userId)
+                            .environmentObject(firestoreManager)) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
+                                .foregroundColor(colorSettings.getCurrentAccentColor())
+                                .padding(.trailing, 20)
+                        }
                     }
-                }) {
-                    ZStack {
-                        let circleSize = UIScreen.main.bounds.width / 3 * 0.7
-                        let imageSize = UIScreen.main.bounds.width / 3 * 0.65
-                        
-                        Circle()
-                            .fill(hasDiary ? colorSettings.getCurrentAccentColor() : Color.gray.opacity(0.4))
-                            .frame(width: circleSize, height: circleSize)
-                        Image(systemName: "book.fill") // 日記アイコン（本のマーク）
-                            .font(.system(size: imageSize * 0.5))
-                            .foregroundColor(hasDiary ? .white : .gray.opacity(0.7))
+                    .padding(.top, 8)
+
+                    // 常に本マーク＋予定表示の構成にする
+                    HStack(alignment: .top) {
+                        // 左：本マークボタン（常に表示）
+                        Button(action: {
+                            if !selectedDiaryId.isEmpty {
+                                self.navigateToDiaryDetail = true
+                            }
+                        }) {
+                            ZStack {
+                                let circleSize = geometry.size.width / 3 * 0.7
+                                let imageSize = geometry.size.width / 3 * 0.65
+
+                                Circle()
+                                    .fill(hasDiary ? colorSettings.getCurrentAccentColor() : Color.gray.opacity(0.4))
+                                    .frame(width: circleSize, height: circleSize)
+                                Image(systemName: "book.fill") // 日記アイコン（本のマーク）
+                                    .font(.system(size: imageSize * 0.5))
+                                    .foregroundColor(hasDiary ? .white : .gray.opacity(0.7))
+                            }
+                        }
+                        .frame(width: geometry.size.width / 3)
+
+                        // 右：予定リスト（予定がなくても空表示）
+                        VStack(alignment: .leading, spacing: 8) {
+                            if sortedDisplayItems.isEmpty {
+                                Text("予定はありません")
+                                    .dynamicBody()
+                                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.6))
+                                    .padding(.top, 8)
+                            } else {
+                                ForEach(Array(sortedDisplayItems.prefix(5).enumerated()), id: \.offset) { index, item in
+                                    displayItemRow(for: item)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.leading, 4)
                     }
+
+                    // バナー広告
+                    if subscriptionManager.shouldDisplayBannerAd() {
+                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                            .frame(height: 50)
+                            .background(Color.clear)
+                            .onAppear {
+                                subscriptionManager.trackBannerAdImpression()
+                            }
+                    }
+
+                    Spacer()
                 }
-                
-                .frame(width: UIScreen.main.bounds.width / 3)
-                
-                // 右：予定リスト（予定がなくても空表示）
-                VStack(alignment: .leading, spacing: 8) {
-                    if sortedDisplayItems.isEmpty {
-                        Text("予定はありません")
-                            .dynamicBody()
-                            .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.6))
-                            .padding(.top, 8)
-                    } else {
-                        ForEach(Array(sortedDisplayItems.prefix(5).enumerated()), id: \.offset) { index, item in
-                            displayItemRow(for: item)
+                .frame(maxWidth: .infinity)
+                .background(colorSettings.getCurrentBackgroundGradient())
+                .cornerRadius(20)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(Color.black.opacity(0.3), lineWidth: 1)
+                )
+                .edgesIgnoringSafeArea(.bottom)
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onEnded { value in
+                            if abs(value.translation.width) > abs(value.translation.height) {
+                                // 横スワイプが優勢
+                                if value.translation.width < -50 {
+                                    // 右スワイプ → 翌日
+                                    date = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
+                                } else if value.translation.width > 50 {
+                                    // 左スワイプ → 前日
+                                    date = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
+                                }
+                            } else if value.translation.height > 100 {
+                                // 下スワイプで閉じる
+                                closeAction()
+                            }
+                        }
+                )
+                .transition(.move(edge: .bottom))
+                .onAppear {
+                    loadDiary(for: date)
+                }
+                .onChange(of: date) { newDate in
+                    // 既存のタスクをキャンセル
+                    loadDiaryTask?.cancel()
+
+                    // 新しいタスクを作成（デバウンス）
+                    loadDiaryTask = Task {
+                        try? await Task.sleep(nanoseconds: 150_000_000) // 0.15秒待機
+
+                        if !Task.isCancelled {
+                            await MainActor.run {
+                                loadDiary(for: newDate)
+                            }
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 4)
-            }
-
-            // バナー広告
-            if subscriptionManager.shouldDisplayBannerAd() {
-                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
-                    .frame(height: 50)
-                    .background(Color.clear)
-                    .onAppear {
-                        subscriptionManager.trackBannerAdImpression()
-                    }
-            }
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
-        .background(colorSettings.getCurrentBackgroundGradient())
-        .cornerRadius(20)
-        .overlay(
-            RoundedRectangle(cornerRadius: 20)
-                .stroke(Color.black.opacity(0.3), lineWidth: 1)
-        )
-        .edgesIgnoringSafeArea(.bottom)
-        .gesture(
-            DragGesture()
-                .updating($dragOffset) { value, state, _ in
-                    if value.translation.height > 0 {
-                        state = value.translation.height
-                    }
+                .onDisappear {
+                    // BottomSheetが閉じられたときにタスクをキャンセル
+                    loadDiaryTask?.cancel()
                 }
-                .onEnded { value in
-                    if value.translation.width < -50 {
-                        // 右スワイプ → 翌日
-                        date = Calendar.current.date(byAdding: .day, value: 1, to: date) ?? date
-                    } else if value.translation.width > 50 {
-                        // 左スワイプ → 前日
-                        date = Calendar.current.date(byAdding: .day, value: -1, to: date) ?? date
-                    } else if value.translation.height > 100 {
-                        // 下スワイプで閉じる
-                        closeAction()
+
+                // NavigationLinkを非表示で配置
+                if !selectedDiaryId.isEmpty {
+                    NavigationLink(
+                        destination: DiaryDetailView(diaryId: selectedDiaryId, characterId: characterId, userId: userId),
+                        isActive: $navigateToDiaryDetail
+                    ) {
+                        EmptyView()
                     }
+                    .frame(width: 0, height: 0)
+                    .opacity(0)
                 }
-        )
-        .offset(y: offsetY + dragOffset)
-        .onAppear {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                offsetY = 0
-            }
-            loadDiary(for: date)
-        }
-        .onChange(of: date) { newDate in
-            loadDiary(for: newDate)
-        }
-        .transition(.move(edge: .bottom))
-        if !selectedDiaryId.isEmpty {
-            NavigationLink(
-                destination: DiaryDetailView(diaryId: selectedDiaryId, characterId: characterId, userId: userId),
-                isActive: $navigateToDiaryDetail
-            ) {
-                EmptyView()
             }
         }
     }
@@ -1959,56 +1970,59 @@ struct YearMonthInlinePickerView: View {
         return formatter.string(from: NSNumber(value: year)) ?? "\(year)"
     }
     
-    private var dynamicPickerHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
+    private func dynamicPickerHeight(for screenHeight: CGFloat) -> CGFloat {
         return screenHeight * 0.18
     }
-    
+
     var body: some View {
-        VStack(spacing: 10) {
-            HStack {
-                Spacer()
-                Button(action: { onClose() }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(FontSettingsManager.shared.font(size: 20, weight: .semibold)).foregroundColor(.gray)
-                }
-                .padding(.trailing)
-            }
-            
-            HStack {
-                Picker("年", selection: $selectedYear) {
-                    ForEach(1900...2100, id: \.self) { year in
-                        Text("\(formatYearWithoutComma(year))年")
-                            .dynamicBody()
+        GeometryReader { geometry in
+            let pickerHeight = dynamicPickerHeight(for: geometry.size.height)
+
+            VStack(spacing: 10) {
+                HStack {
+                    Spacer()
+                    Button(action: { onClose() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(FontSettingsManager.shared.font(size: 20, weight: .semibold)).foregroundColor(.gray)
                     }
+                    .padding(.trailing)
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: dynamicPickerHeight)
-                .clipped()
-                .pickerStyle(WheelPickerStyle())
-                
-                Picker("月", selection: $selectedMonth) {
-                    ForEach(1...12, id: \.self) { month in
-                        Text("\(month)月")
-                            .dynamicBody()
+
+                HStack {
+                    Picker("年", selection: $selectedYear) {
+                        ForEach(1900...2100, id: \.self) { year in
+                            Text("\(formatYearWithoutComma(year))年")
+                                .dynamicBody()
+                        }
                     }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: pickerHeight)
+                    .clipped()
+                    .pickerStyle(WheelPickerStyle())
+
+                    Picker("月", selection: $selectedMonth) {
+                        ForEach(1...12, id: \.self) { month in
+                            Text("\(month)月")
+                                .dynamicBody()
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .frame(height: pickerHeight)
+                    .clipped()
+                    .pickerStyle(WheelPickerStyle())
                 }
-                .frame(maxWidth: .infinity)
-                .frame(height: dynamicPickerHeight)
-                .clipped()
-                .pickerStyle(WheelPickerStyle())
+                .padding(.horizontal)
+                .padding(.bottom)
             }
-            .padding(.horizontal)
-            .padding(.bottom)
+            .background(colorSettings.getCurrentBackgroundGradient())
+            .cornerRadius(0)
+            .overlay(
+                Rectangle()
+                    .stroke(Color.gray, lineWidth: 1)
+            )
+            .ignoresSafeArea(.container, edges: .horizontal)
+            .transition(.move(edge: .top))
         }
-        .background(colorSettings.getCurrentBackgroundGradient())
-        .cornerRadius(0)
-        .overlay(
-            Rectangle()
-                .stroke(Color.gray, lineWidth: 1)
-        )
-        .ignoresSafeArea(.container, edges: .horizontal)
-        .transition(.move(edge: .top))
     }
 }
 

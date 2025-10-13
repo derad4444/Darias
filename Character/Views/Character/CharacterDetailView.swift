@@ -28,24 +28,16 @@ struct CharacterDetailView: View {
     @State private var currentAnalysisLevel: Big5AnalysisLevel?
     @State private var showBig5AnalysisDetail = false
     @State private var selectedAnalysisCategory: Big5AnalysisCategory?
-    
-    private var dynamicHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        let safeAreaTop: CGFloat = 47
-        let safeAreaBottom: CGFloat = 34
-        let navigationBarHeight: CGFloat = 44
-        
-        return screenHeight - safeAreaTop - navigationBarHeight - safeAreaBottom - 55
-    }
-    
-    var body: some View {
-        ZStack {
-            // 背景グラデーション
-            colorSettings.getCurrentBackgroundGradient()
-                .ignoresSafeArea()
 
-            ScrollView {
-                VStack(spacing: 0) {
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                // 背景グラデーション
+                colorSettings.getCurrentBackgroundGradient()
+                    .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(spacing: 0) {
                     // 1つ目のバナー広告（キャラクター画像の上）
                     if subscriptionManager.shouldDisplayBannerAd() {
                         BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
@@ -107,8 +99,7 @@ struct CharacterDetailView: View {
                     }
                 }
             }
-            .frame(height: dynamicHeight)
-            .clipped()
+        }
         }
         .navigationTitle("キャラ詳細")
         .navigationBarTitleDisplayMode(.inline)

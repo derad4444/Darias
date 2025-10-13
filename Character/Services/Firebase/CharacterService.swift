@@ -13,11 +13,16 @@ class CharacterService: ObservableObject {
     private let db = Firestore.firestore()
     private let functions = Functions.functions(region: "asia-northeast1")
     private let subscriptionManager = SubscriptionManager.shared
-    
+
     @Published var big5AnsweredCount: Int = 0
     @Published var currentBIG5Question: BIG5Question? = nil
     @Published var showBIG5Question: Bool = false
     @Published var characterGenerationStatus: CharacterGenerationStatus = .notStarted
+
+    deinit {
+        big5ProgressListener?.remove()
+        generationStatusListener?.remove()
+    }
     
     // MARK: - Character Info Loading (画像取得処理を削除)
     func loadCharacterInfo(
@@ -199,7 +204,12 @@ class CharacterService: ObservableObject {
     }
     
     // MARK: - BIG5 Progress Monitoring
+    private var big5ProgressListener: ListenerRegistration?
+
     func monitorBIG5Progress(characterId: String) {
+        // 既存のリスナーを解除
+        big5ProgressListener?.remove()
+
         // ユーザーIDを取得（認証済みユーザーから）
         guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
             Logger.error("User not authenticated for BIG5 progress monitoring", category: Logger.authentication)
@@ -210,29 +220,38 @@ class CharacterService: ObservableObject {
             Logger.error("CharacterId cannot be empty for BIG5 progress monitoring", category: Logger.general)
             return
         }
-        
-        db.collection("users").document(currentUserId)
+
+        print("✅ Starting BIG5 progress monitoring for characterId: \(characterId)")
+
+        // リアルタイムリスナーを設定
+        big5ProgressListener = db.collection("users").document(currentUserId)
             .collection("characters").document(characterId)
             .collection("big5Progress").document("current")
-            .getDocument { [weak self] document, error in
+            .addSnapshotListener { [weak self] document, error in
                 if let error = error {
                     print("❌ BIG5 progress monitoring error: \(error)")
                     return
                 }
-                
+
                 guard let data = document?.data() else {
+                    print("⚠️ BIG5 progress document has no data")
                     return
                 }
-                
+
                 let answeredQuestions = data["answeredQuestions"] as? [[String: Any]] ?? []
                 let newCount = answeredQuestions.count
-                
+
+                print("📊 BIG5 progress update: \(newCount) questions answered")
+
                 DispatchQueue.main.async {
                     let oldCount = self?.big5AnsweredCount ?? 0
                     self?.big5AnsweredCount = newCount
-                    
+
+                    print("📊 Updated big5AnsweredCount from \(oldCount) to \(newCount)")
+
                     // カウントが増えた場合はアニメーション通知を送信
                     if newCount > oldCount {
+                        print("✅ Posting big5ProgressUpdated notification")
                         NotificationCenter.default.post(
                             name: .big5ProgressUpdated,
                             object: nil,
@@ -424,19 +443,46 @@ class CharacterService: ObservableObject {
     }
     
     func submitBIG5Answer(_ answerValue: Int, characterId: String) {
-        guard let _ = currentBIG5Question else { return }
-        
+        guard let currentQuestion = currentBIG5Question else {
+            print("❌ submitBIG5Answer: No current question")
+            return
+        }
+
+        print("✅ submitBIG5Answer called: answer=\(answerValue), questionId=\(currentQuestion.id), characterId=\(characterId)")
+
+        // Firestoreの状態を確認
+        guard let userId = Auth.auth().currentUser?.uid else { return }
+        db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("big5Progress").document("current")
+            .getDocument { snapshot, error in
+                if let data = snapshot?.data() {
+                    print("🔍 Firestore big5Progress/current data: \(data)")
+                    if let currentQ = data["currentQuestion"] as? [String: Any] {
+                        print("🔍 Firestore currentQuestion: \(currentQ)")
+                    } else {
+                        print("❌ Firestore has no currentQuestion field!")
+                    }
+                } else {
+                    print("❌ Firestore big5Progress/current document does not exist!")
+                }
+            }
+
         // ユーザーIDを取得
         guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else {
             Logger.error("User not authenticated for BIG5 answer submission", category: Logger.authentication)
+            print("❌ submitBIG5Answer: User not authenticated")
             return
         }
 
         guard !characterId.isEmpty else {
             Logger.error("CharacterId cannot be empty for BIG5 answer submission", category: Logger.general)
+            print("❌ submitBIG5Answer: CharacterId is empty")
             return
         }
-        
+
+        print("✅ Calling Cloud Function with userId=\(userId), characterId=\(characterId)")
+
         // Cloud Functionに回答を送信
         Task { @MainActor in
             let isPremiumValue = subscriptionManager.isPremium
@@ -447,6 +493,8 @@ class CharacterService: ObservableObject {
                 "userId": userId,
                 "isPremium": isPremiumValue
             ]
+
+            print("✅ Request data: \(data)")
 
             functions.httpsCallable("generateCharacterReply").call(data) { [weak self] result, error in
             if let error = error {

@@ -435,8 +435,11 @@ exports.generateCharacterReply = onCall(
           return {error: "Missing characterId or userMessage"};
         }
 
-        // 無意味な入力を検出してフォールバック返答を返す
-        if (isMeaninglessInput(userMessage)) {
+        // BIG5質問の回答（1-5の数字）を先にチェック
+        const isNumericAnswer = /^[1-5]$/.test(userMessage.trim());
+
+        // BIG5回答以外の無意味な入力を検出してフォールバック返答を返す
+        if (!isNumericAnswer && isMeaninglessInput(userMessage)) {
           console.log(`🚫 Meaningless input detected: "${userMessage}"`);
 
           // キャラクター情報を取得（genderのみ必要）
@@ -483,9 +486,6 @@ exports.generateCharacterReply = onCall(
         const isTopicRequest = topicRequestPatterns.some((pattern) =>
           pattern.test(userMessage.replace(/\s/g, "")),
         );
-
-        // BIG5質問の回答（1-5の数字）を検出
-        const isNumericAnswer = /^[1-5]$/.test(userMessage.trim());
 
         const [charDetailSnap, big5ProgressSnap] =
           await Promise.all([

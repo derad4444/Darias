@@ -14,27 +14,19 @@ struct DiaryDetailView: View {
     @State private var userComment: String = ""
     @State private var isLoading = true
     @State private var isSavingComment = false
-    
-    private var dynamicHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        let safeAreaTop = UIApplication.shared.windows.first?.safeAreaInsets.top ?? 47
-        let safeAreaBottom = UIApplication.shared.windows.first?.safeAreaInsets.bottom ?? 34
-        let navigationBarHeight: CGFloat = 44
-        
-        return screenHeight - safeAreaTop - navigationBarHeight - safeAreaBottom - 55
-    }
 
     var body: some View {
-        ZStack {
-            // 設定された背景グラデーション
-            colorSettings.getCurrentBackgroundGradient()
-                .ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                // 設定された背景グラデーション
+                colorSettings.getCurrentBackgroundGradient()
+                    .ignoresSafeArea()
 
-            if isLoading {
-                ProgressView("読み込み中…")
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
+                if isLoading {
+                    ProgressView("読み込み中…")
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 0) {
                         // 広告バナー1（日記の上）
                         if !isPremium {
                             BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
@@ -144,9 +136,8 @@ struct DiaryDetailView: View {
                         Spacer(minLength: 20)
                     }
                 }
-                .frame(height: dynamicHeight)
-                .clipped()
             }
+        }
         }
         .navigationTitle("日記")
         .navigationBarTitleDisplayMode(.inline)
