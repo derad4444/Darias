@@ -17,7 +17,6 @@ struct CharacterApp: App {
         // Firebase初期化
         FirebaseApp.configure()
         
-        print("Firebase and App Check configuration completed")
     }
     
     private func configureAppCheck() {
@@ -25,16 +24,12 @@ struct CharacterApp: App {
         // デバッグビルド：デバッグプロバイダーを使用
         let providerFactory = AppCheckDebugProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
-        print("App Check: Debug provider enabled for development")
 
         // デバッグトークンをログ出力
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             AppCheck.appCheck().token(forcingRefresh: false) { token, error in
                 if let token = token {
-                    print("🔥 App Check Debug Token: \(token.token)")
-                    print("🔥 Copy this token to Firebase Console")
                 } else if let error = error {
-                    print("🔥 App Check Token Error: \(error)")
                 }
             }
         }
@@ -42,7 +37,6 @@ struct CharacterApp: App {
         // 本番リリース：DeviceCheck/App Attestを使用（自動）
         let providerFactory = AppAttestProviderFactory()
         AppCheck.setAppCheckProviderFactory(providerFactory)
-        print("App Check: Production provider (App Attest) enabled")
         #endif
     }
 

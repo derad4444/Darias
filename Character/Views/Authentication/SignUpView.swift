@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct SignUpView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -64,16 +65,7 @@ struct SignUpView: View {
                             case .success():
                                 dismiss() // 成功したら画面を閉じる
                             case .failure(let error):
-                                let msg = error.localizedDescription
-                                if msg.contains("badly formatted") {
-                                    errorMessage = "メールアドレスの形式が正しくありません。"
-                                } else if msg.contains("already in use") {
-                                    errorMessage = "このメールアドレスはすでに使用されています。"
-                                } else if msg.contains("Password should be at least") {
-                                    errorMessage = "パスワードは6文字以上で入力してください。"
-                                } else {
-                                    errorMessage = msg
-                                }
+                                errorMessage = getJapaneseErrorMessage(error)
                             }
                         }
                     } label: {
@@ -96,6 +88,58 @@ struct SignUpView: View {
                     .padding()
                 }
             }
+        }
+    }
+
+    // MARK: - Error Message Helper
+
+    private func getJapaneseErrorMessage(_ error: Error) -> String {
+        let nsError = error as NSError
+
+        // FirebaseAuthのエラーコードで判定
+        if nsError.domain == AuthErrorDomain {
+            // エラーコードのraw valueで判定
+            switch nsError.code {
+            case 17008: // invalidEmail
+                return "メールアドレスの形式が正しくありません。"
+            case 17007: // emailAlreadyInUse
+                return "このメールアドレスはすでに使用されています。"
+            case 17026: // weakPassword
+                return "パスワードは6文字以上で入力してください。"
+            case 17020: // networkError
+                return "ネットワークエラーが発生しました。接続を確認してください。"
+            case 17011: // userNotFound
+                return "ユーザーが見つかりません。"
+            case 17009: // wrongPassword
+                return "パスワードが正しくありません。"
+            case 17010: // userDisabled
+                return "このアカウントは無効化されています。"
+            case 17999: // tooManyRequests
+                return "リクエストが多すぎます。しばらく待ってから再度お試しください。"
+            case 17006: // operationNotAllowed
+                return "この操作は許可されていません。"
+            default:
+                // その他のエラーは英語メッセージから日本語に変換を試みる
+                return translateErrorMessage(error.localizedDescription)
+            }
+        }
+
+        return translateErrorMessage(error.localizedDescription)
+    }
+
+    private func translateErrorMessage(_ message: String) -> String {
+        let msg = message.lowercased()
+
+        if msg.contains("badly formatted") || msg.contains("invalid email") {
+            return "メールアドレスの形式が正しくありません。"
+        } else if msg.contains("already in use") {
+            return "このメールアドレスはすでに使用されています。"
+        } else if msg.contains("password") && (msg.contains("at least") || msg.contains("weak")) {
+            return "パスワードは6文字以上で入力してください。"
+        } else if msg.contains("network") {
+            return "ネットワークエラーが発生しました。"
+        } else {
+            return "エラーが発生しました: \(message)"
         }
     }
 }

@@ -16,13 +16,11 @@ class ChatLimitManager: ObservableObject {
 
     func fetchChatCount() {
         guard let userId = userId else {
-            print("⚠️ ChatLimitManager: userIdがありません")
             return
         }
         let docRef = db.collection("users").document(userId)
         docRef.getDocument { document, error in
             if let error = error {
-                print("❌ ChatLimitManager: チャット数取得エラー: \(error.localizedDescription)")
                 self.totalChatsToday = 0
                 return
             }
@@ -40,18 +38,14 @@ class ChatLimitManager: ObservableObject {
 
                     // 日付が変わっていたらリセット
                     if lastDate != today {
-                        print("📅 日付が変わったのでチャット数をリセット")
                         self.totalChatsToday = 0
                     } else {
                         self.totalChatsToday = count
-                        print("✅ チャット数を取得: \(count)")
                     }
                 } else {
-                    print("⚠️ usage_trackingがありません。0から開始")
                     self.totalChatsToday = 0
                 }
             } else {
-                print("⚠️ ユーザードキュメントがありません")
                 self.totalChatsToday = 0
             }
         }
@@ -59,13 +53,11 @@ class ChatLimitManager: ObservableObject {
     
     func consumeChat() {
         totalChatsToday += 1
-        print("💬 チャット消費: 今日のチャット数 = \(totalChatsToday)")
         updateFirestore()
     }
 
     private func updateFirestore() {
         guard let userId = userId else {
-            print("⚠️ updateFirestore: userIdがありません")
             return
         }
 
@@ -79,9 +71,7 @@ class ChatLimitManager: ObservableObject {
             "updated_at": Timestamp()
         ]) { error in
             if let error = error {
-                print("❌ Firestoreチャット数更新エラー: \(error.localizedDescription)")
             } else {
-                print("✅ Firestoreチャット数更新成功: \(self.totalChatsToday)")
             }
         }
     }

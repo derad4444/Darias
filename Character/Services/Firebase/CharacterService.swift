@@ -17,6 +17,9 @@ class CharacterService: ObservableObject {
     @Published var big5AnsweredCount: Int = 0
     @Published var currentBIG5Question: BIG5Question? = nil
     @Published var showBIG5Question: Bool = false
+    @Published var showBIG5ContinueDialog: Bool = false
+    @Published var pendingNextQuestion: BIG5Question? = nil
+    @Published var lastBIG5Reply: String = ""
     @Published var characterGenerationStatus: CharacterGenerationStatus = .notStarted
 
     deinit {
@@ -221,7 +224,6 @@ class CharacterService: ObservableObject {
             return
         }
 
-        print("✅ Starting BIG5 progress monitoring for characterId: \(characterId)")
 
         // リアルタイムリスナーを設定
         big5ProgressListener = db.collection("users").document(currentUserId)
@@ -229,29 +231,24 @@ class CharacterService: ObservableObject {
             .collection("big5Progress").document("current")
             .addSnapshotListener { [weak self] document, error in
                 if let error = error {
-                    print("❌ BIG5 progress monitoring error: \(error)")
                     return
                 }
 
                 guard let data = document?.data() else {
-                    print("⚠️ BIG5 progress document has no data")
                     return
                 }
 
                 let answeredQuestions = data["answeredQuestions"] as? [[String: Any]] ?? []
                 let newCount = answeredQuestions.count
 
-                print("📊 BIG5 progress update: \(newCount) questions answered")
 
                 DispatchQueue.main.async {
                     let oldCount = self?.big5AnsweredCount ?? 0
                     self?.big5AnsweredCount = newCount
 
-                    print("📊 Updated big5AnsweredCount from \(oldCount) to \(newCount)")
 
                     // カウントが増えた場合はアニメーション通知を送信
                     if newCount > oldCount {
-                        print("✅ Posting big5ProgressUpdated notification")
                         NotificationCenter.default.post(
                             name: .big5ProgressUpdated,
                             object: nil,
@@ -289,7 +286,6 @@ class CharacterService: ObservableObject {
             .collection("generationStatus").document("current")
             .addSnapshotListener { [weak self] document, error in
                 if let error = error {
-                    print("❌ Generation status monitoring error: \(error)")
                     return
                 }
                 
@@ -309,7 +305,6 @@ class CharacterService: ObservableObject {
                             ]
                         )
                         
-                        print("🔔 Generation status updated: stage \(status.stage), status: \(status.status.rawValue)")
                     } else {
                         // ドキュメントが存在しない場合は初期状態に戻す
                         self?.characterGenerationStatus = .notStarted
@@ -359,7 +354,6 @@ class CharacterService: ObservableObject {
             .collection("big5Progress").document("current")
             .getDocument { document, error in
                 if let error = error {
-                    print("❌ Error checking BIG5 progress: \(error)")
                     return
                 }
                 
@@ -389,9 +383,7 @@ class CharacterService: ObservableObject {
                         .collection("big5Progress").document("current")
                         .setData(initialData) { error in
                             if let error = error {
-                                print("❌ Error initializing BIG5 progress: \(error)")
                             } else {
-                                print("✅ BIG5 progress initialized for character: \(characterId)")
                             }
                         }
                 }
@@ -407,7 +399,6 @@ class CharacterService: ObservableObject {
             .collection("details").document("current")
             .getDocument { document, error in
                 if let error = error {
-                    print("❌ Error checking character details: \(error)")
                     return
                 }
                 
@@ -433,9 +424,7 @@ class CharacterService: ObservableObject {
                         .collection("details").document("current")
                         .setData(initialData) { error in
                             if let error = error {
-                                print("❌ Error initializing character details: \(error)")
                             } else {
-                                print("✅ Character details initialized for character: \(characterId)")
                             }
                         }
                 }
@@ -444,11 +433,9 @@ class CharacterService: ObservableObject {
     
     func submitBIG5Answer(_ answerValue: Int, characterId: String) {
         guard let currentQuestion = currentBIG5Question else {
-            print("❌ submitBIG5Answer: No current question")
             return
         }
 
-        print("✅ submitBIG5Answer called: answer=\(answerValue), questionId=\(currentQuestion.id), characterId=\(characterId)")
 
         // Firestoreの状態を確認
         guard let userId = Auth.auth().currentUser?.uid else { return }
@@ -457,31 +444,24 @@ class CharacterService: ObservableObject {
             .collection("big5Progress").document("current")
             .getDocument { snapshot, error in
                 if let data = snapshot?.data() {
-                    print("🔍 Firestore big5Progress/current data: \(data)")
                     if let currentQ = data["currentQuestion"] as? [String: Any] {
-                        print("🔍 Firestore currentQuestion: \(currentQ)")
                     } else {
-                        print("❌ Firestore has no currentQuestion field!")
                     }
                 } else {
-                    print("❌ Firestore big5Progress/current document does not exist!")
                 }
             }
 
         // ユーザーIDを取得
         guard let userId = Auth.auth().currentUser?.uid, !userId.isEmpty else {
             Logger.error("User not authenticated for BIG5 answer submission", category: Logger.authentication)
-            print("❌ submitBIG5Answer: User not authenticated")
             return
         }
 
         guard !characterId.isEmpty else {
             Logger.error("CharacterId cannot be empty for BIG5 answer submission", category: Logger.general)
-            print("❌ submitBIG5Answer: CharacterId is empty")
             return
         }
 
-        print("✅ Calling Cloud Function with userId=\(userId), characterId=\(characterId)")
 
         // Cloud Functionに回答を送信
         Task { @MainActor in
@@ -494,40 +474,65 @@ class CharacterService: ObservableObject {
                 "isPremium": isPremiumValue
             ]
 
-            print("✅ Request data: \(data)")
 
             functions.httpsCallable("generateCharacterReply").call(data) { [weak self] result, error in
             if let error = error {
-                print("❌ BIG5 answer submission error: \(error)")
                 return
             }
             
-            print("🔄 BIG5 answer submission response received")
             if let data = result?.data as? [String: Any] {
-                print("🔄 Response data: \(data)")
                 DispatchQueue.main.async {
-                    // BIG5質問を非表示にして通常チャットに戻る
-                    self?.showBIG5Question = false
-                    self?.currentBIG5Question = nil
-                    
-                    // Big5スコア更新処理
-                    self?.updateBig5PersonalityKey(characterId: characterId)
-                    
-                    // 回答への返答をチャット履歴に追加（必要に応じて）
+                    // フィードバックを保存
                     if let reply = data["reply"] as? String {
-                        print("🔄 Sending BIG5AnswerResponse notification with reply: \(reply)")
-                        NotificationCenter.default.post(
-                            name: .init("BIG5AnswerResponse"),
-                            object: nil,
-                            userInfo: ["reply": reply]
+                        self?.lastBIG5Reply = reply
+                    }
+
+                    // 次の質問があるかチェック
+                    if let isBig5Question = data["isBig5Question"] as? Int,
+                       isBig5Question == 1,
+                       let questionId = data["questionId"] as? String,
+                       let questionText = data["questionText"] as? String {
+
+
+                        let nextQuestion = BIG5Question(
+                            id: questionId,
+                            question: questionText,
+                            trait: "",
+                            direction: ""
                         )
-                        print("🔄 BIG5AnswerResponse notification sent")
+
+                        // 次の質問を保存
+                        self?.pendingNextQuestion = nextQuestion
+
+                        // BIG5質問UIは一旦非表示
+                        self?.showBIG5Question = false
+                        self?.currentBIG5Question = nil
+
+                        // フィードバックは表示せず、lastBIG5Replyに保存済み
+                        // ダイアログで「後で」を選んだ時に表示する
+
+                        // すぐにダイアログ表示
+                        self?.showBIG5ContinueDialog = true
                     } else {
-                        print("❌ No reply found in response data")
+                        // 診断完了または通常チャット
+                        self?.showBIG5Question = false
+                        self?.currentBIG5Question = nil
+
+                        // Big5スコア更新処理
+                        self?.updateBig5PersonalityKey(characterId: characterId)
+
+                        // 返答を表示
+                        if let reply = data["reply"] as? String {
+                            NotificationCenter.default.post(
+                                name: .init("BIG5AnswerResponse"),
+                                object: nil,
+                                userInfo: ["reply": reply]
+                            )
+                        } else {
+                        }
                     }
                 }
             } else {
-                print("❌ Invalid response data format")
             }
             }
         }
@@ -539,13 +544,43 @@ class CharacterService: ObservableObject {
             self.currentBIG5Question = nil
         }
     }
-    
+
+    func continueToNextQuestion() {
+
+        DispatchQueue.main.async {
+            if let nextQuestion = self.pendingNextQuestion {
+                self.currentBIG5Question = nextQuestion
+                self.showBIG5Question = true
+                self.showBIG5ContinueDialog = false
+                self.pendingNextQuestion = nil
+
+            } else {
+            }
+        }
+    }
+
+    func skipToChat() {
+        DispatchQueue.main.async {
+            self.showBIG5Question = false
+            self.showBIG5ContinueDialog = false
+            self.pendingNextQuestion = nil
+
+            // キャラクターの返答を通知（HomeViewで表示）
+            if !self.lastBIG5Reply.isEmpty {
+                NotificationCenter.default.post(
+                    name: .init("BIG5AnswerResponse"),
+                    object: nil,
+                    userInfo: ["reply": self.lastBIG5Reply]
+                )
+            }
+        }
+    }
+
     // MARK: - Big5 PersonalityKey Update
     
     private func updateBig5PersonalityKey(characterId: String) {
         // ユーザーIDを取得
         guard let currentUserId = Auth.auth().currentUser?.uid else {
-            print("❌ User not authenticated for BIG5 personality key update")
             return
         }
         
@@ -557,13 +592,11 @@ class CharacterService: ObservableObject {
                 guard let data = document?.data(),
                       let currentScores = data["currentScores"] as? [String: Any],
                       let answeredQuestions = data["answeredQuestions"] as? [[String: Any]] else {
-                    print("❌ BIG5 progress data not found or invalid structure")
                     return
                 }
                 
                 // Big5Scoresに変換
                 guard let big5Scores = Big5Scores.fromScoreMap(currentScores) else {
-                    print("❌ Failed to convert currentScores to Big5Scores")
                     return
                 }
                 
@@ -584,9 +617,7 @@ class CharacterService: ObservableObject {
                         "updated_at": Timestamp()
                     ]) { error in
                         if let error = error {
-                            print("❌ PersonalityKey update error: \(error)")
                         } else {
-                            print("✅ PersonalityKey updated to: \(newPersonalityKey) with confirmed scores")
                             
                             // 通知を送信してUIの更新を促す
                             DispatchQueue.main.async {

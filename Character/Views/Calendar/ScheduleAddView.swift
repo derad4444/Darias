@@ -93,7 +93,7 @@ struct ScheduleAddView: View {
                             VStack(spacing: 20) {
                                 // 1つ目のバナー広告（タイトルの上）
                                 if subscriptionManager.shouldDisplayBannerAd() {
-                                    BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                    BannerAdView(adUnitID: Config.scheduleAddTopBannerAdUnitID)
                                         .frame(height: 50)
                                         .background(Color.clear)
                                         .onAppear {
@@ -243,7 +243,7 @@ struct ScheduleAddView: View {
 
                                     // 2つ目のバナー広告（メモ欄の下）
                                     if subscriptionManager.shouldDisplayBannerAd() {
-                                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                        BannerAdView(adUnitID: Config.scheduleAddBottomBannerAdUnitID)
                                             .frame(height: 50)
                                             .background(Color.clear)
                                             .onAppear {
@@ -452,7 +452,6 @@ struct ScheduleAddView: View {
                         }
                     } else {
                         // エラー処理 - 部分的に失敗した場合の処理
-                        print("予定の保存に失敗しました: \(index + 1)/\(totalCount)")
                         successCount += 1 // エラーでもカウントを増やして進行
                         self.recurringProgress = successCount
 

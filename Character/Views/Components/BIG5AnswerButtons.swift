@@ -116,7 +116,6 @@ struct BIG5AnswerButtons: View {
         BIG5AnswerButtons(
             question: "人と話すことが好きだ",
             onAnswer: { value in
-                print("Selected: \\(value)")
             }
         )
         .environmentObject(FontSettingsManager())

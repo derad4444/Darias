@@ -154,7 +154,7 @@ struct ScheduleDetailView: View {
 
                             // バナー広告（画面最下部）
                             if subscriptionManager.shouldDisplayBannerAd() {
-                                BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                BannerAdView(adUnitID: Config.scheduleDetailBannerAdUnitID)
                                     .frame(height: 50)
                                     .background(Color.clear)
                                     .onAppear {
@@ -462,7 +462,6 @@ struct ScheduleDetailView: View {
                 if success {
                     dismiss()
                 } else {
-                    print("❌ 予定の削除に失敗しました")
                 }
             }
         }
@@ -471,19 +470,15 @@ struct ScheduleDetailView: View {
     // すべての繰り返し予定を削除
     private func deleteAllRecurringSchedules() {
         guard let recurringGroupId = schedule.recurringGroupId else {
-            print("❌ recurringGroupIdがありません")
             return
         }
 
-        print("🔍 繰り返し予定グループ削除開始 - \(schedule.title)")
 
         firestoreManager.deleteRecurringGroup(groupId: recurringGroupId) { success in
             DispatchQueue.main.async {
                 if success {
-                    print("✅ 繰り返し予定削除成功")
                     self.dismiss()
                 } else {
-                    print("❌ 繰り返し予定の削除に失敗しました")
                 }
             }
         }

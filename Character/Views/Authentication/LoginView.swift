@@ -1,4 +1,5 @@
 import SwiftUI
+import FirebaseAuth
 
 struct LoginView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -52,7 +53,7 @@ struct LoginView: View {
                                 // 成功時の処理
                                 break
                             case .failure(let error):
-                                errorMessage = error.localizedDescription
+                                errorMessage = getJapaneseErrorMessage(error)
                             }
                         }
                     } label: {
@@ -80,6 +81,62 @@ struct LoginView: View {
         .sheet(isPresented: $showSignUp) {
             SignUpView()
                 .environmentObject(authManager)
+        }
+    }
+
+    // MARK: - Error Message Helper
+
+    private func getJapaneseErrorMessage(_ error: Error) -> String {
+        let nsError = error as NSError
+
+        // FirebaseAuthのエラーコードで判定
+        if nsError.domain == AuthErrorDomain {
+            // エラーコードのraw valueで判定
+            switch nsError.code {
+            case 17008: // invalidEmail
+                return "メールアドレスの形式が正しくありません。"
+            case 17007: // emailAlreadyInUse
+                return "このメールアドレスはすでに使用されています。"
+            case 17026: // weakPassword
+                return "パスワードは6文字以上で入力してください。"
+            case 17020: // networkError
+                return "ネットワークエラーが発生しました。接続を確認してください。"
+            case 17011: // userNotFound
+                return "ユーザーが見つかりません。"
+            case 17009: // wrongPassword
+                return "パスワードが正しくありません。"
+            case 17010: // userDisabled
+                return "このアカウントは無効化されています。"
+            case 17999: // tooManyRequests
+                return "リクエストが多すぎます。しばらく待ってから再度お試しください。"
+            case 17006: // operationNotAllowed
+                return "この操作は許可されていません。"
+            case 17004: // invalidCredential
+                return "メールアドレスまたはパスワードが正しくありません。"
+            default:
+                // その他のエラーは英語メッセージから日本語に変換を試みる
+                return translateErrorMessage(error.localizedDescription)
+            }
+        }
+
+        return translateErrorMessage(error.localizedDescription)
+    }
+
+    private func translateErrorMessage(_ message: String) -> String {
+        let msg = message.lowercased()
+
+        if msg.contains("badly formatted") || msg.contains("invalid email") {
+            return "メールアドレスの形式が正しくありません。"
+        } else if msg.contains("user not found") || msg.contains("no user") {
+            return "ユーザーが見つかりません。"
+        } else if msg.contains("wrong password") || msg.contains("invalid credential") {
+            return "メールアドレスまたはパスワードが正しくありません。"
+        } else if msg.contains("network") {
+            return "ネットワークエラーが発生しました。"
+        } else if msg.contains("too many requests") {
+            return "リクエストが多すぎます。しばらく待ってから再度お試しください。"
+        } else {
+            return "エラーが発生しました: \(message)"
         }
     }
 }

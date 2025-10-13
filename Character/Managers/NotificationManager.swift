@@ -90,7 +90,6 @@ class NotificationManager: ObservableObject {
             // 通知を登録
             UNUserNotificationCenter.current().add(request) { error in
                 if let error = error {
-                    print("通知登録エラー: \(error.localizedDescription)")
                 }
             }
         }
@@ -154,7 +153,6 @@ class NotificationManager: ObservableObject {
 
             // 制限に達した場合は停止
             if totalNotifications + notificationSettings.notifications.count > maxNotifications {
-                print("通知制限に達しました。一部の予定の通知が設定されませんでした。")
                 break
             }
 
@@ -172,10 +170,8 @@ class NotificationManager: ObservableObject {
     // 登録済み通知を確認（デバッグ用）
     func listPendingNotifications() {
         UNUserNotificationCenter.current().getPendingNotificationRequests { requests in
-            print("登録済み通知数: \(requests.count)")
             for request in requests {
                 if let trigger = request.trigger as? UNCalendarNotificationTrigger {
-                    print("ID: \(request.identifier), タイトル: \(request.content.title), 日時: \(trigger.dateComponents)")
                 }
             }
         }

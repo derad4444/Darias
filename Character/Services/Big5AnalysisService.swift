@@ -30,6 +30,7 @@ class Big5AnalysisService: ObservableObject {
     // MARK: - Analysis Data Fetching
     
     func fetchAnalysisData(personalityKey: String, completion: @escaping (Result<Big5AnalysisData, Error>) -> Void) {
+
         // キャッシュから取得を試行
         if let cachedData = cache.getCachedAnalysis(personalityKey: personalityKey) {
             DispatchQueue.main.async {
@@ -38,10 +39,10 @@ class Big5AnalysisService: ObservableObject {
             }
             return
         }
-        
+
         isLoading = true
         errorMessage = nil
-        
+
         db.collection("Big5Analysis").document(personalityKey).getDocument { [weak self] document, error in
             if let error = error {
                 DispatchQueue.main.async {
@@ -51,7 +52,7 @@ class Big5AnalysisService: ObservableObject {
                 }
                 return
             }
-            
+
             if let document = document, document.exists, let data = document.data() {
                 // データが存在する場合は既存の処理
                 do {
@@ -72,8 +73,13 @@ class Big5AnalysisService: ObservableObject {
                     }
                 }
             } else {
-                // データが存在しない場合は動的生成
-                self?.generateAnalysisData(personalityKey: personalityKey, completion: completion)
+                // データが存在しない場合はエラーを返す（画面では生成しない）
+                let notFoundError = NSError(domain: "Big5AnalysisService", code: 404, userInfo: [NSLocalizedDescriptionKey: "解析データがまだ生成されていません"])
+                DispatchQueue.main.async {
+                    self?.isLoading = false
+                    self?.errorMessage = "解析データがまだ生成されていません"
+                    completion(.failure(notFoundError))
+                }
             }
         }
     }
@@ -97,11 +103,14 @@ class Big5AnalysisService: ObservableObject {
     }
     
     private func parseAnalysisLevel(from data: [String: Any], level: String) -> [Big5AnalysisCategory: Big5DetailedAnalysis]? {
-        guard let levelData = data[level] as? [String: Any] else { return nil }
-        
+        guard let levelData = data[level] as? [String: Any] else {
+            return nil
+        }
+
+
         var result: [Big5AnalysisCategory: Big5DetailedAnalysis] = [:]
         let analysisLevel: Big5AnalysisLevel
-        
+
         switch level {
         case "analysis_20":
             analysisLevel = .basic
@@ -112,51 +121,69 @@ class Big5AnalysisService: ObservableObject {
         default:
             return nil
         }
-        
+
         for category in Big5AnalysisCategory.allCases {
-            if let categoryData = levelData[category.rawValue] as? [String: Any],
-               let personalityType = categoryData["personality_type"] as? String,
-               let detailedText = categoryData["detailed_text"] as? String,
-               let keyPoints = categoryData["key_points"] as? [String] {
-                
-                let analysis = Big5DetailedAnalysis(
-                    category: category,
-                    personalityType: personalityType,
-                    detailedText: detailedText,
-                    keyPoints: keyPoints,
-                    analysisLevel: analysisLevel
-                )
-                
-                result[category] = analysis
+
+            if let categoryData = levelData[category.rawValue] as? [String: Any] {
+
+                if let personalityType = categoryData["personality_type"] as? String,
+                   let detailedText = categoryData["detailed_text"] as? String,
+                   let keyPoints = categoryData["key_points"] as? [String] {
+
+                    let analysis = Big5DetailedAnalysis(
+                        category: category,
+                        personalityType: personalityType,
+                        detailedText: detailedText,
+                        keyPoints: keyPoints,
+                        analysisLevel: analysisLevel
+                    )
+
+                    result[category] = analysis
+                } else {
+                }
+            } else {
             }
         }
-        
+
         return result.isEmpty ? nil : result
     }
     
     // MARK: - Character Analysis Data Fetching
     
     func fetchCharacterAnalysis(characterId: String, userId: String, completion: @escaping (Result<Big5AnalysisData, Error>) -> Void) {
+
         // ユーザーのキャラクター詳細からpersonalityKeyを取得
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
             .collection("details").document("current").getDocument { [weak self] document, error in
                 if let error = error {
                     DispatchQueue.main.async {
+                        self?.errorMessage = "キャラクター詳細の取得に失敗: \(error.localizedDescription)"
                         completion(.failure(error))
                     }
                     return
                 }
-                
-                guard let data = document?.data(),
-                      let personalityKey = data["personalityKey"] as? String else {
-                    let notFoundError = NSError(domain: "Big5AnalysisService", code: 404, userInfo: [NSLocalizedDescriptionKey: "キャラクターのpersonalityKeyが見つかりませんでした"])
+
+                guard let data = document?.data() else {
+                    let notFoundError = NSError(domain: "Big5AnalysisService", code: 404, userInfo: [NSLocalizedDescriptionKey: "キャラクター詳細が見つかりませんでした"])
                     DispatchQueue.main.async {
+                        self?.errorMessage = "キャラクター詳細が見つかりませんでした"
                         completion(.failure(notFoundError))
                     }
                     return
                 }
-                
+
+
+                guard let personalityKey = data["personalityKey"] as? String else {
+                    let notFoundError = NSError(domain: "Big5AnalysisService", code: 404, userInfo: [NSLocalizedDescriptionKey: "キャラクターのpersonalityKeyが見つかりませんでした"])
+                    DispatchQueue.main.async {
+                        self?.errorMessage = "personalityKeyが設定されていません"
+                        completion(.failure(notFoundError))
+                    }
+                    return
+                }
+
+
                 // personalityKeyで解析データを取得
                 self?.fetchAnalysisData(personalityKey: personalityKey, completion: completion)
             }
@@ -192,6 +219,7 @@ class Big5AnalysisService: ObservableObject {
     // MARK: - Dynamic Analysis Data Generation
     
     private func generateAnalysisData(personalityKey: String, completion: @escaping (Result<Big5AnalysisData, Error>) -> Void) {
+
         // Cloud Functionを呼び出してAIで解析データを生成
         let functions = Functions.functions(region: "asia-northeast1")
 
@@ -207,12 +235,13 @@ class Big5AnalysisService: ObservableObject {
             if let error = error {
                 DispatchQueue.main.async {
                     self?.isLoading = false
-                    self?.errorMessage = "解析データの生成に失敗しました"
+                    self?.errorMessage = "解析データの生成に失敗しました: \(error.localizedDescription)"
                     completion(.failure(error))
                 }
                 return
             }
-            
+
+
             guard let data = result?.data as? [String: Any] else {
                 let parseError = NSError(domain: "Big5AnalysisService", code: 500, userInfo: [NSLocalizedDescriptionKey: "生成データの解析に失敗しました"])
                 DispatchQueue.main.async {
@@ -222,7 +251,8 @@ class Big5AnalysisService: ObservableObject {
                 }
                 return
             }
-            
+
+
             do {
                 // 生成されたデータを解析
                 let analysisData = try self?.parseAnalysisData(from: data, personalityKey: personalityKey)

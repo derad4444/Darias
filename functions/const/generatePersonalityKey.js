@@ -1,15 +1,19 @@
 // functions/utils/generatePersonalityKey.js
 
 /**
- * Big5スコアから一意のpersonalityKeyを生成する
+ * Big5スコアと性別から一意のpersonalityKeyを生成する
  * @param {Object} big5 - Big5スコア（openness, conscientiousnessなど）
- * @return {string} - personalityKey（例: O4_C2_A5_E3_N1）
+ * @param {string} gender - 性別（male/female）省略可能、後方互換性のため
+ * @return {string} - personalityKey（例: O3_C3_E3_A3_N3_female）
  */
-function generatePersonalityKey(big5) {
-  return (
-    `O${big5.openness}_C${big5.conscientiousness}_A${big5.agreeableness}_` +
-    `E${big5.extraversion}_N${big5.neuroticism}`
+function generatePersonalityKey(big5, gender) {
+  const baseKey = (
+    `O${big5.openness}_C${big5.conscientiousness}_E${big5.extraversion}_` +
+    `A${big5.agreeableness}_N${big5.neuroticism}`
   );
+
+  // genderが指定されている場合は末尾に追加
+  return gender ? `${baseKey}_${gender}` : baseKey;
 }
 
 module.exports = {

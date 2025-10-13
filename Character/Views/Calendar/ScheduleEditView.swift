@@ -145,7 +145,7 @@ struct ScheduleEditView: View {
                             VStack(spacing: 20) {
                                 // 1つ目のバナー広告（タイトルの上）
                                 if subscriptionManager.shouldDisplayBannerAd() {
-                                    BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                    BannerAdView(adUnitID: Config.scheduleEditTopBannerAdUnitID)
                                         .frame(height: 50)
                                         .background(Color.clear)
                                         .onAppear {
@@ -277,7 +277,7 @@ struct ScheduleEditView: View {
 
                                 // 2つ目のバナー広告（メモ欄の下）
                                 if subscriptionManager.shouldDisplayBannerAd() {
-                                    BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                    BannerAdView(adUnitID: Config.scheduleEditBottomBannerAdUnitID)
                                         .frame(height: 50)
                                         .background(Color.clear)
                                         .onAppear {
@@ -458,7 +458,6 @@ struct ScheduleEditView: View {
         if repeatSettings.type != .none {
             // 既存の繰り返しグループがあれば削除してから新しい繰り返し予定を作成
             if let groupId = schedule.recurringGroupId {
-                print("🔄 既存グループを削除してから新規作成")
                 deleteRecurringGroup(groupId: groupId) {
                     // 削除完了後に新しい予定群を作成（元の予定の更新はスキップ）
                     self.createNewRecurringSchedulesOnly(
@@ -467,7 +466,6 @@ struct ScheduleEditView: View {
                     )
                 }
             } else {
-                print("🔄 単発→繰り返し: 元の予定を更新してから追加予定作成")
                 // 単発→繰り返しの場合、元の予定を更新してから追加予定を作成
 
                 // FirestoreManagerの統一メソッドを使用
@@ -505,7 +503,6 @@ struct ScheduleEditView: View {
         } else {
             // 繰り返し→単発または単発→単発の場合、通常の更新
             if let groupId = schedule.recurringGroupId {
-                print("🔄 繰り返し→単発: 他の関連予定削除")
                 deleteOtherRecurringSchedules(groupId: groupId, keepScheduleId: schedule.id)
             }
 

@@ -245,20 +245,17 @@ struct ExtractedScheduleData {
 
     // ISO8601文字列をパースするヘルパーメソッド
     private static func parseISODate(_ dateString: String) -> Date? {
-        print("🔍 Parsing date string: \(dateString)")
 
         // 方法1: ISO8601DateFormatterでタイムゾーン付き形式をパース
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = isoFormatter.date(from: dateString) {
-            print("✅ Parsed with method 1 (ISO8601 with fractional seconds): \(date)")
             return date
         }
 
         // 方法2: タイムゾーン付き（秒まで）の形式を試す
         isoFormatter.formatOptions = [.withInternetDateTime]
         if let date = isoFormatter.date(from: dateString) {
-            print("✅ Parsed with method 2 (ISO8601 standard): \(date)")
             return date
         }
 
@@ -268,7 +265,6 @@ struct ExtractedScheduleData {
         fallbackFormatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
         fallbackFormatter.locale = Locale(identifier: "en_US_POSIX")
         if let date = fallbackFormatter.date(from: dateString) {
-            print("✅ Parsed with method 3 (DateFormatter no timezone): \(date)")
             return date
         }
 
@@ -278,16 +274,13 @@ struct ExtractedScheduleData {
         manualFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssZ"
         manualFormatter.locale = Locale(identifier: "en_US_POSIX")
         if let date = manualFormatter.date(from: dateString) {
-            print("✅ Parsed with method 4 (DateFormatter with Z): \(date)")
             return date
         }
 
-        print("❌ Failed to parse date string with all methods")
         return nil
     }
 
     init(from dict: [String: Any]) {
-        print("📦 ExtractedScheduleData init with dict: \(dict)")
 
         self.title = dict["title"] as? String ?? ""
         self.date = dict["date"] as? String ?? ""
@@ -296,41 +289,30 @@ struct ExtractedScheduleData {
         self.isAllDay = dict["isAllDay"] as? Bool ?? false
 
         // Cloud Functionから返される日付データの処理
-        print("🔍 startDate type: \(type(of: dict["startDate"]))")
         if let startTimestamp = dict["startDate"] as? Timestamp {
-            print("✅ startDate is Timestamp")
             self.startDate = startTimestamp.dateValue()
         } else if let startDateString = dict["startDate"] as? String {
-            print("✅ startDate is String: \(startDateString)")
             self.startDate = Self.parseISODate(startDateString)
         } else if let timestampDict = dict["startDate"] as? [String: Any],
                   let seconds = timestampDict["_seconds"] as? TimeInterval {
             // Firebase Timestampが辞書として返される場合
-            print("✅ startDate is Timestamp dict with _seconds: \(seconds)")
             self.startDate = Date(timeIntervalSince1970: seconds)
         } else {
-            print("❌ startDate could not be parsed")
             self.startDate = nil
         }
 
-        print("🔍 endDate type: \(type(of: dict["endDate"]))")
         if let endTimestamp = dict["endDate"] as? Timestamp {
-            print("✅ endDate is Timestamp")
             self.endDate = endTimestamp.dateValue()
         } else if let endDateString = dict["endDate"] as? String {
-            print("✅ endDate is String: \(endDateString)")
             self.endDate = Self.parseISODate(endDateString)
         } else if let timestampDict = dict["endDate"] as? [String: Any],
                   let seconds = timestampDict["_seconds"] as? TimeInterval {
             // Firebase Timestampが辞書として返される場合
-            print("✅ endDate is Timestamp dict with _seconds: \(seconds)")
             self.endDate = Date(timeIntervalSince1970: seconds)
         } else {
-            print("❌ endDate could not be parsed")
             self.endDate = nil
         }
 
-        print("📊 Final parsed dates - startDate: \(String(describing: self.startDate)), endDate: \(String(describing: self.endDate))")
     }
 }
 

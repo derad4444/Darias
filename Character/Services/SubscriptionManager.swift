@@ -69,7 +69,6 @@ class SubscriptionManager: ObservableObject {
                 self.isLoading = false
 
                 if let error = error {
-                    print("❌ Subscription monitoring error: \(error)")
                     self.subscriptionStatus = .free // エラー時は無料扱い
                     self.shouldShowBannerAd = true
                     return
@@ -77,7 +76,6 @@ class SubscriptionManager: ObservableObject {
 
                 guard let document = document, document.exists,
                       let data = document.data() else {
-                    print("⚠️ User document not found")
                     self.subscriptionStatus = .free
                     self.shouldShowBannerAd = true
                     return
@@ -121,7 +119,6 @@ class SubscriptionManager: ObservableObject {
                 shouldShowBannerAd = true
             }
         } catch {
-            print("❌ Failed to refresh subscription: \(error)")
             // エラー時はPurchaseManagerの状態を使用
             subscriptionStatus = isPremiumFromPurchase ? .premium : .free
             shouldShowBannerAd = !isPremiumFromPurchase
@@ -203,7 +200,6 @@ class SubscriptionManager: ObservableObject {
             self.adFrequency = 5 // デフォルト5回毎
         }
 
-        print("✅ Subscription updated: \(subscriptionStatus), Banner: \(shouldShowBannerAd)")
     }
 
     // MARK: - Analytics & Usage Tracking
@@ -277,19 +273,16 @@ extension SubscriptionManager {
     /// テストモードの有効/無効を切り替え
     func toggleTestMode() {
         isTestModeEnabled.toggle()
-        print("🧪 Test mode: \(isTestModeEnabled ? "ON" : "OFF")")
     }
 
     /// テスト用サブスクリプション状態を切り替え
     func toggleTestSubscription() {
         testSubscriptionStatus = testSubscriptionStatus == .free ? .premium : .free
-        print("🧪 Test subscription: \(testSubscriptionStatus)")
     }
 
     /// テスト用サブスクリプション状態を直接設定
     func setTestSubscription(_ status: SubscriptionStatus) {
         testSubscriptionStatus = status
-        print("🧪 Test subscription set to: \(status)")
     }
 
     /// 現在の実効サブスクリプション状態を取得

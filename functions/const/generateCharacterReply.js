@@ -667,6 +667,7 @@ exports.generateCharacterReply = onCall(
                 // バックグラウンドで実行（await しない）
                 generateStagedCharacterDetails(
                     characterId,
+                    userId,
                     currentStage,
                     gender,
                     null,
@@ -709,6 +710,7 @@ exports.generateCharacterReply = onCall(
               reply: aiResponse,
               isBig5Question: true,
               questionId: nextQuestion.id,
+              questionText: nextQuestion.question,
               progress: `${updatedAnsweredQuestions.length + 1}/100`,
               emotion: big5Emotion,
             };
@@ -750,6 +752,7 @@ exports.generateCharacterReply = onCall(
               // バックグラウンドで実行（await しない）
               generateStagedCharacterDetails(
                   characterId,
+                  userId,
                   3,
                   gender,
                   calculatedScores,

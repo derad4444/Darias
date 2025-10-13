@@ -61,7 +61,6 @@ struct TipBubbleArrow: Shape {
         CharacterTipBubble(
             message: "早速、お話ししましょう！"
         ) {
-            print("Tip dismissed")
         }
         .padding()
 
@@ -70,7 +69,6 @@ struct TipBubbleArrow: Shape {
         CharacterTipBubble(
             message: "性格解析は全部で100問あるよ。好きなタイミングで「話題ある？」と話しかけてくれれば質問するから答えてね！"
         ) {
-            print("Long tip dismissed")
         }
         .padding()
 

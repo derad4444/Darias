@@ -40,7 +40,7 @@ struct CharacterDetailView: View {
                     VStack(spacing: 0) {
                     // 1つ目のバナー広告（キャラクター画像の上）
                     if subscriptionManager.shouldDisplayBannerAd() {
-                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                        BannerAdView(adUnitID: Config.characterDetailTopBannerAdUnitID)
                             .frame(height: 50)
                             .background(Color.clear)
                             .onAppear {
@@ -86,7 +86,7 @@ struct CharacterDetailView: View {
 
                         // 2つ目のバナー広告（性格表示の一番下）
                         if subscriptionManager.shouldDisplayBannerAd() {
-                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                            BannerAdView(adUnitID: Config.characterDetailBottomBannerAdUnitID)
                                 .frame(height: 50)
                                 .background(Color.clear)
                                 .onAppear {
@@ -436,7 +436,6 @@ struct CharacterDetailView: View {
                         // データは既にサービス内で設定済み
                         break
                     case .failure(let error):
-                        print("Big5 analysis fetch error: \(error.localizedDescription)")
                     }
                 }
             } else {

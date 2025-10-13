@@ -170,7 +170,6 @@ struct DiaryDetailView: View {
     func fetchDiary() {
         // diaryIdが空の場合は早期リターン
         guard !diaryId.isEmpty, !characterId.isEmpty, !userId.isEmpty else {
-            print("⚠️ fetchDiary: Invalid parameters (diaryId: '\(diaryId)', characterId: '\(characterId)', userId: '\(userId)')")
             diaryContent = "日記データを取得できませんでした"
             dateText = ""
             isLoading = false

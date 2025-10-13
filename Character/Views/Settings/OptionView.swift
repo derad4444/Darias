@@ -147,7 +147,6 @@ struct OptionView: View {
                         .onChange(of: isPremium) { newValue in
                             // 変更を即座に反映させる
                             subscriptionManager.objectWillChange.send()
-                            print("🛠️ DEBUG: isPremium changed to \(newValue)")
                         }
                 }
                 .padding(.horizontal, 16)
@@ -258,7 +257,7 @@ struct OptionView: View {
 
     private var firstBannerAdSection: some View {
         Section {
-            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+            BannerAdView(adUnitID: Config.settingsTopBannerAdUnitID)
                 .frame(height: 50)
                 .background(Color.clear)
                 .onAppear {
@@ -273,7 +272,7 @@ struct OptionView: View {
 
     private var secondBannerAdSection: some View {
         Section {
-            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+            BannerAdView(adUnitID: Config.settingsBottomBannerAdUnitID)
                 .frame(height: 50)
                 .background(Color.clear)
                 .onAppear {

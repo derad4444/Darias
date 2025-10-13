@@ -86,13 +86,14 @@ async function generateStagedCharacterDetails(
             throw new Error("Big5 scores are required for stage 3");
           }
           const {generatePersonalityKey} =
-            require("./generatePersonalityKey");
+            require("../generatePersonalityKey");
           const {generateCharacterDetails} =
             require("../generateCharacterDetails");
 
-          personalityKey = generatePersonalityKey(big5Scores);
+          personalityKey = generatePersonalityKey(big5Scores, gender);
 
           // 既存の generateCharacterDetails 関数を使用（内部でリトライ機能あり）
+          // この関数内でBig5解析データも生成される
           const detailsResult =
             await generateCharacterDetails(characterId, userId, apiKey);
 

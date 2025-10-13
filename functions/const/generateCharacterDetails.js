@@ -1,6 +1,7 @@
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
+const {generateBig5Analysis} = require("./generateBig5Analysis");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
 if (!admin.apps.length) {
@@ -73,8 +74,8 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
       throw new Error("GPT出力のパースに失敗しました: " + err.message);
     }
 
-    // personalityKey生成
-    const personalityKey = generatePersonalityKey(big5Scores);
+    // personalityKey生成（genderを含める）
+    const personalityKey = generatePersonalityKey(big5Scores, gender);
 
     // Firestoreに保存（新しいコレクション構造に保存）
     await db.collection("users").doc(userId)
@@ -85,7 +86,18 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
           updated_at: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-    console.log(`✅ 生成成功: ${characterId}`);
+    console.log(`✅ キャラクター詳細生成成功: ${characterId}, personalityKey: ${personalityKey}`);
+
+    // Big5解析データを生成（バックグラウンドで実行、エラーでも続行）
+    try {
+      console.log(`🔄 Big5解析データ生成開始: ${personalityKey}`);
+      await generateBig5Analysis(big5Scores, gender, apiKey, isPremium);
+      console.log(`✅ Big5解析データ生成成功: ${personalityKey}`);
+    } catch (error) {
+      console.error(`⚠️ Big5解析データ生成失敗（キャラクター詳細は保存済み）: ${personalityKey}`, error);
+      // エラーが発生してもキャラクター詳細生成は成功として扱う
+    }
+
     return characterData;
   } catch (err) {
     console.error(`❌ 詳細生成失敗: ${characterId}`, err);

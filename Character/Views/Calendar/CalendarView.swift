@@ -178,7 +178,6 @@ struct CalendarView: View {
     // 月次コメントを取得する関数
     private func fetchMonthlyComment() {
         guard !characterId.isEmpty, !userId.isEmpty else {
-            print("⚠️ fetchMonthlyComment: characterId or userId is empty (characterId: '\(characterId)', userId: '\(userId)')")
             // デフォルトメッセージを設定
             self.monthlyComment = "今月もあなたらしく、素敵な時間を過ごしてくださいね！新しい発見や楽しい出来事があることを願っています。"
             self.isLoadingComment = false
@@ -191,7 +190,6 @@ struct CalendarView: View {
 
         isLoadingComment = true
 
-        print("✅ fetchMonthlyComment: Fetching comment for user: \(userId), character: \(characterId), month: \(monthId)")
 
         let db = Firestore.firestore()
         db.collection("users").document(userId)
@@ -202,7 +200,6 @@ struct CalendarView: View {
                     self.isLoadingComment = false
 
                     if let error = error {
-                        print("❌ 月次コメント取得エラー: \(error)")
                         self.monthlyComment = "今月のひとことを取得できませんでした。"
                         return
                     }
@@ -211,11 +208,9 @@ struct CalendarView: View {
                        let data = document.data(),
                        let comment = data["comment"] as? String {
                         self.monthlyComment = comment
-                        print("✅ 月次コメント取得成功: \(comment.prefix(30))...")
                     } else {
                         // フォールバック用デフォルトメッセージ
                         self.monthlyComment = "今月もあなたらしく、素敵な時間を過ごしてくださいね！新しい発見や楽しい出来事があることを願っています。"
-                        print("⚠️ 月次コメントが見つかりません - デフォルトメッセージを使用")
                     }
                 }
             }
@@ -255,7 +250,6 @@ struct CalendarView: View {
             if !characterId.isEmpty {
                 firestoreManager.fetchDiaries(characterId: characterId)
             } else {
-                print("⚠️ loadInitialData: characterId is empty, skipping fetchDiaries")
             }
 
             fetchMonthlyComment()
@@ -436,30 +430,23 @@ struct CalendarView: View {
         .onReceive(NotificationCenter.default.publisher(for: .init("ScheduleDeleted"))) { notification in
             // 単一予定削除の場合
             if let scheduleId = notification.userInfo?["scheduleId"] as? String {
-                print("✅ Calendar received single schedule deletion: \(scheduleId)")
                 firestoreManager.schedules.removeAll { $0.id == scheduleId }
             }
             // 繰り返し予定グループ削除の場合
             else if let recurringGroupId = notification.userInfo?["recurringGroupId"] as? String {
-                print("✅ Calendar received recurring group deletion: \(recurringGroupId)")
                 firestoreManager.schedules.removeAll { $0.recurringGroupId == recurringGroupId }
             }
             // 安全のため、全体を再取得
             else {
-                print("✅ Calendar refreshing all schedules")
                 firestoreManager.fetchSchedules()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("CalendarTabTapped"))) { _ in
-            print("📨 CalendarTabTapped notification received")
-            print("🔍 isCalendarViewActive: \(isCalendarViewActive)")
             // カレンダータブがタップされた際の処理
             // カレンダー画面がアクティブな状態でカレンダータブがタップされた場合のみジャンプ
             if isCalendarViewActive {
-                print("🎯 Jumping to current month")
                 jumpToCurrentMonth()
             } else {
-                print("❌ Calendar view not active - skipping jump")
             }
         }
     }
@@ -885,15 +872,7 @@ struct CustomCalendarView: View {
             }
         }
     }
-    
-    
-    // デバッグ用：予定開始位置のログ出力
-    private func debugScheduleOffset(date: Date, offset: CGFloat) {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "M/d"
-        let dateString = dateFormatter.string(from: date)
-    }
-    
+
     // 予定表示アイテムの種類
     private enum DisplayItem {
         case holiday(Holiday)
@@ -1002,7 +981,6 @@ struct CustomCalendarView: View {
     // 日付変更処理
     private func moveScheduleToDate(schedule: Schedule, targetDate: Date) {
         guard let startDate = calculateNewStartDate(for: schedule, targetDate: targetDate) else {
-            print("❌ 新しい開始日の計算に失敗")
             return
         }
         
@@ -1015,12 +993,10 @@ struct CustomCalendarView: View {
                     
                     // データを再取得
                     firestoreManager.fetchSchedules()
-                    print("✅ スケジュール移動完了: \(schedule.title)")
                 } else {
                     // 失敗時のハプティックフィードバック
                     let errorFeedback = UINotificationFeedbackGenerator()
                     errorFeedback.notificationOccurred(.error)
-                    print("❌ スケジュール移動失敗: \(schedule.title)")
                 }
             }
         }
@@ -1283,13 +1259,7 @@ struct CustomCalendarView: View {
             
             // この期間予定全体が祝日をまたぐかチェック
             let hasHolidayInPeriod = checkHolidayInPeriod(start: scheduleStart, end: scheduleEnd)
-            
-            // その日に祝日があるかチェック（デバッグ用）
-            let currentDateString = formattedDateString(currentDate)
-            let hasHoliday = firestoreManager.holidays.contains { $0.dateString == currentDateString }
-            
-            
-            
+
             // この週にかかる期間予定の中での順番を計算（現在の週のみ）
             let currentWeekStart = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: currentDate))!
             let currentWeekEnd = calendar.date(byAdding: .day, value: 6, to: currentWeekStart)!
@@ -1467,8 +1437,7 @@ struct CustomCalendarView: View {
             // 次のセグメントへ移動
             tempDate = calendar.date(byAdding: .day, value: currentSegmentDays, to: tempDate) ?? scheduleEnd
         }
-        
-        // すべてのセグメントにタイトルを表示する（テスト用）
+
         // 1日以上のセグメントにはタイトルを表示
         if segmentDays >= 1 {
             return true
@@ -1493,13 +1462,7 @@ struct CustomCalendarView: View {
         
         let middleDate = calendar.date(byAdding: .day, value: middleDayOffset, to: start) ?? start
         let isMiddle = calendar.isDate(current, inSameDayAs: middleDate)
-        
-        // 出張バーのデバッグ
-        if schedule.title.contains("出張") {
-            let formatter = DateFormatter()
-            formatter.dateFormat = "M/d"
-        }
-        
+
         return isMiddle
     }
     
@@ -1512,8 +1475,6 @@ struct CustomCalendarView: View {
         cellHeight: CGFloat,
         geometry: GeometryProxy
     ) -> CGRect? {
-        
-        // 期間予定の存在確認デバッグ
         let calendar = Calendar.current
         let monthStart = firstDayOfMonth
         
@@ -1575,13 +1536,6 @@ struct CustomCalendarView: View {
         
         let baseIndex = regularScheduleCount + multiScheduleIndex
         let adjustedIndex = hasHolidayInPeriod ? (baseIndex + 1) : baseIndex
-        
-        // 8月の期間予定バーデバッグ（簡潔な条件）
-        let august11 = calendar.date(from: DateComponents(year: 2025, month: 8, day: 11))!
-        let isAugust11Related = scheduleStartDate <= august11 && scheduleEndDate >= august11
-        
-        if isAugust11Related {
-        }
 
         // 祝日表示エリア分を考慮してバーの開始位置を下に移動
         let holidayAreaHeight: CGFloat = hasHolidayInPeriod ? 22 : 0 // 期間内に祝日がある場合のエリア高さ
@@ -1593,11 +1547,7 @@ struct CustomCalendarView: View {
         let y = cellTopY + dateCircleToBarDistance + CGFloat(adjustedIndex) * barSpacing + barCenterOffset
         let width = endX - startX
         let height = barHeight
-        
-        // Y座標デバッグ（8月11日関連のバー）
-        if isAugust11Related {
-        }
-        
+
         return CGRect(x: startX, y: y, width: width, height: height)
     }
     
@@ -1728,7 +1678,7 @@ struct BottomSheetView: View {
 
                     // バナー広告
                     if subscriptionManager.shouldDisplayBannerAd() {
-                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                        BannerAdView(adUnitID: Config.calendarScreenBannerAdUnitID)
                             .frame(height: 50)
                             .background(Color.clear)
                             .onAppear {
@@ -1914,7 +1864,6 @@ struct BottomSheetView: View {
     //日記取得
     private func queryDiary(for date: Date, completion: @escaping (_ documentID: String?) -> Void) {
         guard !characterId.isEmpty, !userId.isEmpty else {
-            print("⚠️ queryDiary: characterId or userId is empty (characterId: '\(characterId)', userId: '\(userId)')")
             completion(nil)
             return
         }
@@ -1927,7 +1876,6 @@ struct BottomSheetView: View {
         dateFormatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
         let dateString = dateFormatter.string(from: date)
 
-        print("✅ queryDiary: Searching diary for user: \(userId), character: \(characterId), date: \(dateString)")
 
         // 正しい構造で日記検索を実行: users/{userId}/characters/{characterId}/diary
         db.collection("users").document(userId)
@@ -1938,16 +1886,13 @@ struct BottomSheetView: View {
             .limit(to: 1)
             .getDocuments { snapshot, error in
                 if let error = error {
-                    print("❌ queryDiary error: \(error)")
                     completion(nil)
                     return
                 }
 
                 if let doc = snapshot?.documents.first {
-                    print("✅ queryDiary: Found diary document: \(doc.documentID)")
                     completion(doc.documentID)
                 } else {
-                    print("⚠️ queryDiary: No diary found for date: \(dateString)")
                     completion(nil)
                 }
             }

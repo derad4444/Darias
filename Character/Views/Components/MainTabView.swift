@@ -111,13 +111,11 @@ struct MainTabView: View {
     }
     private func fetchUserAndCharacter() {
         guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
-            print("❌ User ID is nil or empty")
             self.isLoading = false
             return
         }
 
         self.userId = uid
-        print("✅ Fetching character for userId: \(uid)")
 
         let db = Firestore.firestore()
 
@@ -125,23 +123,18 @@ struct MainTabView: View {
         db.collection("users").document(uid).getDocument { document, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ User document fetch error: \(error)")
                     self.characterId = ""
                     self.isLoading = false
                 } else if let document = document, document.exists {
                     let data = document.data() ?? [:]
                     if let characterId = data["character_id"] as? String, !characterId.isEmpty {
                         self.characterId = characterId
-                        print("✅ Character ID fetched from users collection: \(self.characterId)")
                         self.isLoading = false
                     } else {
-                        print("⚠️ character_id not found or empty in user document")
-                        print("⚠️ User data: \(data)")
                         self.characterId = ""
                         self.isLoading = false
                     }
                 } else {
-                    print("⚠️ User document does not exist for uid: \(uid)")
                     self.characterId = ""
                     self.isLoading = false
                 }

@@ -121,8 +121,9 @@ struct HomeView: View {
                                 .padding(.trailing, 16)
                             }
 
-                            // BIG5質問の選択肢またはチャット入力
+                            // BIG5質問の選択肢、確認ダイアログ、またはチャット入力
                             if characterService.showBIG5Question {
+                                // BIG5質問表示
                                 if let question = characterService.currentBIG5Question {
                                     SimpleAnswerButtons(
                                         question: question.question,
@@ -134,6 +135,20 @@ struct HomeView: View {
                                     .transition(.move(edge: .bottom).combined(with: .opacity))
                                     .animation(.spring(response: 0.6, dampingFraction: 0.8), value: characterService.showBIG5Question)
                                 }
+                            } else if characterService.showBIG5ContinueDialog {
+                                // 確認ダイアログ表示
+                                BIG5ContinueDialog(
+                                    onContinue: {
+                                        displayedMessage = ""  // メッセージをクリア
+                                        characterService.continueToNextQuestion()
+                                    },
+                                    onLater: {
+                                        characterService.skipToChat()
+                                    }
+                                )
+                                .environmentObject(fontSettings)
+                                .transition(.scale.combined(with: .opacity))
+                                .animation(.spring(response: 0.5, dampingFraction: 0.8), value: characterService.showBIG5ContinueDialog)
                             } else {
                                 // 通常のチャット入力
                                 ChatInputComponent(
@@ -149,7 +164,7 @@ struct HomeView: View {
 
                         // バナー広告（無料ユーザーのみ、チャット入力とタブの間に配置）
                         if subscriptionManager.shouldDisplayBannerAd() {
-                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                            BannerAdView(adUnitID: Config.homeScreenBannerAdUnitID)
                                 .frame(height: 50)
                                 .background(Color.clear)
                                 .onAppear {
@@ -162,7 +177,7 @@ struct HomeView: View {
 
 
                     // 吹き出し表示（中央配置）
-                    if !displayedMessage.isEmpty || (characterService.showBIG5Question && characterService.currentBIG5Question != nil) {
+                    if (characterService.showBIG5Question && characterService.currentBIG5Question != nil) || (!characterService.showBIG5ContinueDialog && !displayedMessage.isEmpty) {
                         VStack {
                             Text(getBubbleMessage())
                                 .padding(.horizontal, 20)
@@ -180,6 +195,8 @@ struct HomeView: View {
                             x: geometry.size.width / 2,
                             y: geometry.safeAreaInsets.top + 80
                         )
+                        .onAppear {
+                        }
                     }
 
                 }
@@ -281,17 +298,6 @@ struct HomeView: View {
     
     // MARK: - View Lifecycle
     private func onViewAppear() {
-        
-        // 🔴 デバッグモード用の簡単なバイパス
-        if userId == "debug_user" && characterId == "debug_character" {
-            
-            // デバッグメッセージを削除 - texture_00_female.pngキャラクターのみ表示
-            if !hasLoadedInitialMessage {
-                self.hasLoadedInitialMessage = true
-            }
-            return
-        }
-        
         if !hasLoadedInitialMessage {
             loadCharacterInfo()
             hasLoadedInitialMessage = true
@@ -337,11 +343,8 @@ struct HomeView: View {
             }
         }
         
-        // ポイント初期読み込み（デバッグモードはスキップ）
-        if userId != "debug_user" {
-            pointsManager.loadPoints(for: characterId)
-        } else {
-        }
+        // ポイント初期読み込み
+        pointsManager.loadPoints(for: characterId)
     }
     
     // MARK: - Character Info Loading
@@ -437,7 +440,6 @@ struct HomeView: View {
     private func handleChatLimit() {
         // プレミアムユーザーは広告なし
         if subscriptionManager.subscriptionStatus == .premium {
-            print("🔵 プレミアムユーザーのため広告スキップ")
             return
         }
 
@@ -446,42 +448,33 @@ struct HomeView: View {
 
         // 5回に1回動画広告表示チェック
         let currentChatCount = chatLimitManager.totalChatsToday
-        print("💬 現在のチャット回数: \(currentChatCount), リワード広告準備状態: \(rewardedAd.isReady)")
 
         if currentChatCount % 5 == 0 {
-            print("🎬 5の倍数でリワード広告表示を試みます")
             // 他のビューが表示されている可能性があるため、少し遅延させる
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                if let root = UIApplication.shared.connectedScenes
-                    .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController {
-                    // 既に他のビューを表示中でないか確認
-                    if root.presentedViewController == nil {
-                        self.rewardedAd.showAd(from: root) {
-                            // 広告視聴完了時の処理（特になし）
-                            print("✅ リワード広告視聴完了")
-                        }
-                    } else {
-                        print("⚠️ 他のビューが表示中のため、広告表示をスキップします")
-                        // さらに遅延して再試行
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            if let root = UIApplication.shared.connectedScenes
-                                .compactMap({ ($0 as? UIWindowScene)?.keyWindow }).first?.rootViewController,
-                               root.presentedViewController == nil {
-                                self.rewardedAd.showAd(from: root) {
-                                    print("✅ リワード広告視聴完了")
-                                }
-                            } else {
-                                print("⚠️ 再試行でも他のビューが表示中のため、広告表示をスキップします")
-                            }
-                        }
-                    }
-                } else {
-                    print("❌ rootViewControllerが見つかりませんでした")
-                }
+                self.showRewardedAdFromTopViewController()
             }
         }
     }
-    
+
+    // 最前面のViewControllerから広告を表示
+    private func showRewardedAdFromTopViewController() {
+        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let rootViewController = windowScene.keyWindow?.rootViewController else {
+            return
+        }
+
+        // 最前面のViewControllerを取得
+        var topViewController = rootViewController
+        while let presentedVC = topViewController.presentedViewController {
+            topViewController = presentedVC
+        }
+
+        // 広告を表示
+        self.rewardedAd.showAd(from: topViewController) {
+        }
+    }
+
     private func handleCharacterReply(_ reply: CharacterReply) {
         fullCharacterMessage = reply.message
         displayedMessage = ""

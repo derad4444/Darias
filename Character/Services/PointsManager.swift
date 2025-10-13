@@ -24,7 +24,6 @@ class PointsManager: ObservableObject {
             .collection("characters").document(characterId)
             .collection("details").document("current").getDocument { [weak self] document, error in
                 if let error = error {
-                    print("❌ Points loading error: \(error)")
                     return
                 }
                 
@@ -60,7 +59,6 @@ class PointsManager: ObservableObject {
         // ドキュメントの存在確認とデータ更新
         detailsRef.getDocument { document, error in
             if let error = error {
-                print("❌ Points adding error: \(error)")
                 completion(false)
                 return
             }
@@ -72,7 +70,6 @@ class PointsManager: ObservableObject {
                     "updated_at": Timestamp()
                 ]) { [weak self] error in
                     if let error = error {
-                        print("❌ Points update error: \(error)")
                         completion(false)
                     } else {
                         DispatchQueue.main.async {
@@ -89,10 +86,8 @@ class PointsManager: ObservableObject {
                     "updated_at": Timestamp()
                 ], merge: true) { [weak self] error in
                     if let error = error {
-                        print("❌ Points creation error: \(error)")
                         completion(false)
                     } else {
-                        print("✅ Points document created with \(newPoints) points")
                         DispatchQueue.main.async {
                             self?.currentPoints = newPoints
                         }
@@ -131,7 +126,6 @@ class PointsManager: ObservableObject {
         // ドキュメントの存在確認とデータ更新
         detailsRef.getDocument { document, error in
             if let error = error {
-                print("❌ Points consumption error: \(error)")
                 completion(false)
                 return
             }
@@ -143,7 +137,6 @@ class PointsManager: ObservableObject {
                     "updated_at": Timestamp()
                 ]) { [weak self] error in
                     if let error = error {
-                        print("❌ Points consumption update error: \(error)")
                         completion(false)
                     } else {
                         DispatchQueue.main.async {
@@ -153,7 +146,6 @@ class PointsManager: ObservableObject {
                     }
                 }
             } else {
-                print("❌ Cannot consume points: details document does not exist")
                 completion(false)
             }
         }
@@ -176,7 +168,6 @@ class PointsManager: ObservableObject {
             .collection("details").document("current")
             .addSnapshotListener { [weak self] documentSnapshot, error in
                 if let error = error {
-                    print("❌ Points monitoring error: \(error)")
                     return
                 }
                 

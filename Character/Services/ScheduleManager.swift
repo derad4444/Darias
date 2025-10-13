@@ -28,9 +28,7 @@ class ScheduleManager: ObservableObject {
         
         scheduleRef.setData(scheduleDoc) { error in
             if let error = error {
-                print("❌ Schedule save error: \(error)")
             } else {
-                print("✅ Schedule saved successfully: \(scheduleData.title)")
                 
                 // 通知設定
                 self.scheduleNotification(for: scheduleData)

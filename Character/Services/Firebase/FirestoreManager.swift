@@ -76,7 +76,6 @@ class FirestoreManager: ObservableObject {
                                     notificationSettings = try JSONDecoder().decode(NotificationSettings.self, from: jsonData)
                                 }
                             } catch {
-                                print("❌ Notification settings decoding error: \(error)")
                             }
                         }
 
@@ -144,7 +143,6 @@ class FirestoreManager: ObservableObject {
     func fetchHolidays(completion: @escaping () -> Void = {}) {
         db.collection("holidays").getDocuments { snapshot, error in
             if let error = error {
-                print("❌ fetchHolidays error: \(error)")
                 DispatchQueue.main.async {
                     completion()
                 }
@@ -207,7 +205,6 @@ class FirestoreManager: ObservableObject {
             guard let data = snapshot?.data(),
                   let originalStartTimestamp = data["startDate"] as? Timestamp,
                   let originalEndTimestamp = data["endDate"] as? Timestamp else {
-                print("❌ Failed to get original schedule data")
                 completion(false)
                 return
             }
@@ -227,10 +224,8 @@ class FirestoreManager: ObservableObject {
             
             docRef.updateData(updateData) { error in
                 if let error = error {
-                    print("❌ Schedule update error: \(error)")
                     completion(false)
                 } else {
-                    print("✅ Schedule dates updated for \(scheduleId)")
                     // CalendarViewに予定更新を通知
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
@@ -267,7 +262,6 @@ class FirestoreManager: ObservableObject {
                     data["notificationSettings"] = jsonString
                 }
             } catch {
-                print("❌ Notification settings encoding error: \(error)")
             }
         }
 
@@ -289,10 +283,8 @@ class FirestoreManager: ObservableObject {
 
         docRef.updateData(data) { error in
             if let error = error {
-                print("❌ Schedule update error: \(error)")
                 completion(false)
             } else {
-                print("✅ Schedule updated: \(schedule.id)")
                 // CalendarViewに予定更新を通知
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
@@ -313,10 +305,8 @@ class FirestoreManager: ObservableObject {
 
         docRef.delete { error in
             if let error = error {
-                print("❌ Schedule delete error: \(error)")
                 completion(false)
             } else {
-                print("✅ Schedule deleted: \(scheduleId)")
                 // ローカルの予定リストからも削除
                 DispatchQueue.main.async {
                     self.schedules.removeAll { $0.id == scheduleId }
@@ -351,10 +341,8 @@ class FirestoreManager: ObservableObject {
             let docRef = db.collection("users").document(userId).collection("schedules").document(schedule.id)
             docRef.setData(data) { error in
                 if let error = error {
-                    print("❌ 繰り返し予定作成エラー: \(error)")
                     hasError = true
                 } else {
-                    print("✅ 繰り返し予定作成成功: \(schedule.id)")
                 }
 
                 successCount += 1
@@ -378,7 +366,6 @@ class FirestoreManager: ObservableObject {
         let schedulesRef = db.collection("users").document(userId).collection("schedules")
         schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
             if let error = error {
-                print("❌ グループ削除クエリエラー: \(error)")
                 completion(false)
                 return
             }
@@ -399,7 +386,6 @@ class FirestoreManager: ObservableObject {
             for document in documents {
                 document.reference.delete { error in
                     if let error = error {
-                        print("❌ 予定削除エラー: \(document.documentID) - \(error)")
                     } else {
                         // 通知も削除
                         NotificationManager.shared.removeNotifications(for: document.documentID)
@@ -427,10 +413,8 @@ class FirestoreManager: ObservableObject {
         let docRef = db.collection("users").document(userId).collection("schedules").document(scheduleId)
         docRef.updateData(["recurringGroupId": FieldValue.delete()]) { error in
             if let error = error {
-                print("❌ recurringGroupId削除エラー: \(error)")
                 completion(false)
             } else {
-                print("✅ 予定をグループから分離: \(scheduleId)")
                 completion(true)
             }
         }
@@ -446,7 +430,6 @@ class FirestoreManager: ObservableObject {
         let schedulesRef = db.collection("users").document(userId).collection("schedules")
         schedulesRef.whereField("recurringGroupId", isEqualTo: groupId).getDocuments { snapshot, error in
             if let error = error {
-                print("❌ グループ取得エラー: \(error)")
                 completion(false)
                 return
             }

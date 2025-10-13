@@ -142,7 +142,7 @@ struct ChatHistoryView: View {
                                             .padding(.horizontal, 32)
 
                                         // バナー広告
-                                        BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716") // テスト用ID
+                                        BannerAdView(adUnitID: Config.chatHistoryBannerAdUnitID)
                                             .frame(height: 50)
                                             .background(Color.clear)
                                             .id("banner-ad")
