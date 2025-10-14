@@ -42,6 +42,8 @@ functions/node_modules/
 functions/pglite-debug.log
 functions/.env
 functions/.DS_Store
+functions/keys/
+*.json
 
 # Apple Developer Keys (Security)
 *.p8

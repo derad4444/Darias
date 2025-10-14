@@ -38,10 +38,6 @@ struct StartView2: View {
                     Text("© 2025 DERAD")
                         .font(.footnote)
                         .foregroundColor(.gray)
-                    
-                    Text("Created with Midjourney")
-                        .font(.caption2)
-                        .foregroundColor(.gray.opacity(0.7))
                 }
                 .padding(.bottom, 24)
             }
