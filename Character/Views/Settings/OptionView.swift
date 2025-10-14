@@ -19,6 +19,8 @@ struct OptionView: View {
     @State private var showMailCompose = false
     @State private var showMailUnavailableAlert = false
     @State private var showPremiumUpgrade = false
+    @State private var showDeleteAccountAlert = false
+    @State private var showDeleteConfirmation = false
     
     private var dynamicListHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -71,6 +73,22 @@ struct OptionView: View {
         } message: {
             Text("お使いのデバイスでメール送信が利用できません。設定からメールアカウントをご確認ください。")
         }
+        .alert("アカウント削除", isPresented: $showDeleteAccountAlert) {
+            Button("キャンセル", role: .cancel) { }
+            Button("削除する", role: .destructive) {
+                showDeleteConfirmation = true
+            }
+        } message: {
+            Text("アカウントを削除すると、すべてのデータが完全に削除され、復元できなくなります。本当に削除しますか?")
+        }
+        .alert("最終確認", isPresented: $showDeleteConfirmation) {
+            Button("キャンセル", role: .cancel) { }
+            Button("完全に削除", role: .destructive) {
+                deleteAccount()
+            }
+        } message: {
+            Text("この操作は取り消せません。アカウントとすべてのデータを完全に削除しますか?")
+        }
     }
     
     private var backgroundView: some View {
@@ -112,6 +130,7 @@ struct OptionView: View {
             }
 
             logoutSection
+            deleteAccountSection
         }
         .scrollContentBackground(.hidden)
         .background(Color.clear)
@@ -524,6 +543,51 @@ struct OptionView: View {
             UIApplication.shared.open(url)
         } else if let url = URL(string: webURL) {
             UIApplication.shared.open(url)
+        }
+    }
+
+    private var deleteAccountSection: some View {
+        Section {
+            Button {
+                showDeleteAccountAlert = true
+            } label: {
+                Text("アカウントを削除")
+                    .dynamicBody()
+                    .foregroundColor(.red)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.red.opacity(0.05))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.red.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+    }
+
+    private func deleteAccount() {
+        Task {
+            do {
+                // Firestoreからユーザーデータを削除
+                if let userId = authManager.user?.uid {
+                    try await FirestoreManager.shared.deleteUserData(userId: userId)
+                }
+
+                // Firebase Authenticationからアカウントを削除
+                try await authManager.deleteAccount()
+
+                // ログアウトして画面を閉じる
+                dismiss()
+            } catch {
+                print("アカウント削除エラー: \(error.localizedDescription)")
+            }
         }
     }
 }

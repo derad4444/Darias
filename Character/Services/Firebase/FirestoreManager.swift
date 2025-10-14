@@ -466,4 +466,46 @@ class FirestoreManager: ObservableObject {
             }
         }
     }
+
+    // ユーザーデータを完全削除
+    func deleteUserData(userId: String) async throws {
+        // ユーザードキュメントのサブコレクションを削除
+        let userRef = db.collection("users").document(userId)
+
+        // schedulesサブコレクションを削除
+        let schedulesSnapshot = try await userRef.collection("schedules").getDocuments()
+        for document in schedulesSnapshot.documents {
+            try await document.reference.delete()
+        }
+
+        // charactersサブコレクションとその配下を削除
+        let charactersSnapshot = try await userRef.collection("characters").getDocuments()
+        for characterDoc in charactersSnapshot.documents {
+            // detailsサブコレクションを削除
+            let detailsSnapshot = try await characterDoc.reference.collection("details").getDocuments()
+            for detailDoc in detailsSnapshot.documents {
+                try await detailDoc.reference.delete()
+            }
+
+            // diaryサブコレクションを削除
+            let diarySnapshot = try await characterDoc.reference.collection("diary").getDocuments()
+            for diaryDoc in diarySnapshot.documents {
+                try await diaryDoc.reference.delete()
+            }
+
+            // Big5分析サブコレクションを削除
+            let big5Snapshot = try await characterDoc.reference.collection("big5_analysis").getDocuments()
+            for big5Doc in big5Snapshot.documents {
+                try await big5Doc.reference.delete()
+            }
+
+            // キャラクタードキュメントを削除
+            try await characterDoc.reference.delete()
+        }
+
+        // ユーザードキュメント自体を削除
+        try await userRef.delete()
+    }
+
+    static let shared = FirestoreManager()
 }

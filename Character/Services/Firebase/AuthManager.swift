@@ -138,4 +138,22 @@ class AuthManager: ObservableObject {
             // Sign out failed
         }
     }
+
+    var user: User? {
+        return Auth.auth().currentUser
+    }
+
+    func deleteAccount() async throws {
+        guard let user = Auth.auth().currentUser else {
+            throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "ユーザーが見つかりません"])
+        }
+
+        // Firebase Authenticationからアカウント削除
+        try await user.delete()
+
+        // ローカルの状態をクリア
+        self.isAuthenticated = false
+        self.userId = ""
+        self.characterId = ""
+    }
 }
