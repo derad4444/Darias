@@ -61,14 +61,16 @@ class SubscriptionManager: ObservableObject {
 
         isLoading = true
 
-        // リアルタイム監視開始
+        // リアルタイム監視開始 - subscription/currentドキュメントを監視
         userListener = db.collection("users").document(userId)
+            .collection("subscription").document("current")
             .addSnapshotListener { [weak self] document, error in
                 guard let self = self else { return }
 
                 self.isLoading = false
 
                 if let error = error {
+                    print("❌ Subscription monitoring error: \(error.localizedDescription)")
                     self.subscriptionStatus = .free // エラー時は無料扱い
                     self.shouldShowBannerAd = true
                     return
@@ -76,11 +78,13 @@ class SubscriptionManager: ObservableObject {
 
                 guard let document = document, document.exists,
                       let data = document.data() else {
+                    print("ℹ️ No subscription document found, setting to free")
                     self.subscriptionStatus = .free
                     self.shouldShowBannerAd = true
                     return
                 }
 
+                print("✅ Subscription document found: \(data)")
                 self.updateSubscriptionFromDocument(data: data)
             }
     }
@@ -166,40 +170,32 @@ class SubscriptionManager: ObservableObject {
     // MARK: - Private Methods
 
     private func updateSubscriptionFromDocument(data: [String: Any]) {
-        // サブスクリプション情報の解析
-        if let subscription = data["subscription"] as? [String: Any] {
-            let status = subscription["status"] as? String ?? "free"
+        // subscription/currentドキュメントから直接読み取り
+        let status = data["status"] as? String ?? "free"
+        let plan = data["plan"] as? String ?? "free"
 
-            // 期限チェック
-            var isValidPremium = false
-            if status == "premium" {
-                if let expiresAtTimestamp = subscription["expires_at"] as? Timestamp {
-                    let expiresAt = expiresAtTimestamp.dateValue()
-                    isValidPremium = Date() < expiresAt
-                } else {
-                    // expires_at が null の場合は無期限premium
-                    isValidPremium = true
-                }
+        print("📊 Subscription data - status: \(status), plan: \(plan)")
+
+        // 期限チェック
+        var isValidPremium = false
+        if status == "active" || plan == "premium" {
+            if let endDateTimestamp = data["end_date"] as? Timestamp {
+                let endDate = endDateTimestamp.dateValue()
+                isValidPremium = Date() < endDate
+                print("📅 Subscription end date: \(endDate), is valid: \(isValidPremium)")
+            } else {
+                // end_date が null の場合は無期限premium (StoreKitのみの場合)
+                isValidPremium = true
+                print("♾️ Subscription has no end date (lifetime premium)")
             }
-
-            self.subscriptionStatus = isValidPremium ? .premium : .free
-        } else {
-            self.subscriptionStatus = .free
         }
 
-        // 広告設定の解析
-        if let adSettings = data["ad_settings"] as? [String: Any] {
-            self.shouldShowBannerAd = adSettings["banner_enabled"] as? Bool ?? true
-        } else {
-            self.shouldShowBannerAd = true
-        }
+        self.subscriptionStatus = isValidPremium ? .premium : .free
 
-        // 使用量追跡から広告頻度を取得
-        if let usageTracking = data["usage_tracking"] as? [String: Any] {
-            // 必要に応じて広告頻度を動的に変更
-            self.adFrequency = 5 // デフォルト5回毎
-        }
+        // プレミアムユーザーは広告を表示しない
+        self.shouldShowBannerAd = !isValidPremium
 
+        print("✨ Final subscription status: \(subscriptionStatus), show banner: \(shouldShowBannerAd)")
     }
 
     // MARK: - Analytics & Usage Tracking
