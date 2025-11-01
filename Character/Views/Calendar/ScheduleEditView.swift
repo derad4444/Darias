@@ -1,9 +1,11 @@
 import SwiftUI
+import FirebaseFirestore
 
 struct ScheduleEditView: View {
     let schedule: ScheduleItem  // ✅ ScheduleItemを受け取る
     let userId: String
     let editSingleOnly: Bool  // 単一予定のみ編集するかどうか
+    let isNewSchedule: Bool  // 新規作成モード（チャットから追加の場合はtrue）
 
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @ObservedObject var tagSettings = TagSettingsManager.shared
@@ -52,10 +54,11 @@ struct ScheduleEditView: View {
     }
 
     // ✅ 初期化でStateに代入
-    init(schedule: ScheduleItem, userId: String, editSingleOnly: Bool = false) {
+    init(schedule: ScheduleItem, userId: String, editSingleOnly: Bool = false, isNewSchedule: Bool = false) {
         self.schedule = schedule
         self.userId = userId
         self.editSingleOnly = editSingleOnly
+        self.isNewSchedule = isNewSchedule
         _scheduleTitle = State(initialValue: schedule.title)
         _startDate = State(initialValue: schedule.startDate)
         _endDate = State(initialValue: schedule.endDate)
@@ -413,8 +416,12 @@ struct ScheduleEditView: View {
             finalEndDate = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: endDate) ?? endDate
         }
 
-        // 元の予定を更新
-        updateExistingSchedule(startDate: finalStartDate, endDate: finalEndDate)
+        // 新規作成モードの場合は新規保存、それ以外は既存予定を更新
+        if isNewSchedule {
+            createNewSchedule(startDate: finalStartDate, endDate: finalEndDate)
+        } else {
+            updateExistingSchedule(startDate: finalStartDate, endDate: finalEndDate)
+        }
     }
 
     private func updateExistingSchedule(startDate: Date, endDate: Date) {
@@ -531,6 +538,61 @@ struct ScheduleEditView: View {
                     self.notifyScheduleUpdate()
                     DispatchQueue.main.async { dismiss() }
                 }
+            }
+        }
+    }
+
+    // 新規作成（INSERT）処理
+    private func createNewSchedule(startDate: Date, endDate: Date) {
+        let db = Firestore.firestore()
+        let scheduleRef = db.collection("users").document(userId).collection("schedules").document()
+
+        let scheduleDoc: [String: Any] = [
+            "id": scheduleRef.documentID,
+            "title": scheduleTitle,
+            "isAllDay": isAllDay,
+            "startDate": Timestamp(date: startDate),
+            "endDate": Timestamp(date: endDate),
+            "location": location,
+            "tag": tag,
+            "memo": memo,
+            "repeatOption": repeatSettings.getDescription(for: startDate),
+            "created_at": Timestamp(date: Date())
+        ]
+
+        scheduleRef.setData(scheduleDoc) { error in
+            if let error = error {
+                print("❌ 予定の保存に失敗: \(error.localizedDescription)")
+                return
+            }
+
+            // 保存成功後の処理
+            DispatchQueue.main.async {
+                // 通知設定
+                let newSchedule = ScheduleItem(
+                    id: scheduleRef.documentID,
+                    title: self.scheduleTitle,
+                    isAllDay: self.isAllDay,
+                    startDate: startDate,
+                    endDate: endDate,
+                    location: self.location,
+                    tag: self.tag,
+                    memo: self.memo,
+                    repeatOption: self.repeatSettings.getDescription(for: startDate),
+                    recurringGroupId: nil,
+                    notificationSettings: self.notificationSettings
+                )
+
+                NotificationManager.shared.updateNotifications(for: newSchedule)
+
+                // カレンダーのリフレッシュを通知
+                NotificationCenter.default.post(
+                    name: .init("ScheduleAdded"),
+                    object: nil
+                )
+
+                // 画面を閉じる
+                dismiss()
             }
         }
     }

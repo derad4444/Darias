@@ -254,7 +254,7 @@ struct HomeView: View {
             .sheet(isPresented: $showScheduleEdit) {
                 if let schedule = scheduleToEdit {
                     NavigationStack {
-                        ScheduleEditView(schedule: schedule, userId: userId)
+                        ScheduleEditView(schedule: schedule, userId: userId, isNewSchedule: true)
                     }
                 }
             }
@@ -276,7 +276,7 @@ struct HomeView: View {
                         pendingScheduleData = nil
                     },
                     onEdit: { scheduleData in
-                        // ExtractedScheduleDataからScheduleItemを作成
+                        // ExtractedScheduleDataからScheduleItemを作成（まだDB保存しない）
                         scheduleToEdit = createScheduleItem(from: scheduleData)
                         showScheduleConfirmation = false
                         showScheduleEdit = true
