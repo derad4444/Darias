@@ -10,6 +10,8 @@ struct MainTabView: View {
     @State private var characterId: String = ""
     @State private var isLoading = true
     @State private var selectedTab: Int = 0
+    @State private var showErrorAlert = false
+    @State private var showSignUp = false
     
     private var dynamicTabBarPadding: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -23,67 +25,38 @@ struct MainTabView: View {
             if isLoading {
                 ProgressView("読み込み中...")
                     .font(FontSettingsManager.shared.font(size: 17, weight: .regular))
-            } else {
-                if !characterId.isEmpty {
-                    TabView(selection: $selectedTab) {
-                        HomeView(userId: userId, characterId: characterId)
-                            .tabItem {
-                                Image(systemName: "house")
-                                Text("ホーム")
-                            }
-                            .tag(0)
-
-                        CalendarView(userId: userId, characterId: characterId, isPremium: false)
-                            .environmentObject(FirestoreManager())
-                            .tabItem {
-                                Image(systemName: "calendar")
-                                Text("カレンダー")
-                            }
-                            .tag(1)
-
-                        CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
-                            .tabItem {
-                                Image(systemName: "person.crop.circle")
-                                Text("キャラクター詳細")
-                            }
-                            .tag(2)
-
-                        OptionView()
-                            .tabItem {
-                                Image(systemName: "gearshape")
-                                Text("設定")
-                            }
-                            .tag(3)
-                    }
-                    .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
-                } else {
-                    // characterIdが空の場合のエラー画面
-                    VStack(spacing: 20) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .font(.system(size: 50))
-                            .foregroundColor(.orange)
-
-                        Text("キャラクター情報を取得できません")
-                            .font(.title2)
-                            .fontWeight(.bold)
-
-                        Text("アプリを再起動するか、再ログインしてください")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-
-                        Button("再取得") {
-                            isLoading = true
-                            fetchUserAndCharacter()
+            } else if !characterId.isEmpty {
+                TabView(selection: $selectedTab) {
+                    HomeView(userId: userId, characterId: characterId)
+                        .tabItem {
+                            Image(systemName: "house")
+                            Text("ホーム")
                         }
-                        .padding()
-                        .background(colorSettings.getCurrentAccentColor())
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                    }
-                    .padding()
-                }
+                        .tag(0)
 
+                    CalendarView(userId: userId, characterId: characterId, isPremium: false)
+                        .environmentObject(FirestoreManager())
+                        .tabItem {
+                            Image(systemName: "calendar")
+                            Text("カレンダー")
+                        }
+                        .tag(1)
+
+                    CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
+                        .tabItem {
+                            Image(systemName: "person.crop.circle")
+                            Text("キャラクター詳細")
+                        }
+                        .tag(2)
+
+                    OptionView()
+                        .tabItem {
+                            Image(systemName: "gearshape")
+                            Text("設定")
+                        }
+                        .tag(3)
+                }
+                .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
 
                 // フッター上に線を自然に配置
                 VStack {
@@ -108,10 +81,25 @@ struct MainTabView: View {
             UITabBar.appearance().backgroundColor = UIColor.clear
             UITabBar.appearance().isTranslucent = true
         }
+        .alert("アカウント情報の取得ができませんでした", isPresented: $showErrorAlert) {
+            Button("ログアウト", role: .cancel) {
+                authManager.signOut()
+            }
+            Button("アカウント登録") {
+                showSignUp = true
+            }
+        } message: {
+            Text("アカウントが作成されていない可能性があります。\n新規アカウントを作成する場合は「アカウント登録」を、ログイン画面に戻る場合は「ログアウト」を選択してください。")
+        }
+        .sheet(isPresented: $showSignUp) {
+            SignUpView()
+                .environmentObject(authManager)
+        }
     }
     private func fetchUserAndCharacter() {
         guard let uid = Auth.auth().currentUser?.uid, !uid.isEmpty else {
             self.isLoading = false
+            self.showErrorAlert = true
             return
         }
 
@@ -125,6 +113,7 @@ struct MainTabView: View {
                 if let error = error {
                     self.characterId = ""
                     self.isLoading = false
+                    self.showErrorAlert = true
                 } else if let document = document, document.exists {
                     let data = document.data() ?? [:]
                     if let characterId = data["character_id"] as? String, !characterId.isEmpty {
@@ -133,10 +122,12 @@ struct MainTabView: View {
                     } else {
                         self.characterId = ""
                         self.isLoading = false
+                        self.showErrorAlert = true
                     }
                 } else {
                     self.characterId = ""
                     self.isLoading = false
+                    self.showErrorAlert = true
                 }
             }
         }

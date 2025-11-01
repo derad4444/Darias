@@ -151,9 +151,11 @@ class AuthManager: ObservableObject {
         // Firebase Authenticationからアカウント削除
         try await user.delete()
 
-        // ローカルの状態をクリア
-        self.isAuthenticated = false
-        self.userId = ""
-        self.characterId = ""
+        // ローカルの状態をクリア（メインスレッドで実行）
+        await MainActor.run {
+            self.isAuthenticated = false
+            self.userId = ""
+            self.characterId = ""
+        }
     }
 }

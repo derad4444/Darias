@@ -1,5 +1,6 @@
 import SwiftUI
 import MessageUI
+import FirebaseAuth
 
 struct OptionView: View {
     @EnvironmentObject var authManager: AuthManager
@@ -21,6 +22,11 @@ struct OptionView: View {
     @State private var showPremiumUpgrade = false
     @State private var showDeleteAccountAlert = false
     @State private var showDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var showReauthAlert = false
+    @State private var reauthPassword = ""
+    @State private var deleteErrorMessage = ""
+    @State private var showDeleteErrorAlert = false
     
     private var dynamicListHeight: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -88,6 +94,45 @@ struct OptionView: View {
             }
         } message: {
             Text("この操作は取り消せません。アカウントとすべてのデータを完全に削除しますか?")
+        }
+        .overlay {
+            if isDeletingAccount {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                            .tint(.white)
+                        Text("アカウントを削除中...")
+                            .foregroundColor(.white)
+                            .font(.headline)
+                    }
+                    .padding(32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(Color.gray.opacity(0.9))
+                    )
+                }
+            }
+        }
+        .disabled(isDeletingAccount)
+        .alert("パスワードの再入力", isPresented: $showReauthAlert) {
+            SecureField("パスワード", text: $reauthPassword)
+            Button("キャンセル", role: .cancel) {
+                reauthPassword = ""
+            }
+            Button("削除を続ける", role: .destructive) {
+                deleteAccountWithReauth(password: reauthPassword)
+            }
+        } message: {
+            Text("セキュリティのため、パスワードを再入力してください。")
+        }
+        .alert("エラー", isPresented: $showDeleteErrorAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(deleteErrorMessage)
         }
     }
     
@@ -573,6 +618,8 @@ struct OptionView: View {
     }
 
     private func deleteAccount() {
+        isDeletingAccount = true
+
         Task {
             do {
                 // Firestoreからユーザーデータを削除
@@ -583,11 +630,75 @@ struct OptionView: View {
                 // Firebase Authenticationからアカウントを削除
                 try await authManager.deleteAccount()
 
-                // ログアウトして画面を閉じる
-                dismiss()
-            } catch {
+                // 削除完了後、メインスレッドで画面を閉じる
+                await MainActor.run {
+                    isDeletingAccount = false
+                    dismiss()
+                }
+            } catch let error as NSError {
                 print("アカウント削除エラー: \(error.localizedDescription)")
+                await MainActor.run {
+                    isDeletingAccount = false
+
+                    // 再認証が必要なエラー（エラーコード17014）
+                    if error.code == 17014 {
+                        showReauthAlert = true
+                    } else {
+                        deleteErrorMessage = "アカウント削除に失敗しました: \(error.localizedDescription)"
+                        showDeleteErrorAlert = true
+                    }
+                }
             }
+        }
+    }
+
+    private func deleteAccountWithReauth(password: String) {
+        isDeletingAccount = true
+
+        Task {
+            do {
+                // 再認証を実行
+                guard let user = authManager.user, let email = user.email else {
+                    throw NSError(domain: "AuthError", code: -1, userInfo: [NSLocalizedDescriptionKey: "ユーザー情報が取得できません"])
+                }
+
+                let credential = FirebaseAuth.EmailAuthProvider.credential(withEmail: email, password: password)
+                try await user.reauthenticate(with: credential)
+
+                // Firestoreからユーザーデータを削除
+                if let userId = authManager.user?.uid {
+                    try await FirestoreManager.shared.deleteUserData(userId: userId)
+                }
+
+                // Firebase Authenticationからアカウントを削除
+                try await authManager.deleteAccount()
+
+                // 削除完了後、メインスレッドで画面を閉じる
+                await MainActor.run {
+                    isDeletingAccount = false
+                    reauthPassword = ""
+                    dismiss()
+                }
+            } catch let error as NSError {
+                print("再認証後のアカウント削除エラー: \(error.localizedDescription)")
+                await MainActor.run {
+                    isDeletingAccount = false
+                    reauthPassword = ""
+                    deleteErrorMessage = "アカウント削除に失敗しました: \(getDeleteErrorMessage(error))"
+                    showDeleteErrorAlert = true
+                }
+            }
+        }
+    }
+
+    private func getDeleteErrorMessage(_ error: NSError) -> String {
+        switch error.code {
+        case 17009: // wrongPassword
+            return "パスワードが正しくありません"
+        case 17014: // requiresRecentLogin
+            return "セキュリティのため再ログインが必要です"
+        default:
+            return error.localizedDescription
         }
     }
 }

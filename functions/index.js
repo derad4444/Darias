@@ -55,6 +55,16 @@ Object.defineProperty(exports, "sendContactEmail", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "validateAppStoreReceipt", {
+  get: () => require("./validateReceipt").validateAppStoreReceipt,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "checkSubscriptionStatus", {
+  get: () => require("./validateReceipt").checkSubscriptionStatus,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

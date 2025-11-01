@@ -87,6 +87,8 @@ struct SignUpView: View {
                             .foregroundColor(.blue)
                             .underline()
                             .onTapGesture {
+                                // ログイン画面に戻るため、まずログアウトしてからdismiss
+                                authManager.signOut()
                                 dismiss()
                             }
                     }

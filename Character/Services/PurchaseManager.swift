@@ -32,6 +32,15 @@ class PurchaseManager: ObservableObject {
 
         do {
             products = try await Product.products(for: productIDs)
+
+            // 商品が取得できなかった場合の明示的なエラー
+            if products.isEmpty {
+                purchaseError = "アプリ内課金商品が見つかりませんでした。しばらく時間をおいてから再度お試しください。"
+                Logger.error("No products found for IDs: \(productIDs)", category: Logger.subscription)
+            } else {
+                Logger.success("Successfully loaded \(products.count) product(s)", category: Logger.subscription)
+            }
+
             await checkPurchasedProducts()
         } catch {
             purchaseError = "商品の読み込みに失敗しました: \(error.localizedDescription)"
@@ -46,34 +55,42 @@ class PurchaseManager: ObservableObject {
         purchaseError = nil
 
         do {
+            Logger.info("Starting purchase for product: \(product.id)", category: Logger.subscription)
             let result = try await product.purchase()
 
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
+                Logger.success("Purchase successful: \(transaction.productID)", category: Logger.subscription)
                 await handleSuccessfulPurchase(transaction)
                 await transaction.finish()
+                isLoading = false
                 return true
 
             case .userCancelled:
                 purchaseError = "購入がキャンセルされました"
+                Logger.info("Purchase cancelled by user", category: Logger.subscription)
+                isLoading = false
                 return false
 
             case .pending:
-                purchaseError = "購入が保留中です"
+                purchaseError = "購入が保留中です。承認後に自動的に処理されます。"
+                Logger.info("Purchase pending approval", category: Logger.subscription)
+                isLoading = false
                 return false
 
             @unknown default:
                 purchaseError = "不明なエラーが発生しました"
+                Logger.error("Unknown purchase result", category: Logger.subscription)
+                isLoading = false
                 return false
             }
         } catch {
             purchaseError = "購入に失敗しました: \(error.localizedDescription)"
             Logger.error("Purchase failed", category: Logger.subscription, error: error)
+            isLoading = false
             return false
         }
-
-        isLoading = false
     }
 
     func restorePurchases() async {
@@ -170,15 +187,28 @@ class PurchaseManager: ObservableObject {
     }
 
     private func validateReceiptWithFirebase(_ transaction: StoreKit.Transaction) async {
-        guard let userId = Auth.auth().currentUser?.uid else { return }
+        guard let userId = Auth.auth().currentUser?.uid else {
+            Logger.error("User not authenticated", category: Logger.subscription)
+            return
+        }
+
+        Logger.info("Starting receipt validation for user: \(userId), transaction: \(transaction.id)", category: Logger.subscription)
 
         do {
             // レシートデータを取得
-            guard let appStoreReceiptURL = Bundle.main.appStoreReceiptURL,
-                  let receiptData = try? Data(contentsOf: appStoreReceiptURL) else {
-                Logger.error("Failed to get receipt data", category: Logger.subscription)
+            guard let appStoreReceiptURL = Bundle.main.appStoreReceiptURL else {
+                Logger.error("App Store receipt URL not found", category: Logger.subscription)
                 return
             }
+
+            Logger.info("Receipt URL found: \(appStoreReceiptURL.path)", category: Logger.subscription)
+
+            guard let receiptData = try? Data(contentsOf: appStoreReceiptURL) else {
+                Logger.error("Failed to load receipt data from URL", category: Logger.subscription)
+                return
+            }
+
+            Logger.info("Receipt data loaded successfully. Size: \(receiptData.count) bytes", category: Logger.subscription)
 
             let receiptString = receiptData.base64EncodedString()
 
@@ -191,7 +221,11 @@ class PurchaseManager: ObservableObject {
                 "transactionId": String(transaction.id)
             ]
 
+            Logger.info("Calling Firebase Function: validateAppStoreReceipt", category: Logger.subscription)
+
             let result = try await validateReceipt.call(data)
+
+            Logger.info("Firebase Function response received", category: Logger.subscription)
 
             if let resultData = result.data as? [String: Any],
                let success = resultData["success"] as? Bool,
@@ -201,11 +235,21 @@ class PurchaseManager: ObservableObject {
                 // サブスクリプション状態を更新
                 await updateSubscriptionStatus()
             } else {
-                Logger.error("Receipt validation failed", category: Logger.subscription)
+                let errorMessage = (result.data as? [String: Any])?["error"] as? String ?? "Unknown error"
+                Logger.error("Receipt validation failed: \(errorMessage)", category: Logger.subscription)
             }
 
+        } catch let error as NSError {
+            Logger.error("Receipt validation error - Domain: \(error.domain), Code: \(error.code), Message: \(error.localizedDescription)", category: Logger.subscription, error: error)
+
+            // Functions特有のエラーの場合、詳細を記録
+            if error.domain == "FIRFunctionsErrorDomain" {
+                if let details = error.userInfo["details"] as? String {
+                    Logger.error("Firebase Functions error details: \(details)", category: Logger.subscription)
+                }
+            }
         } catch {
-            Logger.error("Receipt validation error", category: Logger.subscription, error: error)
+            Logger.error("Receipt validation unexpected error", category: Logger.subscription, error: error)
         }
     }
 

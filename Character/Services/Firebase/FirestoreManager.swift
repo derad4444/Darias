@@ -499,6 +499,12 @@ class FirestoreManager: ObservableObject {
                 try await big5Doc.reference.delete()
             }
 
+            // postsサブコレクション（チャット履歴）を削除
+            let postsSnapshot = try await characterDoc.reference.collection("posts").getDocuments()
+            for postDoc in postsSnapshot.documents {
+                try await postDoc.reference.delete()
+            }
+
             // キャラクタードキュメントを削除
             try await characterDoc.reference.delete()
         }
