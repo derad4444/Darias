@@ -430,7 +430,7 @@ exports.generateCharacterReply = onCall(
     async (request) => {
       const {data} = request;
       try {
-        const {characterId, userMessage, userId, isPremium} = data;
+        const {characterId, userMessage, userId, isPremium, chatHistory} = data;
         if (!characterId || !userMessage || !userId) {
           return {error: "Missing characterId or userMessage"};
         }
@@ -849,12 +849,36 @@ exports.generateCharacterReply = onCall(
         // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
         const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
 
+        // 会話履歴を含むメッセージ配列を構築
+        const messages = [
+          {role: "system", content: prompt},
+        ];
+
+        // 会話履歴を追加（最大2件）
+        if (chatHistory && Array.isArray(chatHistory)) {
+          chatHistory.forEach((history) => {
+            if (history.userMessage && history.aiResponse) {
+              messages.push(
+                  {role: "user", content: history.userMessage.substring(0, 100)},
+                  {role: "assistant", content: history.aiResponse.substring(0, 100)},
+              );
+            }
+          });
+        }
+
+        // 新しいユーザーメッセージを追加（100文字制限）
+        messages.push({
+          role: "user",
+          content: userMessage.substring(0, 100),
+        });
+
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),
             {
               model: model,
-              messages: [{role: "user", content: prompt}],
+              messages: messages,
               temperature: 0.8,
+              max_tokens: 150, // 出力100文字相当
             },
         );
 

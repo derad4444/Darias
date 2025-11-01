@@ -144,18 +144,21 @@ class CharacterService: ObservableObject {
         userId: String,
         completion: @escaping (Result<CharacterReply, AppError>) -> Void
     ) {
-        // キャラクター返答Cloud Function呼び出し
-        // isPremiumフラグでFirebase Functions側でモデル選択
-        // 無料: GPT-4o-mini, 有料: GPT-4o-2024-11-20
-        Task { @MainActor in
-            let isPremiumValue = subscriptionManager.isPremium
+        // 会話履歴を取得してからCloud Functionを呼び出し
+        fetchRecentChatHistory(userId: userId, characterId: characterId) { chatHistory in
+            // キャラクター返答Cloud Function呼び出し
+            // isPremiumフラグでFirebase Functions側でモデル選択
+            // 無料: GPT-4o-mini, 有料: GPT-4o-2024-11-20
+            Task { @MainActor in
+                let isPremiumValue = self.subscriptionManager.isPremium
 
-            functions.httpsCallable("generateCharacterReply").call([
-                "characterId": characterId,
-                "userMessage": userMessage,
-                "userId": userId,
-                "isPremium": isPremiumValue
-            ]) { result, error in
+                self.functions.httpsCallable("generateCharacterReply").call([
+                    "characterId": characterId,
+                    "userMessage": userMessage,
+                    "userId": userId,
+                    "isPremium": isPremiumValue,
+                    "chatHistory": chatHistory
+                ]) { result, error in
             if let error = error {
                 completion(.failure(.cloudFunctionError(error.localizedDescription)))
                 return
@@ -185,8 +188,9 @@ class CharacterService: ObservableObject {
             
             // 投稿をFirestoreに保存
             self.saveUserPost(userId: userId, characterId: characterId, content: userMessage, reply: reply)
-            
+
             completion(.success(characterReply))
+                }
             }
         }
     }
@@ -197,7 +201,7 @@ class CharacterService: ObservableObject {
             "timestamp": Timestamp(date: Date()),
             "analysis_result": reply // Stringとして保存
         ]
-        
+
         // ユーザーのキャラクター別サブコレクションに保存
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
@@ -205,7 +209,42 @@ class CharacterService: ObservableObject {
                 // Post saved silently
             }
     }
-    
+
+    // 会話履歴を取得（直近2件）
+    private func fetchRecentChatHistory(userId: String, characterId: String, completion: @escaping ([[String: String]]) -> Void) {
+        db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("posts")
+            .order(by: "timestamp", descending: true)
+            .limit(to: 2)
+            .getDocuments { snapshot, error in
+                guard let documents = snapshot?.documents, error == nil else {
+                    completion([])
+                    return
+                }
+
+                // 会話履歴を古い順に並べ替え、100文字制限を適用
+                let chatHistory = documents.reversed().compactMap { doc -> [String: String]? in
+                    let data = doc.data()
+                    guard let userContent = data["content"] as? String,
+                          let aiResponse = data["analysis_result"] as? String else {
+                        return nil
+                    }
+
+                    // 各メッセージを100文字に制限
+                    let trimmedUserContent = String(userContent.prefix(100))
+                    let trimmedAiResponse = String(aiResponse.prefix(100))
+
+                    return [
+                        "userMessage": trimmedUserContent,
+                        "aiResponse": trimmedAiResponse
+                    ]
+                }
+
+                completion(chatHistory)
+            }
+    }
+
     // MARK: - BIG5 Progress Monitoring
     private var big5ProgressListener: ListenerRegistration?
 
