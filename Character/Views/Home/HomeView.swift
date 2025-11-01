@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseAuth
+import FirebaseFirestore
 
 struct HomeView: View {
     @State private var userInput: String = ""
@@ -52,7 +53,11 @@ struct HomeView: View {
     // サービス
     @StateObject private var characterService = CharacterService()
     @StateObject private var errorManager = ErrorManager()
-    
+
+    // キャラクター性別
+    @State private var characterGender: CharacterGender = .female
+    @State private var characterConfig: CharacterConfig? = nil
+
     let userId: String
     let characterId: String
 
@@ -65,23 +70,20 @@ struct HomeView: View {
                         .ignoresSafeArea()
 
                     // キャラクター画像表示（背景レイヤー）
-                    CharacterDisplayComponent(
-                        displayedMessage: $displayedMessage,
-                        currentExpression: $characterExpression,
-                        characterConfig: CharacterConfig(
-                            id: "character_female",
-                            name: "Koharu",
-                            gender: .female,
-                            imageSource: .local("character_female"),
-                            isDefault: true
+                    if let config = characterConfig {
+                        CharacterDisplayComponent(
+                            displayedMessage: $displayedMessage,
+                            currentExpression: $characterExpression,
+                            characterConfig: config
                         )
-                    )
-                    .frame(
-                        width: min(geometry.size.width * 1.3, 800),
-                        height: min(geometry.size.height * 0.8, 800)
-                    )
-                    .position(x: geometry.size.width / 2, y: geometry.size.height * 0.6)
-                    .allowsHitTesting(false) // UIの邪魔にならないよう無効化
+                        .id(config.id) // configが変更されたら完全に再生成
+                        .frame(
+                            width: min(geometry.size.width * 1.3, 800),
+                            height: min(geometry.size.height * 0.8, 800)
+                        )
+                        .position(x: geometry.size.width / 2, y: geometry.size.height * 0.6)
+                        .allowsHitTesting(false) // UIの邪魔にならないよう無効化
+                    }
 
                     // UI要素（最前面レイヤー）
                     VStack(spacing: 0) {
@@ -300,14 +302,15 @@ struct HomeView: View {
     private func onViewAppear() {
         if !hasLoadedInitialMessage {
             loadCharacterInfo()
+            loadCharacterGender()
             hasLoadedInitialMessage = true
         }
-        
+
         if let currentUser = Auth.auth().currentUser {
         } else {
         }
-        
-        
+
+
         // 予定検出の通知を監視
         NotificationCenter.default.addObserver(
             forName: .scheduleDetected,
@@ -349,11 +352,11 @@ struct HomeView: View {
     
     // MARK: - Character Info Loading
     private func loadCharacterInfo() {
-        
+
         characterService.loadCharacterInfo(userId: userId) { [self] result in
-            
+
             DispatchQueue.main.async {
-                
+
                 switch result {
                 case .success(let info):
                     // Live2DCharacterViewが画像管理するため、singleImageUrlは不要
@@ -364,10 +367,70 @@ struct HomeView: View {
                 case .failure(let error):
                     self.errorManager.handleError(error)
                 }
-                
+
             }
         }
-        
+
+    }
+
+    private func loadCharacterGender() {
+        let db = Firestore.firestore()
+        let detailsRef = db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
+
+        print("🔍 性別情報を取得開始 - userId: \(userId), characterId: \(characterId)")
+
+        detailsRef.getDocument { document, error in
+            if let error = error {
+                print("❌ 性別情報の取得エラー: \(error.localizedDescription)")
+                return
+            }
+
+            guard let document = document, document.exists else {
+                print("❌ ドキュメントが存在しません")
+                return
+            }
+
+            guard let data = document.data() else {
+                print("❌ ドキュメントデータが空です")
+                return
+            }
+
+            print("📦 取得したデータ: \(data)")
+
+            guard let genderString = data["gender"] as? String else {
+                print("❌ gender フィールドが見つかりません or 文字列ではありません")
+                return
+            }
+
+            print("✅ 性別情報取得成功: \(genderString)")
+
+            DispatchQueue.main.async {
+                // "男性" -> .male, "女性" -> .female
+                let gender: CharacterGender
+                if genderString == "男性" {
+                    print("🚹 男性キャラクターに設定")
+                    gender = .male
+                } else {
+                    print("🚺 女性キャラクターに設定")
+                    gender = .female
+                }
+
+                self.characterGender = gender
+
+                // CharacterConfigを更新
+                self.characterConfig = CharacterConfig(
+                    id: "character_\(gender.rawValue)",
+                    name: "Koharu",
+                    gender: gender,
+                    imageSource: .local("character_\(gender.rawValue)"),
+                    isDefault: true
+                )
+
+                print("✨ CharacterConfig更新完了 - gender: \(gender.rawValue)")
+            }
+        }
     }
 
     

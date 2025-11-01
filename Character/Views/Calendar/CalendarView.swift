@@ -67,6 +67,7 @@ struct CalendarView: View {
     @State private var selectedDate: Date = Date()
     @State private var showBottomSheet = false
     @State private var characterExpression: CharacterExpression = .normal
+    @State private var characterGender: CharacterGender?
     @State private var monthlyComment: String = "今月のひとことを読み込み中..."
     @State private var isLoadingComment = true
     @State private var isCalendarViewActive = false
@@ -144,8 +145,9 @@ struct CalendarView: View {
     }
     
     // MARK: - Character Expression Functions
-    private func getCharacterImageName() -> String {
-        let genderPrefix = "character_female" // 固定で女性キャラクター
+    private func getCharacterImageName() -> String? {
+        guard let gender = characterGender else { return nil }
+        let genderPrefix = "character_\(gender.rawValue)"
         switch characterExpression {
         case .normal:
             return genderPrefix
@@ -253,6 +255,27 @@ struct CalendarView: View {
             }
 
             fetchMonthlyComment()
+            loadCharacterGender()
+        }
+    }
+
+    private func loadCharacterGender() {
+        let db = Firestore.firestore()
+        let detailsRef = db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
+
+        detailsRef.getDocument { document, error in
+            if let data = document?.data(),
+               let genderString = data["gender"] as? String {
+                DispatchQueue.main.async {
+                    if genderString == "男性" {
+                        characterGender = .male
+                    } else {
+                        characterGender = .female
+                    }
+                }
+            }
         }
     }
     
@@ -356,13 +379,19 @@ struct CalendarView: View {
                         Spacer()
                         HStack(alignment: .bottom, spacing: 5) {
                             // キャラクター画像（Assets内の画像を使用）
-                            Image(getCharacterImageName())
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 150, height: 150)
-                                .onTapGesture {
-                                    triggerRandomExpression()
-                                }
+                            if let imageName = getCharacterImageName() {
+                                Image(imageName)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(width: 150, height: 150)
+                                    .onTapGesture {
+                                        triggerRandomExpression()
+                                    }
+                            } else {
+                                // 性別情報読み込み中
+                                ProgressView()
+                                    .frame(width: 150, height: 150)
+                            }
 
                             // 当月コメントの吹き出し
                             VStack(alignment: .leading, spacing: 4) {
@@ -1836,25 +1865,7 @@ struct BottomSheetView: View {
             }
         }
     }
-    
-    
-    // MARK: - Character Expression Functions for BottomSheet
-    private func getCharacterImageName() -> String {
-        let genderPrefix = "character_female" // 固定で女性キャラクター
-        switch characterExpression {
-        case .normal:
-            return genderPrefix
-        case .smile:
-            return "\(genderPrefix)_smile"
-        case .angry:
-            return "\(genderPrefix)_angry"
-        case .cry:
-            return "\(genderPrefix)_cry"
-        case .sleep:
-            return "\(genderPrefix)_sleep"
-        }
-    }
-    
+
     private func triggerRandomExpression() {
         let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
         let availableExpressions = expressions.filter { $0 != characterExpression }

@@ -9,11 +9,11 @@ struct SignUpView: View {
     @State private var name = ""
     @State private var email = ""
     @State private var password = ""
-    @State private var gender = "未設定"
+    @State private var gender = "女性"
     @State private var errorMessage = ""
     @Environment(\.dismiss) private var dismiss
 
-    let genderOptions = ["未設定", "男性", "女性"]
+    let genderOptions = ["男性", "女性"]
     
     var body: some View {
         VStack(spacing: 0) {
@@ -46,9 +46,9 @@ struct SignUpView: View {
                         .dynamicBody()
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
-                    // ✅ 性別選択（任意）
+                    // ✅ 性別選択
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("性別（任意）")
+                        Text("性別")
                             .dynamicCaption()
                             .foregroundColor(.secondary)
                         Picker("性別", selection: $gender) {

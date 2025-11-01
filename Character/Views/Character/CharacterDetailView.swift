@@ -22,7 +22,8 @@ struct CharacterDetailView: View {
     @State private var aptitude: String = ""
     @State private var dream: String = ""
     @State private var characterExpression: CharacterExpression = .normal
-    
+    @State private var characterGender: CharacterGender?
+
     // Big5解析関連
     @StateObject private var big5AnalysisService = Big5AnalysisService()
     @State private var currentAnalysisLevel: Big5AnalysisLevel?
@@ -51,14 +52,21 @@ struct CharacterDetailView: View {
                     }
 
                     // キャラクター画像（Assets内の画像を使用）
-                    Image(getCharacterImageName())
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .onTapGesture {
-                            triggerRandomExpression()
-                        }
-                        .frame(width: 200, height: 200)
-                        .padding(.top, 20)
+                    if let imageName = getCharacterImageName() {
+                        Image(imageName)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .onTapGesture {
+                                triggerRandomExpression()
+                            }
+                            .frame(width: 200, height: 200)
+                            .padding(.top, 20)
+                    } else {
+                        // 性別情報読み込み中
+                        ProgressView()
+                            .frame(width: 200, height: 200)
+                            .padding(.top, 20)
+                    }
 
                     // Big5性格解析セクション（キャラクター画像の直下）
                     big5AnalysisSection
@@ -146,8 +154,9 @@ struct CharacterDetailView: View {
     }
     
     // MARK: - Character Expression Functions
-    private func getCharacterImageName() -> String {
-        let genderPrefix = "character_female" // 固定で女性キャラクター
+    private func getCharacterImageName() -> String? {
+        guard let gender = characterGender else { return nil }
+        let genderPrefix = "character_\(gender.rawValue)"
         switch characterExpression {
         case .normal:
             return genderPrefix
@@ -188,6 +197,15 @@ struct CharacterDetailView: View {
                 hobby = data["hobby"] as? String ?? ""
                 aptitude = data["aptitude"] as? String ?? ""
                 dream = data["dream"] as? String ?? ""
+
+                // 性別情報を取得
+                if let genderString = data["gender"] as? String {
+                    if genderString == "男性" {
+                        characterGender = .male
+                    } else {
+                        characterGender = .female
+                    }
+                }
             }
         }
     }
