@@ -28,16 +28,42 @@ struct ChatHistoryView: View {
                     }
                     Spacer()
                 } else if chatHistoryService.posts.isEmpty {
-                    Spacer()
-                    VStack(spacing: 16) {
-                        Image(systemName: "message")
-                            .font(.system(size: 50))
-                            .foregroundColor(.gray)
-                        Text("チャット履歴がありません")
-                            .dynamicBody()
-                            .foregroundColor(.gray)
+                    VStack(spacing: 0) {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Image(systemName: "message")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray)
+                            Text("チャット履歴がありません")
+                                .dynamicBody()
+                                .foregroundColor(.gray)
+                        }
+                        Spacer()
+
+                        // バナー広告（チャット履歴が空でも表示）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            VStack(spacing: 16) {
+                                // 区切り線
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 32)
+
+                                // バナー広告
+                                BannerAdView(adUnitID: Config.chatHistoryBannerAdUnitID)
+                                    .frame(height: 50)
+                                    .background(Color.clear)
+                                    .onAppear {
+                                        subscriptionManager.trackBannerAdImpression()
+                                    }
+                                    .padding(.horizontal, 16)
+
+                                // 下部余白
+                                Spacer()
+                                    .frame(height: 20)
+                            }
+                        }
                     }
-                    Spacer()
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {

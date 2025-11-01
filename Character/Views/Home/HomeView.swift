@@ -379,41 +379,29 @@ struct HomeView: View {
             .collection("characters").document(characterId)
             .collection("details").document("current")
 
-        print("🔍 性別情報を取得開始 - userId: \(userId), characterId: \(characterId)")
-
         detailsRef.getDocument { document, error in
             if let error = error {
-                print("❌ 性別情報の取得エラー: \(error.localizedDescription)")
                 return
             }
 
             guard let document = document, document.exists else {
-                print("❌ ドキュメントが存在しません")
                 return
             }
 
             guard let data = document.data() else {
-                print("❌ ドキュメントデータが空です")
                 return
             }
-
-            print("📦 取得したデータ: \(data)")
 
             guard let genderString = data["gender"] as? String else {
-                print("❌ gender フィールドが見つかりません or 文字列ではありません")
                 return
             }
-
-            print("✅ 性別情報取得成功: \(genderString)")
 
             DispatchQueue.main.async {
                 // "男性" -> .male, "女性" -> .female
                 let gender: CharacterGender
                 if genderString == "男性" {
-                    print("🚹 男性キャラクターに設定")
                     gender = .male
                 } else {
-                    print("🚺 女性キャラクターに設定")
                     gender = .female
                 }
 
@@ -427,8 +415,6 @@ struct HomeView: View {
                     imageSource: .local("character_\(gender.rawValue)"),
                     isDefault: true
                 )
-
-                print("✨ CharacterConfig更新完了 - gender: \(gender.rawValue)")
             }
         }
     }

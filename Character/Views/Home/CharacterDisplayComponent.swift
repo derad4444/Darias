@@ -18,7 +18,6 @@ struct CharacterDisplayComponent: View {
         // 初期画像名を設定
         let gender = characterConfig?.gender ?? .female
         self._currentImageName = State(initialValue: "character_\(gender.rawValue)")
-        print("🎨 CharacterDisplayComponent初期化 - gender: \(gender.rawValue), imageName: character_\(gender.rawValue)")
     }
     
     var body: some View {
@@ -41,7 +40,6 @@ struct CharacterDisplayComponent: View {
     private func updateImageBasedOnGender() {
         let gender = characterConfig?.gender ?? .female
         let imageName = "character_\(gender.rawValue)"
-        print("🖼️ 画像を更新: \(imageName) (gender: \(gender.rawValue))")
         currentImageName = imageName
     }
     
