@@ -325,8 +325,8 @@ struct CalendarView: View {
                             .background(Color.clear)
                             .padding(.horizontal)
                             .offset(
-                                x: geometry.size.height < 700 ? -25 : -10,
-                                y: geometry.size.height < 700 ? 10 : 0
+                                x: geometry.size.height < 700 ? 0 : -10,
+                                y: geometry.size.height < 700 ? 15 : 0
                             )
                             .zIndex(1)
                             
@@ -341,8 +341,12 @@ struct CalendarView: View {
                                 showBottomSheet: $showBottomSheet,
                                 screenHeight: geometry.size.height
                             )
-                            .scaleEffect(geometry.size.height < 700 ? 0.85 : 1.0, anchor: .center)
-                            .offset(x: geometry.size.height < 700 ? -30 : -10)
+                            .scaleEffect(
+                                x: geometry.size.height < 700 ? 1.1 : 1.0,
+                                y: geometry.size.height < 700 ? 0.85 : 1.0,
+                                anchor: .center
+                            )
+                            .offset(x: geometry.size.height < 700 ? 0 : -10)
                             .frame(height: calendarHeight)
                             .frame(maxWidth: .infinity)
                             
@@ -377,7 +381,7 @@ struct CalendarView: View {
                     // 左下にキャラクター画像と吹き出しを配置
                     VStack {
                         Spacer()
-                        HStack(alignment: .bottom, spacing: 5) {
+                        HStack(alignment: .bottom, spacing: geometry.size.width < 400 ? -15 : 5) {
                             // キャラクター画像（Assets内の画像を使用）
                             if let imageName = getCharacterImageName() {
                                 Image(imageName)
@@ -428,7 +432,7 @@ struct CalendarView: View {
 
                             Spacer()
                         }
-                        .padding(.leading, -20) // 左に20pxずらす
+                        .padding(.leading, geometry.size.width < 400 ? -20 : -20) // 小さい画面では更に左にずらす
                         .padding(.bottom, 10)
                     }
                     .allowsHitTesting(false) // タッチイベントを無効化
@@ -883,12 +887,12 @@ struct CustomCalendarView: View {
                         // ハプティックフィードバック
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                         impactFeedback.impactOccurred()
-                        
+
                         selectedDate = date
                         showBottomSheet = true
                     } label: {
                         Text("+\(totalItems - 2)")
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.gray)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 1)
@@ -944,7 +948,7 @@ struct CustomCalendarView: View {
     @ViewBuilder
     private func holidayItemView(holiday: Holiday) -> some View {
         Text(holiday.name)
-            .font(.system(size: 10, weight: .medium))
+            .font(.system(size: 8, weight: .medium))
             .foregroundColor(.white)
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
@@ -964,7 +968,7 @@ struct CustomCalendarView: View {
             if schedule.isAllDay {
                 // 終日予定：タイトルのみ、背景あり（セル全幅固定）
                 Text(schedule.title.prefix(30))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: .infinity)
@@ -975,7 +979,7 @@ struct CustomCalendarView: View {
             } else {
                 // 時間指定予定：タイトルのみ、背景なし（文字色のみ）
                 Text(schedule.title.prefix(30))
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 8, weight: .medium))
                     .foregroundColor(tagColor)
                     .frame(maxWidth: .infinity)
                     .multilineTextAlignment(.center)
@@ -1179,7 +1183,7 @@ struct CustomCalendarView: View {
         ForEach(Array(weeklyFirstRows.enumerated()), id: \.offset) { _, row in
             let barHeight = cellHeight * 0.2 // セル高さの20%
             Text(schedule.title.prefix(30))
-                .font(.system(size: 10, weight: .medium))
+                .font(.system(size: 8, weight: .medium))
                 .foregroundColor(.white)
                 .position(
                     x: row.x, // row.xが既に中央座標として計算されている

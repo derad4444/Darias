@@ -38,23 +38,31 @@ struct MainTabView: View {
                         .environmentObject(FirestoreManager())
                         .tabItem {
                             Image(systemName: "calendar")
-                            Text("カレンダー")
+                            Text("予定")
                         }
                         .tag(1)
 
-                    CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
+                    NoteView(userId: userId)
+                        .environmentObject(fontSettings)
                         .tabItem {
-                            Image(systemName: "person.crop.circle")
-                            Text("キャラクター詳細")
+                            Image(systemName: "note.text")
+                            Text("ノート")
                         }
                         .tag(2)
+
+                    CharacterDetailView(userId: userId, characterId: characterId, isPreview: false)
+                        .tabItem {
+                            Image(systemName: "person.circle")
+                            Text("詳細")
+                        }
+                        .tag(3)
 
                     OptionView()
                         .tabItem {
                             Image(systemName: "gearshape")
                             Text("設定")
                         }
-                        .tag(3)
+                        .tag(4)
                 }
                 .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
 

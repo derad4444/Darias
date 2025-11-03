@@ -19,6 +19,10 @@ class FirestoreManager: ObservableObject {
     @Published var diaries: [Diary] = []
     //Firestoreから取得した祝日データ（一覧）を保存する
     @Published var holidays: [Holiday] = []
+    //Firestoreから取得したメモデータ（一覧）を保存する
+    @Published var memos: [Memo] = []
+    //Firestoreから取得したTODOデータ（一覧）を保存する
+    @Published var todos: [TodoItem] = []
     
     //Firestoreからスケジュール一覧を取得して schedules に反映
     func fetchSchedules() {
@@ -511,6 +515,264 @@ class FirestoreManager: ObservableObject {
 
         // ユーザードキュメント自体を削除
         try await userRef.delete()
+    }
+
+    // MARK: - Memo CRUD Operations
+
+    // メモ一覧を取得
+    func fetchMemos(userId: String) {
+        Logger.debug("fetchMemos: userId = \(userId)", category: Logger.firestore)
+
+        db.collection("users").document(userId).collection("memos")
+            .order(by: "isPinned", descending: true)
+            .order(by: "updatedAt", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    Logger.error("Memo fetch failed", category: Logger.firestore, error: error)
+                    return
+                }
+
+                if let documents = snapshot?.documents {
+                    self.memos = documents.compactMap { doc in
+                        let data = doc.data()
+
+                        guard let title = data["title"] as? String,
+                              let content = data["content"] as? String else {
+                            return nil
+                        }
+
+                        let createdAtTimestamp = data["createdAt"] as? Timestamp
+                        let updatedAtTimestamp = data["updatedAt"] as? Timestamp
+                        let tag = data["tag"] as? String ?? ""
+                        let isPinned = data["isPinned"] as? Bool ?? false
+
+                        let createdAt = createdAtTimestamp?.dateValue() ?? Date()
+                        let updatedAt = updatedAtTimestamp?.dateValue() ?? Date()
+
+                        return Memo(
+                            id: doc.documentID,
+                            title: title,
+                            content: content,
+                            createdAt: createdAt,
+                            updatedAt: updatedAt,
+                            tag: tag,
+                            isPinned: isPinned
+                        )
+                    }
+                    Logger.debug("fetchMemos: Found \(self.memos.count) memos", category: Logger.firestore)
+                }
+            }
+    }
+
+    // メモを追加
+    func addMemo(_ memo: Memo, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("memos").document(memo.id)
+
+        docRef.setData(memo.toDictionary()) { error in
+            if let error = error {
+                Logger.error("Memo add failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Memo added successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("MemoAdded"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // メモを更新
+    func updateMemo(_ memo: Memo, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("memos").document(memo.id)
+
+        var updatedMemo = memo
+        updatedMemo.updatedAt = Date()
+
+        docRef.updateData(updatedMemo.toDictionary()) { error in
+            if let error = error {
+                Logger.error("Memo update failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Memo updated successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("MemoUpdated"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // メモを削除
+    func deleteMemo(memoId: String, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("memos").document(memoId)
+
+        docRef.delete { error in
+            if let error = error {
+                Logger.error("Memo delete failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Memo deleted successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    self.memos.removeAll { $0.id == memoId }
+                    NotificationCenter.default.post(name: .init("MemoDeleted"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // メモのピン留め切り替え
+    func toggleMemoPin(memoId: String, userId: String, isPinned: Bool, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("memos").document(memoId)
+
+        docRef.updateData([
+            "isPinned": isPinned,
+            "updatedAt": Timestamp(date: Date())
+        ]) { error in
+            if let error = error {
+                Logger.error("Memo pin toggle failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Memo pin toggled successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("MemoUpdated"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // MARK: - Todo CRUD Operations
+
+    // TODO一覧を取得
+    func fetchTodos(userId: String) {
+        Logger.debug("fetchTodos: userId = \(userId)", category: Logger.firestore)
+
+        db.collection("users").document(userId).collection("todos")
+            .order(by: "isCompleted")
+            .order(by: "createdAt", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    Logger.error("Todo fetch failed", category: Logger.firestore, error: error)
+                    return
+                }
+
+                if let documents = snapshot?.documents {
+                    self.todos = documents.compactMap { doc in
+                        let data = doc.data()
+
+                        guard let title = data["title"] as? String else {
+                            return nil
+                        }
+
+                        let description = data["description"] as? String ?? ""
+                        let isCompleted = data["isCompleted"] as? Bool ?? false
+                        let dueDateTimestamp = data["dueDate"] as? Timestamp
+                        let priorityString = data["priority"] as? String ?? "中"
+                        let tag = data["tag"] as? String ?? ""
+                        let createdAtTimestamp = data["createdAt"] as? Timestamp
+                        let updatedAtTimestamp = data["updatedAt"] as? Timestamp
+
+                        let dueDate = dueDateTimestamp?.dateValue()
+                        let priority = TodoItem.TodoPriority(rawValue: priorityString) ?? .medium
+                        let createdAt = createdAtTimestamp?.dateValue() ?? Date()
+                        let updatedAt = updatedAtTimestamp?.dateValue() ?? Date()
+
+                        return TodoItem(
+                            id: doc.documentID,
+                            title: title,
+                            description: description,
+                            isCompleted: isCompleted,
+                            dueDate: dueDate,
+                            priority: priority,
+                            tag: tag,
+                            createdAt: createdAt,
+                            updatedAt: updatedAt
+                        )
+                    }
+                    Logger.debug("fetchTodos: Found \(self.todos.count) todos", category: Logger.firestore)
+                }
+            }
+    }
+
+    // TODOを追加
+    func addTodo(_ todo: TodoItem, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("todos").document(todo.id)
+
+        docRef.setData(todo.toDictionary()) { error in
+            if let error = error {
+                Logger.error("Todo add failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Todo added successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("TodoAdded"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // TODOを更新
+    func updateTodo(_ todo: TodoItem, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("todos").document(todo.id)
+
+        var updatedTodo = todo
+        updatedTodo.updatedAt = Date()
+
+        docRef.updateData(updatedTodo.toDictionary()) { error in
+            if let error = error {
+                Logger.error("Todo update failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Todo updated successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("TodoUpdated"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // TODOを削除
+    func deleteTodo(todoId: String, userId: String, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("todos").document(todoId)
+
+        docRef.delete { error in
+            if let error = error {
+                Logger.error("Todo delete failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Todo deleted successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    self.todos.removeAll { $0.id == todoId }
+                    NotificationCenter.default.post(name: .init("TodoDeleted"), object: nil)
+                }
+                completion(true)
+            }
+        }
+    }
+
+    // TODO完了状態を切り替え
+    func toggleTodoComplete(todoId: String, userId: String, isCompleted: Bool, completion: @escaping (Bool) -> Void) {
+        let docRef = db.collection("users").document(userId).collection("todos").document(todoId)
+
+        docRef.updateData([
+            "isCompleted": isCompleted,
+            "updatedAt": Timestamp(date: Date())
+        ]) { error in
+            if let error = error {
+                Logger.error("Todo complete toggle failed", category: Logger.firestore, error: error)
+                completion(false)
+            } else {
+                Logger.success("Todo complete toggled successfully", category: Logger.firestore)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .init("TodoUpdated"), object: nil)
+                }
+                completion(true)
+            }
+        }
     }
 
     static let shared = FirestoreManager()
