@@ -7,9 +7,72 @@ struct ChatHistoryView: View {
     @AppStorage("isPremium") var isPremium: Bool = false
     @Environment(\.dismiss) private var dismiss
     @State private var showPremiumUpgrade = false
+    @State private var searchText: String = ""
 
     let userId: String
     let characterId: String
+
+    // 検索フィルタリング
+    private var filteredPosts: [Post] {
+        if searchText.isEmpty {
+            return chatHistoryService.posts
+        }
+        return chatHistoryService.posts.filter { post in
+            post.content.localizedCaseInsensitiveContains(searchText) ||
+            post.analysisResult.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    // フィルタリングされた投稿から日付別メッセージを取得
+    private func getFilteredMessagesByDate() -> [String: [ChatMessage]] {
+        var messagesByDate: [String: [ChatMessage]] = [:]
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy年M月d日"
+        dateFormatter.locale = Locale(identifier: "ja_JP")
+
+        for post in filteredPosts {
+            let dateString = dateFormatter.string(from: post.timestamp)
+
+            let userMessage = ChatMessage(
+                content: post.content,
+                isUser: true,
+                timestamp: post.timestamp
+            )
+            let characterMessage = ChatMessage(
+                content: post.analysisResult,
+                isUser: false,
+                timestamp: post.timestamp.addingTimeInterval(1) // 少し後の時間
+            )
+
+            if messagesByDate[dateString] != nil {
+                messagesByDate[dateString]?.append(userMessage)
+                messagesByDate[dateString]?.append(characterMessage)
+            } else {
+                messagesByDate[dateString] = [userMessage, characterMessage]
+            }
+        }
+
+        // 各日付内でメッセージを時間順にソート（新しい順）
+        for dateKey in messagesByDate.keys {
+            messagesByDate[dateKey]?.sort { $0.timestamp > $1.timestamp }
+        }
+
+        return messagesByDate
+    }
+
+    private func getFilteredDateList() -> [String] {
+        return Array(getFilteredMessagesByDate().keys).sorted { date1, date2 in
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy年M月d日"
+            formatter.locale = Locale(identifier: "ja_JP")
+
+            guard let d1 = formatter.date(from: date1),
+                  let d2 = formatter.date(from: date2) else {
+                return date1 > date2
+            }
+            return d1 > d2
+        }
+    }
     
     var body: some View {
         ZStack {
@@ -18,6 +81,34 @@ struct ChatHistoryView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
+                // 検索バー
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.gray)
+
+                    TextField("メッセージを検索", text: $searchText)
+                        .dynamicBody()
+
+                    // クリアボタン（常に表示、テキストがない時は無効化）
+                    Button(action: {
+                        withAnimation {
+                            searchText = ""
+                        }
+                        // キーボードを閉じる
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(searchText.isEmpty ? .gray.opacity(0.3) : .gray.opacity(0.6))
+                    }
+                    .disabled(searchText.isEmpty)
+                }
+                .padding(12)
+                .background(Color.white.opacity(0.8))
+                .cornerRadius(10)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 8)
+
                 // チャット履歴
                 if chatHistoryService.isLoading {
                     Spacer()
@@ -64,12 +155,55 @@ struct ChatHistoryView: View {
                             }
                         }
                     }
+                } else if filteredPosts.isEmpty {
+                    // 検索結果が空の場合
+                    VStack(spacing: 0) {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 50))
+                                .foregroundColor(.gray)
+                            Text("検索結果がありません")
+                                .dynamicBody()
+                                .foregroundColor(.gray)
+                            Text("「\(searchText)」に一致するメッセージが見つかりませんでした")
+                                .dynamicCaption()
+                                .foregroundColor(.gray)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        }
+                        Spacer()
+
+                        // バナー広告（チャット履歴が空でも表示）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            VStack(spacing: 16) {
+                                // 区切り線
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(height: 1)
+                                    .padding(.horizontal, 32)
+
+                                // バナー広告
+                                BannerAdView(adUnitID: Config.chatHistoryBannerAdUnitID)
+                                    .frame(height: 50)
+                                    .background(Color.clear)
+                                    .onAppear {
+                                        subscriptionManager.trackBannerAdImpression()
+                                    }
+                                    .padding(.horizontal, 16)
+
+                                // 下部余白
+                                Spacer()
+                                    .frame(height: 20)
+                            }
+                        }
+                    }
                 } else {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(spacing: 0) {
-                                let messagesByDate = chatHistoryService.getChatMessagesByDate()
-                                let dateList = chatHistoryService.getDateList().reversed() // 古い順（時系列順）
+                                let messagesByDate = getFilteredMessagesByDate()
+                                let dateList = getFilteredDateList().reversed() // 古い順（時系列順）
 
                                 ForEach(Array(dateList), id: \.self) { dateString in
                                     // 日付ヘッダー
@@ -197,8 +331,8 @@ struct ChatHistoryView: View {
                                     }
                                 } else {
                                     // バナー広告がない場合は最新メッセージまで
-                                    let messagesByDate = chatHistoryService.getChatMessagesByDate()
-                                    let dateList = chatHistoryService.getDateList()
+                                    let messagesByDate = getFilteredMessagesByDate()
+                                    let dateList = getFilteredDateList()
 
                                     if let latestDate = dateList.first,
                                        let latestMessages = messagesByDate[latestDate],

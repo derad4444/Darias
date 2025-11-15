@@ -67,7 +67,7 @@ struct TipBubbleArrow: Shape {
         Spacer()
 
         CharacterTipBubble(
-            message: "性格解析は全部で100問あるよ。好きなタイミングで「話題ある？」と話しかけてくれれば質問するから答えてね！"
+            message: "性格解析は全部で100問あるよ。好きなタイミングで「性格診断して」と話しかけてくれれば質問するから答えてね！"
         ) {
         }
         .padding()

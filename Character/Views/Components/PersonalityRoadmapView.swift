@@ -5,6 +5,7 @@ struct PersonalityRoadmapView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var fontSettings: FontSettingsManager
     @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @State private var showHowToPopover = false
     
     // 3段階の情報
     private let stages = [
@@ -89,7 +90,7 @@ struct PersonalityRoadmapView: View {
                             .fill(Color(.systemBackground))
                             .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                     )
-                    
+
                     // 段階別情報
                     VStack(spacing: 16) {
                         ForEach(stages, id: \.number) { stage in
@@ -109,6 +110,22 @@ struct PersonalityRoadmapView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        showHowToPopover = true
+                    } label: {
+                        Image(systemName: "questionmark.circle")
+                            .font(.system(size: 20))
+                            .foregroundColor(colorSettings.getCurrentAccentColor())
+                    }
+                    .popover(isPresented: $showHowToPopover) {
+                        HowToPopoverContent(
+                            fontSettings: fontSettings,
+                            colorSettings: colorSettings
+                        )
+                    }
+                }
+
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("閉じる") {
                         dismiss()
@@ -272,11 +289,71 @@ struct StageCardView: View {
     }
 }
 
+struct HowToPopoverContent: View {
+    let fontSettings: FontSettingsManager
+    let colorSettings: ColorSettingsManager
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // タイトル
+            HStack(spacing: 8) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: 18 * fontSettings.fontSize.scale))
+                    .foregroundColor(.yellow)
+
+                Text("診断の進め方")
+                    .font(.system(size: 18 * fontSettings.fontSize.scale, weight: .bold))
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+            }
+
+            Divider()
+
+            // 説明文
+            Text("チャット画面でこのメッセージを送信すると質問が始まります：")
+                .font(.system(size: 14 * fontSettings.fontSize.scale))
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
+                .fixedSize(horizontal: false, vertical: true)
+
+            // 送信例
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14 * fontSettings.fontSize.scale))
+                        .foregroundColor(colorSettings.getCurrentAccentColor())
+
+                    Text("「性格診断して」")
+                        .font(.system(size: 15 * fontSettings.fontSize.scale, weight: .medium))
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                }
+
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 14 * fontSettings.fontSize.scale))
+                        .foregroundColor(colorSettings.getCurrentAccentColor())
+
+                    Text("「性格解析して」")
+                        .font(.system(size: 15 * fontSettings.fontSize.scale, weight: .medium))
+                        .foregroundColor(colorSettings.getCurrentTextColor())
+                }
+            }
+            .padding(.leading, 4)
+
+            // 補足
+            Text("好きなタイミングで質問を受けられます。")
+                .font(.system(size: 13 * fontSettings.fontSize.scale))
+                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+        }
+        .padding(20)
+        .frame(width: 300)
+        .background(Color(.systemBackground))
+    }
+}
+
 enum StageStatus {
     case notStarted
     case inProgress
     case completed
-    
+
     func color(colorSettings: ColorSettingsManager) -> Color {
         switch self {
         case .notStarted:
@@ -287,7 +364,7 @@ enum StageStatus {
             return colorSettings.getCurrentAccentColor()
         }
     }
-    
+
     func borderColor(colorSettings: ColorSettingsManager) -> Color {
         switch self {
         case .notStarted:

@@ -46,12 +46,15 @@ struct SignUpView: View {
                         .dynamicBody()
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
-                    // ✅ 性別選択
+                    // ✅ キャラクター性別選択
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("性別")
+                        Text("キャラクターの性別")
                             .dynamicCaption()
                             .foregroundColor(.secondary)
-                        Picker("性別", selection: $gender) {
+                        Text("対話するキャラクターの性別を選択してください")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Picker("キャラクターの性別", selection: $gender) {
                             ForEach(genderOptions, id: \.self) { option in
                                 Text(option)
                             }

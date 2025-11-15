@@ -5,7 +5,16 @@ struct TodoRowView: View {
     let onToggleComplete: (Bool) -> Void
 
     @StateObject private var colorSettings = ColorSettingsManager.shared
+    @StateObject private var tagSettings = TagSettingsManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
+
+    // タグの色を取得（設定されていない場合はアクセントカラー）
+    private var tagColor: Color {
+        if !todo.tag.isEmpty, let tag = tagSettings.getTag(by: todo.tag) {
+            return tag.color
+        }
+        return colorSettings.getCurrentAccentColor()
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -52,10 +61,10 @@ struct TodoRowView: View {
                     if !todo.tag.isEmpty {
                         Text(todo.tag)
                             .dynamicCaption()
-                            .foregroundColor(colorSettings.getCurrentAccentColor())
+                            .foregroundColor(tagColor)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(colorSettings.getCurrentAccentColor().opacity(0.1))
+                            .background(tagColor.opacity(0.1))
                             .cornerRadius(4)
                     }
                 }

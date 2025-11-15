@@ -1,8 +1,14 @@
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const { logger } = require('./src/utils/logger');
 const { GMAIL_USER, GMAIL_APP_PASSWORD } = require('./src/config/config');
+
+// Firebase Admin初期化（未初期化の場合のみ）
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 // Nodemailer設定
 const createTransporter = () => {
@@ -79,6 +85,7 @@ async function sendAdminEmail(contactData, userData) {
   const mailOptions = {
     from: `"DARIAS App" <${GMAIL_USER.value()}>`,
     to: 'darias.app4@gmail.com',
+    replyTo: userData.email, // ユーザーのメールアドレスを返信先に設定
     subject: contactData.subject,
     text: emailBody
   };
@@ -179,7 +186,7 @@ ${contactData.message || '内容が記録されていません'}
 ■ その他のサポート
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-【公式Instagram】@ryosuke_4444
+【公式Instagram】@darias_1025
 【アプリストア】App Store で「DARIAS」を検索
 
 今後ともDARIASをよろしくお願いいたします。

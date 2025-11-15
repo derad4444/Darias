@@ -25,6 +25,14 @@ struct TodoDetailView: View {
         todo == nil
     }
 
+    // タグの色を取得（設定されていない場合はアクセントカラー）
+    private var tagColor: Color {
+        if !selectedTag.isEmpty, let tag = tagSettingsManager.getTag(by: selectedTag) {
+            return tag.color
+        }
+        return colorSettings.getCurrentAccentColor()
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -110,9 +118,19 @@ struct TodoDetailView: View {
                                 showTagSelection = true
                             }) {
                                 HStack {
-                                    Text(selectedTag.isEmpty ? "タグを選択" : selectedTag)
-                                        .dynamicBody()
-                                        .foregroundColor(selectedTag.isEmpty ? .gray : .primary)
+                                    if selectedTag.isEmpty {
+                                        Text("タグを選択")
+                                            .dynamicBody()
+                                            .foregroundColor(.gray)
+                                    } else {
+                                        Text(selectedTag)
+                                            .dynamicBody()
+                                            .foregroundColor(tagColor)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(tagColor.opacity(0.1))
+                                            .cornerRadius(8)
+                                    }
                                     Spacer()
                                     Image(systemName: "chevron.down")
                                         .foregroundColor(.gray)

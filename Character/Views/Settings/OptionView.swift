@@ -581,8 +581,8 @@ struct OptionView: View {
     }
 
     private func openInstagram() {
-        let instagramURL = "instagram://user?username=ryosuke_4444"
-        let webURL = "https://www.instagram.com/ryosuke_4444"
+        let instagramURL = "instagram://user?username=darias_1025"
+        let webURL = "https://www.instagram.com/darias_1025/"
 
         if let url = URL(string: instagramURL), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)

@@ -1,13 +1,19 @@
 // functions/src/functions/sendRegistrationEmail.js
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const admin = require('firebase-admin');
 const { getFirestore } = require('firebase-admin/firestore');
 const nodemailer = require('nodemailer');
 const { logger } = require('../utils/logger');
 const { GMAIL_USER, GMAIL_APP_PASSWORD } = require('../config/config');
 
+// Firebase Admin初期化（未初期化の場合のみ）
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
 // Gmail SMTPを使用したメール送信設定
 const createTransporter = () => {
-  return nodemailer.createTransporter({
+  return nodemailer.createTransport({
     service: 'gmail',
     auth: {
       user: GMAIL_USER.value(), // Gmail アドレス
@@ -165,24 +171,29 @@ const sendRegistrationEmail = onDocumentCreated({
 
     // メール送信の設定確認
     try {
+      logger.info('Checking email configuration');
       const gmailUser = GMAIL_USER.value();
       const gmailPassword = GMAIL_APP_PASSWORD.value();
       if (!gmailUser || !gmailPassword) {
         logger.error('Email configuration missing. Please set GMAIL_USER and GMAIL_APP_PASSWORD secrets.');
         return;
       }
+      logger.info('Email configuration verified');
     } catch (error) {
-      logger.error('Failed to access email configuration secrets', { error: error.message });
+      logger.error('Failed to access email configuration secrets', error, { userId });
       return;
     }
 
     // メールトランスポーターの作成
+    logger.info('Creating email transporter');
     const transporter = createTransporter();
 
     // 登録日時の取得（createdAt があればそれを使用、なければ現在時刻）
     const registrationDate = userData.createdAt ? userData.createdAt.toDate() : new Date();
+    logger.info('Registration date retrieved', { registrationDate });
 
     // メールテンプレートの作成
+    logger.info('Creating email template');
     const emailTemplate = createEmailTemplate(userData.name, userId, registrationDate);
 
     // メール送信オプション
@@ -193,9 +204,12 @@ const sendRegistrationEmail = onDocumentCreated({
       text: emailTemplate.text,
       html: emailTemplate.html,
     };
+    logger.info('Mail options prepared', { to: userData.email, subject: emailTemplate.subject });
 
     // メール送信実行
+    logger.info('Attempting to send email');
     const result = await transporter.sendMail(mailOptions);
+    logger.info('Email send call completed', { messageId: result.messageId });
 
     logger.info('Registration email sent successfully', {
       userId,
@@ -212,10 +226,19 @@ const sendRegistrationEmail = onDocumentCreated({
     });
 
   } catch (error) {
-    logger.error('Failed to send registration email', {
-      error: error.message,
-      stack: error.stack,
-      userId: event.params.userId
+    // エラーの詳細をコンソールに直接出力
+    console.error('=== REGISTRATION EMAIL ERROR ===');
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    console.error('================================');
+
+    logger.error('Failed to send registration email', error, {
+      userId: event.params.userId,
+      errorName: error.name,
+      errorMessage: error.message,
+      errorStack: error.stack
     });
 
     // エラーをFirestoreに記録（デバッグ用）
@@ -223,10 +246,13 @@ const sendRegistrationEmail = onDocumentCreated({
       const db = getFirestore();
       await db.collection('users').doc(event.params.userId).update({
         emailError: error.message,
+        emailErrorName: error.name,
+        emailErrorStack: error.stack,
         emailErrorAt: new Date()
       });
     } catch (dbError) {
-      logger.error('Failed to save email error to Firestore', { error: dbError.message });
+      console.error('Failed to save error to Firestore:', dbError);
+      logger.error('Failed to save email error to Firestore', dbError);
     }
   }
 });

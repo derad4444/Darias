@@ -32,6 +32,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // お問い合わせ - 認証済みユーザーは作成可能
+    match /contacts/{contactId} {
+      allow create: if request.auth != null
+                    && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if false; // 読み取り・更新・削除は不可（Cloud Functionとコンソールのみ）
+    }
+
     // 全ての他のドキュメントはアクセス拒否
     match /{document=**} {
       allow read, write: if false;

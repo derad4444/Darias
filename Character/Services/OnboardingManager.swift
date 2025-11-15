@@ -9,7 +9,7 @@ class OnboardingManager: ObservableObject {
     private let hasCompletedInitialOnboardingKey = "hasCompletedInitialOnboarding"
 
     private let allTips: [String] = [
-        "性格解析は全部で100問あるよ。好きなタイミングで「話題ある？」と話しかけてくれれば質問するから答えてね！",
+        "性格解析は全部で100問あるよ。好きなタイミングで「性格診断して」と話しかけてくれれば質問するから答えてね！",
         "「何日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！",
         "アプリでわからないことや欲しい機能があれば設定画面の問い合わせから開発者に連絡してね！",
         "性格解析が終わったらキャラクター詳細画面でどんな性格か確認してみてね",

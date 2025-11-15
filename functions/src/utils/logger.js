@@ -87,4 +87,7 @@ class Logger {
   }
 }
 
-module.exports = {Logger};
+// デフォルトインスタンスをエクスポート（簡易的に使用できるように）
+const logger = new Logger("CloudFunctions");
+
+module.exports = {Logger, logger};

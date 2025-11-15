@@ -473,14 +473,10 @@ exports.generateCharacterReply = onCall(
           pattern.test(userMessage.replace(/\s/g, "")),
         );
 
-        // 「話題ある？」パターンの検出
+        // 性格診断のトリガーパターンの検出
         const topicRequestPatterns = [
-          /話題.*ある[？?]/,
-          /何.*話.*[？?]/,
-          /話.*[？?]/,
-          /なんか.*話.*[？?]/,
-          /話.*したい/,
-          /話.*しよう/,
+          /性格解析して/,
+          /性格診断して/,
         ];
 
         const isTopicRequest = topicRequestPatterns.some((pattern) =>
@@ -794,7 +790,7 @@ exports.generateCharacterReply = onCall(
           }
         }
 
-        // 「話題ある？」が検出された場合、BIG5質問を返す
+        // 性格診断のトリガーが検出された場合、BIG5質問を返す
         if (isTopicRequest) {
           const answeredQuestions = big5ProgressData ?
             big5ProgressData.answeredQuestions || [] : [];

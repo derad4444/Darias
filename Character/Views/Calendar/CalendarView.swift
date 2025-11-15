@@ -72,6 +72,8 @@ struct CalendarView: View {
     @State private var isLoadingComment = true
     @State private var isCalendarViewActive = false
     @State private var isHolidaysLoaded = false
+    @State private var showSearchMode = false
+    @State private var searchText = ""
     
     // ドラッグ&ドロップ用状態変数（一時的に無効化）
     // @State private var draggingSchedule: Schedule?
@@ -110,13 +112,25 @@ struct CalendarView: View {
     func schedulesForDate(_ date: Date) -> [Schedule] {
         firestoreManager.schedules.filter { schedule in
             let calendar = Calendar.current
-            
+
             // 指定された日付がスケジュールの期間内にあるかチェック
             let startOfDay = calendar.startOfDay(for: date)
             let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
-            
+
             // スケジュールの開始日と終了日の範囲と重複するかチェック
             return schedule.startDate < endOfDay && schedule.endDate >= startOfDay
+        }
+    }
+
+    // 検索フィルタリング
+    private var filteredSchedules: [Schedule] {
+        if searchText.isEmpty {
+            return firestoreManager.schedules
+        }
+        return firestoreManager.schedules.filter { schedule in
+            schedule.title.localizedCaseInsensitiveContains(searchText) ||
+            schedule.memo.localizedCaseInsensitiveContains(searchText) ||
+            schedule.tag.localizedCaseInsensitiveContains(searchText)
         }
     }
     
@@ -294,62 +308,182 @@ struct CalendarView: View {
                         .ignoresSafeArea()
 
                     VStack(spacing: 0) {
-                            // ヘッダーを完全固定
-                            HStack {
-                                Button(action: {
-                                    moveToPreviousMonth()
-                                }) {
-                                    Image(systemName: "chevron.left")
-                                        .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
-                                        .foregroundColor(colorSettings.getCurrentTextColor())
-                                        .padding(.leading, 16)
+                            // ヘッダー（検索モードと通常モードで切り替え）
+                            if showSearchMode {
+                                // 検索モード用ヘッダー
+                                HStack(spacing: 12) {
+                                    // 戻るボタン
+                                    Button(action: {
+                                        withAnimation {
+                                            showSearchMode = false
+                                            searchText = ""
+                                        }
+                                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                    }) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: geometry.size.height < 700 ? 18 : 20))
+                                            .foregroundColor(colorSettings.getCurrentTextColor())
+                                    }
+                                    .padding(.leading, 16)
+
+                                    // 検索バー
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "magnifyingglass")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: geometry.size.height < 700 ? 14 : 16))
+
+                                        TextField("予定を検索", text: $searchText)
+                                            .font(.system(size: geometry.size.height < 700 ? 14 : 16))
+
+                                        // クリアボタン
+                                        if !searchText.isEmpty {
+                                            Button(action: {
+                                                withAnimation {
+                                                    searchText = ""
+                                                }
+                                                // キーボードを閉じる
+                                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                                            }) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .foregroundColor(.gray.opacity(0.6))
+                                                    .font(.system(size: geometry.size.height < 700 ? 14 : 16))
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.white.opacity(0.8))
+                                    .cornerRadius(10)
+                                    .padding(.trailing, 16)
                                 }
-                                Spacer()
-                                Button(action: { showPicker.toggle() }) {
-                                    Text("\(formatYearWithoutComma(selectedYear))年 \(selectedMonth)月")
-                                        .dynamicTitle2()
-                                        .foregroundColor(colorSettings.getCurrentTextColor())
+                                .frame(height: headerHeight)
+                                .padding(.top, geometry.size.height < 700 ? -5 : -20)
+                                .background(Color.clear)
+                                .offset(
+                                    x: 0,
+                                    y: geometry.size.height < 700 ? 15 : 0
+                                )
+                                .zIndex(1)
+                            } else {
+                                // 通常モード用ヘッダー
+                                HStack {
+                                    Button(action: {
+                                        moveToPreviousMonth()
+                                    }) {
+                                        Image(systemName: "chevron.left")
+                                            .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
+                                            .foregroundColor(colorSettings.getCurrentTextColor())
+                                            .padding(.leading, 16)
+                                    }
+                                    Spacer()
+                                    Button(action: { showPicker.toggle() }) {
+                                        Text("\(formatYearWithoutComma(selectedYear))年 \(selectedMonth)月")
+                                            .dynamicTitle2()
+                                            .foregroundColor(colorSettings.getCurrentTextColor())
+                                    }
+                                    Spacer()
+                                    Button(action: {
+                                        moveToNextMonth()
+                                    }) {
+                                        Image(systemName: "chevron.right")
+                                            .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
+                                            .foregroundColor(colorSettings.getCurrentTextColor())
+                                    }
+                                    .padding(.trailing, geometry.size.height < 700 ? 50 : 60) // 検索ボタン分のスペースを確保
                                 }
-                                Spacer()
-                                Button(action: {
-                                    moveToNextMonth()
-                                }) {
-                                    Image(systemName: "chevron.right")
-                                        .font(FontSettingsManager.shared.font(size: 22, weight: .bold))
-                                        .foregroundColor(colorSettings.getCurrentTextColor())
-                                        .padding(.trailing, 16)
-                                }
+                                .frame(height: headerHeight)
+                                .padding(.top, -20)
+                                .background(Color.clear)
+                                .padding(.horizontal)
+                                .offset(
+                                    x: geometry.size.height < 700 ? 0 : -10,
+                                    y: geometry.size.height < 700 ? 15 : 0
+                                )
+                                .zIndex(1)
+                                .overlay(
+                                    // 検索ボタンを右上にオーバーレイ
+                                    Button(action: {
+                                        withAnimation {
+                                            showSearchMode = true
+                                        }
+                                    }) {
+                                        Image(systemName: "magnifyingglass")
+                                            .font(.system(size: geometry.size.height < 700 ? 16 : 18))
+                                            .foregroundColor(colorSettings.getCurrentAccentColor())
+                                            .padding(geometry.size.height < 700 ? 8 : 10)
+                                            .background(
+                                                Circle()
+                                                    .fill(Color.white.opacity(0.9))
+                                                    .shadow(color: Color.black.opacity(0.1), radius: 3, x: 0, y: 2)
+                                            )
+                                    }
+                                    .padding(.trailing, geometry.size.height < 700 ? 8 : 16)
+                                    .offset(y: geometry.size.height < 700 ? 10 : -10),
+                                    alignment: .topTrailing
+                                )
                             }
-                            .frame(height: headerHeight)
-                            .padding(.top, -20)
-                            .background(Color.clear)
-                            .padding(.horizontal)
-                            .offset(
-                                x: geometry.size.height < 700 ? 0 : -10,
-                                y: geometry.size.height < 700 ? 15 : 0
-                            )
-                            .zIndex(1)
-                            
-                            // カレンダー本体
-                            CustomCalendarView(
-                                selectedDate: $selectedDate,
-                                selectedYear: $selectedYear,
-                                selectedMonth: $selectedMonth,
-                                schedulesForDate: self.schedulesForDate,
-                                firestoreManager: firestoreManager,
-                                userId: userId,
-                                showBottomSheet: $showBottomSheet,
-                                screenHeight: geometry.size.height
-                            )
-                            .scaleEffect(
-                                x: geometry.size.height < 700 ? 1.1 : 1.0,
-                                y: geometry.size.height < 700 ? 0.85 : 1.0,
-                                anchor: .center
-                            )
-                            .offset(x: geometry.size.height < 700 ? 0 : -10)
-                            .frame(height: calendarHeight)
-                            .frame(maxWidth: .infinity)
-                            
+
+                            // カレンダー本体または検索結果
+                            if showSearchMode {
+                                // 検索結果リスト
+                                if filteredSchedules.isEmpty {
+                                    VStack(spacing: 16) {
+                                        Spacer()
+                                        Image(systemName: searchText.isEmpty ? "calendar" : "magnifyingglass")
+                                            .font(.system(size: 50))
+                                            .foregroundColor(.gray.opacity(0.5))
+                                        Text(searchText.isEmpty ? "予定を検索してください" : "検索結果がありません")
+                                            .dynamicTitle3()
+                                            .foregroundColor(.gray)
+                                        if !searchText.isEmpty {
+                                            Text("「\(searchText)」に一致する予定が見つかりませんでした")
+                                                .dynamicCaption()
+                                                .foregroundColor(.gray)
+                                                .multilineTextAlignment(.center)
+                                                .padding(.horizontal, 32)
+                                        }
+                                        Spacer()
+                                    }
+                                } else {
+                                    ScrollView {
+                                        VStack(spacing: 12) {
+                                            ForEach(filteredSchedules.sorted(by: { $0.startDate < $1.startDate })) { schedule in
+                                                ScheduleSearchResultCard(schedule: schedule, colorSettings: colorSettings)
+                                                    .onTapGesture {
+                                                        selectedDate = schedule.startDate
+                                                        showSearchMode = false
+                                                        searchText = ""
+                                                        showBottomSheet = true
+                                                    }
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .padding(.top, 12)
+                                        .padding(.bottom, 100)
+                                    }
+                                }
+                            } else {
+                                // 通常のカレンダー表示
+                                CustomCalendarView(
+                                    selectedDate: $selectedDate,
+                                    selectedYear: $selectedYear,
+                                    selectedMonth: $selectedMonth,
+                                    schedulesForDate: self.schedulesForDate,
+                                    firestoreManager: firestoreManager,
+                                    userId: userId,
+                                    showBottomSheet: $showBottomSheet,
+                                    screenHeight: geometry.size.height
+                                )
+                                .scaleEffect(
+                                    x: geometry.size.height < 700 ? 1.1 : 1.0,
+                                    y: geometry.size.height < 700 ? 0.85 : 1.0,
+                                    anchor: .center
+                                )
+                                .offset(x: geometry.size.height < 700 ? 0 : -10)
+                                .frame(height: calendarHeight)
+                                .frame(maxWidth: .infinity)
+                            }
+
                         Spacer()
                     }
                     // オーバーレイ表示
@@ -1994,6 +2128,72 @@ func formattedDateString(_ date: Date) -> String {
 }
 
 
+// 検索結果カード
+struct ScheduleSearchResultCard: View {
+    let schedule: Schedule
+    let colorSettings: ColorSettingsManager
+
+    private func formatDateRange() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "M/d(E)"
+        formatter.locale = Locale(identifier: "ja_JP")
+
+        let startStr = formatter.string(from: schedule.startDate)
+
+        // 終了日が開始日と異なる場合
+        let calendar = Calendar.current
+        if !calendar.isDate(schedule.startDate, inSameDayAs: schedule.endDate) {
+            let endStr = formatter.string(from: schedule.endDate)
+            return "\(startStr) 〜 \(endStr)"
+        }
+
+        return startStr
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                // タグ
+                if !schedule.tag.isEmpty {
+                    Text(schedule.tag)
+                        .dynamicCaption2()
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(colorSettings.getCurrentAccentColor())
+                        .cornerRadius(4)
+                }
+
+                Spacer()
+
+                // 日付
+                Text(formatDateRange())
+                    .dynamicCaption()
+                    .foregroundColor(.gray)
+            }
+
+            // タイトル
+            Text(schedule.title)
+                .dynamicBody()
+                .foregroundColor(colorSettings.getCurrentTextColor())
+                .fontWeight(.semibold)
+
+            // メモ（空でない場合）
+            if !schedule.memo.isEmpty {
+                Text(schedule.memo)
+                    .dynamicCaption()
+                    .foregroundColor(.gray)
+                    .lineLimit(2)
+            }
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.white.opacity(0.8))
+                .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
+        )
+    }
+}
 
 // プレビュー画面表示
 struct CalendarView_Previews: PreviewProvider {

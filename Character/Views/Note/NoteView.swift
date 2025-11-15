@@ -175,8 +175,18 @@ struct MemoContentView: View {
             HStack {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.gray)
+
                 TextField("メモを検索", text: $searchText)
                     .dynamicBody()
+
+                // クリアボタン（常に表示、テキストがない時は無効化）
+                Button(action: {
+                    searchText = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(searchText.isEmpty ? .gray.opacity(0.3) : .gray.opacity(0.6))
+                }
+                .disabled(searchText.isEmpty)
             }
             .padding(12)
             .background(Color.white.opacity(0.8))
