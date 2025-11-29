@@ -29,7 +29,7 @@ struct DiaryDetailView: View {
                         VStack(alignment: .leading, spacing: 0) {
                         // 広告バナー1（日記の上）
                         if !isPremium {
-                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                            BannerAdView(adUnitID: Config.diaryDetailTopBannerAdUnitID)
                                 .frame(width: 320, height: 50)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
@@ -127,7 +127,7 @@ struct DiaryDetailView: View {
 
                         // 広告バナー2（コメント欄の下）
                         if !isPremium {
-                            BannerAdView(adUnitID: "ca-app-pub-3940256099942544/2934735716")
+                            BannerAdView(adUnitID: Config.diaryDetailBottomBannerAdUnitID)
                                 .frame(width: 320, height: 50)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)

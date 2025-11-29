@@ -12,6 +12,10 @@ struct MainTabView: View {
     @State private var selectedTab: Int = 0
     @State private var showErrorAlert = false
     @State private var showSignUp = false
+    @State private var showDiaryDetail = false
+    @State private var selectedDiaryId: String = ""
+    @State private var selectedDiaryCharacterId: String = ""
+    @State private var selectedDiaryUserId: String = ""
     
     private var dynamicTabBarPadding: CGFloat {
         let screenHeight = UIScreen.main.bounds.height
@@ -88,6 +92,23 @@ struct MainTabView: View {
             UITabBar.appearance().scrollEdgeAppearance = tabAppearance
             UITabBar.appearance().backgroundColor = UIColor.clear
             UITabBar.appearance().isTranslucent = true
+
+            // 日記を開く通知を監視
+            NotificationCenter.default.addObserver(
+                forName: .openDiary,
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let userInfo = notification.userInfo,
+                   let diaryId = userInfo["diaryId"] as? String,
+                   let characterId = userInfo["characterId"] as? String,
+                   let userId = userInfo["userId"] as? String {
+                    self.selectedDiaryId = diaryId
+                    self.selectedDiaryCharacterId = characterId
+                    self.selectedDiaryUserId = userId
+                    self.showDiaryDetail = true
+                }
+            }
         }
         .alert("アカウント情報の取得ができませんでした", isPresented: $showErrorAlert) {
             Button("ログアウト", role: .cancel) {
@@ -102,6 +123,15 @@ struct MainTabView: View {
         .sheet(isPresented: $showSignUp) {
             SignUpView()
                 .environmentObject(authManager)
+        }
+        .fullScreenCover(isPresented: $showDiaryDetail) {
+            NavigationStack {
+                DiaryDetailView(
+                    diaryId: selectedDiaryId,
+                    characterId: selectedDiaryCharacterId,
+                    userId: selectedDiaryUserId
+                )
+            }
         }
     }
     private func fetchUserAndCharacter() {

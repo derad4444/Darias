@@ -164,18 +164,31 @@ class PurchaseManager: ObservableObject {
         guard let userId = Auth.auth().currentUser?.uid else { return }
 
         let isPremium = !purchasedProductIDs.isEmpty
-        let subscriptionData: [String: Any] = [
-            "plan": isPremium ? "premium" : "free",
-            "status": isPremium ? "active" : "free",
-            "payment_method": "app_store",
-            "auto_renewal": isPremium,
-            "updated_at": Timestamp()
-        ]
 
+        // 手動テスト用フラグをチェック
         do {
-            try await db.collection("users").document(userId)
+            let docRef = db.collection("users").document(userId)
                 .collection("subscription").document("current")
-                .setData(subscriptionData, merge: true)
+            let document = try await docRef.getDocument()
+
+            // manual_override フィールドがtrueの場合はスキップ（テスト用）
+            if let data = document.data(),
+               let manualOverride = data["manual_override"] as? Bool,
+               manualOverride {
+                Logger.info("Manual override enabled, skipping StoreKit update", category: Logger.subscription)
+                return
+            }
+
+            // 通常の更新処理
+            let subscriptionData: [String: Any] = [
+                "plan": isPremium ? "premium" : "free",
+                "status": isPremium ? "active" : "free",
+                "payment_method": "app_store",
+                "auto_renewal": isPremium,
+                "updated_at": Timestamp()
+            ]
+
+            try await docRef.setData(subscriptionData, merge: true)
 
             // SubscriptionManagerに通知
             await MainActor.run {

@@ -53,6 +53,7 @@ struct HomeView: View {
     // サービス
     @StateObject private var characterService = CharacterService()
     @StateObject private var errorManager = ErrorManager()
+    @StateObject private var diaryNotificationService = DiaryNotificationService.shared
 
     // キャラクター性別
     @State private var characterGender: CharacterGender = .female
@@ -348,6 +349,14 @@ struct HomeView: View {
         
         // ポイント初期読み込み
         pointsManager.loadPoints(for: characterId)
+
+        // 日記通知の監視を開始
+        if let config = characterConfig {
+            diaryNotificationService.startMonitoringCharacter(
+                userId: userId,
+                character: config
+            )
+        }
     }
     
     // MARK: - Character Info Loading

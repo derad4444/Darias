@@ -2,6 +2,7 @@ import Foundation
 import FirebaseFirestore
 import FirebaseFunctions
 import FirebaseAuth
+import WidgetKit
 
 extension Notification.Name {
     static let scheduleDetected = Notification.Name("scheduleDetected")
@@ -9,6 +10,7 @@ extension Notification.Name {
     static let characterGenerationUpdated = Notification.Name("characterGenerationUpdated")
 }
 
+@MainActor
 class CharacterService: ObservableObject {
     private let db = Firestore.firestore()
     private let functions = Functions.functions(region: "asia-northeast1")
@@ -285,6 +287,8 @@ class CharacterService: ObservableObject {
                     let oldCount = self?.big5AnsweredCount ?? 0
                     self?.big5AnsweredCount = newCount
 
+                    // ウィジェット用にキャッシュ
+                    WidgetDataService.shared.cacheBig5Progress(answeredCount: newCount, totalCount: 100)
 
                     // カウントが増えた場合はアニメーション通知を送信
                     if newCount > oldCount {

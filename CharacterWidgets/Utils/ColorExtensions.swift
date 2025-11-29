@@ -1,15 +1,14 @@
 //
-//  Color+Extensions.swift
-//  Character
+//  ColorExtensions.swift
+//  CharacterWidgets
 //
-//  Created for Widget Utilities
+//  Color extension for widgets
 //
 
 import SwiftUI
 
 extension Color {
-    /// 16進数文字列からColorを生成
-    /// - Parameter hex: 16進数カラーコード（例: "FFFFFF" or "#FFFFFF"）
+    /// Hexカラーコードから色を生成（ウィジェット用）
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
         var int: UInt64 = 0

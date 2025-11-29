@@ -9,7 +9,7 @@ import Foundation
 
 struct AppGroupConstants {
     /// App Group ID for sharing data between main app and widgets
-    static let suiteName = "group.com.darias.character"
+    static let suiteName = "group.com.derad.Character"
 
     // MARK: - UserDefaults Keys for Widget Data Cache
 

@@ -1,6 +1,7 @@
 import FirebaseFirestore
 import FirebaseAuth
 import Foundation
+import WidgetKit
 
 class FirestoreManager: ObservableObject {
     //Firestoreへの接続インスタンス
@@ -42,27 +43,27 @@ class FirestoreManager: ObservableObject {
                 if let documents = snapshot?.documents {
                     self.schedules = documents.compactMap { doc in
                         let data = doc.data()
-                        
-                        guard let title = data["title"] as? String else { 
-                            return nil 
+
+                        guard let title = data["title"] as? String else {
+                            return nil
                         }
-                        
+
                         // startDateとendDateを取得
                         let startTimestamp = data["startDate"] as? Timestamp
                         let endTimestamp = data["endDate"] as? Timestamp
-                        
+
                         guard let startDate = startTimestamp?.dateValue() else {
                             return nil
                         }
-                        
+
                         // endDateが必須
                         guard let endDate = endTimestamp?.dateValue() else {
                             return nil
                         }
-                        
+
                         // isAllDayがFirestoreに無いケースも考慮してデフォルトfalse
                         let isAllDay = data["isAllDay"] as? Bool ?? false
-                        
+
                         // 詳細情報も取得（存在しない場合はデフォルト値）
                         let location = data["location"] as? String ?? ""
                         let memo = data["memo"] as? String ?? ""
@@ -103,6 +104,9 @@ class FirestoreManager: ObservableObject {
 
                         return schedule
                     }
+
+                    // ウィジェット用にキャッシュ
+                    WidgetDataService.shared.cacheSchedules(self.schedules)
                 }
             }
     }
@@ -186,6 +190,8 @@ class FirestoreManager: ObservableObject {
                 completion(false)
             } else {
                 Logger.success("Schedule added successfully", category: Logger.firestore)
+                // 最新データを取得してウィジェット更新
+                self.fetchSchedules()
                 // CalendarViewに予定追加を通知
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
@@ -230,6 +236,8 @@ class FirestoreManager: ObservableObject {
                 if let error = error {
                     completion(false)
                 } else {
+                    // 最新データを取得してウィジェット更新
+                    self.fetchSchedules()
                     // CalendarViewに予定更新を通知
                     DispatchQueue.main.async {
                         NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
@@ -289,6 +297,8 @@ class FirestoreManager: ObservableObject {
             if let error = error {
                 completion(false)
             } else {
+                // 最新データを取得してウィジェット更新
+                self.fetchSchedules()
                 // CalendarViewに予定更新を通知
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("ScheduleAdded"), object: nil)
@@ -314,6 +324,8 @@ class FirestoreManager: ObservableObject {
                 // ローカルの予定リストからも削除
                 DispatchQueue.main.async {
                     self.schedules.removeAll { $0.id == scheduleId }
+                    // ウィジェットキャッシュも更新
+                    WidgetDataService.shared.cacheSchedules(self.schedules)
                     // 削除完了の通知を送信
                     NotificationCenter.default.post(
                         name: .init("ScheduleDeleted"),
@@ -560,6 +572,9 @@ class FirestoreManager: ObservableObject {
                         )
                     }
                     Logger.debug("fetchMemos: Found \(self.memos.count) memos", category: Logger.firestore)
+
+                    // ウィジェット用にキャッシュ
+                    WidgetDataService.shared.cacheMemos(self.memos)
                 }
             }
     }
@@ -574,6 +589,8 @@ class FirestoreManager: ObservableObject {
                 completion(false)
             } else {
                 Logger.success("Memo added successfully", category: Logger.firestore)
+                // 最新データを取得してウィジェット更新
+                self.fetchMemos(userId: userId)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("MemoAdded"), object: nil)
                 }
@@ -595,6 +612,8 @@ class FirestoreManager: ObservableObject {
                 completion(false)
             } else {
                 Logger.success("Memo updated successfully", category: Logger.firestore)
+                // 最新データを取得してウィジェット更新
+                self.fetchMemos(userId: userId)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("MemoUpdated"), object: nil)
                 }
@@ -615,6 +634,8 @@ class FirestoreManager: ObservableObject {
                 Logger.success("Memo deleted successfully", category: Logger.firestore)
                 DispatchQueue.main.async {
                     self.memos.removeAll { $0.id == memoId }
+                    // ウィジェットキャッシュも更新
+                    WidgetDataService.shared.cacheMemos(self.memos)
                     NotificationCenter.default.post(name: .init("MemoDeleted"), object: nil)
                 }
                 completion(true)
@@ -692,6 +713,9 @@ class FirestoreManager: ObservableObject {
                         )
                     }
                     Logger.debug("fetchTodos: Found \(self.todos.count) todos", category: Logger.firestore)
+
+                    // ウィジェット用にキャッシュ
+                    WidgetDataService.shared.cacheTodos(self.todos)
                 }
             }
     }
@@ -706,6 +730,8 @@ class FirestoreManager: ObservableObject {
                 completion(false)
             } else {
                 Logger.success("Todo added successfully", category: Logger.firestore)
+                // 最新データを取得してウィジェット更新
+                self.fetchTodos(userId: userId)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("TodoAdded"), object: nil)
                 }
@@ -727,6 +753,8 @@ class FirestoreManager: ObservableObject {
                 completion(false)
             } else {
                 Logger.success("Todo updated successfully", category: Logger.firestore)
+                // 最新データを取得してウィジェット更新
+                self.fetchTodos(userId: userId)
                 DispatchQueue.main.async {
                     NotificationCenter.default.post(name: .init("TodoUpdated"), object: nil)
                 }
@@ -747,6 +775,8 @@ class FirestoreManager: ObservableObject {
                 Logger.success("Todo deleted successfully", category: Logger.firestore)
                 DispatchQueue.main.async {
                     self.todos.removeAll { $0.id == todoId }
+                    // ウィジェットキャッシュも更新
+                    WidgetDataService.shared.cacheTodos(self.todos)
                     NotificationCenter.default.post(name: .init("TodoDeleted"), object: nil)
                 }
                 completion(true)

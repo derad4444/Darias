@@ -176,6 +176,49 @@ class NotificationManager: ObservableObject {
             }
         }
     }
+
+    // MARK: - Diary Notifications
+
+    /// 新しい日記が作成されたときに通知を送信
+    func sendDiaryNotification(characterName: String, diaryId: String, characterId: String, userId: String, date: Date) {
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "新しい日記が届きました"
+        content.body = "\(characterName)が日記を書きました"
+        content.sound = .default
+        content.badge = 1
+
+        // 日記を開くための情報を追加
+        content.userInfo = [
+            "type": "diary",
+            "diaryId": diaryId,
+            "characterId": characterId,
+            "userId": userId
+        ]
+
+        // 即座に通知を表示（1秒後）
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+
+        let request = UNNotificationRequest(
+            identifier: "diary_\(diaryId)",
+            content: content,
+            trigger: trigger
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ 日記通知エラー: \(error.localizedDescription)")
+            } else {
+                print("✅ 日記通知を送信しました: \(diaryId)")
+            }
+        }
+    }
+
+    /// バッジをクリア
+    func clearBadge() {
+        UNUserNotificationCenter.current().setBadgeCount(0)
+    }
 }
 
 // 通知単位の列挙型

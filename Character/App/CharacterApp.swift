@@ -76,8 +76,34 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     func userNotificationCenter(_ center: UNUserNotificationCenter,
                                didReceive response: UNNotificationResponse,
                                withCompletionHandler completionHandler: @escaping () -> Void) {
-        // 通知タップ時の処理を追加可能
-        // Notification tapped
+        let userInfo = response.notification.request.content.userInfo
+
+        // 通知のタイプを確認
+        if let type = userInfo["type"] as? String, type == "diary" {
+            // 日記通知の場合
+            if let diaryId = userInfo["diaryId"] as? String,
+               let characterId = userInfo["characterId"] as? String,
+               let userId = userInfo["userId"] as? String {
+                // 日記画面を開くための通知を送信
+                NotificationCenter.default.post(
+                    name: .openDiary,
+                    object: nil,
+                    userInfo: [
+                        "diaryId": diaryId,
+                        "characterId": characterId,
+                        "userId": userId
+                    ]
+                )
+
+                print("📖 日記通知をタップ: diaryId=\(diaryId), characterId=\(characterId)")
+            }
+        }
+
         completionHandler()
     }
+}
+
+// MARK: - Notification Names
+extension Notification.Name {
+    static let openDiary = Notification.Name("openDiary")
 }
