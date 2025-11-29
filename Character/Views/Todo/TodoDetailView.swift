@@ -9,6 +9,7 @@ struct TodoDetailView: View {
     @StateObject private var firestoreManager = FirestoreManager.shared
     @StateObject private var colorSettings = ColorSettingsManager.shared
     @StateObject private var tagSettingsManager = TagSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
 
     @State private var title: String = ""
@@ -42,6 +43,16 @@ struct TodoDetailView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
+                        // 上部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.taskAddTopBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                        }
+
                         // タイトル入力
                         VStack(alignment: .leading, spacing: 8) {
                             Text("タイトル")
@@ -173,6 +184,16 @@ struct TodoDetailView: View {
                                 .cornerRadius(10)
                             }
                         }
+
+                        // 下部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.taskAddBottomBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                        }
                     }
                     .padding(16)
                 }
@@ -205,6 +226,9 @@ struct TodoDetailView: View {
                 Text("このTODOを削除してもよろしいですか？")
             }
             .onAppear {
+                // サブスクリプション監視開始
+                subscriptionManager.startMonitoring()
+
                 if let todo = todo {
                     title = todo.title
                     description = todo.description
@@ -216,6 +240,10 @@ struct TodoDetailView: View {
                     selectedTag = todo.tag
                     isCompleted = todo.isCompleted
                 }
+            }
+            .onDisappear {
+                // サブスクリプション監視停止
+                subscriptionManager.stopMonitoring()
             }
         }
     }

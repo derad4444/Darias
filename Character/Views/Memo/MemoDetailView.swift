@@ -9,6 +9,7 @@ struct MemoDetailView: View {
     @StateObject private var firestoreManager = FirestoreManager.shared
     @StateObject private var colorSettings = ColorSettingsManager.shared
     @StateObject private var tagSettingsManager = TagSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
 
     @State private var title: String = ""
@@ -17,14 +18,9 @@ struct MemoDetailView: View {
     @State private var isPinned: Bool = false
     @State private var showDeleteAlert: Bool = false
     @State private var showTagSelection: Bool = false
-    @State private var selectedTab: MemoEditTab = .edit
     @State private var previousContent: String = ""
     @State private var textToInsert: String = ""
-
-    enum MemoEditTab: String, CaseIterable {
-        case edit = "編集"
-        case preview = "プレビュー"
-    }
+    @State private var isEditMode: Bool = false
 
     private var isNewMemo: Bool {
         memo == nil
@@ -39,6 +35,16 @@ struct MemoDetailView: View {
 
                 ScrollView {
                     VStack(spacing: 16) {
+                        // 上部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.memoAddTopBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                        }
+
                         // タイトル入力
                         VStack(alignment: .leading, spacing: 8) {
                             Text("タイトル")
@@ -52,27 +58,14 @@ struct MemoDetailView: View {
                                 .cornerRadius(10)
                         }
 
-                        // 内容入力
+                        // 内容表示（編集モードまたはプレビューモード）
                         VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("内容")
-                                    .dynamicCallout()
-                                    .foregroundColor(.secondary)
+                            Text("内容")
+                                .dynamicCallout()
+                                .foregroundColor(.secondary)
 
-                                Spacer()
-
-                                // タブ切り替え
-                                Picker("", selection: $selectedTab) {
-                                    ForEach(MemoEditTab.allCases, id: \.self) { tab in
-                                        Text(tab.rawValue).tag(tab)
-                                    }
-                                }
-                                .pickerStyle(.segmented)
-                                .frame(width: 180)
-                            }
-
-                            if selectedTab == .edit {
-                                // 編集タブ
+                            if isEditMode {
+                                // 編集モード
                                 CustomTextEditor(text: $content, textToInsert: $textToInsert)
                                     .frame(minHeight: 200)
                                     .padding(12)
@@ -91,11 +84,11 @@ struct MemoDetailView: View {
                                     .padding(.horizontal, 4)
                                 }
                             } else {
-                                // プレビュータブ
+                                // プレビューモード
                                 ScrollView {
                                     VStack(alignment: .leading, spacing: 8) {
                                         if content.isEmpty {
-                                            Text("内容を入力すると、ここにプレビューが表示されます")
+                                            Text("内容がありません")
                                                 .dynamicBody()
                                                 .foregroundColor(.gray)
                                                 .frame(maxWidth: .infinity, alignment: .center)
@@ -168,6 +161,16 @@ struct MemoDetailView: View {
                                 .cornerRadius(10)
                             }
                         }
+
+                        // 下部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.memoAddBottomBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                        }
                     }
                     .padding(16)
                 }
@@ -182,17 +185,17 @@ struct MemoDetailView: View {
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if selectedTab == .preview {
-                        // プレビュータブ時は「編集」ボタン
-                        Button("編集") {
-                            selectedTab = .edit
-                        }
-                    } else {
-                        // 編集タブ時は「保存」ボタン
+                    if isEditMode {
+                        // 編集モード時は「保存」ボタン
                         Button("保存") {
                             saveMemo()
                         }
                         .disabled(title.isEmpty)
+                    } else {
+                        // プレビューモード時は「編集」ボタン
+                        Button("編集") {
+                            isEditMode = true
+                        }
                     }
                 }
             }
@@ -208,18 +211,25 @@ struct MemoDetailView: View {
                 Text("このメモを削除してもよろしいですか？")
             }
             .onAppear {
+                // サブスクリプション監視開始
+                subscriptionManager.startMonitoring()
+
                 if let memo = memo {
                     title = memo.title
                     content = memo.content
                     selectedTag = memo.tag
                     isPinned = memo.isPinned
-                    // 既存メモはプレビュータブから開始
-                    selectedTab = .preview
+                    // 既存メモはプレビューモードで開始
+                    isEditMode = false
                 } else {
-                    // 新規メモは編集タブから開始
-                    selectedTab = .edit
+                    // 新規メモは編集モードで開始
+                    isEditMode = true
                 }
                 previousContent = content
+            }
+            .onDisappear {
+                // サブスクリプション監視停止
+                subscriptionManager.stopMonitoring()
             }
         }
     }

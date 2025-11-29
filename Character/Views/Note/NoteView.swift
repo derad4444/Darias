@@ -5,6 +5,7 @@ struct NoteView: View {
 
     @StateObject private var colorSettings = ColorSettingsManager.shared
     @StateObject private var firestoreManager = FirestoreManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
     @State private var selectedSegment: NoteSegment = .memo
     @State private var showAddMemo: Bool = false
@@ -94,6 +95,9 @@ struct NoteView: View {
                 .environmentObject(fontSettings)
             }
             .onAppear {
+                // サブスクリプション監視開始
+                subscriptionManager.startMonitoring()
+
                 firestoreManager.fetchMemos(userId: userId)
                 firestoreManager.fetchTodos(userId: userId)
 
@@ -131,6 +135,10 @@ struct NoteView: View {
                     firestoreManager.fetchTodos(userId: userId)
                 }
             }
+            .onDisappear {
+                // サブスクリプション監視停止
+                subscriptionManager.stopMonitoring()
+            }
         }
     }
 }
@@ -142,10 +150,13 @@ struct MemoContentView: View {
 
     @StateObject private var firestoreManager = FirestoreManager.shared
     @StateObject private var colorSettings = ColorSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
 
     @State private var searchText: String = ""
     @State private var selectedTag: String = "すべて"
+    @State private var memoToDelete: Memo?
+    @State private var showDeleteAlert: Bool = false
 
     private var filteredMemos: [Memo] {
         var memos = firestoreManager.memos
@@ -237,6 +248,17 @@ struct MemoContentView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 12) {
+                        // 上部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.memoTopBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.bottom, 8)
+                        }
+
                         ForEach(filteredMemos) { memo in
                             Button(action: {
                                 selectedMemo = memo
@@ -245,12 +267,52 @@ struct MemoContentView: View {
                                     .environmentObject(fontSettings)
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    memoToDelete = memo
+                                    showDeleteAlert = true
+                                } label: {
+                                    Label("削除", systemImage: "trash")
+                                }
+                            }
+                        }
+
+                        // 下部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.memoBottomBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.top, 8)
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 80)
                 }
+            }
+        }
+        .alert("メモを削除", isPresented: $showDeleteAlert) {
+            Button("キャンセル", role: .cancel) {
+                memoToDelete = nil
+            }
+            Button("削除", role: .destructive) {
+                if let memo = memoToDelete {
+                    deleteMemo(memo)
+                }
+            }
+        } message: {
+            Text("このメモを削除してもよろしいですか？")
+        }
+    }
+
+    private func deleteMemo(_ memo: Memo) {
+        firestoreManager.deleteMemo(memoId: memo.id, userId: userId) { success in
+            if success {
+                firestoreManager.fetchMemos(userId: userId)
+                memoToDelete = nil
             }
         }
     }
@@ -263,10 +325,13 @@ struct TodoContentView: View {
 
     @StateObject private var firestoreManager = FirestoreManager.shared
     @StateObject private var colorSettings = ColorSettingsManager.shared
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @EnvironmentObject var fontSettings: FontSettingsManager
 
     @State private var selectedFilter: TodoFilter = .all
     @State private var selectedTag: String = "すべて"
+    @State private var todoToDelete: TodoItem?
+    @State private var showDeleteAlert: Bool = false
 
     enum TodoFilter: String, CaseIterable {
         case all = "すべて"
@@ -376,6 +441,17 @@ struct TodoContentView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
+                        // 上部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.taskTopBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.bottom, 8)
+                        }
+
                         ForEach(filteredTodos) { todo in
                             Button(action: {
                                 selectedTodo = todo
@@ -386,12 +462,52 @@ struct TodoContentView: View {
                                 .environmentObject(fontSettings)
                             }
                             .buttonStyle(PlainButtonStyle())
+                            .contextMenu {
+                                Button(role: .destructive) {
+                                    todoToDelete = todo
+                                    showDeleteAlert = true
+                                } label: {
+                                    Label("削除", systemImage: "trash")
+                                }
+                            }
+                        }
+
+                        // 下部バナー広告（無料ユーザーのみ）
+                        if subscriptionManager.shouldDisplayBannerAd() {
+                            BannerAdView(adUnitID: Config.taskBottomBannerAdUnitID)
+                                .frame(height: 50)
+                                .background(Color.clear)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
+                                .padding(.top, 8)
                         }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
                     .padding(.bottom, 80)
                 }
+            }
+        }
+        .alert("タスクを削除", isPresented: $showDeleteAlert) {
+            Button("キャンセル", role: .cancel) {
+                todoToDelete = nil
+            }
+            Button("削除", role: .destructive) {
+                if let todo = todoToDelete {
+                    deleteTodo(todo)
+                }
+            }
+        } message: {
+            Text("このタスクを削除してもよろしいですか？")
+        }
+    }
+
+    private func deleteTodo(_ todo: TodoItem) {
+        firestoreManager.deleteTodo(todoId: todo.id, userId: userId) { success in
+            if success {
+                firestoreManager.fetchTodos(userId: userId)
+                todoToDelete = nil
             }
         }
     }

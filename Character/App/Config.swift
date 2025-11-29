@@ -31,7 +31,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/4098604324"
+        return "ca-app-pub-5851550594315289/8287132245"
         #endif
     }
 
@@ -40,7 +40,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/5277429400"
+        return "ca-app-pub-5851550594315289/5497209577"
         #endif
     }
 
@@ -49,7 +49,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/3392027317"
+        return "ca-app-pub-5851550594315289/3362000823"
         #endif
     }
 
@@ -58,7 +58,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/3964347732"
+        return "ca-app-pub-5851550594315289/2539873743"
         #endif
     }
 
@@ -67,7 +67,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/8452782303"
+        return "ca-app-pub-5851550594315289/8127350145"
         #endif
     }
 
@@ -76,7 +76,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/5826618960"
+        return "ca-app-pub-5851550594315289/1805376571"
         #endif
     }
 
@@ -85,7 +85,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/4993841454"
+        return "ca-app-pub-5851550594315289/2670191098"
         #endif
     }
 
@@ -94,7 +94,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/1338184394"
+        return "ca-app-pub-5851550594315289/6566748666"
         #endif
     }
 
@@ -103,7 +103,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/5028542613"
+        return "ca-app-pub-5851550594315289/3034805563"
         #endif
     }
 
@@ -112,7 +112,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/1045065575"
+        return "ca-app-pub-5851550594315289/3683889865"
         #endif
     }
 
@@ -121,7 +121,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/3715460944"
+        return "ca-app-pub-5851550594315289/2370808193"
         #endif
     }
 
@@ -130,7 +130,97 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/1066721657"
+        return "ca-app-pub-5851550594315289/5501186800"
+        #endif
+    }
+
+    /// 日記詳細画面上部バナー
+    static var diaryDetailTopBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/1226792077" // 本番用ID（要設定）
+        #endif
+    }
+
+    /// 日記詳細画面下部バナー
+    static var diaryDetailBottomBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/1046936476" // 本番用ID（要設定）
+        #endif
+    }
+
+    /// メモ画面上部バナー
+    static var memoTopBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/8134270760"
+        #endif
+    }
+
+    /// メモ画面下部バナー
+    static var memoBottomBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/6730400193"
+        #endif
+    }
+
+    /// タスク画面上部バナー
+    static var taskTopBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/4442437769"
+        #endif
+    }
+
+    /// タスク画面下部バナー
+    static var taskBottomBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/9412511653"
+        #endif
+    }
+
+    /// メモ追加画面上部バナー
+    static var memoAddTopBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/5138116921"
+        #endif
+    }
+
+    /// メモ追加画面下部バナー
+    static var memoAddBottomBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/6754558720"
+        #endif
+    }
+
+    /// タスク追加画面上部バナー
+    static var taskAddTopBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/5441477059"
+        #endif
+    }
+
+    /// タスク追加画面下部バナー
+    static var taskAddBottomBannerAdUnitID: String {
+        #if DEBUG
+        return "ca-app-pub-3940256099942544/2934735716" // テスト用ID
+        #else
+        return "ca-app-pub-5851550594315289/XXXXXXXXXX" // 本番用ID（要設定）
         #endif
     }
 
@@ -141,7 +231,7 @@ struct Config {
         #if DEBUG
         return "ca-app-pub-3940256099942544/5224354917" // テスト用ID
         #else
-        return "ca-app-pub-5851550594315289/5095991225"
+        return "ca-app-pub-5851550594315289/8397160491"
         #endif
     }
     
