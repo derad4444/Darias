@@ -6,10 +6,10 @@ struct HomeView: View {
     @State private var userInput: String = ""
     @State private var isWaitingForReply: Bool = false
     @State private var hasLoadedInitialMessage = false
-    @State private var showChatHistory = false
     @EnvironmentObject var authManager: AuthManager
     @EnvironmentObject var fontSettings: FontSettingsManager
-    @StateObject private var colorSettings = ColorSettingsManager.shared
+    // 共有インスタンスは直接参照（パフォーマンス改善）
+    private let colorSettings = ColorSettingsManager.shared
     @AppStorage("characterVolume") var characterVolume: Double = 0.8
     @AppStorage("isPremium") var isPremium: Bool = false
     
@@ -26,7 +26,7 @@ struct HomeView: View {
     // 広告表示
     @StateObject private var rewardedAd = RewardedAdManager()
     @StateObject private var chatLimitManager = ChatLimitManager()
-    @StateObject private var subscriptionManager = SubscriptionManager.shared
+    private let subscriptionManager = SubscriptionManager.shared
     
     // 予定確認ポップアップ
     @State private var showChatLimitUpgrade = false
@@ -49,11 +49,17 @@ struct HomeView: View {
     // BIG5回答後のメッセージ
     @State private var engagingComment: String = ""
     @State private var showEngagingComment: Bool = false
-    
+
+    // 6人会議機能
+    @State private var showMeetingInput = false
+
+    // 統合履歴
+    @State private var showUnifiedHistory = false
+
     // サービス
     @StateObject private var characterService = CharacterService()
     @StateObject private var errorManager = ErrorManager()
-    @StateObject private var diaryNotificationService = DiaryNotificationService.shared
+    private let diaryNotificationService = DiaryNotificationService.shared
 
     // キャラクター性別
     @State private var characterGender: CharacterGender = .female
@@ -69,6 +75,10 @@ struct HomeView: View {
                     // 背景
                     colorSettings.getCurrentBackgroundGradient()
                         .ignoresSafeArea()
+                        .onTapGesture {
+                            // 背景タップでキーボードを閉じる
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
 
                     // キャラクター画像表示（背景レイヤー）
                     if let config = characterConfig {
@@ -83,7 +93,10 @@ struct HomeView: View {
                             height: min(geometry.size.height * 0.8, 800)
                         )
                         .position(x: geometry.size.width / 2, y: geometry.size.height * 0.6)
-                        .allowsHitTesting(false) // UIの邪魔にならないよう無効化
+                        .onTapGesture {
+                            // キャラクター画像タップでキーボードを閉じる
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
                     }
 
                     // UI要素（最前面レイヤー）
@@ -103,11 +116,31 @@ struct HomeView: View {
                                 Spacer()
                             }
 
-                            // 履歴ボタン
+                            // 6人会議ボタンと履歴ボタン
                             HStack {
-                                Spacer()
+                                // 自分会議ボタン
                                 Button(action: {
-                                    showChatHistory = true
+                                    showMeetingInput = true
+                                }) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "person.3.fill")
+                                        Text("自分会議")
+                                            .dynamicCallout()
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(colorSettings.getCurrentAccentColor().opacity(0.85))
+                                    .cornerRadius(20)
+                                    .shadow(radius: 2)
+                                }
+                                .padding(.leading, 16)
+
+                                Spacer()
+
+                                // 統合履歴ボタン
+                                Button(action: {
+                                    showUnifiedHistory = true
                                 }) {
                                     HStack(spacing: 8) {
                                         Image(systemName: "clock.arrow.circlepath")
@@ -117,7 +150,7 @@ struct HomeView: View {
                                     .foregroundColor(colorSettings.getCurrentAccentColor())
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(Color.white.opacity(0.2))
+                                    .background(Color.white.opacity(0.3))
                                     .cornerRadius(20)
                                     .shadow(radius: 2)
                                 }
@@ -198,6 +231,10 @@ struct HomeView: View {
                             x: geometry.size.width / 2,
                             y: geometry.safeAreaInsets.top + 80
                         )
+                        .onTapGesture {
+                            // 吹き出しタップでキーボードを閉じる
+                            UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                        }
                         .onAppear {
                         }
                     }
@@ -259,8 +296,17 @@ struct HomeView: View {
                     }
                 }
             }
-            .navigationDestination(isPresented: $showChatHistory) {
-                ChatHistoryView(userId: userId, characterId: characterId)
+            .sheet(isPresented: $showMeetingInput) {
+                MeetingInputView(
+                    userId: userId,
+                    characterId: characterId
+                )
+            }
+            .fullScreenCover(isPresented: $showUnifiedHistory) {
+                UnifiedHistoryView(
+                    userId: userId,
+                    characterId: characterId
+                )
             }
         }
         .overlay {
@@ -466,7 +512,10 @@ struct HomeView: View {
         // 送信直後にテキストをクリア＆入力を無効化
         userInput = ""
         isWaitingForReply = true
-        
+
+        // キーボードを閉じる
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
         characterService.sendMessage(
             characterId: characterId,
             userMessage: trimmed,
@@ -754,7 +803,7 @@ struct ChatInputComponent: View {
                     Image(systemName: isWaitingForReply ? "hourglass" : "paperplane.fill")
                         .foregroundColor(.white)
                         .padding(10)
-                        .background(!isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty ? colorSettings.getCurrentAccentColor() : Color.gray.opacity(0.5))
+                        .background(!isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty ? colorSettings.getCurrentAccentColor().opacity(0.85) : Color.gray.opacity(0.5))
                         .clipShape(Circle())
                         .shadow(radius: !isWaitingForReply && !isPlaceholderVisible && !userInput.isEmpty ? 4 : 0)
                         .disabled(isWaitingForReply)

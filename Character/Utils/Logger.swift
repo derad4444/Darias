@@ -15,6 +15,7 @@ struct Logger {
     static let character = OSLog(subsystem: subsystem, category: "Character")
     static let subscription = OSLog(subsystem: subsystem, category: "Subscription")
     static let general = OSLog(subsystem: subsystem, category: "General")
+    static let network = OSLog(subsystem: subsystem, category: "Network")
 
     /// デバッグ情報のログ（デバッグビルドでのみ出力）
     static func debug(_ message: String, category: OSLog = .default, file: String = #file, function: String = #function, line: Int = #line) {

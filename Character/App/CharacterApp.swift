@@ -3,6 +3,7 @@ import FirebaseCore
 import FirebaseAppCheck
 import GoogleMobileAds
 import UserNotifications
+import AVFoundation
 
 @main
 struct CharacterApp: App {
@@ -56,11 +57,24 @@ struct CharacterApp: App {
 class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(_ application: UIApplication,
                      didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+        // AudioSession設定（広告の音声処理を適切に処理）
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: [.mixWithOthers])
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("⚠️ AudioSession設定エラー: \(error.localizedDescription)")
+        }
+
+        // Google Mobile Ads初期化
         MobileAds.shared.start()
-        
+
+        // 広告の音声をミュート（オーディオ過負荷を防ぐ）
+        MobileAds.shared.isApplicationMuted = true
+        MobileAds.shared.applicationVolume = 0.0
+
         // 通知デリゲートを設定
         UNUserNotificationCenter.current().delegate = self
-        
+
         return true
     }
     

@@ -22,6 +22,7 @@ class SubscriptionManager: ObservableObject {
     private let db = Firestore.firestore()
     private var userListener: ListenerRegistration?
     private let purchaseManager = PurchaseManager.shared
+    private var currentMonitoringUserId: String?
 
     private init() {
         // PurchaseManagerの状態変化を監視
@@ -54,12 +55,25 @@ class SubscriptionManager: ObservableObject {
     /// ユーザーのサブスクリプション状態を取得・監視開始
     func startMonitoring() {
         guard let userId = Auth.auth().currentUser?.uid else {
+            print("⚠️ SubscriptionManager: No authenticated user, cannot start monitoring")
             subscriptionStatus = .unknown
             shouldShowBannerAd = false
             return
         }
 
+        // 既に同じユーザーを監視中の場合はスキップ
+        if currentMonitoringUserId == userId, userListener != nil {
+            print("✅ Already monitoring user \(userId), skipping duplicate")
+            return
+        }
+
+        print("🔍 SubscriptionManager: Starting monitoring for user \(userId)")
+
+        // 既存のリスナーを削除（ユーザー切り替え対応）
+        stopMonitoring()
+
         isLoading = true
+        currentMonitoringUserId = userId
 
         // リアルタイム監視開始 - subscription/currentドキュメントを監視
         userListener = db.collection("users").document(userId)
@@ -93,6 +107,7 @@ class SubscriptionManager: ObservableObject {
     func stopMonitoring() {
         userListener?.remove()
         userListener = nil
+        currentMonitoringUserId = nil
     }
 
     /// 手動でサブスクリプション状態を更新

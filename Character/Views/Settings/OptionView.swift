@@ -10,12 +10,12 @@ struct OptionView: View {
     @Environment(\.dismiss) var dismiss
     
     @AppStorage("isPremium") var isPremium: Bool = false
-    @AppStorage("bgmVolume") var bgmVolume: Double = 0.5
-    @AppStorage("characterVolume") var characterVolume: Double = 0.8
     
     @State private var showFontSettings = false
     @State private var showColorSettings = false
     @State private var showTagSettings = false
+    @State private var showNotificationSettings = false
+    @State private var showVolumeSettings = false
     @State private var showContactView = false
     @State private var showMailCompose = false
     @State private var showMailUnavailableAlert = false
@@ -27,15 +27,7 @@ struct OptionView: View {
     @State private var reauthPassword = ""
     @State private var deleteErrorMessage = ""
     @State private var showDeleteErrorAlert = false
-    
-    private var dynamicListHeight: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        let safeAreaTop: CGFloat = 47
-        let safeAreaBottom: CGFloat = 34
-        let navigationBarHeight: CGFloat = 44
-        return screenHeight - safeAreaTop - safeAreaBottom - navigationBarHeight - 20
-    }
-    
+
     var body: some View {
         ZStack {
             backgroundView
@@ -53,6 +45,13 @@ struct OptionView: View {
         }
         .sheet(isPresented: $showTagSettings) {
             TagSettingsView()
+        }
+        .sheet(isPresented: $showNotificationSettings) {
+            NotificationPreferencesView()
+                .environmentObject(authManager)
+        }
+        .sheet(isPresented: $showVolumeSettings) {
+            VolumeSettingsView()
         }
         .sheet(isPresented: $showContactView) {
             NavigationStack {
@@ -164,7 +163,8 @@ struct OptionView: View {
             debugPremiumToggleSection
             #endif
 
-            volumeSettingsSection
+            notificationSettingsSection
+            volumeSettingsButtonSection
             colorSettingsSection
             tagSettingsSection
             socialAndSupportSection
@@ -179,8 +179,6 @@ struct OptionView: View {
         }
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        .frame(height: dynamicListHeight)
-        .clipped()
     }
 
     // MARK: - デバッグ用プレミアム切り替え
@@ -349,56 +347,59 @@ struct OptionView: View {
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
 
-    private var volumeSettingsSection: some View {
-        Section(header: sectionHeader("音量設定")) {
-            VStack(spacing: 20) {
-                bgmVolumeControl
-                characterVolumeControl
+    private var volumeSettingsButtonSection: some View {
+        Section() {
+            Button(action: {
+                showVolumeSettings = true
+            }) {
+                settingsRowContent(
+                    title: "音量設定",
+                    subtitle: "BGM・キャラクター音声の音量調整"
+                )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                        )
+                )
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 16)
-            .background(
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.white.opacity(0.9))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
-                    )
-            )
+            .buttonStyle(PlainButtonStyle())
         }
         .listRowBackground(Color.clear)
         .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
     
-    private var bgmVolumeControl: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("BGM音量")
-                .dynamicCallout()
-                .foregroundColor(colorSettings.getCurrentTextColor())
-            Slider(value: $bgmVolume, in: 0...1, step: 0.01, onEditingChanged: { _ in
-                BGMPlayer.shared.updateVolume(bgmVolume)
-            })
-            .accentColor(colorSettings.getCurrentAccentColor())
-            Text("音量: \(Int(bgmVolume * 100))%")
-                .dynamicCaption()
-                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
+    
+    private var notificationSettingsSection: some View {
+        Section() {
+            Button(action: {
+                showNotificationSettings = true
+            }) {
+                settingsRowContent(
+                    title: "通知設定",
+                    subtitle: "予定・日記の通知を管理"
+                )
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.9))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(colorSettings.getCurrentTextColor().opacity(0.2), lineWidth: 1)
+                        )
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
         }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
     }
-    
-    private var characterVolumeControl: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("キャラクター音声")
-                .dynamicCallout()
-                .foregroundColor(colorSettings.getCurrentTextColor())
-            Slider(value: $characterVolume, in: 0...1, step: 0.01)
-                .accentColor(colorSettings.getCurrentAccentColor())
-            Text("音量: \(Int(characterVolume * 100))%")
-                .dynamicCaption()
-                .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
-        }
-    }
-    
-    
+
     private var tagSettingsSection: some View {
         Section() {
             Button(action: {
@@ -581,8 +582,8 @@ struct OptionView: View {
     }
 
     private func openInstagram() {
-        let instagramURL = "instagram://user?username=darias_1025"
-        let webURL = "https://www.instagram.com/darias_1025/"
+        let instagramURL = "instagram://user?username=darias_1024"
+        let webURL = "https://www.instagram.com/darias_1024/"
 
         if let url = URL(string: instagramURL), UIApplication.shared.canOpenURL(url) {
             UIApplication.shared.open(url)
@@ -614,7 +615,7 @@ struct OptionView: View {
             .buttonStyle(PlainButtonStyle())
         }
         .listRowBackground(Color.clear)
-        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
+        .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 20, trailing: 16))
     }
 
     private func deleteAccount() {

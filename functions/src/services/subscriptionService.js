@@ -21,7 +21,16 @@ class SubscriptionService {
       }
 
       const userData = userDoc.data();
-      const subscription = userData.subscription || {};
+
+      // 新しいサブスクリプション構造から取得
+      const subscriptionDoc = await db
+          .collection("users")
+          .doc(userId)
+          .collection("subscription")
+          .doc("current")
+          .get();
+
+      const subscription = subscriptionDoc.exists ? subscriptionDoc.data() : {};
 
       // サブスクリプション状態を検証
       const isValidPremium = await this.validatePremiumSubscription(subscription);
@@ -35,7 +44,8 @@ class SubscriptionService {
         tier: currentTier,
         subscription: {
           status: subscription.status || "free",
-          expires_at: subscription.expires_at,
+          plan: subscription.plan || "free",
+          end_date: subscription.end_date,
           is_valid: isValidPremium
         },
         usage: usageInfo,

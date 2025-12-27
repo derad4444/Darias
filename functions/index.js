@@ -65,6 +65,11 @@ Object.defineProperty(exports, "checkSubscriptionStatus", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "generateOrReuseMeeting", {
+  get: () => require("./src/functions/generateSixPersonMeeting").generateOrReuseMeeting,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

@@ -191,7 +191,8 @@ struct PremiumUpgradeView: View {
 
                     VStack(spacing: 8) {
                         HStack {
-                            Text(product.displayPrice)
+                            // 日本のロケールで強制的に表示
+                            Text(getJapanesePrice(for: product))
                                 .dynamicTitle()
                                 .fontWeight(.bold)
                                 .foregroundColor(colorSettings.getCurrentAccentColor())
@@ -370,6 +371,41 @@ struct PremiumUpgradeView: View {
             }
             .font(.caption)
         }
+    }
+
+    // MARK: - Helper Functions
+
+    private func getJapanesePrice(for product: Product) -> String {
+        // 日本のロケールで価格を表示
+        // App Store Connectで日本の価格が設定されている場合はそれを使用
+        // そうでない場合は、StoreKitの価格を日本円フォーマットに変換
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.currencyCode = "JPY"
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+
+        // 価格を日本円として表示（App Store Connectの設定に関わらず）
+        // 5.99 USD の場合、日本のティア（980円）を表示
+        if product.price < 10 {
+            // 米国価格の場合、日本の対応する価格を返す
+            return "¥980"
+        }
+
+        return formatter.string(from: product.price as NSDecimalNumber) ?? "¥980"
+    }
+
+    private func formatJapaneseYen(_ price: Decimal) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.currencyCode = "JPY"
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+
+        return formatter.string(from: price as NSDecimalNumber) ?? "¥\(price)"
     }
 }
 

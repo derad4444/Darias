@@ -1,4 +1,5 @@
 import SwiftUI
+import StoreKit
 
 struct ChatLimitUpgradeView: View {
     @Environment(\.dismiss) private var dismiss
@@ -88,7 +89,7 @@ struct ChatLimitUpgradeView: View {
                 // 価格情報
                 if let product = purchaseManager.getMonthlyProduct() {
                     VStack(spacing: 4) {
-                        Text("\(product.displayPrice)/月")
+                        Text("\(getJapanesePrice(for: product))/月")
                             .dynamicTitle3()
                             .fontWeight(.bold)
                             .foregroundColor(colorSettings.getCurrentAccentColor())
@@ -129,6 +130,39 @@ struct ChatLimitUpgradeView: View {
 
             Spacer()
         }
+    }
+
+    // MARK: - Helper Functions
+
+    private func getJapanesePrice(for product: Product) -> String {
+        // 日本のロケールで価格を表示
+        // 5.99 USD の場合、日本のティア（980円）を表示
+
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.currencyCode = "JPY"
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+
+        // 価格を日本円として表示（App Store Connectの設定に関わらず）
+        if product.price < 10 {
+            // 米国価格の場合、日本の対応する価格を返す
+            return "¥980"
+        }
+
+        return formatter.string(from: product.price as NSDecimalNumber) ?? "¥980"
+    }
+
+    private func formatJapaneseYen(_ price: Decimal) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.currencyCode = "JPY"
+        formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 0
+
+        return formatter.string(from: price as NSDecimalNumber) ?? "¥\(price)"
     }
 }
 

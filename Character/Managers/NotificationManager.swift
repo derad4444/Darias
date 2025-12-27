@@ -36,6 +36,14 @@ class NotificationManager: ObservableObject {
     func scheduleNotifications(for schedule: ScheduleItem) {
         guard isAuthorized else { return }
 
+        // 予定通知が無効化されている場合は何もしない
+        let scheduleNotificationEnabled = UserDefaults.standard.bool(forKey: "scheduleNotificationEnabled")
+        guard scheduleNotificationEnabled else {
+            // 設定が無効の場合、既存の通知のみ削除して終了
+            removeNotifications(for: schedule.id)
+            return
+        }
+
         // 既存の通知を削除
         removeNotifications(for: schedule.id)
 
@@ -213,6 +221,53 @@ class NotificationManager: ObservableObject {
                 print("✅ 日記通知を送信しました: \(diaryId)")
             }
         }
+    }
+
+    /// 毎日の日記通知をスケジュール（毎日23:50）
+    func scheduleDailyDiaryNotification(characterName: String, characterId: String, userId: String) {
+        guard isAuthorized else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "新しい日記が届きました"
+        content.body = "\(characterName)が今日の日記を書きました"
+        content.sound = .default
+        content.badge = 1
+
+        // 日記画面を開くための情報を追加
+        content.userInfo = [
+            "type": "daily_diary",
+            "characterId": characterId,
+            "userId": userId
+        ]
+
+        // 毎日23:50に通知
+        var dateComponents = DateComponents()
+        dateComponents.hour = 23
+        dateComponents.minute = 50
+
+        let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
+
+        let request = UNNotificationRequest(
+            identifier: "daily_diary_\(characterId)",
+            content: content,
+            trigger: trigger
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ 日記定期通知エラー: \(error.localizedDescription)")
+            } else {
+                print("✅ 日記定期通知をスケジュールしました: 毎日23:50")
+            }
+        }
+    }
+
+    /// 日記の定期通知をキャンセル
+    func cancelDailyDiaryNotification(characterId: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: ["daily_diary_\(characterId)"]
+        )
+        print("📝 日記定期通知をキャンセルしました: \(characterId)")
     }
 
     /// バッジをクリア

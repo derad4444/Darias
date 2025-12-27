@@ -16,14 +16,7 @@ struct MainTabView: View {
     @State private var selectedDiaryId: String = ""
     @State private var selectedDiaryCharacterId: String = ""
     @State private var selectedDiaryUserId: String = ""
-    
-    private var dynamicTabBarPadding: CGFloat {
-        let screenHeight = UIScreen.main.bounds.height
-        // iPhone SEなど小さい機種では小さめ、大きい機種では大きめに調整
-        return screenHeight * 0.065
-    }
 
-    
     var body: some View {
         ZStack {
             if isLoading {
@@ -69,28 +62,23 @@ struct MainTabView: View {
                         .tag(4)
                 }
                 .accentColor(colorSettings.getCurrentAccentColor()) // 選択中タブの色
-
-                // フッター上に線を自然に配置
-                VStack {
-                    Spacer()
-                    Divider()
-                        .padding(.bottom, dynamicTabBarPadding)  // 線の高さ
-                }
-                .allowsHitTesting(false)
             }
         }
         .onAppear {
             fetchUserAndCharacter()
 
-            // タブバーを透明化
+            // タブバーを半透明化
             let tabAppearance = UITabBarAppearance()
-            tabAppearance.configureWithTransparentBackground()
-            tabAppearance.backgroundColor = UIColor.clear
-            tabAppearance.backgroundEffect = nil
+            tabAppearance.configureWithDefaultBackground()
+
+            // 半透明の背景色を設定（白ベースで透明度80%）
+            tabAppearance.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+
+            // ぼかし効果を適用
+            tabAppearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
 
             UITabBar.appearance().standardAppearance = tabAppearance
             UITabBar.appearance().scrollEdgeAppearance = tabAppearance
-            UITabBar.appearance().backgroundColor = UIColor.clear
             UITabBar.appearance().isTranslucent = true
 
             // 日記を開く通知を監視

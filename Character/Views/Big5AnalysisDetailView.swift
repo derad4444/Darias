@@ -3,34 +3,31 @@ import SwiftUI
 struct Big5AnalysisDetailView: View {
     let analysis: Big5DetailedAnalysis
     let analysisLevel: Big5AnalysisLevel
-    
+
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var fontSettings: FontSettingsManager
-    @ObservedObject var colorSettings = ColorSettingsManager.shared
+    @StateObject private var colorSettings = ColorSettingsManager.shared
     
     var body: some View {
-        NavigationView {
-            ZStack {
-                // 背景グラデーション
-                colorSettings.getCurrentBackgroundGradient()
-                    .ignoresSafeArea()
-                
-                ScrollView {
-                    VStack(spacing: 0) {
-                        // ヘッダー部分
-                        headerSection
-                            .padding(.horizontal, 20)
-                            .padding(.top, 20)
-                        
-                        // メインコンテンツ
-                        mainContentSection
-                            .padding(.horizontal, 20)
-                            .padding(.bottom, 20)
-                    }
+        ZStack {
+            // 背景グラデーション
+            colorSettings.getCurrentBackgroundGradient()
+                .ignoresSafeArea()
+
+            ScrollView {
+                VStack(spacing: 0) {
+                    // ヘッダー部分
+                    headerSection
+                        .padding(.horizontal, 20)
+                        .padding(.top, 20)
+
+                    // メインコンテンツ
+                    mainContentSection
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20)
                 }
             }
         }
-        .navigationBarHidden(true)
     }
     
     // MARK: - Header Section
@@ -40,19 +37,13 @@ struct Big5AnalysisDetailView: View {
         VStack(spacing: 16) {
             // 解析レベルと進捗表示
             HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(analysisLevel.icon) \(analysisLevel.displayName)")
-                        .dynamicTitle2()
-                        .foregroundColor(colorSettings.getCurrentTextColor())
-                        .fontWeight(.bold)
-                    
-                    Text(analysisLevel.description)
-                        .dynamicCaption()
-                        .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
-                }
-                
+                Text("\(analysisLevel.icon) \(analysisLevel.displayName)")
+                    .dynamicTitle2()
+                    .foregroundColor(colorSettings.getCurrentTextColor())
+                    .fontWeight(.bold)
+
                 Spacer()
-                
+
                 Button {
                     dismiss()
                 } label: {
@@ -101,12 +92,9 @@ struct Big5AnalysisDetailView: View {
         VStack(spacing: 20) {
             // 詳細解析文
             analysisTextSection
-            
+
             // キーポイント
             keyPointsSection
-            
-            // アンドロイド進化メッセージ
-            evolutionMessageSection
         }
     }
     
@@ -228,11 +216,11 @@ struct Big5AnalysisDetailView: View {
     private func getEvolutionTitle() -> String {
         switch analysisLevel {
         case .basic:
-            return "基本プログラム実装"
+            return ""
         case .detailed:
-            return "学習システム進化中"
+            return ""
         case .complete:
-            return "人間化完了"
+            return ""
         }
     }
     

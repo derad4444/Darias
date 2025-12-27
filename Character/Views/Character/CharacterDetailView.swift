@@ -1,6 +1,13 @@
 import SwiftUI
 import FirebaseFirestore
 
+// 選択された解析データを保持する構造体
+struct SelectedAnalysisData: Identifiable {
+    let id = UUID()
+    let analysis: Big5DetailedAnalysis
+    let level: Big5AnalysisLevel
+}
+
 struct CharacterDetailView: View {
     let userId: String
     let characterId: String
@@ -27,8 +34,7 @@ struct CharacterDetailView: View {
     // Big5解析関連
     @StateObject private var big5AnalysisService = Big5AnalysisService()
     @State private var currentAnalysisLevel: Big5AnalysisLevel?
-    @State private var showBig5AnalysisDetail = false
-    @State private var selectedAnalysisCategory: Big5AnalysisCategory?
+    @State private var selectedAnalysisData: SelectedAnalysisData?
 
     var body: some View {
         GeometryReader { geometry in
@@ -141,14 +147,14 @@ struct CharacterDetailView: View {
         .onDisappear {
             subscriptionManager.stopMonitoring()
         }
-        .sheet(isPresented: $showBig5AnalysisDetail) {
-            if let selectedCategory = selectedAnalysisCategory,
-               let analysisData = big5AnalysisService.currentAnalysisData,
-               let currentLevel = currentAnalysisLevel,
-               let categoryAnalysis = analysisData.getAvailableAnalysis(for: currentLevel),
-               let analysis = categoryAnalysis[selectedCategory] {
-                Big5AnalysisDetailView(analysis: analysis, analysisLevel: currentLevel)
-                    .environmentObject(fontSettings)
+        .sheet(item: $selectedAnalysisData) { data in
+            Big5AnalysisDetailView(
+                analysis: data.analysis,
+                analysisLevel: data.level
+            )
+            .environmentObject(fontSettings)
+            .onAppear {
+                print("✅ シート表示: \(data.analysis.category.displayName)")
             }
         }
     }
@@ -252,13 +258,7 @@ struct CharacterDetailView: View {
                         .dynamicCaption()
                         .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
                 }
-                .padding(.bottom, 4)
-                
-                // 進化の説明
-                Text(analysisLevel.description)
-                    .dynamicCaption()
-                    .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.8))
-                    .padding(.bottom, 8)
+                .padding(.bottom, 12)
                 
                 // 解析カテゴリー一覧
                 if let analysisData = big5AnalysisService.currentAnalysisData {
@@ -294,8 +294,19 @@ struct CharacterDetailView: View {
     @ViewBuilder
     private func analysisRowButton(analysis: Big5DetailedAnalysis) -> some View {
         Button {
-            selectedAnalysisCategory = analysis.category
-            showBig5AnalysisDetail = true
+            // デバッグログ
+            print("🔍 タップされたカテゴリ: \(analysis.category.displayName)")
+            print("🔍 currentAnalysisLevel: \(String(describing: currentAnalysisLevel))")
+            print("🔍 analysisData: \(big5AnalysisService.currentAnalysisData != nil ? "存在" : "nil")")
+
+            // 選択されたデータを保存
+            if let level = currentAnalysisLevel {
+                let data = SelectedAnalysisData(analysis: analysis, level: level)
+                print("✅ selectedAnalysisData を設定: \(analysis.category.displayName)")
+                selectedAnalysisData = data
+            } else {
+                print("❌ currentAnalysisLevel が nil")
+            }
         } label: {
             HStack {
                 Text(analysis.category.icon)

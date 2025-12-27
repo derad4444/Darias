@@ -94,10 +94,10 @@ enum Big5AnalysisLevel: Int, CaseIterable {
         switch self {
         case .basic: return "基本プログラム解析"
         case .detailed: return "学習進化解析"
-        case .complete: return "完全人格解析"
+        case .complete: return "人格解析"
         }
     }
-    
+
     var icon: String {
         switch self {
         case .basic: return "🤖"
@@ -105,12 +105,12 @@ enum Big5AnalysisLevel: Int, CaseIterable {
         case .complete: return "👤"
         }
     }
-    
+
     var description: String {
         switch self {
-        case .basic: return "アンドロイドとして起動したばかりの基本設定"
-        case .detailed: return "多くの経験を積み、人間らしい感情が発達"
-        case .complete: return "完全な人間へと進化した豊かな人格"
+        case .basic: return ""
+        case .detailed: return ""
+        case .complete: return ""
         }
     }
 }
@@ -175,7 +175,7 @@ struct Big5AnalysisData {
 }
 
 // personalityKey生成用のスコア構造
-struct Big5Scores {
+struct Big5Scores: Codable, Equatable {
     let openness: Double
     let conscientiousness: Double
     let extraversion: Double

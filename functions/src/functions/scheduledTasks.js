@@ -3,14 +3,14 @@
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 
 // 遅延インポートで軽量化
-let CONFIG; let Logger; let generateHolidays; let generateDiary; let admin; let errorHandler;
+let CONFIG; let Logger; let generateHolidaysForTwoYears; let generateDiary; let admin; let errorHandler;
 let logger;
 
 function initializeDependencies() {
   if (!CONFIG) {
     CONFIG = require("../config/config").CONFIG;
     Logger = require("../utils/logger").Logger;
-    generateHolidays = require("../../const/generateHolidays").generateHolidays;
+    generateHolidaysForTwoYears = require("../../const/generateHolidays").generateHolidaysForTwoYears;
     generateDiary = require("../../const/generateDiary").generateDiary;
     admin = require("firebase-admin");
     errorHandler = require("../utils/errorHandler");
@@ -134,15 +134,25 @@ const scheduledHolidays = onSchedule(
       initializeDependencies();
 
       const now = new Date();
-      const year = now.getFullYear();
+      const currentYear = now.getFullYear();
+      const nextYear = currentYear + 1;
 
-      logger.info("Starting holiday generation", {year});
+      logger.info("Starting holiday generation for two years", {
+        currentYear,
+        nextYear,
+      });
 
       try {
-        await generateHolidays(year);
-        logger.success("Holiday generation completed", {year});
+        await generateHolidaysForTwoYears();
+        logger.success("Holiday generation completed for two years", {
+          currentYear,
+          nextYear,
+        });
       } catch (error) {
-        logger.error("Holiday generation failed", error, {year});
+        logger.error("Holiday generation failed", error, {
+          currentYear,
+          nextYear,
+        });
         throw error;
       }
     },

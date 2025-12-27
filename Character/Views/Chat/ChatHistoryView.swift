@@ -5,7 +5,6 @@ struct ChatHistoryView: View {
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
     @AppStorage("isPremium") var isPremium: Bool = false
-    @Environment(\.dismiss) private var dismiss
     @State private var showPremiumUpgrade = false
     @State private var searchText: String = ""
 
@@ -75,51 +74,46 @@ struct ChatHistoryView: View {
     }
     
     var body: some View {
-        ZStack {
-            // 全画面背景
-            colorSettings.getCurrentBackgroundGradient()
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                // 検索バー
-                HStack {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.gray)
+        VStack(spacing: 0) {
+            // 検索バー
+            HStack {
+                Image(systemName: "magnifyingglass")
+                    .foregroundColor(.gray)
 
-                    TextField("メッセージを検索", text: $searchText)
-                        .dynamicBody()
+                TextField("メッセージを検索", text: $searchText)
+                    .dynamicBody()
 
-                    // クリアボタン（常に表示、テキストがない時は無効化）
-                    Button(action: {
-                        withAnimation {
-                            searchText = ""
-                        }
-                        // キーボードを閉じる
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(searchText.isEmpty ? .gray.opacity(0.3) : .gray.opacity(0.6))
+                // クリアボタン（常に表示、テキストがない時は無効化）
+                Button(action: {
+                    withAnimation {
+                        searchText = ""
                     }
-                    .disabled(searchText.isEmpty)
+                    // キーボードを閉じる
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(searchText.isEmpty ? .gray.opacity(0.3) : .gray.opacity(0.6))
                 }
-                .padding(12)
-                .background(Color.white.opacity(0.8))
-                .cornerRadius(10)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 8)
+                .disabled(searchText.isEmpty)
+            }
+            .padding(12)
+            .background(Color.white.opacity(0.8))
+            .cornerRadius(10)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .padding(.bottom, 8)
 
-                // チャット履歴
-                if chatHistoryService.isLoading {
-                    Spacer()
-                    VStack(spacing: 16) {
-                        ProgressView()
-                        Text("読み込み中...")
-                            .dynamicBody()
-                    }
-                    Spacer()
-                } else if chatHistoryService.posts.isEmpty {
-                    VStack(spacing: 0) {
+            // チャット履歴
+            if chatHistoryService.isLoading {
+                Spacer()
+                VStack(spacing: 16) {
+                    ProgressView()
+                    Text("読み込み中...")
+                        .dynamicBody()
+                }
+                Spacer()
+            } else if chatHistoryService.posts.isEmpty {
+                VStack(spacing: 0) {
                         Spacer()
                         VStack(spacing: 16) {
                             Image(systemName: "message")
@@ -332,12 +326,13 @@ struct ChatHistoryView: View {
                                 } else {
                                     // バナー広告がない場合は最新メッセージまで
                                     let messagesByDate = getFilteredMessagesByDate()
-                                    let dateList = getFilteredDateList()
+                                    let dateList = getFilteredDateList().reversed() // 古い順に変換
 
-                                    if let latestDate = dateList.first,
+                                    if let latestDate = dateList.last, // 最後の日付が最新
                                        let latestMessages = messagesByDate[latestDate],
                                        !latestMessages.isEmpty {
-                                        let latestIndex = 0 // reversed()で最新が最初
+                                        // reversed()後の最後のインデックスが最新メッセージ
+                                        let latestIndex = latestMessages.count - 1
                                         withAnimation(.easeOut(duration: 0.5)) {
                                             proxy.scrollTo("\(latestDate)-\(latestIndex)", anchor: .bottom)
                                         }
@@ -347,23 +342,9 @@ struct ChatHistoryView: View {
                         }
                     }
                 }
-            }
-
         }
         .navigationTitle("チャット履歴")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: {
-                    dismiss()
-                }) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(Color(hex: "#A084CA"))
-                        .font(.system(size: 18, weight: .semibold))
-                }
-            }
-        }
         .onAppear {
             chatHistoryService.fetchChatHistory(userId: userId, characterId: characterId)
             subscriptionManager.startMonitoring()

@@ -6,9 +6,9 @@ struct DiaryDetailView: View {
     let characterId: String
     let userId: String
     @ObservedObject var colorSettings = ColorSettingsManager.shared
-    @AppStorage("isPremium") var isPremium: Bool = false
+    @StateObject private var subscriptionManager = SubscriptionManager.shared
     @Environment(\.dismiss) private var dismiss
-    
+
     @State private var diaryContent: String = ""
     @State private var dateText: String = ""
     @State private var userComment: String = ""
@@ -28,11 +28,14 @@ struct DiaryDetailView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 0) {
                         // 広告バナー1（日記の上）
-                        if !isPremium {
+                        if subscriptionManager.shouldDisplayBannerAd() {
                             BannerAdView(adUnitID: Config.diaryDetailTopBannerAdUnitID)
                                 .frame(width: 320, height: 50)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
                         }
 
                         // 日記帳のような紙のカード
@@ -126,11 +129,14 @@ struct DiaryDetailView: View {
                         .padding(.top, 24)
 
                         // 広告バナー2（コメント欄の下）
-                        if !isPremium {
+                        if subscriptionManager.shouldDisplayBannerAd() {
                             BannerAdView(adUnitID: Config.diaryDetailBottomBannerAdUnitID)
                                 .frame(width: 320, height: 50)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 8)
+                                .onAppear {
+                                    subscriptionManager.trackBannerAdImpression()
+                                }
                         }
 
                         Spacer(minLength: 20)
@@ -163,6 +169,10 @@ struct DiaryDetailView: View {
         )
         .onAppear {
             fetchDiary()
+            subscriptionManager.startMonitoring()
+        }
+        .onDisappear {
+            subscriptionManager.stopMonitoring()
         }
     }
 
