@@ -466,22 +466,44 @@ struct CalendarView: View {
                                 // 通常のカレンダー表示
                                 // 小さい画面（iPhone 8など）はスクロール表示、大きい画面（iPhone 14以上）は固定表示
                                 if geometry.size.height < 700 {
-                                    // 小さい画面：スクロール可能（5週分全て表示）
-                                    ScrollView(.vertical, showsIndicators: true) {
-                                        CustomCalendarView(
-                                            selectedDate: $selectedDate,
-                                            selectedYear: $selectedYear,
-                                            selectedMonth: $selectedMonth,
-                                            schedulesForDate: self.schedulesForDate,
-                                            firestoreManager: firestoreManager,
-                                            userId: userId,
-                                            showBottomSheet: $showBottomSheet,
-                                            screenHeight: geometry.size.height
-                                        )
-                                        .frame(maxWidth: .infinity)
-                                        .fixedSize(horizontal: false, vertical: true)
+                                    // 小さい画面：曜日固定、日付部分のみスクロール可能
+                                    VStack(spacing: 0) {
+                                        Spacer()
+                                            .frame(height: 30)
+
+                                        // 曜日ヘッダー（固定）
+                                        let gridColumns = Array(repeating: GridItem(.flexible()), count: 7)
+                                        LazyVGrid(columns: gridColumns) {
+                                            let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+                                            ForEach(weekdays, id: \.self) { weekday in
+                                                Text(weekday)
+                                                    .dynamicCaption()
+                                                    .foregroundColor(.primary)
+                                                    .fontWeight(.semibold)
+                                            }
+                                        }
+                                        .padding(.horizontal)
+                                        .padding(.bottom, 4)
+
+                                        // 日付グリッド部分のみスクロール
+                                        ScrollView(.vertical, showsIndicators: true) {
+                                            CustomCalendarView(
+                                                selectedDate: $selectedDate,
+                                                selectedYear: $selectedYear,
+                                                selectedMonth: $selectedMonth,
+                                                schedulesForDate: self.schedulesForDate,
+                                                firestoreManager: firestoreManager,
+                                                userId: userId,
+                                                showBottomSheet: $showBottomSheet,
+                                                screenHeight: geometry.size.height,
+                                                showWeekdayHeader: false
+                                            )
+                                            .frame(maxWidth: .infinity)
+                                            .frame(height: 80 * 6)
+                                        }
+                                        .scrollIndicators(.visible)
+                                        .frame(height: geometry.size.height * 0.65)
                                     }
-                                    .frame(height: calendarHeight)
                                 } else {
                                     // 大きい画面：固定表示（iPhone 14の完璧な状態を維持）
                                     CustomCalendarView(
@@ -650,6 +672,7 @@ struct CustomCalendarView: View {
 
     @Binding var showBottomSheet: Bool
     let screenHeight: CGFloat
+    var showWeekdayHeader: Bool = true
 
     let calendar = Calendar.current
     let today = Date()
@@ -664,18 +687,21 @@ struct CustomCalendarView: View {
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
 
         VStack(spacing: 8) {
-            // 曜日ヘッダーを固定表示
-            let gridColumns = Array(repeating: GridItem(.flexible()), count: 7)
-            LazyVGrid(columns: gridColumns) {
-                let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
-                ForEach(weekdays, id: \.self) { weekday in
-                    Text(weekday)
-                        .dynamicCaption()
-                        .foregroundColor(.primary)
-                        .fontWeight(.semibold)
+            // 曜日ヘッダーを固定表示（スワイプ対象外）
+            if showWeekdayHeader {
+                let gridColumns = Array(repeating: GridItem(.flexible()), count: 7)
+                LazyVGrid(columns: gridColumns) {
+                    let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+                    ForEach(weekdays, id: \.self) { weekday in
+                        Text(weekday)
+                            .dynamicCaption()
+                            .foregroundColor(.primary)
+                            .fontWeight(.semibold)
+                    }
                 }
+                .padding(.horizontal)
+                .padding(.bottom, 4)
             }
-            .padding(.bottom, 4)
 
             // スワイプ可能な日付グリッド部分
             GeometryReader { geometry in
