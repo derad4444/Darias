@@ -479,7 +479,9 @@ struct CalendarView: View {
                                             screenHeight: geometry.size.height
                                         )
                                         .frame(maxWidth: .infinity)
+                                        .fixedSize(horizontal: false, vertical: true)
                                     }
+                                    .frame(height: calendarHeight)
                                 } else {
                                     // 大きい画面：固定表示（iPhone 14の完璧な状態を維持）
                                     CustomCalendarView(
