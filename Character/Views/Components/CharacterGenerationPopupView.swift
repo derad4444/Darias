@@ -78,8 +78,51 @@ struct CharacterGenerationPopupView: View {
                         .foregroundColor(.secondary)
                 }
                 
-                // 閉じるボタン（完了・失敗時のみ）
-                if status.isCompleted || status.isFailed {
+                // ボタン（完了・失敗時のみ）
+                if status.isCompleted {
+                    // 完了時: キャラクター詳細への誘導ボタン
+                    VStack(spacing: 12) {
+                        Button(action: {
+                            // ポップアップを閉じる
+                            NotificationCenter.default.post(
+                                name: .dismissCharacterGenerationPopup,
+                                object: nil
+                            )
+                            // キャラクター詳細タブに切り替え
+                            NotificationCenter.default.post(
+                                name: .openCharacterDetail,
+                                object: nil
+                            )
+                        }) {
+                            Text("キャラクター詳細を見る")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(
+                                    LinearGradient(
+                                        gradient: Gradient(colors: [Color.blue, Color.blue.opacity(0.8)]),
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(12)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
+                        Button(action: {
+                            NotificationCenter.default.post(
+                                name: .dismissCharacterGenerationPopup,
+                                object: nil
+                            )
+                        }) {
+                            Text("閉じる")
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                } else if status.isFailed {
+                    // 失敗時: OKボタンのみ
                     Button("OK") {
                         // ポップアップを閉じる処理
                         NotificationCenter.default.post(
@@ -112,7 +155,7 @@ struct CharacterGenerationPopupView: View {
         case .generating:
             return "性格を生成中です"
         case .completed:
-            return "生成完了！"
+            return status.completionTitle
         case .failed:
             return "生成に失敗しました"
         case .notStarted:
@@ -124,6 +167,7 @@ struct CharacterGenerationPopupView: View {
 // MARK: - Notification Extension
 extension Notification.Name {
     static let dismissCharacterGenerationPopup = Notification.Name("dismissCharacterGenerationPopup")
+    static let openCharacterDetail = Notification.Name("openCharacterDetail")
 }
 
 // MARK: - Preview

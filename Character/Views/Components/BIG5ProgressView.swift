@@ -73,7 +73,7 @@ struct BIG5ProgressView: View {
         switch currentStage {
         case 1: return "基本分析"
         case 2: return "詳細分析"
-        case 3: return "完全分析"
+        case 3: return "総合分析"
         default: return "性格分析"
         }
     }

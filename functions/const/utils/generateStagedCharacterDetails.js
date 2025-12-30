@@ -19,6 +19,15 @@ async function generateStagedCharacterDetails(
   console.log(
       `🔄 Generating staged character details: ${characterId}, stage ${stage}`);
 
+  // プレミアムユーザーかどうかを確認
+  let isPremium = false;
+  try {
+    const userDoc = await db.collection("users").doc(userId).get();
+    isPremium = userDoc.data()?.isPremium || false;
+  } catch (error) {
+    console.warn(`Failed to check premium status, defaulting to free: ${error.message}`);
+  }
+
   // 生成状態を開始に設定
   await updateGenerationStatus(
       characterId, userId, stage, "generating",
@@ -35,17 +44,30 @@ async function generateStagedCharacterDetails(
       let result;
 
       switch (stage) {
-        case 1:
-          // 20問完了: 固定のアンドロイド風キャラクター
-          personalityKey = "stage1_android";
-          characterDetails = getStage1AndroidDetails(gender);
+        case 1: {
+          // 20問完了: BIG5スコアを更新 + キャラクター属性を生成
+          if (!big5Scores) {
+            throw new Error("Big5 scores are required for stage 1");
+          }
+          const {generatePersonalityKey} =
+            require("../generatePersonalityKey");
+          const {generateCharacterAttributes} =
+            require("../generateCharacterAttributes");
 
-          // 固定コンテンツなので失敗リスクは低いが、Firebase書き込みエラー対応
+          personalityKey = generatePersonalityKey(big5Scores, gender);
+
+          // キャラクター属性を生成
+          const attributes = await generateCharacterAttributes(
+              big5Scores, gender, 1, apiKey, isPremium);
+
+          // details/currentのBIG5スコアと属性を上書き
           await db.collection("users").doc(userId)
               .collection("characters").doc(characterId)
               .collection("details").doc("current").update({
-                ...characterDetails,
+                confirmedBig5Scores: big5Scores,
                 personalityKey,
+                analysis_level: 20,
+                ...attributes, // キャラクター属性を追加
                 updated_at: admin.firestore.FieldValue.serverTimestamp(),
               });
 
@@ -53,21 +75,36 @@ async function generateStagedCharacterDetails(
             success: true,
             personalityKey,
             stage,
-            details: characterDetails,
-            method: "fixed_content",
+            attributes,
+            method: "attributes_generated",
           };
           break;
+        }
 
-        case 2:
-          // 50問完了: 固定のアンドロイド+人間性キャラクター
-          personalityKey = "stage2_android_human";
-          characterDetails = getStage2AndroidHumanDetails(gender);
+        case 2: {
+          // 50問完了: BIG5スコアを更新 + キャラクター属性を再生成
+          if (!big5Scores) {
+            throw new Error("Big5 scores are required for stage 2");
+          }
+          const {generatePersonalityKey} =
+            require("../generatePersonalityKey");
+          const {generateCharacterAttributes} =
+            require("../generateCharacterAttributes");
 
+          personalityKey = generatePersonalityKey(big5Scores, gender);
+
+          // キャラクター属性を再生成（50問の精度で）
+          const attributes = await generateCharacterAttributes(
+              big5Scores, gender, 2, apiKey, isPremium);
+
+          // details/currentのBIG5スコアと属性を上書き
           await db.collection("users").doc(userId)
               .collection("characters").doc(characterId)
               .collection("details").doc("current").update({
-                ...characterDetails,
+                confirmedBig5Scores: big5Scores,
                 personalityKey,
+                analysis_level: 50,
+                ...attributes, // キャラクター属性を更新
                 updated_at: admin.firestore.FieldValue.serverTimestamp(),
               });
 
@@ -75,10 +112,11 @@ async function generateStagedCharacterDetails(
             success: true,
             personalityKey,
             stage,
-            details: characterDetails,
-            method: "fixed_content",
+            attributes,
+            method: "attributes_generated",
           };
           break;
+        }
 
         case 3: {
           // 100問完了: Big5ベースの人間的キャラクター (既存機能活用)
@@ -150,44 +188,6 @@ async function generateStagedCharacterDetails(
       await new Promise((resolve) => setTimeout(resolve, waitTime));
     }
   }
-}
-
-/**
- * Stage 1: 20問完了時の固定アンドロイド風詳細
- */
-function getStage1AndroidDetails(gender) {
-  return {
-    favorite_color: "青",
-    favorite_place: "データセンター",
-    favorite_word: "効率化",
-    word_tendency: "論理的で簡潔な表現を好む",
-    strength: "情報処理能力",
-    weakness: "感情の理解が不十分",
-    skill: "データ分析",
-    hobby: "システム最適化",
-    aptitude: "論理的思考",
-    dream: "", // 夢は100問完了時に設定
-    favorite_entertainment_genre: "SF・テクノロジー系",
-  };
-}
-
-/**
- * Stage 2: 50問完了時の固定アンドロイド+人間性詳細
- */
-function getStage2AndroidHumanDetails(gender) {
-  return {
-    favorite_color: "緑",
-    favorite_place: "静かな図書館",
-    favorite_word: "成長",
-    word_tendency: "丁寧で思いやりのある表現",
-    strength: "学習能力と適応性",
-    weakness: "まだ完全には理解できない人間の複雑さ",
-    skill: "パターン認識と感情分析",
-    hobby: "人間の行動観察",
-    aptitude: "コミュニケーション",
-    dream: "", // 夢は100問完了時に設定
-    favorite_entertainment_genre: "ヒューマンドラマ・ドキュメンタリー",
-  };
 }
 
 /**

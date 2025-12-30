@@ -84,14 +84,21 @@ class CharacterService: ObservableObject {
             completion(.failure(.invalidInput("ユーザーIDが設定されていません")))
             return
         }
-        
-        
-        // 先に予定抽出をチェック
-        // 予定抽出は無料・有料問わずGPT-3.5-turboを使用（isPremiumパラメータなし）
-        functions.httpsCallable("extractSchedule").call([
-            "userId": userId,
-            "userMessage": trimmed
-        ]) { result, error in
+
+
+        // 予定関連のキーワードをチェック
+        let scheduleKeywords = ["予定", "スケジュール", "日", "時", "から", "まで", "明日", "今日", "週", "月", "年"]
+        let containsScheduleKeyword = scheduleKeywords.contains { keyword in
+            trimmed.contains(keyword)
+        }
+
+        // キーワードがある場合のみ予定抽出をチェック
+        if containsScheduleKeyword {
+            // 予定抽出は無料・有料問わずGPT-4o-miniを使用（isPremiumパラメータなし）
+            functions.httpsCallable("extractSchedule").call([
+                "userId": userId,
+                "userMessage": trimmed
+            ]) { result, error in
             if let error = error {
                 // extractSchedule error handled silently, proceed to character reply
                 self.generateCharacterReply(characterId: characterId, userMessage: trimmed, userId: userId, completion: completion)
@@ -124,8 +131,12 @@ class CharacterService: ObservableObject {
                     self.generateCharacterReply(characterId: characterId, userMessage: trimmed, userId: userId, completion: completion)
                 }
             }
+            }
+        } else {
+            // キーワードがない場合は予定抽出をスキップして通常のキャラクター返答を生成
+            self.generateCharacterReply(characterId: characterId, userMessage: trimmed, userId: userId, completion: completion)
         }
-        
+
         // ポイント付与通知
         DispatchQueue.main.async {
             NotificationCenter.default.post(
@@ -360,7 +371,42 @@ class CharacterService: ObservableObject {
         generationStatusListener?.remove()
         generationStatusListener = nil
     }
-    
+
+    func clearGenerationStatusInFirestore(characterId: String) {
+        // Firestoreドキュメントのみ削除（ローカル状態は維持）
+        guard let currentUserId = Auth.auth().currentUser?.uid, !currentUserId.isEmpty else {
+            Logger.error("User not authenticated for clearing generation status", category: Logger.authentication)
+            return
+        }
+
+        guard !characterId.isEmpty else {
+            Logger.error("CharacterId cannot be empty for clearing generation status", category: Logger.general)
+            return
+        }
+
+        // Firestoreドキュメントを削除
+        db.collection("users").document(currentUserId)
+            .collection("characters").document(characterId)
+            .collection("generationStatus").document("current")
+            .delete { error in
+                if let error = error {
+                    Logger.error("Failed to clear generation status: \(error.localizedDescription)", category: Logger.general)
+                } else {
+                    Logger.info("Generation status cleared in Firestore", category: Logger.general)
+                }
+            }
+    }
+
+    func clearGenerationStatus(characterId: String) {
+        // Firestoreドキュメントを削除 + ローカル状態もリセット
+        clearGenerationStatusInFirestore(characterId: characterId)
+
+        // ローカル状態もリセット
+        DispatchQueue.main.async {
+            self.characterGenerationStatus = .notStarted
+        }
+    }
+
     // MARK: - BIG5 Question Management
     func handleBIG5QuestionFromResponse(_ response: [String: Any], characterId: String) {
         if let isBIG5Question = response["isBig5Question"] as? Bool, isBIG5Question,

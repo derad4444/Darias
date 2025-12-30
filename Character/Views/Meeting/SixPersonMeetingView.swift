@@ -10,7 +10,6 @@ struct SixPersonMeetingView: View {
 
     let meetingResponse: GenerateMeetingResponse
     let concernText: String
-    let category: ConcernCategory
 
     @State private var displayedMessages: [ConversationMessage] = []
     @State private var currentRoundIndex: Int = 0
@@ -311,15 +310,20 @@ struct SixPersonMeetingView: View {
                 displayedMessages.append(message)
                 currentMessageIndex += 1
 
-                // 1.0秒ごとに次のメッセージを表示（軽量化）
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
+                // メッセージの長さに応じて2.5〜5秒で表示
+                let baseDelay: UInt64 = 2_500_000_000 // 2.5秒ベース
+                let charCount = message.text.count
+                let additionalDelay = UInt64(min(charCount, 150)) * 17_000_000 // 1文字あたり0.017秒、最大2.5秒追加
+                let totalDelay = min(baseDelay + additionalDelay, 5_000_000_000) // 最大5秒
+
+                try? await Task.sleep(nanoseconds: totalDelay)
 
                 if Task.isCancelled { break }
             }
 
             // 全メッセージ表示完了後、結論を表示
             if currentMessageIndex >= allMessages.count {
-                try? await Task.sleep(nanoseconds: 800_000_000)
+                try? await Task.sleep(nanoseconds: 2_000_000_000) // 2秒待機
                 if !Task.isCancelled {
                     showConclusion = true
                 }
@@ -511,8 +515,7 @@ struct RatingView: View {
                 usageCount: 1,
                 duration: 500
             ),
-            concernText: "転職すべきか迷っています",
-            category: .career
+            concernText: "転職すべきか迷っています"
         )
     }
 }

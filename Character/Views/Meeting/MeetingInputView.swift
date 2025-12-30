@@ -14,7 +14,6 @@ struct MeetingInputView: View {
     let characterId: String
 
     @State private var concernText: String = ""
-    @State private var selectedCategory: ConcernCategory = .other
     @State private var isGenerating: Bool = false
     @State private var showMeetingView: Bool = false
     @State private var generatedResponse: GenerateMeetingResponse?
@@ -40,9 +39,6 @@ struct MeetingInputView: View {
                     if !subscriptionManager.isPremium {
                         usageLimitBanner
                     }
-
-                    // カテゴリ選択
-                    categorySection
 
                     // 悩み入力
                     concernInputSection
@@ -101,8 +97,7 @@ struct MeetingInputView: View {
                 if let response = generatedResponse {
                     SixPersonMeetingView(
                         meetingResponse: response,
-                        concernText: concernText,
-                        category: selectedCategory
+                        concernText: concernText
                     )
                 }
             }
@@ -211,30 +206,6 @@ struct MeetingInputView: View {
         )
     }
 
-    // MARK: - Category Section
-
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("カテゴリを選択")
-                .font(.headline)
-
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
-                ForEach(ConcernCategory.allCases) { category in
-                    CategoryButton(
-                        category: category,
-                        isSelected: selectedCategory == category
-                    ) {
-                        selectedCategory = category
-                    }
-                }
-            }
-        }
-    }
-
     // MARK: - Concern Input Section
 
     private var concernInputSection: some View {
@@ -292,7 +263,7 @@ struct MeetingInputView: View {
                     userId: userId,
                     characterId: characterId,
                     concern: concernText,
-                    category: selectedCategory.rawValue
+                    category: nil  // カテゴリは自動検出
                 )
 
                 generatedResponse = response
@@ -313,45 +284,6 @@ struct MeetingInputView: View {
                     showError = true
                 }
             }
-        }
-    }
-}
-
-// MARK: - Category Button
-
-struct CategoryButton: View {
-    let category: ConcernCategory
-    let isSelected: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                Image(systemName: category.icon)
-                    .font(.title2)
-
-                Text(category.displayName)
-                    .font(.caption)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                Group {
-                    if isSelected {
-                        Color.blue.opacity(0.15)
-                    } else {
-                        Color(.systemGray6).opacity(0.8)
-                    }
-                }
-            )
-            .foregroundColor(isSelected ? .blue : .primary)
-            .cornerRadius(12)
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 2)
-            )
         }
     }
 }

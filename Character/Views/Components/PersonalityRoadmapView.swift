@@ -27,11 +27,11 @@ struct PersonalityRoadmapView: View {
         ),
         StageInfo(
             number: 3,
-            title: "完全分析",
-            description: "総合的な性格プロファイルを完成させます", 
+            title: "総合分析",
+            description: "多角的にあなたの個性を理解します",
             questionRange: "51-100問",
             totalQuestions: 50,
-            features: ["全特性の統合分析", "詳細な性格レポート", "個性の完全理解"]
+            features: ["全特性の統合分析", "詳細な性格レポート", "個性の深い理解"]
         )
     ]
     

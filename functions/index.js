@@ -70,6 +70,11 @@ Object.defineProperty(exports, "generateOrReuseMeeting", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "backfillSixPersonalities", {
+  get: () => require("./src/functions/generateSixPersonMeeting").backfillSixPersonalities,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

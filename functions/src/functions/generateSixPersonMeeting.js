@@ -1,6 +1,7 @@
 // src/functions/generateSixPersonMeeting.js
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {getFirestore} = require("../utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../clients/openai");
 const {OPENAI_API_KEY} = require("../config/config");
@@ -12,7 +13,6 @@ const {
   generatePersonalityKey,
 } = require("../utils/sixPersonMeeting");
 const {
-  generateConversationFromTemplate,
   createMeetingPrompt,
 } = require("../prompts/sixPersonMeetingTemplates");
 
@@ -21,7 +21,13 @@ const logger = new Logger("SixPersonMeeting");
 
 /**
  * 6人会議を生成またはキャッシュから取得する
- * キャッシュ優先のアーキテクチャ
+ *
+ * アーキテクチャ:
+ * 1. ユーザーの閲覧履歴を取得
+ * 2. 閲覧済みを除外してキャッシュ検索
+ * 3. キャッシュヒット → 再利用（コスト削減）
+ * 4. キャッシュミス → AI生成（100% AI、約0.2円/回）
+ * 5. 同じユーザーには異なる会議を提供
  */
 exports.generateOrReuseMeeting = onCall(
     {
@@ -63,14 +69,26 @@ exports.generateOrReuseMeeting = onCall(
           throw new HttpsError("not-found", "キャラクターデータが見つかりません");
         }
 
-        const {big5, gender, personalityKey} = characterData;
+        const {big5, gender, personalityKey, sixPersonalities} = characterData;
 
         // 4. カテゴリの自動検出（指定がない場合）
         const category = concernCategory || detectConcernCategory(concern);
 
-        // 5. 【CRITICAL】キャッシュ検索
-        logger.info("Searching cache", {personalityKey, category});
-        const cacheResult = await searchMeetingCache(personalityKey, category);
+        // 5. 過去の閲覧履歴を取得（同じ会議を見せないため）
+        const viewedMeetings = await getViewedMeetings(userId, characterId);
+        logger.info("Retrieved viewing history", {
+          viewedCount: viewedMeetings.length,
+        });
+
+        // 6. 【CRITICAL】キャッシュ検索（性格タイプのみ、カテゴリ非依存）
+        logger.info("Searching cache (category-independent)", {
+          personalityKey,
+          detectedCategory: category, // 記録用のみ
+        });
+        const cacheResult = await searchMeetingCache(
+            personalityKey,
+            viewedMeetings,
+        );
 
         let sharedMeetingId;
         let conversation;
@@ -98,8 +116,15 @@ exports.generateOrReuseMeeting = onCall(
           // ❌ キャッシュミス - 新規生成
           logger.info("❌ Cache MISS. Generating new meeting...");
 
-          // 6人のキャラクター生成
-          const personalities = generateSixPersonalities(big5, gender);
+          // 6人のキャラクター生成（保存済みがあればそれを使用、なければ計算）
+          const personalities = sixPersonalities ||
+            generateSixPersonalities(big5, gender);
+
+          if (sixPersonalities) {
+            logger.info("✅ Using pre-calculated six personalities");
+          } else {
+            logger.info("⚠️ No pre-calculated personalities, generating on-the-fly");
+          }
 
           // 類似性格の統計データ取得
           statsData = await calculateStatsFromAnalysis(personalityKey, big5);
@@ -135,7 +160,7 @@ exports.generateOrReuseMeeting = onCall(
           logger.info("New meeting created and cached", {sharedMeetingId});
         }
 
-        // 6. ユーザーの meeting_history に参照を保存
+        // 7. ユーザーの meeting_history に参照を保存
         await db
             .collection("users")
             .doc(userId)
@@ -158,8 +183,8 @@ exports.generateOrReuseMeeting = onCall(
           sharedMeetingId,
         });
 
-        // 7. レスポンス
-        return {
+        // 8. レスポンス
+        const response = {
           success: true,
           meetingId: sharedMeetingId,
           conversation,
@@ -168,6 +193,23 @@ exports.generateOrReuseMeeting = onCall(
           usageCount: usageCount + 1,
           duration,
         };
+
+        // デバッグ: レスポンスの構造を確認
+        logger.info("Response structure", {
+          hasConversation: !!response.conversation,
+          roundsCount: response.conversation?.rounds?.length,
+          firstRoundMessages: response.conversation?.rounds?.[0]?.messages?.length,
+          statsDataKeys: Object.keys(response.statsData || {}),
+        });
+
+        // デバッグ: 実際のJSONをログ出力（最初の100文字のみ）
+        const jsonString = JSON.stringify(response);
+        logger.info("Response JSON (first 500 chars)", {
+          json: jsonString.substring(0, 500),
+          totalLength: jsonString.length,
+        });
+
+        return response;
       } catch (error) {
         logger.error("Meeting generation failed", {error: error.message});
         throw error;
@@ -261,7 +303,7 @@ async function getMeetingUsageCount(userId, characterId) {
  * キャラクターデータを取得
  * @param {string} userId - ユーザーID
  * @param {string} characterId - キャラクターID
- * @return {Promise<Object>} - {big5, gender, personalityKey}
+ * @return {Promise<Object>} - {big5, gender, personalityKey, sixPersonalities}
  */
 async function getCharacterData(userId, characterId) {
   try {
@@ -283,6 +325,7 @@ async function getCharacterData(userId, characterId) {
       big5: data.confirmedBig5Scores,
       gender: data.gender,
       personalityKey: data.personalityKey,
+      sixPersonalities: data.sixPersonalities || null, // 保存済みがあれば取得
     };
   } catch (error) {
     logger.error("Failed to get character data", {error: error.message});
@@ -291,32 +334,81 @@ async function getCharacterData(userId, characterId) {
 }
 
 /**
- * キャッシュから会議を検索
+ * ユーザーの過去の閲覧履歴を取得
+ * @param {string} userId - ユーザーID
+ * @param {string} characterId - キャラクターID
+ * @return {Promise<Array<string>>} - 閲覧済みsharedMeetingIdの配列
+ */
+async function getViewedMeetings(userId, characterId) {
+  try {
+    const historySnapshot = await db
+        .collection("users")
+        .doc(userId)
+        .collection("characters")
+        .doc(characterId)
+        .collection("meeting_history")
+        .get();
+
+    const viewedIds = historySnapshot.docs.map((doc) => doc.data().sharedMeetingId);
+    logger.info("Retrieved viewed meetings", {
+      userId,
+      characterId,
+      viewedCount: viewedIds.length,
+    });
+
+    return viewedIds;
+  } catch (error) {
+    logger.error("Failed to get viewed meetings", {error: error.message});
+    return [];
+  }
+}
+
+/**
+ * キャッシュから会議を検索（閲覧履歴を除外）
+ * カテゴリ非依存: 性格タイプのみでマッチング
  * @param {string} personalityKey - 性格キー
- * @param {string} category - カテゴリ
+ * @param {Array<string>} excludeIds - 除外するsharedMeetingIdの配列
  * @return {Promise<Object|null>} - キャッシュデータ or null
  */
-async function searchMeetingCache(personalityKey, category) {
+async function searchMeetingCache(personalityKey, excludeIds = []) {
   try {
     const cacheQuery = await db
         .collection("shared_meetings")
         .where("personalityKey", "==", personalityKey)
-        .where("concernCategory", "==", category)
         .orderBy("usageCount", "desc")
-        .limit(1)
         .get();
 
     if (cacheQuery.empty) {
       return null;
     }
 
-    const doc = cacheQuery.docs[0];
-    return {
-      id: doc.id,
-      ...doc.data(),
-    };
+    // 除外リストに含まれていない最初のドキュメントを返す
+    for (const doc of cacheQuery.docs) {
+      if (!excludeIds.includes(doc.id)) {
+        logger.info("Cache hit (category-independent)", {
+          meetingId: doc.id,
+          excludedCount: excludeIds.length,
+          cachedCategory: doc.data().concernCategory, // 記録用
+        });
+        return {
+          id: doc.id,
+          ...doc.data(),
+        };
+      }
+    }
+
+    // すべて除外リストに含まれていた場合
+    logger.info("All cached meetings were excluded", {
+      totalCached: cacheQuery.docs.length,
+      excludedCount: excludeIds.length,
+    });
+    return null;
   } catch (error) {
-    logger.error("Cache search failed", {error: error.message});
+    logger.error("Cache search failed", {
+      error: error.message,
+      errorCode: error.code,
+      errorDetails: error.details || error.toString(),
+    });
     return null;
   }
 }
@@ -341,6 +433,7 @@ async function calculateStatsFromAnalysis(personalityKey, userBig5) {
         totalUsers: 0,
         avgAge: 30,
         percentile: 50,
+        personalityKey,
       };
     }
 
@@ -376,12 +469,13 @@ async function calculateStatsFromAnalysis(personalityKey, userBig5) {
       totalUsers: 0,
       avgAge: 30,
       percentile: 50,
+      personalityKey,
     };
   }
 }
 
 /**
- * 会話を生成（テンプレート or AI）
+ * 会話を生成（100% AI生成）
  * @param {string} concern - ユーザーの悩み
  * @param {string} category - カテゴリ
  * @param {Array<Object>} personalities - 6人のキャラクター
@@ -396,29 +490,13 @@ async function generateConversation(
     statsData,
     isPremium,
 ) {
-  try {
-    // 80%の確率でテンプレート使用、20%でAI生成
-    const useTemplate = Math.random() < 0.8;
-
-    if (useTemplate) {
-      logger.info("Using template for conversation");
-      return generateConversationFromTemplate(category, personalities);
-    } else {
-      logger.info("Using AI for conversation generation");
-      return await generateConversationWithAI(
-          concern,
-          category,
-          personalities,
-          statsData,
-      );
-    }
-  } catch (error) {
-    logger.error("Conversation generation failed, falling back to template", {
-      error: error.message,
-    });
-    // エラー時はテンプレートにフォールバック
-    return generateConversationFromTemplate(category, personalities);
-  }
+  logger.info("Generating conversation with AI (100% AI mode)");
+  return await generateConversationWithAI(
+      concern,
+      category,
+      personalities,
+      statsData,
+  );
 }
 
 /**
@@ -462,8 +540,123 @@ async function generateConversationWithAI(
     content = content.replace(/^```\s*/, "").replace(/```$/, "").trim();
   }
 
-  // JSON解析
-  const conversation = JSON.parse(content);
-
-  return conversation;
+  // JSON解析（エラーハンドリング強化）
+  try {
+    const conversation = JSON.parse(content);
+    return conversation;
+  } catch (parseError) {
+    logger.error("Failed to parse AI response as JSON", {
+      error: parseError.message,
+      contentPreview: content.substring(0, 500),
+      contentLength: content.length,
+    });
+    throw new Error(`AI returned invalid JSON: ${parseError.message}`);
+  }
 }
+
+/**
+ * 既存ユーザーのsixPersonalitiesフィールドをバックフィル
+ * 毎日深夜3時に自動実行（JST）
+ * generateCharacterReplyで生成されなかったユーザーを拾う保険処理
+ */
+exports.backfillSixPersonalities = onSchedule(
+    {
+      schedule: "0 3 * * *", // 毎日午前3時 JST
+      timeZone: "Asia/Tokyo",
+      region: "asia-northeast1",
+      timeoutSeconds: 540, // 9分
+      memory: "512MiB",
+    },
+    async (event) => {
+      const startTime = Date.now();
+      logger.info("Backfill started (scheduled)");
+
+      try {
+        // collection groupクエリで全ユーザーのdetailsを検索
+        const detailsQuery = await db
+            .collectionGroup("details")
+            .where("analysis_level", "==", 100)
+            .get();
+
+        logger.info(`Found ${detailsQuery.size} users with analysis_level=100`);
+
+        let processedCount = 0;
+        let skippedCount = 0;
+        let errorCount = 0;
+
+        // バッチ処理（500件ごとにコミット）
+        const batchSize = 500;
+        let batch = db.batch();
+        let batchCount = 0;
+
+        for (const doc of detailsQuery.docs) {
+          try {
+            const data = doc.data();
+
+            // すでにsixPersonalitiesが存在する場合はスキップ
+            if (data.sixPersonalities) {
+              skippedCount++;
+              continue;
+            }
+
+            // confirmedBig5Scoresが存在しない場合もスキップ
+            if (!data.confirmedBig5Scores) {
+              logger.warn("No confirmedBig5Scores found", {docPath: doc.ref.path});
+              skippedCount++;
+              continue;
+            }
+
+            // 6人の性格を生成
+            const sixPersonalities = generateSixPersonalities(
+                data.confirmedBig5Scores,
+                data.gender || "male",
+            );
+
+            // バッチに追加
+            batch.update(doc.ref, {
+              sixPersonalities: sixPersonalities,
+              updated_at: new Date(),
+            });
+
+            batchCount++;
+            processedCount++;
+
+            // バッチサイズに達したらコミット
+            if (batchCount >= batchSize) {
+              await batch.commit();
+              logger.info(`Committed batch of ${batchCount} updates`);
+              batch = db.batch();
+              batchCount = 0;
+            }
+          } catch (error) {
+            logger.error("Error processing document", {
+              docPath: doc.ref.path,
+              error: error.message,
+            });
+            errorCount++;
+          }
+        }
+
+        // 残りのバッチをコミット
+        if (batchCount > 0) {
+          await batch.commit();
+          logger.info(`Committed final batch of ${batchCount} updates`);
+        }
+
+        const duration = Date.now() - startTime;
+        const result = {
+          success: true,
+          totalDocuments: detailsQuery.size,
+          processedCount,
+          skippedCount,
+          errorCount,
+          durationMs: duration,
+        };
+
+        logger.info("Backfill completed (scheduled)", result);
+      } catch (error) {
+        logger.error("Backfill failed", {error: error.message});
+        throw error;
+      }
+    },
+);

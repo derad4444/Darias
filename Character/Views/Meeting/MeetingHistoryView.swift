@@ -68,24 +68,30 @@ struct MeetingHistoryView: View {
                 }
                 Spacer()
             } else if viewModel.histories.isEmpty {
-                emptyStateView
+                VStack {
+                    emptyStateView
+                        .padding(.top, 40)
+                    Spacer()
+                }
             } else if filteredHistories.isEmpty {
                 // 検索結果が空の場合
-                Spacer()
-                VStack(spacing: 16) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 50))
-                        .foregroundColor(.gray)
-                    Text("検索結果がありません")
-                        .font(.body)
-                        .foregroundColor(.gray)
-                    Text("「\(searchText)」に一致する会議が見つかりませんでした")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 32)
+                VStack {
+                    VStack(spacing: 16) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 50))
+                            .foregroundColor(.gray)
+                        Text("検索結果がありません")
+                            .font(.body)
+                            .foregroundColor(.gray)
+                        Text("「\(searchText)」に一致する会議が見つかりませんでした")
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 32)
+                    }
+                    .padding(.top, 40)
+                    Spacer()
                 }
-                Spacer()
             } else {
                 historyListView
             }

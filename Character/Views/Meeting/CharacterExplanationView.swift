@@ -10,62 +10,23 @@ struct CharacterExplanationView: View {
 
     let characters: [(id: String, name: String, icon: String, color: Color, description: String, traits: [String])] = [
         (
-            id: "cautious",
-            name: "慎重派の自分",
-            icon: "shield.fill",
+            id: "original",
+            name: "今の自分",
+            icon: "person.fill",
             color: .blue,
-            description: "リスクを避け、計画的に行動する自分",
+            description: "現在のあなたの考え方や価値観",
             traits: [
-                "物事を慎重に考える傾向",
-                "失敗を避けるための準備を重視",
-                "安定した選択を好む",
-                "時間をかけて判断する"
-            ]
-        ),
-        (
-            id: "active",
-            name: "行動派の自分",
-            icon: "bolt.fill",
-            color: .orange,
-            description: "直感的に動き、チャレンジを恐れない自分",
-            traits: [
-                "即座に行動に移す傾向",
-                "新しいことに挑戦するのが好き",
-                "失敗を恐れない",
-                "スピード感を重視"
-            ]
-        ),
-        (
-            id: "emotional",
-            name: "感情重視の自分",
-            icon: "heart.fill",
-            color: .pink,
-            description: "心の声を大切にする自分",
-            traits: [
-                "感情や直感を大切にする",
-                "人との繋がりを重視",
-                "共感力が高い",
-                "心地よさを優先"
-            ]
-        ),
-        (
-            id: "logical",
-            name: "論理重視の自分",
-            icon: "brain.head.profile",
-            color: .purple,
-            description: "データと理性で判断する自分",
-            traits: [
-                "論理的な思考を重視",
-                "データや事実に基づいて判断",
-                "客観的な分析を得意とする",
-                "効率性を追求"
+                "現実的な視点で物事を考える",
+                "今の状況を踏まえた判断",
+                "実際の経験に基づく意見",
+                "バランスの取れた視点"
             ]
         ),
         (
             id: "opposite",
             name: "真逆の自分",
             icon: "arrow.triangle.2.circlepath",
-            color: .green,
+            color: .orange,
             description: "あなたとは正反対の性格を持つ自分",
             traits: [
                 "普段とは異なる視点を提供",
@@ -78,13 +39,52 @@ struct CharacterExplanationView: View {
             id: "ideal",
             name: "理想の自分",
             icon: "star.fill",
-            color: .yellow,
-            description: "バランスが取れた理想的な性格の自分",
+            color: .purple,
+            description: "なりたい姿、目指している理想の自分",
             traits: [
-                "各視点を統合する",
-                "バランスの取れた判断",
                 "長期的な視点を持つ",
-                "全体を俯瞰して考える"
+                "理想の価値観で判断",
+                "目標達成を重視",
+                "成長を促す視点"
+            ]
+        ),
+        (
+            id: "shadow",
+            name: "本音の自分",
+            icon: "person.crop.circle",
+            color: .red,
+            description: "普段は隠している本当の気持ち",
+            traits: [
+                "率直な感情を表現",
+                "本心からの意見",
+                "建前を排除した視点",
+                "抑圧された欲求を代弁"
+            ]
+        ),
+        (
+            id: "child",
+            name: "子供の頃の自分",
+            icon: "figure.walk",
+            color: .green,
+            description: "純粋で素直だった子供時代の自分",
+            traits: [
+                "純粋な感性で物事を見る",
+                "素直な感情表現",
+                "夢や希望を大切にする",
+                "シンプルな幸せを追求"
+            ]
+        ),
+        (
+            id: "wise",
+            name: "未来の自分(70歳)",
+            icon: "person.crop.square.filled.and.at.rectangle",
+            color: Color(red: 0.6, green: 0.4, blue: 0.2),
+            description: "人生経験を積んだ未来の自分",
+            traits: [
+                "長い人生経験からの知恵",
+                "俯瞰的な視点",
+                "本当に大切なものを見抜く",
+                "後悔しない選択を促す"
             ]
         )
     ]
@@ -103,11 +103,11 @@ struct CharacterExplanationView: View {
                             .font(.system(size: 48))
                             .foregroundColor(.blue)
 
-                        Text("6人の性格について")
+                        Text("6人の自分について")
                             .font(.title2)
                             .fontWeight(.bold)
 
-                        Text("あなたのBIG5性格診断データを基に、\n6つの異なる視点から議論します")
+                        Text("あなたのBIG5性格診断データを基に、\n6つの異なる自分が多角的に議論します")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -136,10 +136,11 @@ struct CharacterExplanationView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
-                            BulletPoint(text: "慎重派と行動派が対立しながら議論")
-                            BulletPoint(text: "感情派と論理派がバランスを提供")
-                            BulletPoint(text: "真逆の自分が予想外の視点を追加")
-                            BulletPoint(text: "理想の自分が全体をまとめて結論")
+                            BulletPoint(text: "今の自分と真逆の自分が異なる視点で議論")
+                            BulletPoint(text: "理想の自分が目標達成の視点を提供")
+                            BulletPoint(text: "本音の自分が率直な感情を表現")
+                            BulletPoint(text: "子供の頃の自分が純粋な視点を追加")
+                            BulletPoint(text: "未来の自分が長期的な視野で結論")
                         }
                     }
                     .padding()
@@ -151,7 +152,7 @@ struct CharacterExplanationView: View {
                 .padding(.vertical)
             }
         }
-        .navigationTitle("性格の説明")
+        .navigationTitle("自分会議の説明")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {

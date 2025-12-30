@@ -656,6 +656,9 @@ exports.generateCharacterReply = onCall(
               const currentStage = getCharacterStage(currentCount);
               aiResponse = getStageCompletionMessage(currentStage, gender);
 
+              // 各段階でBIG5スコアを計算
+              const currentBig5Scores = calculateBIG5Scores(updatedAnsweredQuestions);
+
               // 段階的キャラクター詳細生成を実行 (非同期で実行)
               try {
                 const {generateStagedCharacterDetails} =
@@ -666,7 +669,7 @@ exports.generateCharacterReply = onCall(
                     userId,
                     currentStage,
                     gender,
-                    null,
+                    currentBig5Scores,
                     OPENAI_API_KEY.value().trim(),
                 ).catch((error) => {
                   console.error(
@@ -715,11 +718,16 @@ exports.generateCharacterReply = onCall(
             const calculatedScores =
               calculateBIG5Scores(updatedAnsweredQuestions);
 
-            // CharacterDetailのBIG5スコアを更新
+            // 6人の性格を事前計算（会議機能の高速化のため）
+            const {generateSixPersonalities} = require("../src/utils/sixPersonMeeting");
+            const sixPersonalities = generateSixPersonalities(calculatedScores, gender);
+
+            // CharacterDetailのBIG5スコアと6人の性格を更新
             await db.collection("users").doc(userId)
                 .collection("characters").doc(characterId)
                 .collection("details").doc("current").update({
                   confirmedBig5Scores: calculatedScores,
+                  sixPersonalities: sixPersonalities,
                   analysis_level: 100,
                   updated_at: admin.firestore.FieldValue.serverTimestamp(),
                 });

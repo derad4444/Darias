@@ -474,12 +474,6 @@ struct CalendarView: View {
                                     showBottomSheet: $showBottomSheet,
                                     screenHeight: geometry.size.height
                                 )
-                                .scaleEffect(
-                                    x: geometry.size.height < 700 ? 1.1 : 1.0,
-                                    y: geometry.size.height < 700 ? 0.85 : 1.0,
-                                    anchor: .center
-                                )
-                                .offset(x: geometry.size.height < 700 ? 0 : -10)
                                 .frame(height: calendarHeight)
                                 .frame(maxWidth: .infinity)
                             }
@@ -648,33 +642,49 @@ struct CustomCalendarView: View {
         let firstDayOfMonth = calendar.date(from: components)!
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
 
-        GeometryReader { geometry in
-            let screenWidth = geometry.size.width
-
-            ZStack {
-                monthView(for: currentComponents())
-                    .offset(x: dragOffsetX)
-                monthView(for: nextComponents())
-                    .offset(x: dragOffsetX + (dragOffsetX > 0 ? -screenWidth : screenWidth))
+        VStack(spacing: 8) {
+            // 曜日ヘッダーを固定表示
+            let gridColumns = Array(repeating: GridItem(.flexible()), count: 7)
+            LazyVGrid(columns: gridColumns) {
+                let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
+                ForEach(weekdays, id: \.self) { weekday in
+                    Text(weekday)
+                        .dynamicCaption()
+                        .foregroundColor(.primary)
+                        .fontWeight(.semibold)
+                }
             }
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        dragOffsetX = value.translation.width
-                        isDragging = true
-                    }
-                    .onEnded { value in
-                        withAnimation(.spring()) {
-                            if value.translation.width < -100 {
-                                moveToNextMonth()
-                            } else if value.translation.width > 100 {
-                                moveToPreviousMonth()
-                            }
-                            dragOffsetX = 0
-                            isDragging = false
+            .padding(.bottom, 4)
+
+            // スワイプ可能な日付グリッド部分
+            GeometryReader { geometry in
+                let screenWidth = geometry.size.width
+
+                ZStack {
+                    monthView(for: currentComponents())
+                        .offset(x: dragOffsetX)
+                    monthView(for: nextComponents())
+                        .offset(x: dragOffsetX + (dragOffsetX > 0 ? -screenWidth : screenWidth))
+                }
+                .gesture(
+                    DragGesture()
+                        .onChanged { value in
+                            dragOffsetX = value.translation.width
+                            isDragging = true
                         }
-                    }
-            )
+                        .onEnded { value in
+                            withAnimation(.spring()) {
+                                if value.translation.width < -100 {
+                                    moveToNextMonth()
+                                } else if value.translation.width > 100 {
+                                    moveToPreviousMonth()
+                                }
+                                dragOffsetX = 0
+                                isDragging = false
+                            }
+                        }
+                )
+            }
         }
     }
     
@@ -730,57 +740,45 @@ struct CustomCalendarView: View {
         let firstDayOfMonth = calendar.date(from: components)!
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
         let gridColumns = Array(repeating: GridItem(.flexible()), count: 7)
-        
-        VStack(spacing: 8) {
-            // 曜日ヘッダーを追加
-            LazyVGrid(columns: gridColumns) {
-                let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
-                ForEach(weekdays, id: \.self) { weekday in
-                    Text(weekday)
-                        .dynamicCaption()
-                        .foregroundColor(.primary)
-                        .fontWeight(.semibold)
-                }
-            }
-            .padding(.bottom, 4)
-            
-            // 日付セル
-            GeometryReader { geometry in
-                ZStack {
-                    LazyVGrid(columns: gridColumns, spacing: 0) {
-                        ForEach(Array(0..<42), id: \.self) { index in
-                            calendarDateView(
-                                index: index, 
-                                firstDayOfMonth: firstDayOfMonth, 
-                                firstWeekday: firstWeekday
-                            )
-                        }
+
+        // 日付セルのみ（曜日ヘッダーは外側で固定表示）
+        GeometryReader { geometry in
+            ZStack {
+                LazyVGrid(columns: gridColumns, spacing: 0) {
+                    ForEach(Array(0..<42), id: \.self) { index in
+                        calendarDateView(
+                            index: index,
+                            firstDayOfMonth: firstDayOfMonth,
+                            firstWeekday: firstWeekday
+                        )
                     }
-                    
-                    // 期間予定をオーバーレイとして表示（連続バー表示用）
-                    multiDaySchedulesOverlay(for: components)
-                    
-                    // ドラッグ中のドロップゾーンオーバーレイ（一時的に無効化）
-                    // if isDragModeLocal {
-                    //     Color.clear
-                    //         .contentShape(Rectangle())
-                    //         .onDrop(of: [UTType.text], isTargeted: nil) { providers, location in
-                    //             if let draggingSchedule = draggingScheduleLocal,
-                    //                let targetDate = dateFromDropPosition(location, geometry: geometry) {
-                    //                 moveScheduleToDate(schedule: draggingSchedule, targetDate: targetDate)
-                    //             }
-                    //             
-                    //             // ドラッグ状態をリセット
-                    //             withAnimation(.easeOut(duration: 0.3)) {
-                    //                 dragOffset = .zero
-                    //                 self.draggingSchedule = nil
-                    //                 self.isDragMode = false
-                    //             }
-                    //             return true
-                    //         }
-                    // }
                 }
+
+                // 期間予定をオーバーレイとして表示（連続バー表示用）
+                multiDaySchedulesOverlay(for: components, geometry: geometry)
+
+                // ドラッグ中のドロップゾーンオーバーレイ（一時的に無効化）
+                // if isDragModeLocal {
+                //     Color.clear
+                //         .contentShape(Rectangle())
+                //         .onDrop(of: [UTType.text], isTargeted: nil) { providers, location in
+                //             if let draggingSchedule = draggingScheduleLocal,
+                //                let targetDate = dateFromDropPosition(location, geometry: geometry) {
+                //                 moveScheduleToDate(schedule: draggingSchedule, targetDate: targetDate)
+                //             }
+                //
+                //             // ドラッグ状態をリセット
+                //             withAnimation(.easeOut(duration: 0.3)) {
+                //                 dragOffset = .zero
+                //                 self.draggingSchedule = nil
+                //                 self.isDragMode = false
+                //             }
+                //             return true
+                //         }
+                // }
             }
+            .compositingGroup()
+            .drawingGroup()
         }
         .padding(.horizontal)
     }
@@ -967,7 +965,7 @@ struct CustomCalendarView: View {
         
         return VStack(alignment: .leading, spacing: 2) {
             // ①祝日は別の場所で表示される（セル上部に固定表示）
-            
+
             // ②期間予定はオーバーレイで表示されるため、その分のスペースを確保
             let displayedMultiDayCount = min(multiDaySchedulesForDate.count, max(0, 2 - holidayCount))
             
@@ -996,7 +994,7 @@ struct CustomCalendarView: View {
                     Spacer().frame(height: 16)
                 }
             }
-            
+
             // 3行目の条件分岐表示
             if totalItems > 2 {
                 if totalItems == 3 {
@@ -1016,7 +1014,7 @@ struct CustomCalendarView: View {
                     }
                 } else {
                     // 合計4件以上の場合、残り件数を表示
-                    
+
                     Button {
                         // ハプティックフィードバック
                         let impactFeedback = UIImpactFeedbackGenerator(style: .light)
@@ -1025,7 +1023,7 @@ struct CustomCalendarView: View {
                         selectedDate = date
                         showBottomSheet = true
                     } label: {
-                        Text("+\(totalItems - 2)")
+                        Text("+\(totalItems - 3)")
                             .font(.system(size: 8, weight: .medium))
                             .foregroundColor(.gray)
                             .padding(.horizontal, 4)
@@ -1035,7 +1033,6 @@ struct CustomCalendarView: View {
                             .frame(height: 16)
                     }
                 }
-            } else {
             }
         }
     }
@@ -1186,15 +1183,15 @@ struct CustomCalendarView: View {
     
     // 期間予定をオーバーレイとして表示
     @ViewBuilder
-    private func multiDaySchedulesOverlay(for components: DateComponents) -> some View {
+    private func multiDaySchedulesOverlay(for components: DateComponents, geometry: GeometryProxy) -> some View {
         let firstDayOfMonth = calendar.date(from: components)!
         let firstWeekday = calendar.component(.weekday, from: firstDayOfMonth)
-        
+
         // カレンダーグリッドで実際に表示される日付範囲を計算（前月・翌月の日付も含む）
         let startOffset = (firstWeekday - 1 + 7) % 7
         let firstDisplayDate = calendar.date(byAdding: .day, value: -startOffset, to: firstDayOfMonth)!
         let lastDisplayDate = calendar.date(byAdding: .day, value: 41, to: firstDisplayDate)!
-        
+
         let multiDaySchedules = firestoreManager.schedules
             .filter { $0.isMultiDay }
             .filter { schedule in
@@ -1202,46 +1199,44 @@ struct CustomCalendarView: View {
                 let scheduleStart = calendar.startOfDay(for: schedule.startDate)
                 let scheduleEnd = calendar.startOfDay(for: schedule.endDate)
                 let overlaps = (scheduleStart <= lastDisplayDate && scheduleEnd >= firstDisplayDate)
-                
-                
+
+
                 return overlaps
             }
             .sorted { $0.startDate < $1.startDate }
-        
-        GeometryReader { geometry in
-            let cellWidth = (geometry.size.width - 6 * 8) / 7 // spacing 8
-            let cellHeight = dynamicCellHeight
-            
-            ForEach(Array(multiDaySchedules.enumerated()), id: \.element.id) { index, schedule in
-                let tagColor = tagSettings.getTag(by: schedule.tag)?.color ?? Color.blue
-                
-                // 期間予定の各週での表示を計算（期間予定のみでの連番インデックスを使用）
-                let scheduleRows = getScheduleDisplayRows(
-                    for: schedule,
-                    firstDayOfMonth: firstDayOfMonth,
-                    firstWeekday: firstWeekday,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight,
-                    scheduleIndex: index, // 期間予定内での連番（0から開始）
-                    totalScheduleCount: multiDaySchedules.count,
-                    allMultiDaySchedules: multiDaySchedules,
-                    geometry: geometry
-                )
-                
-                scheduleRowsGroup(
-                    schedule: schedule,
-                    scheduleRows: scheduleRows,
-                    tagColor: tagColor,
-                    firstDayOfMonth: firstDayOfMonth,
-                    firstWeekday: firstWeekday,
-                    cellWidth: cellWidth,
-                    cellHeight: cellHeight,
-                    index: index,
-                    totalScheduleCount: multiDaySchedules.count,
-                    allMultiDaySchedules: multiDaySchedules,
-                    geometry: geometry
-                )
-            }
+
+        let cellWidth = (geometry.size.width - 6 * 8) / 7 // spacing 8
+        let cellHeight = dynamicCellHeight
+
+        ForEach(Array(multiDaySchedules.enumerated()), id: \.element.id) { index, schedule in
+            let tagColor = tagSettings.getTag(by: schedule.tag)?.color ?? Color.blue
+
+            // 期間予定の各週での表示を計算（期間予定のみでの連番インデックスを使用）
+            let scheduleRows = getScheduleDisplayRows(
+                for: schedule,
+                firstDayOfMonth: firstDayOfMonth,
+                firstWeekday: firstWeekday,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                scheduleIndex: index, // 期間予定内での連番（0から開始）
+                totalScheduleCount: multiDaySchedules.count,
+                allMultiDaySchedules: multiDaySchedules,
+                geometry: geometry
+            )
+
+            scheduleRowsGroup(
+                schedule: schedule,
+                scheduleRows: scheduleRows,
+                tagColor: tagColor,
+                firstDayOfMonth: firstDayOfMonth,
+                firstWeekday: firstWeekday,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                index: index,
+                totalScheduleCount: multiDaySchedules.count,
+                allMultiDaySchedules: multiDaySchedules,
+                geometry: geometry
+            )
         }
     }
     
@@ -1717,7 +1712,6 @@ struct CustomCalendarView: View {
 
         return CGRect(x: startX, y: y, width: width, height: height)
     }
-    
 }
 
 // 表示アイテムの種類定義

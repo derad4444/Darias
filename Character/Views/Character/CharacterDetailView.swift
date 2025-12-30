@@ -30,6 +30,7 @@ struct CharacterDetailView: View {
     @State private var dream: String = ""
     @State private var characterExpression: CharacterExpression = .normal
     @State private var characterGender: CharacterGender?
+    @State private var analysisLevel: Int = 0  // 0, 20, 50, 100
 
     // Big5解析関連
     @StateObject private var big5AnalysisService = Big5AnalysisService()
@@ -204,6 +205,9 @@ struct CharacterDetailView: View {
                 aptitude = data["aptitude"] as? String ?? ""
                 dream = data["dream"] as? String ?? ""
 
+                // 分析レベルを取得
+                analysisLevel = data["analysis_level"] as? Int ?? 0
+
                 // 性別情報を取得
                 if let genderString = data["gender"] as? String {
                     if genderString == "男性" {
@@ -245,7 +249,8 @@ struct CharacterDetailView: View {
     
     @ViewBuilder
     private var big5AnalysisSection: some View {
-        if let analysisLevel = currentAnalysisLevel {
+        // 100問完了時（analysisLevel == 100）のみBig5Analysisを表示
+        if analysisLevel >= 100, let analysisLevel = currentAnalysisLevel {
             VStack(alignment: .leading, spacing: 12) {
                 // セクションヘッダー
                 HStack {
@@ -285,10 +290,11 @@ struct CharacterDetailView: View {
                 RoundedRectangle(cornerRadius: 16)
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
             )
-        } else {
-            // 解析レベルに達していない場合
+        } else if analysisLevel < 20 {
+            // 20問未満の場合のみ、解析レベルに達していないメッセージを表示
             analysisNotAvailableSection
         }
+        // 20問以上100問未満の場合は、Big5Analysisセクション自体を表示しない
     }
     
     @ViewBuilder

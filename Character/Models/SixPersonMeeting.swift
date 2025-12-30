@@ -50,10 +50,12 @@ struct ConversationMessage: Codable, Identifiable {
 
     var position: MessagePosition {
         // 左右の配置を決定
+        // 左側（慎重派グループ）: original, ideal, wise
+        // 右側（行動派グループ）: opposite, shadow, child
         switch characterId {
-        case "cautious", "emotional", "opposite":
+        case "original", "ideal", "wise":
             return .left
-        case "active", "logical", "ideal":
+        case "opposite", "shadow", "child":
             return .right
         default:
             return .left
@@ -61,20 +63,20 @@ struct ConversationMessage: Codable, Identifiable {
     }
 
     var characterIcon: String {
-        // キャラクターごとのアイコン
+        // キャラクターごとのアイコン（仕様書のアイコンに対応）
         switch characterId {
-        case "cautious":
-            return "shield.fill"
-        case "active":
-            return "bolt.fill"
-        case "emotional":
-            return "heart.fill"
-        case "logical":
-            return "brain.head.profile"
+        case "original":
+            return "person.fill"           // 🧑 今の自分
         case "opposite":
-            return "arrow.triangle.2.circlepath"
+            return "arrow.triangle.2.circlepath"  // 🔄 真逆の自分
         case "ideal":
-            return "star.fill"
+            return "star.fill"             // ✨ 理想の自分
+        case "shadow":
+            return "person.crop.circle"    // 👤 本音の自分
+        case "child":
+            return "figure.walk"           // 👶 子供の頃の自分
+        case "wise":
+            return "person.crop.square.filled.and.at.rectangle"  // 👴 未来の自分(70歳)
         default:
             return "person.fill"
         }
@@ -83,18 +85,18 @@ struct ConversationMessage: Codable, Identifiable {
     var characterColor: String {
         // キャラクターごとの色
         switch characterId {
-        case "cautious":
-            return "blue"
-        case "active":
-            return "orange"
-        case "emotional":
-            return "pink"
-        case "logical":
-            return "purple"
+        case "original":
+            return "blue"      // 今の自分 - 冷静な青
         case "opposite":
-            return "green"
+            return "orange"    // 真逆の自分 - 活発なオレンジ
         case "ideal":
-            return "yellow"
+            return "purple"    // 理想の自分 - 高貴な紫
+        case "shadow":
+            return "red"       // 本音の自分 - 率直な赤
+        case "child":
+            return "green"     // 子供の頃の自分 - 新鮮な緑
+        case "wise":
+            return "brown"     // 未来の自分 - 落ち着いた茶色
         default:
             return "gray"
         }

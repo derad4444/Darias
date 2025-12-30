@@ -97,6 +97,15 @@ struct MainTabView: View {
                     self.showDiaryDetail = true
                 }
             }
+
+            // キャラクター詳細を開く通知を監視
+            NotificationCenter.default.addObserver(
+                forName: .openCharacterDetail,
+                object: nil,
+                queue: .main
+            ) { _ in
+                self.selectedTab = 3  // タブ3: キャラクター詳細
+            }
         }
         .alert("アカウント情報の取得ができませんでした", isPresented: $showErrorAlert) {
             Button("ログアウト", role: .cancel) {

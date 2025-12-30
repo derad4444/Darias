@@ -42,16 +42,24 @@
 - **キャッチコピー**: 「自由奔放な冒険家」
 - **説明**: あなたとは正反対の性格。大胆で即断即決タイプ。
 
-### 性格特性（BIG5を反転）
+### 性格特性（BIG5を極端に反転）
 ```swift
+// 極端反転ロジック（2025年12月29日更新）
+func reverseScore(_ score: Int) -> Int {
+    return score >= 3 ? 1 : 5
+}
+
 Big5Scores(
-    openness: 6 - userBIG5.openness,
-    conscientiousness: 6 - userBIG5.conscientiousness,
-    extraversion: 6 - userBIG5.extraversion,
-    agreeableness: 6 - userBIG5.agreeableness,
-    neuroticism: 6 - userBIG5.neuroticism
+    openness: reverseScore(userBIG5.openness),
+    conscientiousness: reverseScore(userBIG5.conscientiousness),
+    extraversion: reverseScore(userBIG5.extraversion),
+    agreeableness: reverseScore(userBIG5.agreeableness),
+    neuroticism: reverseScore(userBIG5.neuroticism)
 )
-// 例: 4 → 2, 5 → 1, 3 → 3
+// 例:
+//  3以上 → 1 (高い/普通 → 極端に低く)
+//  2以下 → 5 (低い → 極端に高く)
+// 実例: O3→O1, C4→C1, E2→E5, A4→A1, N3→N1
 ```
 
 ### 話し方の特徴
@@ -81,15 +89,13 @@ Big5Scores(
 ### 性格特性（全特性を高水準に）
 ```swift
 Big5Scores(
-    openness: max(userBIG5.openness, 4),
-    conscientiousness: max(userBIG5.conscientiousness, 4),
-    extraversion: optimizeToMiddle(userBIG5.extraversion, target: 3.5),
-    agreeableness: max(userBIG5.agreeableness, 4),
-    neuroticism: max(userBIG5.neuroticism, 4) // 高い = 安定
+    openness: 5,
+    conscientiousness: 5,
+    extraversion: 5,
+    agreeableness: 5,
+    neuroticism: 1  // 1 = 安定、5 = 不安定
 )
-
-// optimizeToMiddle: 極端な値を中央寄りに調整
-// 1-2 → 3, 4-5 → 3-4
+// 全特性が最高水準（2025年12月29日更新）
 ```
 
 ### 話し方の特徴
@@ -119,13 +125,13 @@ Big5Scores(
 ### 性格特性（協調性を下げ、率直に）
 ```swift
 Big5Scores(
-    openness: min(userBIG5.openness + 1.5, 5),
-    conscientiousness: max(userBIG5.conscientiousness - 2, 1),
-    extraversion: min(userBIG5.extraversion + 1.5, 5),
-    agreeableness: max(userBIG5.agreeableness - 2.5, 1), // 本音
-    neuroticism: max(userBIG5.neuroticism - 1.5, 1)
+    openness: userBIG5.openness,
+    conscientiousness: max(userBIG5.conscientiousness - 1, 1),
+    extraversion: userBIG5.extraversion,
+    agreeableness: max(userBIG5.agreeableness - 2, 1), // 率直・遠慮なし
+    neuroticism: userBIG5.neuroticism
 )
-// 協調性を大幅に下げて率直な性格に
+// 協調性を下げて率直な性格に（2025年12月29日更新）
 ```
 
 ### 話し方の特徴
@@ -156,12 +162,12 @@ Big5Scores(
 ```swift
 Big5Scores(
     openness: 5,  // 子供は好奇心旺盛
-    conscientiousness: 1,  // 計画性低い
-    extraversion: max(userBIG5.extraversion + 1, 4),
-    agreeableness: 3,  // 純粋
+    conscientiousness: 2,  // 計画性低い
+    extraversion: 4,  // 活発
+    agreeableness: 5,  // 純粋
     neuroticism: 2  // 感情的だが回復も早い
 )
-// 子供特有の高い好奇心と低い計画性
+// 子供特有の高い好奇心と低い計画性（2025年12月29日更新）
 ```
 
 ### 話し方の特徴
@@ -191,13 +197,13 @@ Big5Scores(
 ### 性格特性（老年期の変化を反映）
 ```swift
 Big5Scores(
-    openness: max(userBIG5.openness - 1, 2),  // やや保守的
-    conscientiousness: min(userBIG5.conscientiousness + 0.5, 5),
-    extraversion: max(userBIG5.extraversion - 1, 2),  // 落ち着く
-    agreeableness: min(userBIG5.agreeableness + 1, 5),  // 寛容
-    neuroticism: min(userBIG5.neuroticism + 1.5, 5)  // 達観
+    openness: min(userBIG5.openness + 1, 5),  // 経験豊富
+    conscientiousness: min(userBIG5.conscientiousness + 1, 5),  // より計画的
+    extraversion: max(userBIG5.extraversion - 1, 1),  // 落ち着く
+    agreeableness: 5,  // 寛容
+    neuroticism: 1  // 達観・安定
 )
-// 年齢と共に寛容で安定した性格に
+// 年齢と共に寛容で安定した性格に（2025年12月29日更新）
 ```
 
 ### 話し方の特徴

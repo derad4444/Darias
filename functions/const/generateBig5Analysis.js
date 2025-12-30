@@ -130,7 +130,7 @@ function createPrompt(big5Scores, gender, level, categories) {
   const levelDescription = {
     20: "基本的な性格傾向の概要",
     50: "より詳細な行動パターンと具体例",
-    100: "完全な性格解析と深い洞察",
+    100: "総合的な性格解析と深い洞察",
   }[level];
 
   const categoryDescriptions = {

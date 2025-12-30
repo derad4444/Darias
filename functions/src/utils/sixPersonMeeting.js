@@ -6,6 +6,7 @@
 
 /**
  * BIG5スコアを変換して6つの性格パターンを生成
+ * 仕様書 (docs/six-person-meeting/02_characters.md) に基づく
  * @param {Object} userBig5 - ユーザーのBIG5スコア (1-5)
  * @param {string} gender - 性別
  * @return {Array<Object>} - 6人のキャラクター情報
@@ -13,11 +14,31 @@
 function generateSixPersonalities(userBig5, gender) {
   const personalities = [];
 
-  // 1. 真逆の自分
+  // 1. 今の自分 (ユーザーのBIG5そのまま)
+  personalities.push({
+    id: "original",
+    name: "今の自分",
+    icon: "🧑",
+    catchphrase: "慎重派の分析家",
+    description: "いつものあなた。リスクを考えてデータを重視する性格。",
+    big5: {
+      openness: userBig5.openness,
+      conscientiousness: userBig5.conscientiousness,
+      extraversion: userBig5.extraversion,
+      agreeableness: userBig5.agreeableness,
+      neuroticism: userBig5.neuroticism,
+    },
+    gender,
+    position: "left", // 慎重派グループ
+  });
+
+  // 2. 真逆の自分 (全BIG5を反転)
   personalities.push({
     id: "opposite",
     name: "真逆の自分",
-    description: "あなたとは正反対の性格を持つ自分",
+    icon: "🔄",
+    catchphrase: "自由奔放な冒険家",
+    description: "あなたとは正反対の性格。大胆で即断即決タイプ。",
     big5: {
       openness: 6 - userBig5.openness,
       conscientiousness: 6 - userBig5.conscientiousness,
@@ -26,87 +47,79 @@ function generateSixPersonalities(userBig5, gender) {
       neuroticism: 6 - userBig5.neuroticism,
     },
     gender,
-    position: "left", // チャット画面での配置
+    position: "right", // 行動派グループ
   });
 
-  // 2. 理想の自分
+  // 3. 理想の自分 (全特性を高水準に)
   personalities.push({
     id: "ideal",
     name: "理想の自分",
-    description: "バランスが取れた理想的な性格の自分",
+    icon: "✨",
+    catchphrase: "冷静な完璧主義者",
+    description: "バランスが取れた成長した姿。客観的に物事を見る。",
     big5: {
       openness: Math.max(userBig5.openness, 4),
       conscientiousness: Math.max(userBig5.conscientiousness, 4),
       extraversion: optimizeToMiddle(userBig5.extraversion, 3.5),
       agreeableness: Math.max(userBig5.agreeableness, 4),
-      neuroticism: Math.min(userBig5.neuroticism, 2),
+      neuroticism: Math.max(userBig5.neuroticism, 4), // 高い = 安定
     },
     gender,
-    position: "right",
+    position: "left", // 慎重派グループ
   });
 
-  // 3. 慎重派の自分
+  // 4. 本音の自分 (協調性を下げ、率直に)
   personalities.push({
-    id: "cautious",
-    name: "慎重派の自分",
-    description: "リスクを避け、計画的に行動する自分",
+    id: "shadow",
+    name: "本音の自分",
+    icon: "👤",
+    catchphrase: "率直な現実主義者",
+    description: "建前なし。本当に思っていることをズバリ言う性格。",
     big5: {
-      openness: Math.max(userBig5.openness - 1, 1),
-      conscientiousness: Math.min(userBig5.conscientiousness + 1, 5),
-      extraversion: Math.max(userBig5.extraversion - 1, 1),
-      agreeableness: userBig5.agreeableness,
-      neuroticism: Math.min(userBig5.neuroticism + 1, 5),
+      openness: Math.min(userBig5.openness + 1.5, 5),
+      conscientiousness: Math.max(userBig5.conscientiousness - 2, 1),
+      extraversion: Math.min(userBig5.extraversion + 1.5, 5),
+      agreeableness: Math.max(userBig5.agreeableness - 2.5, 1), // 本音
+      neuroticism: Math.max(userBig5.neuroticism - 1.5, 1),
     },
     gender,
-    position: "left",
+    position: "right", // 行動派グループ
   });
 
-  // 4. 行動派の自分
+  // 5. 子供の頃の自分 (10歳の頃の性格)
   personalities.push({
-    id: "active",
-    name: "行動派の自分",
-    description: "直感的に動き、チャレンジを恐れない自分",
+    id: "child",
+    name: "子供の頃の自分",
+    icon: "👶",
+    catchphrase: "純粋な夢見る少年/少女",
+    description: "10歳の頃のあなた。感情を大切にワクワクを追い求める。",
     big5: {
-      openness: Math.min(userBig5.openness + 1, 5),
-      conscientiousness: Math.max(userBig5.conscientiousness - 1, 1),
-      extraversion: Math.min(userBig5.extraversion + 1, 5),
-      agreeableness: userBig5.agreeableness,
-      neuroticism: Math.max(userBig5.neuroticism - 1, 1),
+      openness: 5, // 子供は好奇心旺盛
+      conscientiousness: 1, // 計画性低い
+      extraversion: Math.max(userBig5.extraversion + 1, 4),
+      agreeableness: 3, // 純粋
+      neuroticism: 2, // 感情的だが回復も早い
     },
     gender,
-    position: "right",
+    position: "right", // 行動派グループ
   });
 
-  // 5. 感情重視の自分
+  // 6. 未来の自分 (70歳の達観した自分)
   personalities.push({
-    id: "emotional",
-    name: "感情重視の自分",
-    description: "心の声を大切にする自分",
+    id: "wise",
+    name: "未来の自分（70歳）",
+    icon: "👴",
+    catchphrase: "達観した人生の先輩",
+    description: "70歳になったあなた。長い人生経験から冷静にアドバイスしてくれる。",
     big5: {
-      openness: Math.min(userBig5.openness + 1, 5),
-      conscientiousness: userBig5.conscientiousness,
-      extraversion: userBig5.extraversion,
-      agreeableness: Math.min(userBig5.agreeableness + 1, 5),
-      neuroticism: Math.min(userBig5.neuroticism + 1, 5),
+      openness: Math.max(userBig5.openness - 1, 2), // やや保守的
+      conscientiousness: Math.min(userBig5.conscientiousness + 0.5, 5),
+      extraversion: Math.max(userBig5.extraversion - 1, 2), // 落ち着く
+      agreeableness: Math.min(userBig5.agreeableness + 1, 5), // 寛容
+      neuroticism: Math.min(userBig5.neuroticism + 1.5, 5), // 達観
     },
     gender,
-    position: "left",
-  });
-
-  // 6. 論理重視の自分
-  personalities.push({
-    id: "logical",
-    name: "論理重視の自分",
-    description: "データと理性で判断する自分",
-    big5: {
-      openness: userBig5.openness,
-      conscientiousness: Math.min(userBig5.conscientiousness + 1, 5),
-      extraversion: userBig5.extraversion,
-      agreeableness: Math.max(userBig5.agreeableness - 1, 1),
-      neuroticism: Math.max(userBig5.neuroticism - 1, 1),
-    },
-    gender,
-    position: "right",
+    position: "left", // 慎重派グループ
   });
 
   return personalities;

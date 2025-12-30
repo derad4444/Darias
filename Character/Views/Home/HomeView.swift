@@ -52,6 +52,10 @@ struct HomeView: View {
 
     // 6人会議機能
     @State private var showMeetingInput = false
+    @State private var showMeetingLockedDialog = false
+    @State private var showMeetingUnlockPopup = false
+    @AppStorage("meetingFeatureUnlocked") private var meetingFeatureUnlocked = false
+    @AppStorage("meetingFeatureNewBadge") private var showMeetingNewBadge = false
 
     // 統合履歴
     @State private var showUnifiedHistory = false
@@ -120,17 +124,42 @@ struct HomeView: View {
                             HStack {
                                 // 自分会議ボタン
                                 Button(action: {
-                                    showMeetingInput = true
+                                    // 診断中は何もしない（質問に答えるのが優先）
+                                    if characterService.showBIG5Question || characterService.showBIG5ContinueDialog {
+                                        return
+                                    }
+
+                                    let isUnlocked = characterService.big5AnsweredCount >= 20
+                                    if isUnlocked {
+                                        showMeetingInput = true
+                                        // Newバッジを非表示にする
+                                        if showMeetingNewBadge {
+                                            showMeetingNewBadge = false
+                                        }
+                                    } else {
+                                        showMeetingLockedDialog = true
+                                    }
                                 }) {
                                     HStack(spacing: 8) {
-                                        Image(systemName: "person.3.fill")
+                                        Image(systemName: characterService.big5AnsweredCount >= 20 ? "person.3.fill" : "lock.fill")
                                         Text("自分会議")
                                             .dynamicCallout()
+
+                                        // Newバッジ
+                                        if showMeetingNewBadge && characterService.big5AnsweredCount >= 20 {
+                                            Text("New")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 6)
+                                                .padding(.vertical, 2)
+                                                .background(Color.red)
+                                                .cornerRadius(8)
+                                        }
                                     }
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 8)
-                                    .background(colorSettings.getCurrentAccentColor().opacity(0.85))
+                                    .background(colorSettings.getCurrentAccentColor().opacity(characterService.big5AnsweredCount >= 20 ? 0.85 : 0.5))
                                     .cornerRadius(20)
                                     .shadow(radius: 2)
                                 }
@@ -273,6 +302,28 @@ struct HomeView: View {
                 // 自動アニメーションは無効化
                 // startCharacterAnimations()
             }
+            .onChange(of: characterService.characterGenerationStatus.status) { newStatus in
+                // 完了ポップアップが表示された時点でFirestoreのみ削除（ローカル状態は維持）
+                if newStatus == .completed {
+                    characterService.clearGenerationStatusInFirestore(characterId: characterId)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .dismissCharacterGenerationPopup)) { _ in
+                // ポップアップを閉じる時にローカル状態をリセット
+                characterService.characterGenerationStatus = .notStarted
+            }
+            .onChange(of: characterService.big5AnsweredCount) { newValue in
+                // 20問完了時に解禁ポップアップを表示
+                if newValue == 20 && !meetingFeatureUnlocked {
+                    meetingFeatureUnlocked = true
+                    showMeetingNewBadge = true
+
+                    // 少し遅延させてポップアップを表示
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        showMeetingUnlockPopup = true
+                    }
+                }
+            }
             .onDisappear {
                 // リスナーのクリーンアップ
                 characterService.stopMonitoringGenerationStatus()
@@ -336,6 +387,47 @@ struct HomeView: View {
             if characterService.characterGenerationStatus.shouldShowPopup {
                 CharacterGenerationPopupView(status: characterService.characterGenerationStatus)
                     .animation(.easeInOut(duration: 0.3), value: characterService.characterGenerationStatus.status)
+            }
+
+            // 会議機能ロックダイアログ
+            if showMeetingLockedDialog {
+                ZStack {
+                    Color.black.opacity(0.4)
+                        .ignoresSafeArea()
+                        .onTapGesture {
+                            showMeetingLockedDialog = false
+                        }
+
+                    MeetingFeatureLockedDialog(
+                        currentProgress: characterService.big5AnsweredCount,
+                        onContinueDiagnosis: {
+                            showMeetingLockedDialog = false
+                            // 診断を開始
+                            triggerBIG5Question()
+                        },
+                        onDismiss: {
+                            showMeetingLockedDialog = false
+                        }
+                    )
+                    .environmentObject(fontSettings)
+                }
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.3), value: showMeetingLockedDialog)
+            }
+
+            // 会議機能解禁ポップアップ
+            if showMeetingUnlockPopup {
+                MeetingFeatureUnlockPopup(
+                    onTryNow: {
+                        showMeetingUnlockPopup = false
+                        showMeetingInput = true
+                    },
+                    onDismiss: {
+                        showMeetingUnlockPopup = false
+                    }
+                )
+                .transition(.opacity)
+                .animation(.easeInOut(duration: 0.3), value: showMeetingUnlockPopup)
             }
         }
     }

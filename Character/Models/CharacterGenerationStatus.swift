@@ -80,14 +80,38 @@ extension CharacterGenerationStatus {
         case .generating:
             return message ?? "性格を生成しています..."
         case .completed:
-            return "性格の生成が完了しました！"
+            // 段階ごとに異なるメッセージ
+            switch stage {
+            case 1:
+                return "基本分析が完了しました！\n20問の診断お疲れさまでした。\n基本的な性格データが生成されました。"
+            case 2:
+                return "詳細分析が完了しました！\n50問の診断お疲れさまでした。\nより詳しい性格データが生成されました。"
+            case 3:
+                return "総合分析が完了しました！\n100問の診断お疲れさまでした。\nあなたの性格データが完成しました。"
+            default:
+                return "性格データの生成が完了しました！"
+            }
         case .failed:
             return message ?? "生成に失敗しました"
+        }
+    }
+
+    /// 完了時のタイトル
+    var completionTitle: String {
+        switch stage {
+        case 1:
+            return "基本分析完了！"
+        case 2:
+            return "詳細分析完了！"
+        case 3:
+            return "総合分析完了！"
+        default:
+            return "生成完了！"
         }
     }
     
     /// ポップアップを表示すべきかどうか
     var shouldShowPopup: Bool {
-        return status == .generating
+        return status == .generating || status == .completed
     }
 }

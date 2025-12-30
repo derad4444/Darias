@@ -24,7 +24,7 @@ class SixPersonMeetingService: ObservableObject {
     ///   - userId: ユーザーID
     ///   - characterId: キャラクターID
     ///   - concern: 悩み内容
-    ///   - category: カテゴリ（省略可）
+    ///   - category: カテゴリ（省略可、指定なしで自動検出）
     /// - Returns: 会議データ
     func generateOrReuseMeeting(
         userId: String,
@@ -42,12 +42,16 @@ class SixPersonMeetingService: ObservableObject {
         do {
             let callable = functions.httpsCallable("generateOrReuseMeeting")
 
-            let params: [String: Any] = [
+            var params: [String: Any] = [
                 "userId": userId,
                 "characterId": characterId,
-                "concern": concern,
-                "concernCategory": category ?? ""
+                "concern": concern
             ]
+
+            // カテゴリが指定されている場合のみ追加
+            if let category = category {
+                params["concernCategory"] = category
+            }
 
             Logger.debug("Calling generateOrReuseMeeting", category: Logger.network)
 
