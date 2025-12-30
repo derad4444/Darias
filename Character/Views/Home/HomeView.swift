@@ -385,8 +385,12 @@ struct HomeView: View {
             
             // キャラクター生成ポップアップ
             if characterService.characterGenerationStatus.shouldShowPopup {
-                CharacterGenerationPopupView(status: characterService.characterGenerationStatus)
-                    .animation(.easeInOut(duration: 0.3), value: characterService.characterGenerationStatus.status)
+                CharacterGenerationPopupView(
+                    status: characterService.characterGenerationStatus,
+                    userId: userId,
+                    characterId: characterId
+                )
+                .animation(.easeInOut(duration: 0.3), value: characterService.characterGenerationStatus.status)
             }
 
             // 会議機能ロックダイアログ

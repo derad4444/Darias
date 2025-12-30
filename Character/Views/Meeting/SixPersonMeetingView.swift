@@ -21,6 +21,7 @@ struct SixPersonMeetingView: View {
     @State private var showCharacterExplanation: Bool = false
     @State private var shouldAutoScroll: Bool = true
     @State private var animationTask: Task<Void, Never>?
+    @State private var showShareSheet: Bool = false
 
     private var allMessages: [ConversationMessage] {
         meetingResponse.conversation.rounds.flatMap { $0.messages }
@@ -86,6 +87,12 @@ struct SixPersonMeetingView: View {
             NavigationStack {
                 CharacterExplanationView()
             }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: ShareHelper.shareMeetingConclusion(
+                concern: concernText,
+                conclusion: meetingResponse.conversation.conclusion.summary
+            ))
         }
     }
 
@@ -247,6 +254,22 @@ struct SixPersonMeetingView: View {
                 .padding()
                 .background(Color.blue.opacity(0.1))
                 .cornerRadius(12)
+
+                // 共有ボタン
+                Button(action: {
+                    showShareSheet = true
+                }) {
+                    HStack {
+                        Image(systemName: "square.and.arrow.up")
+                        Text("会議結果を共有")
+                    }
+                    .font(.headline)
+                    .foregroundColor(.green)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green.opacity(0.1))
+                    .cornerRadius(12)
+                }
 
                 // 評価ボタン
                 Button(action: { showRatingDialog = true }) {

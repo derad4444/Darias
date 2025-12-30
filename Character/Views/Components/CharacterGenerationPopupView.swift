@@ -3,6 +3,8 @@ import FirebaseFirestore
 
 struct CharacterGenerationPopupView: View {
     let status: CharacterGenerationStatus
+    let userId: String
+    let characterId: String
     
     var body: some View {
         ZStack {
@@ -110,6 +112,23 @@ struct CharacterGenerationPopupView: View {
                         }
                         .buttonStyle(PlainButtonStyle())
 
+                        // 共有ボタン
+                        Button(action: {
+                            fetchCharacterDataAndShare()
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                Text("結果を共有")
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(10)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+
                         Button(action: {
                             NotificationCenter.default.post(
                                 name: .dismissCharacterGenerationPopup,
@@ -145,10 +164,22 @@ struct CharacterGenerationPopupView: View {
             .padding(.horizontal, 40)
         }
         .transition(.opacity.combined(with: .scale(scale: 0.9)))
+        .sheet(isPresented: $showShareSheet) {
+            ShareSheet(items: ShareHelper.sharePersonalityAnalysis(
+                stage: status.stage,
+                strengths: characterStrength,
+                weaknesses: characterWeakness,
+                dreams: characterDream
+            ))
+        }
     }
     
     // MARK: - Private Properties
     @State private var rotationAngle: Double = 0
+    @State private var showShareSheet: Bool = false
+    @State private var characterStrength: String = ""
+    @State private var characterWeakness: String = ""
+    @State private var characterDream: String = ""
     
     private var titleText: String {
         switch status.status {
@@ -160,6 +191,32 @@ struct CharacterGenerationPopupView: View {
             return "生成に失敗しました"
         case .notStarted:
             return ""
+        }
+    }
+
+    // MARK: - Private Methods
+
+    private func fetchCharacterDataAndShare() {
+        let db = Firestore.firestore()
+        let docRef = db.collection("users").document(userId)
+            .collection("characters").document(characterId)
+            .collection("details").document("current")
+
+        docRef.getDocument { document, error in
+            if let data = document?.data() {
+                characterStrength = data["strength"] as? String ?? "未設定"
+                characterWeakness = data["weakness"] as? String ?? "未設定"
+                characterDream = data["dream"] as? String ?? "未設定"
+
+                // データ取得後に共有シートを表示
+                showShareSheet = true
+            } else {
+                // データ取得失敗時もデフォルト値で共有
+                characterStrength = "未設定"
+                characterWeakness = "未設定"
+                characterDream = "未設定"
+                showShareSheet = true
+            }
         }
     }
 }
@@ -181,10 +238,12 @@ struct CharacterGenerationPopupView_Previews: PreviewProvider {
                     status: .generating,
                     message: "性格生成中です。画面を閉じずに少々お待ちください。",
                     updatedAt: Timestamp()
-                )
+                ),
+                userId: "preview_user",
+                characterId: "preview_character"
             )
             .previewDisplayName("生成中")
-            
+
             // 完了
             CharacterGenerationPopupView(
                 status: CharacterGenerationStatus(
@@ -192,10 +251,12 @@ struct CharacterGenerationPopupView_Previews: PreviewProvider {
                     status: .completed,
                     message: nil,
                     updatedAt: Timestamp()
-                )
+                ),
+                userId: "preview_user",
+                characterId: "preview_character"
             )
             .previewDisplayName("完了")
-            
+
             // 失敗
             CharacterGenerationPopupView(
                 status: CharacterGenerationStatus(
@@ -203,7 +264,9 @@ struct CharacterGenerationPopupView_Previews: PreviewProvider {
                     status: .failed,
                     message: "生成に失敗しました: ネットワークエラー",
                     updatedAt: Timestamp()
-                )
+                ),
+                userId: "preview_user",
+                characterId: "preview_character"
             )
             .previewDisplayName("失敗")
         }
