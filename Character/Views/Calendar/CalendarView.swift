@@ -464,18 +464,37 @@ struct CalendarView: View {
                                 }
                             } else {
                                 // 通常のカレンダー表示
-                                CustomCalendarView(
-                                    selectedDate: $selectedDate,
-                                    selectedYear: $selectedYear,
-                                    selectedMonth: $selectedMonth,
-                                    schedulesForDate: self.schedulesForDate,
-                                    firestoreManager: firestoreManager,
-                                    userId: userId,
-                                    showBottomSheet: $showBottomSheet,
-                                    screenHeight: geometry.size.height
-                                )
-                                .frame(height: calendarHeight)
-                                .frame(maxWidth: .infinity)
+                                // 小さい画面（iPhone 8など）はスクロール表示、大きい画面（iPhone 14以上）は固定表示
+                                if geometry.size.height < 700 {
+                                    // 小さい画面：スクロール可能（5週分全て表示）
+                                    ScrollView(.vertical, showsIndicators: true) {
+                                        CustomCalendarView(
+                                            selectedDate: $selectedDate,
+                                            selectedYear: $selectedYear,
+                                            selectedMonth: $selectedMonth,
+                                            schedulesForDate: self.schedulesForDate,
+                                            firestoreManager: firestoreManager,
+                                            userId: userId,
+                                            showBottomSheet: $showBottomSheet,
+                                            screenHeight: geometry.size.height
+                                        )
+                                        .frame(maxWidth: .infinity)
+                                    }
+                                } else {
+                                    // 大きい画面：固定表示（iPhone 14の完璧な状態を維持）
+                                    CustomCalendarView(
+                                        selectedDate: $selectedDate,
+                                        selectedYear: $selectedYear,
+                                        selectedMonth: $selectedMonth,
+                                        schedulesForDate: self.schedulesForDate,
+                                        firestoreManager: firestoreManager,
+                                        userId: userId,
+                                        showBottomSheet: $showBottomSheet,
+                                        screenHeight: geometry.size.height
+                                    )
+                                    .frame(height: calendarHeight)
+                                    .frame(maxWidth: .infinity)
+                                }
                             }
 
                         Spacer()
