@@ -11,6 +11,20 @@ function formatBig5Short(scores) {
 }
 
 /**
+ * Format Big5 scores with trait names for better AI understanding
+ * @param {Object} scores - Big5 scores object
+ * @return {string} - Formatted Big5 with trait names
+ */
+function formatBig5Detailed(scores) {
+  return `BIG5性格モデル:
+- 開放性(Openness): ${scores.openness}/5
+- 誠実性(Conscientiousness): ${scores.conscientiousness}/5
+- 外向性(Extraversion): ${scores.extraversion}/5
+- 協調性(Agreeableness): ${scores.agreeableness}/5
+- 神経症傾向(Neuroticism): ${scores.neuroticism}/5`;
+}
+
+/**
  * Get gender short code
  * @param {string} gender - full gender string
  * @return {string} - M/F/N
@@ -38,16 +52,21 @@ const OPTIMIZED_PROMPTS = {
 
   /**
    * Character Reply Generation - GPT-4o-mini optimized
-   * Enhanced for better Japanese conversation flow
+   * Enhanced for better Japanese conversation flow with detailed Big5
    */
   characterReply: (type, gender, big5, dreamText, userMessage, style, question) => {
-    const dream = dreamText ? ` 夢:${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
-    return `キャラ設定:${type}(${getGenderCode(gender)}) 性格:${formatBig5Short(big5)}${dream}
+    const big5Detailed = formatBig5Detailed(big5);
+    const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
+    const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
+
+    return `${big5Detailed}
+
+性別: ${genderText}
+${dream}
 
 ユーザー発言:"${userMessage}"
 
-${style}で${question}
-自然な日本語で100文字以内で返答。設定情報(AI,M,F,N等)は出力に含めない。`;
+上記のBIG5性格特性を忠実に反映した自然な会話を100文字以内で返答してください。`;
   },
 
   /**
@@ -123,5 +142,6 @@ JSONのみ出力。`;
 module.exports = {
   OPTIMIZED_PROMPTS,
   formatBig5Short,
+  formatBig5Detailed,
   getGenderCode,
 };

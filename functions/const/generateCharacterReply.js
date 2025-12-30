@@ -320,12 +320,13 @@ function generateEngagingComment(questionId, answerValue, currentStage) {
   return patterns[randomIndex];
 }
 
-// 最適化されたプロンプト生成関数
+// 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
 function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
+  // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
 
-  // 事前処理でスタイルを決定
+  // タイプ判定（将来的な利用のため残す）
   let type; let style; let question;
 
   if (androidScore >= 9) {
@@ -345,6 +346,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
     question = "info+emotion Q+";
   }
 
+  // BIG5詳細形式を使用した新しいプロンプト
   return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question);
 }
 
