@@ -15,9 +15,17 @@ class BGMPlayer {
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.numberOfLoops = -1  // 無限ループ
 
-            // 🔸 AppStorageから音量を読み取って適用
-            let savedVolume = UserDefaults.standard.double(forKey: "bgmVolume")
-            audioPlayer?.volume = savedVolume == 0 ? 0.5 : Float(savedVolume)
+            // 🔸 ミュート状態と音量をUserDefaultsから読み取って適用
+            let isMuted = UserDefaults.standard.bool(forKey: "bgmMuted")
+
+            if isMuted {
+                // ミュート状態の場合は音量0
+                audioPlayer?.volume = 0
+            } else {
+                // ミュート解除の場合は保存された音量を使用
+                let savedVolume = UserDefaults.standard.double(forKey: "bgmVolume")
+                audioPlayer?.volume = Float(savedVolume > 0 ? savedVolume : 0.5)
+            }
 
             audioPlayer?.play()
         } catch {
