@@ -201,14 +201,6 @@ struct PremiumUpgradeView: View {
                                 .dynamicBody()
                                 .foregroundColor(.gray)
                         }
-
-                        Text("7日間無料トライアル")
-                            .dynamicCaption()
-                            .foregroundColor(.green)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 4)
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(8)
                     }
                 }
                 .padding(.vertical, 20)
@@ -234,14 +226,6 @@ struct PremiumUpgradeView: View {
                             .dynamicBody()
                             .foregroundColor(.gray)
                     }
-
-                    Text("7日間無料トライアル")
-                        .dynamicCaption()
-                        .foregroundColor(.green)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 4)
-                        .background(Color.green.opacity(0.1))
-                        .cornerRadius(8)
                 }
                 .padding(.vertical, 20)
                 .padding(.horizontal, 16)
@@ -347,8 +331,6 @@ struct PremiumUpgradeView: View {
     private var legalSection: some View {
         VStack(spacing: 16) {
             VStack(spacing: 8) {
-                Text("• 無料トライアル期間終了24時間前に自動更新されます")
-                    .font(.caption)
                 Text("• 購入確定時にApple IDアカウントに課金されます")
                     .font(.caption)
                 Text("• 設定 > Apple ID > サブスクリプションから管理できます")

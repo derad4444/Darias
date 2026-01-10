@@ -272,10 +272,6 @@ struct OptionView: View {
                             .dynamicBody()
                             .fontWeight(.bold)
                             .foregroundColor(colorSettings.getCurrentAccentColor())
-
-                        Text("7日間無料")
-                            .dynamicCaption()
-                            .foregroundColor(.green)
                     }
 
                     Image(systemName: "chevron.right")

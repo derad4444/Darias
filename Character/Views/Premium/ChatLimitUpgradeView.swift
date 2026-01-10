@@ -93,10 +93,6 @@ struct ChatLimitUpgradeView: View {
                             .dynamicTitle3()
                             .fontWeight(.bold)
                             .foregroundColor(colorSettings.getCurrentAccentColor())
-
-                        Text("7日間無料トライアル")
-                            .dynamicCaption()
-                            .foregroundColor(.green)
                     }
                 }
             }
