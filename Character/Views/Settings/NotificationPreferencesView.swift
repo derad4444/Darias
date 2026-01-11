@@ -285,11 +285,17 @@ struct NotificationPreferencesView: View {
         if enabled {
             // 日記通知を再スケジュール
             if !authManager.characterId.isEmpty {
-                // キャラクター名を取得して通知をスケジュール
+                // キャラクター名を取得して通知をスケジュール（details/currentから）
                 let db = authManager.db
                 db.collection("users").document(authManager.userId)
                     .collection("characters").document(authManager.characterId)
+                    .collection("details").document("current")
                     .getDocument { document, error in
+                        if let error = error {
+                            print("❌ キャラクター詳細の取得に失敗: \(error.localizedDescription)")
+                            return
+                        }
+
                         if let data = document?.data() {
                             let characterName = data["name"] as? String ?? "キャラクター"
                             NotificationManager.shared.scheduleDailyDiaryNotification(
@@ -297,6 +303,9 @@ struct NotificationPreferencesView: View {
                                 characterId: authManager.characterId,
                                 userId: authManager.userId
                             )
+                            print("✅ 日記通知をスケジュールしました: \(characterName)")
+                        } else {
+                            print("❌ キャラクターデータが見つかりません")
                         }
                     }
             }
@@ -304,6 +313,7 @@ struct NotificationPreferencesView: View {
             // 日記通知をキャンセル
             if !authManager.characterId.isEmpty {
                 NotificationManager.shared.cancelDailyDiaryNotification(characterId: authManager.characterId)
+                print("🔕 日記通知をキャンセルしました")
             }
         }
     }

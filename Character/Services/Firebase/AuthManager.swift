@@ -209,10 +209,16 @@ class AuthManager: ObservableObject {
 
     // 日記監視を開始
     private func startDiaryMonitoring(userId: String, characterId: String) {
-        // キャラクター名と性別を取得
+        // キャラクター名と性別を取得（details/currentから）
         db.collection("users").document(userId)
             .collection("characters").document(characterId)
+            .collection("details").document("current")
             .getDocument { document, error in
+                if let error = error {
+                    print("❌ キャラクター詳細の取得に失敗: \(error.localizedDescription)")
+                    return
+                }
+
                 if let data = document?.data() {
                     let characterName = data["name"] as? String ?? "キャラクター"
                     let genderString = data["gender"] as? String ?? "女性"
