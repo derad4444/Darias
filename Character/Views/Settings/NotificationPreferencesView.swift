@@ -204,7 +204,7 @@ struct NotificationPreferencesView: View {
                             .foregroundColor(colorSettings.getCurrentTextColor())
                             .fontWeight(.semibold)
 
-                        Text("毎日23:50に日記作成を通知")
+                        Text("毎日23:55に日記作成を通知")
                             .dynamicCaption()
                             .foregroundColor(colorSettings.getCurrentTextColor().opacity(0.7))
                     }

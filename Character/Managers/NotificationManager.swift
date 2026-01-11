@@ -223,7 +223,7 @@ class NotificationManager: ObservableObject {
         }
     }
 
-    /// 毎日の日記通知をスケジュール（毎日23:50）
+    /// 毎日の日記通知をスケジュール（毎日23:55）
     func scheduleDailyDiaryNotification(characterName: String, characterId: String, userId: String) {
         guard isAuthorized else { return }
 
@@ -240,10 +240,10 @@ class NotificationManager: ObservableObject {
             "userId": userId
         ]
 
-        // 毎日23:50に通知
+        // 毎日23:55に通知（日記生成完了の5分後）
         var dateComponents = DateComponents()
         dateComponents.hour = 23
-        dateComponents.minute = 50
+        dateComponents.minute = 55
 
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
 
@@ -257,7 +257,7 @@ class NotificationManager: ObservableObject {
             if let error = error {
                 print("❌ 日記定期通知エラー: \(error.localizedDescription)")
             } else {
-                print("✅ 日記定期通知をスケジュールしました: 毎日23:50")
+                print("✅ 日記定期通知をスケジュールしました: 毎日23:55")
             }
         }
     }
