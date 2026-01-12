@@ -84,30 +84,28 @@ class CharacterPreloadService: ObservableObject {
     
     private func preloadCharacterImages(_ config: CharacterConfig) async {
         guard case .remote(let baseURL) = config.imageSource else { return }
-        
-        for expression in CharacterExpression.allCases {
-            let fileName = "\(config.id)\(expression.rawValue).png"
-            let imageURL = baseURL.appendingPathComponent(fileName)
-            
-            do {
-                let (data, _) = try await URLSession.shared.data(from: imageURL)
-                if let _ = UIImage(data: data) {
-                    // 成功時はキャッシュに保存（実際のViewModelに通知）
-                    await MainActor.run {
-                        NotificationCenter.default.post(
-                            name: .characterImagePreloaded,
-                            object: nil,
-                            userInfo: [
-                                "characterId": config.id,
-                                "expression": expression.rawValue,
-                                "imageData": data
-                            ]
-                        )
-                    }
+
+        // 表情機能を削除したため、基本画像のみプリロード
+        let fileName = "\(config.id).png"
+        let imageURL = baseURL.appendingPathComponent(fileName)
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: imageURL)
+            if let _ = UIImage(data: data) {
+                // 成功時はキャッシュに保存（実際のViewModelに通知）
+                await MainActor.run {
+                    NotificationCenter.default.post(
+                        name: .characterImagePreloaded,
+                        object: nil,
+                        userInfo: [
+                            "characterId": config.id,
+                            "imageData": data
+                        ]
+                    )
                 }
-            } catch {
-                // Failed to preload image
             }
+        } catch {
+            // Failed to preload image
         }
     }
     

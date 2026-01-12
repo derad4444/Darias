@@ -8,15 +8,6 @@ struct BIG5Question {
     let direction: String
 }
 
-// MARK: - Character Expression
-enum CharacterExpression: String, CaseIterable {
-    case normal = ""
-    case smile = "_smile"
-    case angry = "_angry"
-    case cry = "_cry"
-    case sleep = "_sleep"
-}
-
 // MARK: - Character Gender
 enum CharacterGender: String, CaseIterable {
     case male = "male"

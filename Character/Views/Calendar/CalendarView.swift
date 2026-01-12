@@ -66,8 +66,9 @@ struct CalendarView: View {
     @State private var showPicker = false
     @State private var selectedDate: Date = Date()
     @State private var showBottomSheet = false
-    @State private var characterExpression: CharacterExpression = .normal
     @State private var characterGender: CharacterGender?
+    @State private var confirmedBig5Scores: Big5Scores?
+    @State private var showImageNotFoundAlert: Bool = false
     @State private var monthlyComment: String = "今月のひとことを読み込み中..."
     @State private var isLoadingComment = true
     @State private var isCalendarViewActive = false
@@ -158,29 +159,30 @@ struct CalendarView: View {
         saveCurrentViewedMonth()
     }
     
-    // MARK: - Character Expression Functions
+    // MARK: - Character Image Functions
     private func getCharacterImageName() -> String? {
         guard let gender = characterGender else { return nil }
-        let genderPrefix = "character_\(gender.rawValue)"
-        switch characterExpression {
-        case .normal:
-            return genderPrefix
-        case .smile:
-            return "\(genderPrefix)_smile"
-        case .angry:
-            return "\(genderPrefix)_angry"
-        case .cry:
-            return "\(genderPrefix)_cry"
-        case .sleep:
-            return "\(genderPrefix)_sleep"
+
+        // 性格スコアがある場合は性格別画像を使用
+        if let scores = confirmedBig5Scores {
+            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
+
+            // 画像の存在確認
+            if UIImage(named: fileName) != nil {
+                return fileName
+            } else {
+                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
+                showImageNotFoundAlert = true
+                print("⚠️ 性格別画像が見つかりません: \(fileName)")
+                return "character_\(gender.rawValue)"
+            }
+        } else {
+            // スコアがない場合はデフォルト画像
+            return "character_\(gender.rawValue)"
         }
     }
     
-    private func triggerRandomExpression() {
-        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
-        let availableExpressions = expressions.filter { $0 != characterExpression }
-        characterExpression = availableExpressions.randomElement() ?? .smile
-    }
+    // 表情機能は削除されました
     
     // 年をカンマなしでフォーマットする関数
     private func formatYearWithoutComma(_ year: Int) -> String {
@@ -279,14 +281,37 @@ struct CalendarView: View {
             .collection("characters").document(characterId)
             .collection("details").document("current")
 
-        detailsRef.getDocument { document, error in
-            if let data = document?.data(),
-               let genderString = data["gender"] as? String {
+        // リアルタイムリスナーでスコア変更を監視
+        detailsRef.addSnapshotListener { document, error in
+            if let error = error {
+                print("⚠️ Firestoreエラー: \(error.localizedDescription)")
+                return
+            }
+
+            guard let document = document, document.exists else {
+                return
+            }
+
+            guard let data = document.data() else {
+                return
+            }
+
+            if let genderString = data["gender"] as? String {
                 DispatchQueue.main.async {
                     if genderString == "男性" {
                         characterGender = .male
                     } else {
                         characterGender = .female
+                    }
+
+                    // BIG5スコアを取得（診断完了後に自動更新）
+                    if let scoresMap = data["confirmedBig5Scores"] as? [String: Any],
+                       let scores = Big5Scores.fromScoreMap(scoresMap) {
+                        confirmedBig5Scores = scores
+                        print("✅ カレンダー: BIG5スコアを読み込みました: \(scores)")
+                    } else {
+                        confirmedBig5Scores = nil
+                        print("ℹ️ カレンダー: BIG5スコアがまだ設定されていません（診断前）")
                     }
                 }
             }
@@ -559,9 +584,6 @@ struct CalendarView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: 150, height: 150)
-                                    .onTapGesture {
-                                        triggerRandomExpression()
-                                    }
                             } else {
                                 // 性別情報読み込み中
                                 ProgressView()
@@ -627,6 +649,11 @@ struct CalendarView: View {
         .onChange(of: selectedMonth) { _ in
             saveCurrentViewedMonth()  // UserDefaultsに保存
             fetchMonthlyComment()  // 月が変わったときに再取得
+        }
+        .alert("画像が見つかりません", isPresented: $showImageNotFoundAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("性格に対応する画像ファイルが見つかりませんでした。デフォルト画像を表示しています。")
         }
         .onReceive(NotificationCenter.default.publisher(for: .init("ScheduleAdded"))) { _ in
             firestoreManager.fetchSchedules()
@@ -1782,7 +1809,6 @@ struct BottomSheetView: View {
     @State private var navigateToDiaryDetail = false
     @State private var selectedDiaryDate = Date()
     @State private var hasDiary = false
-    @State private var characterExpression: CharacterExpression = .normal
     @State private var loadDiaryTask: Task<Void, Never>?
 
     @EnvironmentObject var firestoreManager: FirestoreManager
@@ -2045,11 +2071,7 @@ struct BottomSheetView: View {
         }
     }
 
-    private func triggerRandomExpression() {
-        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
-        let availableExpressions = expressions.filter { $0 != characterExpression }
-        characterExpression = availableExpressions.randomElement() ?? .smile
-    }
+    // 表情機能は削除されました
     
     //日記取得
     private func queryDiary(for date: Date, completion: @escaping (_ documentID: String?) -> Void) {

@@ -2,24 +2,25 @@ import SwiftUI
 
 struct CharacterDisplayComponent: View {
     @Binding var displayedMessage: String
-    @Binding var currentExpression: CharacterExpression
     let characterConfig: CharacterConfig?
+    let personalityScores: Big5Scores?
+    @State private var showImageNotFoundAlert: Bool = false
     @State private var currentImageName: String
 
     init(
         displayedMessage: Binding<String>,
-        currentExpression: Binding<CharacterExpression>,
-        characterConfig: CharacterConfig? = nil
+        characterConfig: CharacterConfig? = nil,
+        personalityScores: Big5Scores? = nil
     ) {
         self._displayedMessage = displayedMessage
-        self._currentExpression = currentExpression
         self.characterConfig = characterConfig
+        self.personalityScores = personalityScores
 
-        // 初期画像名を設定
+        // 初期画像名を設定（デフォルト画像）
         let gender = characterConfig?.gender ?? .female
         self._currentImageName = State(initialValue: "character_\(gender.rawValue)")
     }
-    
+
     var body: some View {
         ZStack {
             // キャラクター画像表示（Assets内の画像を使用）
@@ -29,101 +30,53 @@ struct CharacterDisplayComponent: View {
                 .clipped()
                 .allowsHitTesting(false) // HomeViewのタップ領域を使用
                 .onAppear {
-                    updateImageBasedOnGender()
-                }
-                .onChange(of: currentExpression) { newExpression in
-                    changeExpression(to: newExpression)
+                    updateImage()
                 }
         }
-    }
-    
-    private func updateImageBasedOnGender() {
-        let gender = characterConfig?.gender ?? .female
-        let imageName = "character_\(gender.rawValue)"
-        currentImageName = imageName
-    }
-    
-    func changeExpression(to expression: CharacterExpression) {
-        let gender = characterConfig?.gender ?? .female
-        let genderPrefix = "character_\(gender.rawValue)"
-        
-        switch expression {
-        case .normal:
-            currentImageName = genderPrefix
-        case .smile:
-            currentImageName = "\(genderPrefix)_smile"
-        case .angry:
-            currentImageName = "\(genderPrefix)_angry"
-        case .cry:
-            currentImageName = "\(genderPrefix)_cry"
-        case .sleep:
-            currentImageName = "\(genderPrefix)_sleep"
+        .alert("画像が見つかりません", isPresented: $showImageNotFoundAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("性格に対応する画像ファイルが見つかりませんでした。デフォルト画像を表示しています。")
         }
     }
-    
-    func switchCharacter(to config: CharacterConfig) {
-        let genderPrefix = "character_\(config.gender.rawValue)"
-        currentImageName = genderPrefix
-    }
-    
-    // MARK: - Interactive Expression Functions
-    
-    private func triggerTapExpression() {
-        // ランダムな表情変更
-        let expressions: [CharacterExpression] = [.smile, .normal, .angry, .cry]
-        let randomExpression = expressions.randomElement() ?? .normal
-        changeExpression(to: randomExpression)
-        
-        // タップ効果音やフィードバック
-        playTapFeedback()
-    }
-    
-    private func triggerDragExpression(translation: CGSize) {
-        // ドラッグ方向に応じた表情変更
-        let expression: CharacterExpression
-        
-        if abs(translation.width) > abs(translation.height) {
-            if translation.width > 50 {
-                expression = .smile  // 右フリック: 笑顔
-            } else if translation.width < -50 {
-                expression = .angry  // 左フリック: 怒り
+
+    private func updateImage() {
+        let gender = characterConfig?.gender ?? .female
+
+        // 性格スコアがある場合は性格別画像を使用
+        if let scores = personalityScores {
+            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
+
+            // 画像の存在確認
+            if UIImage(named: fileName) != nil {
+                currentImageName = fileName
             } else {
-                expression = .normal
+                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
+                currentImageName = "character_\(gender.rawValue)"
+                showImageNotFoundAlert = true
+                print("⚠️ 性格別画像が見つかりません: \(fileName)")
             }
         } else {
-            if translation.height > 50 {
-                expression = .cry    // 下フリック: 泣き
-            } else if translation.height < -50 {
-                expression = .smile  // 上フリック: 笑顔
-            } else {
-                expression = .normal
-            }
+            // スコアがない場合はデフォルト画像
+            currentImageName = "character_\(gender.rawValue)"
         }
-        
-        changeExpression(to: expression)
     }
-    
-    private func playTapFeedback() {
-        // タップ時のフィードバック効果
-        
-        // 触覚フィードバック
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        // 将来的に音効果を追加可能
-        // AudioService.shared.playTapSound()
-    }
-    
-    func startIdleExpression() {
-        // 通常表情に戻す
-        changeExpression(to: .normal)
-    }
-    
-    func playRandomExpression() {
-        // ランダムな表情変更
-        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
-        let randomExpression = expressions.randomElement() ?? .normal
-        changeExpression(to: randomExpression)
+
+    func switchCharacter(to config: CharacterConfig, personalityScores: Big5Scores?) {
+        // 新しいキャラクターに切り替え
+        let gender = config.gender
+
+        if let scores = personalityScores {
+            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
+            if UIImage(named: fileName) != nil {
+                currentImageName = fileName
+            } else {
+                currentImageName = "character_\(gender.rawValue)"
+                showImageNotFoundAlert = true
+            }
+        } else {
+            currentImageName = "character_\(gender.rawValue)"
+        }
     }
 }
 

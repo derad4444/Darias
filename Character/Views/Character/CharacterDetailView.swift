@@ -28,9 +28,10 @@ struct CharacterDetailView: View {
     @State private var hobby: String = ""
     @State private var aptitude: String = ""
     @State private var dream: String = ""
-    @State private var characterExpression: CharacterExpression = .normal
     @State private var characterGender: CharacterGender?
     @State private var analysisLevel: Int = 0  // 0, 20, 50, 100
+    @State private var confirmedBig5Scores: Big5Scores?
+    @State private var showImageNotFoundAlert: Bool = false
 
     // Big5解析関連
     @StateObject private var big5AnalysisService = Big5AnalysisService()
@@ -63,9 +64,6 @@ struct CharacterDetailView: View {
                         Image(imageName)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .onTapGesture {
-                                triggerRandomExpression()
-                            }
                             .frame(width: 200, height: 200)
                             .padding(.top, 20)
                     } else {
@@ -118,6 +116,11 @@ struct CharacterDetailView: View {
         }
         .navigationTitle("キャラ詳細")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("画像が見つかりません", isPresented: $showImageNotFoundAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("性格に対応する画像ファイルが見つかりませんでした。デフォルト画像を表示しています。")
+        }
         .onAppear {
             if !isPreview {
                 fetchCharacterDetail()
@@ -160,28 +163,27 @@ struct CharacterDetailView: View {
         }
     }
     
-    // MARK: - Character Expression Functions
+    // MARK: - Character Image Functions
     private func getCharacterImageName() -> String? {
         guard let gender = characterGender else { return nil }
-        let genderPrefix = "character_\(gender.rawValue)"
-        switch characterExpression {
-        case .normal:
-            return genderPrefix
-        case .smile:
-            return "\(genderPrefix)_smile"
-        case .angry:
-            return "\(genderPrefix)_angry"
-        case .cry:
-            return "\(genderPrefix)_cry"
-        case .sleep:
-            return "\(genderPrefix)_sleep"
+
+        // 性格スコアがある場合は性格別画像を使用
+        if let scores = confirmedBig5Scores {
+            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
+
+            // 画像の存在確認
+            if UIImage(named: fileName) != nil {
+                return fileName
+            } else {
+                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
+                showImageNotFoundAlert = true
+                print("⚠️ 性格別画像が見つかりません: \(fileName)")
+                return "character_\(gender.rawValue)"
+            }
+        } else {
+            // スコアがない場合はデフォルト画像
+            return "character_\(gender.rawValue)"
         }
-    }
-    
-    private func triggerRandomExpression() {
-        let expressions: [CharacterExpression] = [.normal, .smile, .angry, .cry, .sleep]
-        let availableExpressions = expressions.filter { $0 != characterExpression }
-        characterExpression = availableExpressions.randomElement() ?? .smile
     }
     
     // Firestoreデータ取得処理
@@ -215,6 +217,11 @@ struct CharacterDetailView: View {
                     } else {
                         characterGender = .female
                     }
+                }
+
+                // BIG5スコアを取得
+                if let scoresMap = data["confirmedBig5Scores"] as? [String: Any] {
+                    confirmedBig5Scores = Big5Scores.fromScoreMap(scoresMap)
                 }
             }
         }

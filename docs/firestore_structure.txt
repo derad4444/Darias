@@ -1,0 +1,351 @@
+FIRESTORE DATABASE STRUCTURE (COMPLETE)
+====================================================================================================
+
+Export Date: 2026-01-10T08:52:03.629Z
+Total Users: 16
+
+📁 Big5Analysis
+   Sample Document: O3_C2_E1_A2_N5_男性
+   Fields:
+    big5_scores: {
+      conscientiousness: number = 2
+      openness: number = 3
+      extraversion: number = 1
+      neuroticism: number = 5
+      agreeableness: number = 2
+    }
+    analysis_50: {
+      romance: {
+        personality_type: string = "控えめな恋愛者"
+        key_points: [3 items]
+          [0]: string = "控えめなアプローチ"
+          [1]: string = "感情表現が苦手"
+          [2]: string = "信頼関係を重視"
+        detailed_text: string = "恋愛においては、内向性と低い協調性が影響し、パートナーに対して控えめなアプローチを取ります。感情を表に出すのが苦手で、自分の気持ちを伝えるのに時間がかかることがあります。そのため、恋愛関係は非常に深く..."
+      }
+      decision: {
+        key_points: [3 items]
+          [0]: string = "感情に基づく判断"
+          [1]: string = "選択肢に迷う"
+          [2]: string = "状況に応じた決定"
+        detailed_text: string = "意思決定においては、柔軟性を重視する傾向があります。外向性が低いことから、他者の意見を参考にすることは少なく、自分の感情や直感に基づいて判断することが多いです。しかし、神経症傾向が高いため、決断を下す..."
+        personality_type: string = "柔軟な意思決定者"
+      }
+      learning: {
+        key_points: [3 items]
+          [0]: string = "自己主導で進む"
+          [1]: string = "興味のあることに集中"
+          [2]: string = "安定した環境を重視"
+        detailed_text: string = "学習においては、自分のペースで進めることを好む自己主導型のスタイルです。新しい知識やスキルを習得する際、外部からの強制やプレッシャーを嫌い、自分で興味を持ったことに対してじっくりと取り組むことが多いで..."
+        personality_type: string = "自己主導型学習者"
+      }
+      career: {
+        detailed_text: string = "この性格特性は、仕事において内向的な特徴が強く現れます。外向性が低いため、チームでの活動よりも個別の作業を好み、静かな環境での集中を重視します。また、誠実性が低いことから、計画的に物事を進めるよりもそ..."
+        personality_type: string = "内向的な実行者"
+        key_points: [3 items]
+          [0]: string = "個別作業を好む"
+          [1]: string = "柔軟な対応力"
+          [2]: string = "プレッシャーに強い"
+      }
+      stress: {
+        key_points: [3 items]
+          [0]: string = "敏感なストレス反応"
+          [1]: string = "ネガティブ思考になりやすい"
+          [2]: string = "リラックスが重要"
+        detailed_text: string = "高い神経症傾向により、ストレスに対する反応が敏感です。仕事やプライベートでのプレッシャーがかかると、容易に不安や緊張を感じ、時には思考がネガティブになりがちです。そのため、ストレス管理には工夫が必要で..."
+        personality_type: string = "敏感なストレス反応者"
+      }
+    }
+    analysis_20: {
+      career: {
+        detailed_text: string = "この性格特性は、仕事において慎重さや計画性を重視する傾向を示しています。開放性が中程度であるため、既存の手法を用いて安定した成果を目指すことが多いですが、外向性が低いため、チームでの活発なコミュニケー..."
+        key_points: [3 items]
+          [0]: string = "安定性を重視"
+          [1]: string = "慎重な判断"
+          [2]: string = "個人作業に強み"
+        personality_type: string = "慎重な意思決定者"
+      }
+      stress: {
+        personality_type: string = "感情的な反応者"
+        key_points: [3 items]
+          [0]: string = "ストレスに敏感"
+          [1]: string = "感情の波が大きい"
+          [2]: string = "人とのコミュニケーションで軽減"
+        detailed_text: string = "神経症傾向が高いため、ストレスや不安に敏感で、感情の波が大きくなることがあります。新しい環境や予期しない事態には強いストレスを感じることが多く、自己管理が課題となります。ストレスを感じると、ネガティブ..."
+      }
+      romance: {
+        key_points: [3 items]
+          [0]: string = "深い関係を重視"
+          [1]: string = "内向的なアプローチ"
+          [2]: string = "信頼関係が重要"
+        detailed_text: string = "恋愛においては、内向性のため新しい出会いや社交的な場面が苦手で、深い関係を築くことを重視します。誠実性と協調性が低いため、適応が難しい場面では不安を感じやすいですが、心を許した相手には非常に献身的です..."
+        personality_type: string = "内向的な恋愛者"
+      }
+    }
+    analysis_100: {
+      career: {
+        detailed_text: string = "この性格特性を持つ女性は、あまり外向的ではなく、チームでの目立つ役割を好まない傾向があります。誠実性が低いため、細かい計画や組織には不向きですが、創造的なアイデアを持っている可能性があります。ただし、..."
+        personality_type: string = "内向的な実行者"
+        key_points: [3 items]
+          [0]: string = "内向的傾向"
+          [1]: string = "独立した作業好み"
+          [2]: string = "ストレスに弱い"
+      }
+      decision: {
+        key_points: [3 items]
+          [0]: string = "慎重な分析"
+          [1]: string = "感情的影響を受けやすい"
+          [2]: string = "リスク回避の傾向"
+        personality_type: string = "慎重な意思決定者"
+        detailed_text: string = "意思決定において、この性格特性を持つ女性は、非常に慎重であり、感情的な影響を強く受ける傾向があります。神経症傾向が高いため、選択肢を考える際に不安や迷いが生じやすく、決定を下すまでに時間がかかることが..."
+      }
+      stress: {
+        detailed_text: string = "この性格特性では、ストレスに対して非常に敏感で、感情的な反応が強く出ることがあります。神経症傾向が高いため、些細なことでも不安を感じやすく、ストレスを溜め込みやすいです。外向性が低いことから、一人で対..."
+        personality_type: string = "敏感なストレス反応者"
+        key_points: [3 items]
+          [0]: string = "高いストレス感受性"
+          [1]: string = "情緒的反応が強い"
+          [2]: string = "支援を求めるのが苦手"
+      }
+      romance: {
+        key_points: [3 items]
+          [0]: string = "慎重なアプローチ"
+          [1]: string = "感情の抑制"
+          [2]: string = "深い信頼を重視"
+        personality_type: string = "慎重な恋愛者"
+        detailed_text: string = "恋愛に関して、この性格特性を持つ女性は、感情を抑えがちな傾向があります。外向性が低いため、恋愛関係の初期段階では慎重であり、相手との距離を保つことが多いです。神経症傾向が高いことから、過去の経験や不安..."
+      }
+      learning: {
+        detailed_text: string = "学習において、この性格特性を持つ女性は、自分のペースで進むことを好む傾向があります。開放性が中程度であるため、新しい情報や知識には興味を持ちますが、積極的に学ぶ姿勢はあまり強くありません。誠実性が低い..."
+        key_points: [3 items]
+          [0]: string = "自分のペースを重視"
+          [1]: string = "新しいことに興味"
+          [2]: string = "柔軟な学習方法"
+        personality_type: string = "自主的な学習者"
+      }
+    }
+    personality_key: string = "O3_C2_E1_A2_N5_男性"
+    gender: string = "男性"
+    last_updated: timestamp
+
+📁 PersonalityStatsMetadata
+   Sample Document: summary
+   Fields:
+    gender_distribution: {
+      male: number = 10
+    }
+    personality_counts: {
+      O3_C3_E3_A3_N3_男性: number = 2
+      O3_C3_E3_A3_N3_女性: number = 2
+      O3_C3_E2_A4_N2_男性: number = 1
+      O3_C2_E1_A2_N5_男性: number = 1
+      O4_C3_E2_A4_N5_女性: number = 1
+      O3_C3_E3_A4_N3_男性: number = 1
+      O3_C4_E4_A4_N1_女性: number = 1
+      O3_C3_A4_E3_N3_neutral: number = 1
+    }
+    unique_personality_types: number = 8
+    total_completed_users: number = 10
+
+📁 ad_analytics
+   Sample Document: 085S7SatgJOzBe8427rz
+   Fields:
+    screen: string = "home"
+    timestamp: timestamp
+    type: string = "banner_impression"
+    user_tier: string = "free"
+
+📁 contacts
+   Sample Document: 3B980B8D-F5C3-4710-B6D7-2C4B33B2242A
+   Fields:
+    category: string = "bug"
+    categoryDisplay: string = "バグ報告・不具合"
+    createdAt: timestamp
+    deviceInfo: {
+      appVersion: string = "1.1.1 (8)"
+      deviceModel: string = "iPhone"
+      deviceName: string = "iPhone 17"
+      iosVersion: string = "26.0"
+    }
+    message: string = "てst"
+    subject: string = "【DARIAS】バグ報告・不具合"
+    userEmail: string = "kao***com"
+    userId: string = "Tzt***dS2"
+    userName: string = "でぃー"
+    userEmailId: string = "<79***om>"
+    emailSentAt: timestamp
+    adminEmailId: string = "<b5***om>"
+    userEmailSent: boolean = true
+    adminEmailSent: boolean = true
+    status: string = "sent"
+
+📁 holidays
+   Sample Document: 2025-01-01
+   Fields:
+    id: string = "2025-01-01"
+    name: string = "元日"
+    dateString: string = "2025-01-01"
+
+📁 shared_meetings
+   Sample Document: 2N23rK8YLqXqjC5baUnE
+   Fields:
+    createdAt: timestamp
+    conversation: {
+      conclusion: {
+        recommendations: [3 items]
+          [0]: string = "心がワクワクする場所を意識して探してみること。"
+          [1]: string = "小さな冒険から始め、徐々に新しい環境に慣れること。"
+          [2]: string = "自分が楽しめる活動を通じて、気分をリフレッシュさせること。"
+        nextSteps: [3 items]
+          [0]: string = "明日、近所を散歩して新しい場所を探す。"
+          [1]: string = "今週中に、友人と一緒に遊びに行く計画を立てる。"
+          [2]: string = "1ヶ月以内に、興味のあるイベントに参加する。"
+        summary: string = "この内なる会議では、気分が晴れる場所を探す過程で、各人格が異なる視点を持ち寄りました。今の自分は不安を抱えつつも、新しい環境に挑戦することに恐れを感じ、真逆の自分は行動を求めました。未来の自分は長期的..."
+      }
+      rounds: [3 items]
+        [0]: {
+          messages: [6 items]
+            [0]: {
+              text: string = "気分が晴れる場所はどこだと思う？本音で答えてよ。"
+              characterName: string = "本音の自分"
+              characterId: string = "shadow"
+              timestamp: string = "2024-01-01T00:00:00.000Z"
+            }
+            [1]: {
+              timestamp: string = "2024-01-01T00:00:00.001Z"
+              text: string = "うーん、難しいな。安全な場所じゃないと不安になるから…あまり行動できないよ。"
+              characterName: string = "今の自分"
+              characterId: string = "original"
+            }
+            [2]: {
+              characterName: string = "真逆の自分"
+              text: string = "でも、そんなこと言ってたらいつまで経っても行動できないよ！もっとリスクを取らないと。"
+              characterId: string = "opposite"
+              timestamp: string = "2024-01-01T00:00:00.002Z"
+            }
+          roundNumber: number = 1
+        }
+        [1]: {
+          messages: [6 items]
+            [0]: {
+              text: string = "でも、気分が晴れる場所に行くことすら怖い。新しい環境に慣れるのに時間がかかるし。"
+              characterId: string = "original"
+              timestamp: string = "2024-01-01T00:00:00.100Z"
+              characterName: string = "今の自分"
+            }
+            [1]: {
+              text: string = "それがいい機会じゃない？動き出すことで新しいことが見えるかもしれないし。"
+              timestamp: string = "2024-01-01T00:00:00.101Z"
+              characterId: string = "opposite"
+              characterName: string = "真逆の自分"
+            }
+            [2]: {
+              timestamp: string = "2024-01-01T00:00:00.102Z"
+              characterName: string = "未来の自分（70歳）"
+              characterId: string = "wise"
+              text: string = "焦らずに、自分が心地よいと思える場所を探せばいい。時間はかかるかもしれないけど、必ず見つかるよ。"
+            }
+          roundNumber: number = 2
+        }
+        [2]: {
+          roundNumber: number = 3
+          messages: [4 items]
+            [0]: {
+              characterId: string = "ideal"
+              timestamp: string = "2024-01-01T00:00:00.200Z"
+              text: string = "新しい視点として、心がワクワクする場所を意識して探してみるのもいいかもしれないね。"
+              characterName: string = "理想の自分"
+            }
+            [1]: {
+              timestamp: string = "2024-01-01T00:00:00.201Z"
+              characterId: string = "child"
+              text: string = "そうだ！ワクワクする場所を見つけたら、絶対に楽しいよ！"
+              characterName: string = "子供の頃の自分"
+            }
+            [2]: {
+              text: string = "楽しむことを忘れずに、自分を大切にする場所を探せば、自然と気分も晴れてくるさ。"
+              characterId: string = "wise"
+              characterName: string = "未来の自分（70歳）"
+              timestamp: string = "2024-01-01T00:00:00.202Z"
+            }
+        }
+    }
+    ratings: {
+      totalRatings: number = 0
+      ratingSum: number = 0
+      avgRating: number = 0
+    }
+    usageCount: number = 1
+    lastUsedAt: timestamp
+    statsData: {
+      similarCount: number = 0
+      percentile: number = 0
+      totalUsers: number = 7
+      personalityKey: string = "O4_C3_E1_A1_N3_女性"
+      avgAge: number = 30
+    }
+    concernCategory: string = "other"
+    personalityKey: string = "O4_C3_E1_A1_N3_女性"
+
+📁 users
+   Sample Document: 3zGBB934O7h9IbGpts250aJMTqf1
+   Fields:
+    created_at: timestamp
+    email: string = "dar***com"
+    name: string = "サポート"
+    character_id: string = "33AD7AE0-F840-49B8-A1E3-EB58A683C83F"
+    emailMessageId: string = "<52***om>"
+    emailSent: boolean = true
+    emailSentAt: timestamp
+    usage_tracking: {
+      last_chat_date: string = "2026-01-10"
+      chat_count_today: number = 1
+    }
+    updated_at: timestamp
+   Subcollections:
+    📁 users/3zGBB934O7h9IbGpts250aJMTqf1/characters (empty)
+    📁 users/3zGBB934O7h9IbGpts250aJMTqf1/memos
+       Sample Document: 3D85E02F-EEA6-43A3-842D-02FB00764AD7
+       Fields:
+        content: string = "明日職場に着く前に同僚にコーヒー買っていこう。"
+        createdAt: timestamp
+        isPinned: boolean = true
+        tag: string = "仕事"
+        title: string = "仕事"
+        updatedAt: timestamp
+
+    📁 users/3zGBB934O7h9IbGpts250aJMTqf1/schedules
+       Sample Document: DVb6B8Xk4fMlAOhuO6o1
+       Fields:
+        created_at: timestamp
+        endDate: timestamp
+        id: string = "DVb6B8Xk4fMlAOhuO6o1"
+        isAllDay: boolean = false
+        location: string = "会議室A"
+        memo: string = "メモ帳忘れずに。"
+        repeatOption: string = "繰り返さない"
+        startDate: timestamp
+        tag: string = "仕事"
+        title: string = "会議"
+
+    📁 users/3zGBB934O7h9IbGpts250aJMTqf1/subscription
+       Sample Document: current
+       Fields:
+        payment_method: string = "app_store"
+        end_date: null
+        plan: string = "free"
+        auto_renewal: boolean = false
+        status: string = "free"
+        updated_at: timestamp
+
+    📁 users/3zGBB934O7h9IbGpts250aJMTqf1/todos
+       Sample Document: 1058F6CF-D1D6-4051-BE2C-BB9937E7333B
+       Fields:
+        createdAt: timestamp
+        description: string = ""
+        priority: string = "高"
+        tag: string = "仕事"
+        title: string = "会議の資料作成"
+        isCompleted: boolean = true
+        updatedAt: timestamp
+

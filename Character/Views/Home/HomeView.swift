@@ -19,9 +19,9 @@ struct HomeView: View {
     @State private var messageTimer: Timer?
     
     // 画像はローカルファイルから直接読み込み
-    
-    // キャラクターの動作制御用
-    @State private var characterExpression: CharacterExpression = .normal
+
+    // 性格スコア
+    @State private var confirmedBig5Scores: Big5Scores? = nil
     
     // 広告表示
     @StateObject private var rewardedAd = RewardedAdManager()
@@ -88,10 +88,10 @@ struct HomeView: View {
                     if let config = characterConfig {
                         CharacterDisplayComponent(
                             displayedMessage: $displayedMessage,
-                            currentExpression: $characterExpression,
-                            characterConfig: config
+                            characterConfig: config,
+                            personalityScores: confirmedBig5Scores
                         )
-                        .id(config.id) // configが変更されたら完全に再生成
+                        .id("\(config.id)_\(confirmedBig5Scores?.openness ?? 0)") // configまたはスコアが変更されたら完全に再生成
                         .frame(
                             width: min(geometry.size.width * 1.3, 800),
                             height: min(geometry.size.height * 0.8, 800)
@@ -530,8 +530,10 @@ struct HomeView: View {
             .collection("characters").document(characterId)
             .collection("details").document("current")
 
-        detailsRef.getDocument { document, error in
+        // リアルタイムリスナーでスコア変更を監視
+        detailsRef.addSnapshotListener { document, error in
             if let error = error {
+                print("⚠️ Firestoreエラー: \(error.localizedDescription)")
                 return
             }
 
@@ -566,6 +568,16 @@ struct HomeView: View {
                     imageSource: .local("character_\(gender.rawValue)"),
                     isDefault: true
                 )
+
+                // BIG5スコアを取得（診断完了後に自動更新）
+                if let scoresMap = data["confirmedBig5Scores"] as? [String: Any],
+                   let scores = Big5Scores.fromScoreMap(scoresMap) {
+                    self.confirmedBig5Scores = scores
+                    print("✅ BIG5スコアを読み込みました: \(scores)")
+                } else {
+                    self.confirmedBig5Scores = nil
+                    print("ℹ️ BIG5スコアがまだ設定されていません（診断前）")
+                }
             }
         }
     }
