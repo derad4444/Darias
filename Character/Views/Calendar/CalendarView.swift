@@ -75,6 +75,8 @@ struct CalendarView: View {
     @State private var isHolidaysLoaded = false
     @State private var showSearchMode = false
     @State private var searchText = ""
+    @State private var characterImage: UIImage?
+    @State private var isLoadingImage = false
     
     // ドラッグ&ドロップ用状態変数（一時的に無効化）
     // @State private var draggingSchedule: Schedule?
@@ -160,25 +162,25 @@ struct CalendarView: View {
     }
     
     // MARK: - Character Image Functions
-    private func getCharacterImageName() -> String? {
-        guard let gender = characterGender else { return nil }
+    private func loadCharacterImage() async {
+        guard let gender = characterGender else { return }
+        guard !isLoadingImage else { return }
+
+        isLoadingImage = true
 
         // 性格スコアがある場合は性格別画像を使用
         if let scores = confirmedBig5Scores {
-            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
-
-            // 画像の存在確認
-            if UIImage(named: fileName) != nil {
-                return fileName
-            } else {
-                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
-                showImageNotFoundAlert = true
-                print("⚠️ 性格別画像が見つかりません: \(fileName)")
-                return "character_\(gender.rawValue)"
+            let image = await PersonalityImageService.fetchImageWithFallback(from: scores, gender: gender)
+            await MainActor.run {
+                characterImage = image
+                isLoadingImage = false
             }
         } else {
             // スコアがない場合はデフォルト画像
-            return "character_\(gender.rawValue)"
+            await MainActor.run {
+                characterImage = PersonalityImageService.getDefaultImage(for: gender)
+                isLoadingImage = false
+            }
         }
     }
     
@@ -578,14 +580,14 @@ struct CalendarView: View {
                     VStack {
                         Spacer()
                         HStack(alignment: .bottom, spacing: geometry.size.width < 400 ? -15 : 5) {
-                            // キャラクター画像（Assets内の画像を使用）
-                            if let imageName = getCharacterImageName() {
-                                Image(imageName)
+                            // キャラクター画像（Firebase Storageから取得）
+                            if let image = characterImage {
+                                Image(uiImage: image)
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                                     .frame(width: 150, height: 150)
                             } else {
-                                // 性別情報読み込み中
+                                // 画像読み込み中
                                 ProgressView()
                                     .frame(width: 150, height: 150)
                             }
@@ -646,9 +648,22 @@ struct CalendarView: View {
             saveCurrentViewedMonth()  // UserDefaultsに保存
             fetchMonthlyComment()  // 年が変わったときに再取得
         }
+        .task {
+            await loadCharacterImage()
+        }
         .onChange(of: selectedMonth) { _ in
             saveCurrentViewedMonth()  // UserDefaultsに保存
             fetchMonthlyComment()  // 月が変わったときに再取得
+        }
+        .onChange(of: characterGender) { _ in
+            Task {
+                await loadCharacterImage()
+            }
+        }
+        .onChange(of: confirmedBig5Scores) { _ in
+            Task {
+                await loadCharacterImage()
+            }
         }
         .alert("画像が見つかりません", isPresented: $showImageNotFoundAlert) {
             Button("OK", role: .cancel) { }

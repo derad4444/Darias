@@ -32,6 +32,8 @@ struct CharacterDetailView: View {
     @State private var analysisLevel: Int = 0  // 0, 20, 50, 100
     @State private var confirmedBig5Scores: Big5Scores?
     @State private var showImageNotFoundAlert: Bool = false
+    @State private var characterImage: UIImage?
+    @State private var isLoadingImage = false
 
     // Big5解析関連
     @StateObject private var big5AnalysisService = Big5AnalysisService()
@@ -59,15 +61,15 @@ struct CharacterDetailView: View {
                             .padding(.top, 16)
                     }
 
-                    // キャラクター画像（Assets内の画像を使用）
-                    if let imageName = getCharacterImageName() {
-                        Image(imageName)
+                    // キャラクター画像（Firebase Storageから取得）
+                    if let image = characterImage {
+                        Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
                             .frame(width: 200, height: 200)
                             .padding(.top, 20)
                     } else {
-                        // 性別情報読み込み中
+                        // 画像読み込み中
                         ProgressView()
                             .frame(width: 200, height: 200)
                             .padding(.top, 20)
@@ -121,6 +123,19 @@ struct CharacterDetailView: View {
         } message: {
             Text("性格に対応する画像ファイルが見つかりませんでした。デフォルト画像を表示しています。")
         }
+        .task {
+            await loadCharacterImage()
+        }
+        .onChange(of: characterGender) { _ in
+            Task {
+                await loadCharacterImage()
+            }
+        }
+        .onChange(of: confirmedBig5Scores) { _ in
+            Task {
+                await loadCharacterImage()
+            }
+        }
         .onAppear {
             if !isPreview {
                 fetchCharacterDetail()
@@ -164,25 +179,25 @@ struct CharacterDetailView: View {
     }
     
     // MARK: - Character Image Functions
-    private func getCharacterImageName() -> String? {
-        guard let gender = characterGender else { return nil }
+    private func loadCharacterImage() async {
+        guard let gender = characterGender else { return }
+        guard !isLoadingImage else { return }
+
+        isLoadingImage = true
 
         // 性格スコアがある場合は性格別画像を使用
         if let scores = confirmedBig5Scores {
-            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
-
-            // 画像の存在確認
-            if UIImage(named: fileName) != nil {
-                return fileName
-            } else {
-                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
-                showImageNotFoundAlert = true
-                print("⚠️ 性格別画像が見つかりません: \(fileName)")
-                return "character_\(gender.rawValue)"
+            let image = await PersonalityImageService.fetchImageWithFallback(from: scores, gender: gender)
+            await MainActor.run {
+                characterImage = image
+                isLoadingImage = false
             }
         } else {
             // スコアがない場合はデフォルト画像
-            return "character_\(gender.rawValue)"
+            await MainActor.run {
+                characterImage = PersonalityImageService.getDefaultImage(for: gender)
+                isLoadingImage = false
+            }
         }
     }
     
