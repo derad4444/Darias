@@ -21,12 +21,26 @@ struct CharacterConfig: Identifiable, Equatable {
     let gender: CharacterGender
     let imageSource: ImageSource
     let isDefault: Bool
-    
-    enum ImageSource {
+
+    enum ImageSource: Equatable {
         case local(String) // Asset name
         case remote(URL) // Base URL for remote images
+        case firebaseStorage // Firebase Storage (path generated dynamically)
+
+        static func == (lhs: ImageSource, rhs: ImageSource) -> Bool {
+            switch (lhs, rhs) {
+            case (.local(let a), .local(let b)):
+                return a == b
+            case (.remote(let a), .remote(let b)):
+                return a == b
+            case (.firebaseStorage, .firebaseStorage):
+                return true
+            default:
+                return false
+            }
+        }
     }
-    
+
     static func == (lhs: CharacterConfig, rhs: CharacterConfig) -> Bool {
         return lhs.id == rhs.id
     }

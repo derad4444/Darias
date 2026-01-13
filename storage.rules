@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Character Images
+service firebase.storage {
+  match /b/{bucket}/o {
+    // すべてのファイルを一時的に公開（テスト用）
+    match /{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

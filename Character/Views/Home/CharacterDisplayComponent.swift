@@ -5,7 +5,8 @@ struct CharacterDisplayComponent: View {
     let characterConfig: CharacterConfig?
     let personalityScores: Big5Scores?
     @State private var showImageNotFoundAlert: Bool = false
-    @State private var currentImageName: String
+    @State private var currentImage: UIImage?
+    @State private var isLoadingImage: Bool = false
 
     init(
         displayedMessage: Binding<String>,
@@ -16,22 +17,28 @@ struct CharacterDisplayComponent: View {
         self.characterConfig = characterConfig
         self.personalityScores = personalityScores
 
-        // 初期画像名を設定（デフォルト画像）
+        // 初期画像を設定（デフォルト画像）
         let gender = characterConfig?.gender ?? .female
-        self._currentImageName = State(initialValue: "character_\(gender.rawValue)")
+        self._currentImage = State(initialValue: UIImage(named: "character_\(gender.rawValue)"))
     }
 
     var body: some View {
         ZStack {
-            // キャラクター画像表示（Assets内の画像を使用）
-            Image(currentImageName)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .clipped()
-                .allowsHitTesting(false) // HomeViewのタップ領域を使用
-                .onAppear {
-                    updateImage()
-                }
+            // キャラクター画像表示
+            if let image = currentImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .clipped()
+                    .allowsHitTesting(false) // HomeViewのタップ領域を使用
+            } else {
+                // ローディング中のプレースホルダー
+                ProgressView()
+                    .scaleEffect(1.5)
+            }
+        }
+        .task {
+            await loadImage()
         }
         .alert("画像が見つかりません", isPresented: $showImageNotFoundAlert) {
             Button("OK", role: .cancel) { }
@@ -40,42 +47,47 @@ struct CharacterDisplayComponent: View {
         }
     }
 
-    private func updateImage() {
+    private func loadImage() async {
+        guard !isLoadingImage else { return }
+        isLoadingImage = true
+
         let gender = characterConfig?.gender ?? .female
 
         // 性格スコアがある場合は性格別画像を使用
         if let scores = personalityScores {
-            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
-
-            // 画像の存在確認
-            if UIImage(named: fileName) != nil {
-                currentImageName = fileName
-            } else {
-                // 画像が見つからない場合はデフォルト画像を使用し、アラート表示
-                currentImageName = "character_\(gender.rawValue)"
-                showImageNotFoundAlert = true
-                print("⚠️ 性格別画像が見つかりません: \(fileName)")
+            // Firebase Storageから画像を取得（フォールバック付き）
+            let image = await PersonalityImageService.fetchImageWithFallback(from: scores, gender: gender)
+            await MainActor.run {
+                currentImage = image
+                isLoadingImage = false
             }
         } else {
             // スコアがない場合はデフォルト画像
-            currentImageName = "character_\(gender.rawValue)"
+            await MainActor.run {
+                currentImage = PersonalityImageService.getDefaultImage(for: gender)
+                isLoadingImage = false
+            }
         }
     }
 
     func switchCharacter(to config: CharacterConfig, personalityScores: Big5Scores?) {
         // 新しいキャラクターに切り替え
-        let gender = config.gender
+        Task {
+            isLoadingImage = true
+            let gender = config.gender
 
-        if let scores = personalityScores {
-            let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: gender)
-            if UIImage(named: fileName) != nil {
-                currentImageName = fileName
+            if let scores = personalityScores {
+                let image = await PersonalityImageService.fetchImageWithFallback(from: scores, gender: gender)
+                await MainActor.run {
+                    currentImage = image
+                    isLoadingImage = false
+                }
             } else {
-                currentImageName = "character_\(gender.rawValue)"
-                showImageNotFoundAlert = true
+                await MainActor.run {
+                    currentImage = PersonalityImageService.getDefaultImage(for: gender)
+                    isLoadingImage = false
+                }
             }
-        } else {
-            currentImageName = "character_\(gender.rawValue)"
         }
     }
 }

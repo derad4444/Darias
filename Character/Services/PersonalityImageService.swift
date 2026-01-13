@@ -61,4 +61,58 @@ class PersonalityImageService {
     static func getDefaultImageName(for gender: CharacterGender) -> String {
         return "character_\(gender.rawValue)"
     }
+
+    // MARK: - Firebase Storage Path Generation
+
+    /// BIG5スコアからFirebase Storageのパスを生成
+    /// - Parameters:
+    ///   - scores: BIG5スコア
+    ///   - gender: 性別
+    /// - Returns: Firebase Storageパス（例: "character-images/female/Female_HLMHL.png"）
+    static func generateStoragePath(from scores: Big5Scores, gender: CharacterGender) -> String {
+        let fileName = generateImageFileName(from: scores, gender: gender)
+        return "character-images/\(gender.rawValue)/\(fileName).png"
+    }
+
+    /// ファイル名からFirebase Storageのパスを生成
+    /// - Parameters:
+    ///   - fileName: 画像ファイル名（例: "Female_HLMHL"）
+    ///   - gender: 性別
+    /// - Returns: Firebase Storageパス
+    static func generateStoragePath(fileName: String, gender: CharacterGender) -> String {
+        return "character-images/\(gender.rawValue)/\(fileName).png"
+    }
+
+    /// Firebase Storageから画像を取得（非同期）
+    /// - Parameters:
+    ///   - scores: BIG5スコア
+    ///   - gender: 性別
+    /// - Returns: UIImage
+    static func fetchImage(from scores: Big5Scores, gender: CharacterGender) async throws -> UIImage {
+        let fileName = generateImageFileName(from: scores, gender: gender)
+        return try await FirebaseImageService.shared.fetchImage(fileName: fileName, gender: gender)
+    }
+
+    /// デフォルト画像を取得
+    /// - Parameter gender: 性別
+    /// - Returns: UIImage
+    static func getDefaultImage(for gender: CharacterGender) -> UIImage? {
+        let imageName = getDefaultImageName(for: gender)
+        return UIImage(named: imageName)
+    }
+
+    /// 画像を取得（Firebase優先、フォールバックでローカル）
+    /// - Parameters:
+    ///   - scores: BIG5スコア
+    ///   - gender: 性別
+    /// - Returns: UIImage
+    static func fetchImageWithFallback(from scores: Big5Scores, gender: CharacterGender) async -> UIImage {
+        do {
+            // Firebase Storageから取得を試みる
+            return try await fetchImage(from: scores, gender: gender)
+        } catch {
+            // フォールバック: デフォルト画像
+            return getDefaultImage(for: gender) ?? UIImage()
+        }
+    }
 }

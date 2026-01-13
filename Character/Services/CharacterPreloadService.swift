@@ -35,77 +35,59 @@ class CharacterPreloadService: ObservableObject {
         monitor.start(queue: queue)
     }
     
-    func addCharacterForPreload(_ config: CharacterConfig) {
+    func addCharacterForPreload(_ config: CharacterConfig, scores: Big5Scores) {
         guard !config.isDefault else { return } // デフォルトキャラクターはローカル画像なのでスキップ
-        
+
         if !availableCharacters.contains(where: { $0.id == config.id }) {
             availableCharacters.append(config)
         }
-        
+
         // WiFi環境なら即座に開始
         if isConnectedToWiFi {
-            preloadCharacter(config)
+            preloadCharacter(config, scores: scores)
         }
     }
     
     func startAutoPreload() {
         guard isConnectedToWiFi && !isPreloading else { return }
-        
+
         isPreloading = true
         preloadProgress = 0.0
-        
+
+        // Note: 実際のプリロードはFirebaseImageServiceで管理されるため、
+        // ここでは状態管理のみ行う
         Task {
-            let totalCharacters = availableCharacters.count
-            var completedCharacters = 0
-            
-            for character in availableCharacters {
-                await preloadCharacterImages(character)
-                completedCharacters += 1
-                
-                await MainActor.run {
-                    self.preloadProgress = Double(completedCharacters) / Double(totalCharacters)
-                }
-            }
-            
             await MainActor.run {
                 self.isPreloading = false
                 self.preloadProgress = 1.0
             }
         }
     }
-    
-    func preloadCharacter(_ config: CharacterConfig) {
+
+    func preloadCharacter(_ config: CharacterConfig, scores: Big5Scores) {
         guard !config.isDefault else { return }
-        
+
         Task {
-            await preloadCharacterImages(config)
+            await preloadCharacterImages(config, scores: scores)
         }
     }
-    
-    private func preloadCharacterImages(_ config: CharacterConfig) async {
-        guard case .remote(let baseURL) = config.imageSource else { return }
 
-        // 表情機能を削除したため、基本画像のみプリロード
-        let fileName = "\(config.id).png"
-        let imageURL = baseURL.appendingPathComponent(fileName)
+    private func preloadCharacterImages(_ config: CharacterConfig, scores: Big5Scores) async {
+        // Firebase Storageからプリロード
+        let fileName = PersonalityImageService.generateImageFileName(from: scores, gender: config.gender)
 
-        do {
-            let (data, _) = try await URLSession.shared.data(from: imageURL)
-            if let _ = UIImage(data: data) {
-                // 成功時はキャッシュに保存（実際のViewModelに通知）
-                await MainActor.run {
-                    NotificationCenter.default.post(
-                        name: .characterImagePreloaded,
-                        object: nil,
-                        userInfo: [
-                            "characterId": config.id,
-                            "imageData": data
-                        ]
-                    )
-                }
-            }
-        } catch {
-            // Failed to preload image
+        await FirebaseImageService.shared.preloadImage(fileName: fileName, gender: config.gender)
+
+        // 成功時に通知
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: .characterImagePreloaded,
+                object: nil,
+                userInfo: [
+                    "characterId": config.id,
+                    "fileName": fileName
+                ]
+            )
         }
     }
     
