@@ -71,17 +71,16 @@ ${dream}
 
   /**
    * Diary Generation - GPT-4o-mini optimized
-   * Enhanced for stable JSON output
+   * Enhanced with todo and meeting data
    */
-  diary: (characterType, big5, gender, scheduleSummary, chatSummary, diaryStyle, tagStyle) => {
+  diary: (characterType, big5, gender, scheduleSummary, chatSummary, todoSummary, meetingSummary, diaryStyle) => {
     return `キャラクター:${characterType} 性格:${formatBig5Short(big5)} 性別:${getGenderCode(gender)}
 予定:${scheduleSummary || "なし"}
 会話:${chatSummary || "なし"}
+達成:${todoSummary || "なし"}
+相談:${meetingSummary || "なし"}
 
-${diaryStyle}で日記を200-400文字で作成。${tagStyle}
-
-出力形式:
-{"content":"日記内容","summary_tags":["タグ1","タグ2","タグ3"]}`;
+${diaryStyle}で日記を200-400文字で作成。日記本文のみ出力。`;
   },
 
   /**

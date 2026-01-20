@@ -85,30 +85,90 @@ async function generateDiary(characterId, userId) {
     return `・「${data.content}」`;
   }).join("\n");
 
+  // 今日完了したToDo取得（上位2件）
+  const todoSnap = await db.collection("users").doc(userId)
+      .collection("todos")
+      .where("isCompleted", "==", true)
+      .where("updatedAt", ">=", today)
+      .where("updatedAt", "<", tomorrow)
+      .orderBy("updatedAt", "desc")
+      .limit(2)
+      .get();
+
+  // ToDoの文字列整形
+  const todoSummary = todoSnap.docs.map((doc) => {
+    const data = doc.data();
+    return `・${data.title}`;
+  }).join("\n");
+
+  // 今日の会議（6人会議）取得
+  const meetingSnap = await db.collection("users").doc(userId)
+      .collection("characters").doc(characterId)
+      .collection("meeting_history")
+      .where("createdAt", ">=", today)
+      .where("createdAt", "<", tomorrow)
+      .limit(2)
+      .get();
+
+  // 会議の文字列整形（結論も含める）
+  let meetingSummary = "";
+  if (!meetingSnap.empty) {
+    const meetingPromises = meetingSnap.docs.map(async (doc) => {
+      const data = doc.data();
+      const concern = data.userConcern || "";
+
+      // 結論を取得
+      let conclusion = "";
+      if (data.sharedMeetingId) {
+        try {
+          const sharedDoc = await db.collection("shared_meetings")
+              .doc(data.sharedMeetingId).get();
+          if (sharedDoc.exists) {
+            const sharedData = sharedDoc.data();
+            conclusion = sharedData?.conversation?.conclusion?.summary || "";
+          }
+        } catch (e) {
+          console.warn("Failed to fetch shared meeting:", e);
+        }
+      }
+
+      return conclusion ? `・${concern}→${conclusion}` : `・${concern}`;
+    });
+
+    const results = await Promise.all(meetingPromises);
+    meetingSummary = results.join("\n");
+  }
+
   // Android度を計算（協調性、外向性、神経症傾向の低さでAndroid度を判定）
   const androidScore =
    (6 - big5.agreeableness) + (6 - big5.extraversion) + (6 - big5.neuroticism);
   const isAndroid = androidScore >= 9; // 3つの合計が9以上でAndroid風
   const isHuman = androidScore <= 6; // 3つの合計が6以下で人間風
 
-  let characterType; let diaryStyle; let tagStyle;
+  let characterType; let diaryStyle;
 
   if (isAndroid) {
     characterType = "AI";
     diaryStyle = "sys view,process complete,update,optimize terms,session/comm style,logical friendly";
-    tagStyle = "sys keywords 3-5";
   } else if (isHuman) {
     characterType = "Human";
     diaryStyle = "emotion view,happy,worried feelings,chat/talk style,emotion rich";
-    tagStyle = "emotion event keywords 3-5";
   } else {
     characterType = "Learning";
     diaryStyle = "logic+emotion view,tech+feeling mix,session→chat learning,logical→emotional";
-    tagStyle = "sys+emotion mix 3-5";
   }
 
   // 最適化されたプロンプト作成
-  const prompt = OPTIMIZED_PROMPTS.diary(characterType, big5, gender, scheduleSummary, chatSummary, diaryStyle, tagStyle);
+  const prompt = OPTIMIZED_PROMPTS.diary(
+      characterType,
+      big5,
+      gender,
+      scheduleSummary,
+      chatSummary,
+      todoSummary,
+      meetingSummary,
+      diaryStyle,
+  );
 
   // OpenAI呼び出し
   const openai = new OpenAI({
@@ -124,26 +184,16 @@ async function generateDiary(characterId, userId) {
     temperature: 0.8,
   });
 
-  // AIから返されたJSONをJSオブジェクトに変換
-  const resultText = response.choices[0].message.content.trim();
-  console.log("GPT Response:", resultText);
-
-  // 生成された日記を Diary コレクションに保存
-  let diaryData;
-  try {
-    const cleaned = resultText.replace(/```json|```/g, "").trim();
-    diaryData = JSON.parse(cleaned);
-  } catch (e) {
-    console.error("JSON parse error:", e);
-    return {error: "Failed to parse AI response"};
-  }
+  // AIからの返答を取得（プレーンテキスト）
+  const diaryContent = response.choices[0].message.content.trim();
+  console.log("GPT Response:", diaryContent);
 
   // Firestoreに保存
   const diaryRef = db.collection("users").doc(userId)
       .collection("characters").doc(characterId)
       .collection("diary").doc();
 
-  // 🔽 日付文字列を生成（YYYY-MM-DD形式、日本時間で）
+  // 日付文字列を生成（YYYY-MM-DD形式、日本時間で）
   const now = new Date();
   // 日本時間（UTC+9）で日付を取得
   const jstDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
@@ -154,12 +204,11 @@ async function generateDiary(characterId, userId) {
 
   console.log(`📅 Creating diary with created_date: ${createdDate} (JST)`);
 
-  // Firestore登録用データ構築
+  // Firestore登録用データ構築（タグ削除）
   const diaryDoc = {
     id: diaryRef.id,
     date: admin.firestore.Timestamp.now(),
-    content: diaryData.content,
-    summary_tags: diaryData.summary_tags,
+    content: diaryContent,
     user_comment: "",
     created_at: admin.firestore.Timestamp.now(),
     created_date: createdDate,
