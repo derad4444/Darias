@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Darias</string>
+    <string name="todo_widget_description">今日のタスクを確認できます</string>
+    <string name="memo_widget_description">最新のメモを確認できます</string>
+    <string name="calendar_widget_description">今日の予定を確認できます</string>
+</resources>
