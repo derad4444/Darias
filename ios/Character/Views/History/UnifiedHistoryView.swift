@@ -16,11 +16,13 @@ struct UnifiedHistoryView: View {
     enum HistoryTab: String, CaseIterable {
         case chat = "チャット"
         case meeting = "会議"
+        case diary = "日記"
 
         var icon: String {
             switch self {
             case .chat: return "message.fill"
             case .meeting: return "person.3.fill"
+            case .diary: return "book.closed.fill"
             }
         }
     }
@@ -92,6 +94,12 @@ struct UnifiedHistoryView: View {
                             characterId: characterId
                         )
                         .tag(HistoryTab.meeting)
+
+                        DiaryHistoryView(
+                            userId: userId,
+                            characterId: characterId
+                        )
+                        .tag(HistoryTab.diary)
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
                 }

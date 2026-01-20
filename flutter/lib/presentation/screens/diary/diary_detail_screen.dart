@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../data/models/diary_model.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/ad_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 
 /// 日記詳細画面
@@ -33,6 +34,10 @@ class _DiaryDetailScreenState extends ConsumerState<DiaryDetailScreen> {
     super.initState();
     _commentController =
         TextEditingController(text: widget.diary.userComment);
+    // 日記を見たらバッジをクリア
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(notificationServiceProvider).clearBadge();
+    });
   }
 
   @override

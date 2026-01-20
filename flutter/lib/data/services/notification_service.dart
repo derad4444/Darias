@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 
 /// プッシュ通知サービス
 class NotificationService {
@@ -183,6 +184,23 @@ class NotificationService {
       debugPrint('NotificationService: Unsubscribed from topic: $topic');
     } catch (e) {
       debugPrint('NotificationService: Failed to unsubscribe from topic: $e');
+    }
+  }
+
+  /// バッジをクリア
+  Future<void> clearBadge() async {
+    if (kIsWeb) {
+      return;
+    }
+
+    try {
+      final isSupported = await FlutterAppBadger.isAppBadgeSupported();
+      if (isSupported) {
+        await FlutterAppBadger.removeBadge();
+        debugPrint('NotificationService: Badge cleared');
+      }
+    } catch (e) {
+      debugPrint('NotificationService: Failed to clear badge: $e');
     }
   }
 }

@@ -170,6 +170,8 @@ struct DiaryDetailView: View {
         .onAppear {
             fetchDiary()
             subscriptionManager.startMonitoring()
+            // 日記を見たらバッジをクリア
+            NotificationManager.shared.clearBadge()
         }
         .onDisappear {
             subscriptionManager.stopMonitoring()

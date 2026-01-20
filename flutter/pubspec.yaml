@@ -59,6 +59,7 @@ dependencies:
 
   # Push Notifications
   firebase_messaging: ^15.2.1
+  flutter_app_badger: ^1.5.0
 
   # In-App Purchase
   in_app_purchase: ^3.2.0

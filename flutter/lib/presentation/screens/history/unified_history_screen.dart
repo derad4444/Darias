@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../data/models/diary_model.dart';
 import '../../../data/models/meeting_model.dart';
 import '../../../data/models/post_model.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/diary_provider.dart';
 import '../../providers/meeting_provider.dart';
+import '../../providers/notification_provider.dart';
 
 /// 履歴タブ
-enum HistoryTab { chat, meeting }
+enum HistoryTab { chat, meeting, diary }
 
 /// 統合履歴画面
 class UnifiedHistoryScreen extends ConsumerStatefulWidget {
@@ -31,11 +34,21 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
+    // 日記タブが選択されたらバッジをクリア
+    _tabController.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    // タブインデックス2（日記）が選択されたらバッジをクリア
+    if (_tabController.index == 2 && !_tabController.indexIsChanging) {
+      ref.read(notificationServiceProvider).clearBadge();
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -63,6 +76,10 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
               icon: Icon(Icons.groups),
               text: '会議',
             ),
+            Tab(
+              icon: Icon(Icons.book),
+              text: '日記',
+            ),
           ],
           labelColor: colorScheme.primary,
           unselectedLabelColor: colorScheme.onSurfaceVariant,
@@ -74,6 +91,7 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
         children: [
           _ChatHistoryTab(characterId: widget.characterId),
           _MeetingHistoryTab(),
+          _DiaryHistoryTab(characterId: widget.characterId),
         ],
       ),
     );
@@ -494,5 +512,183 @@ class _MeetingCard extends StatelessWidget {
 
   String _formatTime(DateTime date) {
     return '${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+/// 日記履歴タブ
+class _DiaryHistoryTab extends ConsumerWidget {
+  final String? characterId;
+
+  const _DiaryHistoryTab({this.characterId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final diariesAsync = ref.watch(diariesProvider(characterId ?? ''));
+
+    return diariesAsync.when(
+      data: (diaries) {
+        if (diaries.isEmpty) {
+          return _EmptyState(
+            icon: Icons.book_outlined,
+            title: '日記がありません',
+            subtitle: '毎日23:55に日記が届きます',
+          );
+        }
+
+        // 日付でグループ化
+        final groupedDiaries = <String, List<DiaryModel>>{};
+        for (final diary in diaries) {
+          final dateKey = _formatDateKey(diary.date);
+          groupedDiaries.putIfAbsent(dateKey, () => []).add(diary);
+        }
+
+        final sortedKeys = groupedDiaries.keys.toList()
+          ..sort((a, b) => b.compareTo(a));
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: sortedKeys.length,
+          itemBuilder: (context, index) {
+            final dateKey = sortedKeys[index];
+            final dateDiaries = groupedDiaries[dateKey]!;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DateHeader(dateKey: dateKey),
+                ...dateDiaries.map((diary) => _DiaryCard(
+                      diary: diary,
+                      characterId: characterId,
+                    )),
+                const SizedBox(height: 16),
+              ],
+            );
+          },
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, st) => Center(child: Text('エラー: $e')),
+    );
+  }
+
+  String _formatDateKey(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final diaryDate = DateTime(date.year, date.month, date.day);
+
+    if (diaryDate == today) {
+      return '今日';
+    } else if (diaryDate == yesterday) {
+      return '昨日';
+    } else if (diaryDate.year == now.year) {
+      return '${date.month}月${date.day}日';
+    } else {
+      return '${date.year}年${date.month}月${date.day}日';
+    }
+  }
+}
+
+/// 日記カード
+class _DiaryCard extends StatelessWidget {
+  final DiaryModel diary;
+  final String? characterId;
+
+  const _DiaryCard({
+    required this.diary,
+    this.characterId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () {
+          if (characterId != null) {
+            context.push('/diary/${diary.id}?characterId=$characterId');
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ヘッダー
+              Row(
+                children: [
+                  Icon(
+                    Icons.book,
+                    color: Colors.brown[400],
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    diary.dateString,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.brown[600],
+                        ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '(${_getWeekdayString(diary.date)})',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.brown[400],
+                        ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.chevron_right,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+
+              // 内容プレビュー
+              Text(
+                diary.content,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontFamily: 'serif',
+                    ),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+
+              // コメントがある場合
+              if (diary.userComment.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.comment,
+                      size: 14,
+                      color: colorScheme.primary.withValues(alpha: 0.7),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'コメントあり',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.primary.withValues(alpha: 0.7),
+                          ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getWeekdayString(DateTime date) {
+    const weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+    return weekdays[date.weekday - 1];
   }
 }
