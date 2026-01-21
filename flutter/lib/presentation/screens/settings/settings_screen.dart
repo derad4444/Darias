@@ -123,7 +123,10 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.history,
             title: '履歴',
             subtitle: 'チャット・会議の履歴を確認',
-            onTap: () => context.push('/history'),
+            onTap: () {
+              final characterId = ref.read(userDocProvider).valueOrNull?.characterId;
+              context.push('/history', extra: characterId);
+            },
           ),
           _SettingsTile(
             icon: Icons.download,

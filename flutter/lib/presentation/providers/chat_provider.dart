@@ -16,6 +16,7 @@ final chatDatasourceProvider = Provider<ChatDatasource>((ref) {
 final chatHistoryProvider = StreamProvider.family<List<PostModel>, String>((ref, characterId) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
+  if (characterId.isEmpty) return Stream.value([]);
 
   final datasource = ref.watch(chatDatasourceProvider);
   return datasource.watchChatHistory(

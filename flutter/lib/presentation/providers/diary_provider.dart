@@ -14,6 +14,7 @@ final diaryDatasourceProvider = Provider<DiaryDatasource>((ref) {
 final diariesProvider = StreamProvider.family<List<DiaryModel>, String>((ref, characterId) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
+  if (characterId.isEmpty) return Stream.value([]);
 
   final datasource = ref.watch(diaryDatasourceProvider);
   return datasource.watchDiaries(
