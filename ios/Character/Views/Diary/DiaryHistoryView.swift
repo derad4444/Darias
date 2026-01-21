@@ -141,10 +141,10 @@ struct DiaryHistoryView: View {
         }
         .navigationTitle("日記履歴")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            fetchDiaries()
+        .task {
+            // taskはビューが表示される時に確実に実行される
+            await fetchDiariesAsync()
             subscriptionManager.startMonitoring()
-            // 日記履歴を見たらバッジをクリア
             NotificationManager.shared.clearBadge()
         }
         .onDisappear {
@@ -183,39 +183,33 @@ struct DiaryHistoryView: View {
         }
     }
 
-    private func fetchDiaries() {
+    @MainActor
+    private func fetchDiariesAsync() async {
         let db = Firestore.firestore()
 
-        db.collection("users").document(userId)
-            .collection("characters").document(characterId)
-            .collection("diary")
-            .order(by: "date", descending: true)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    print("❌ 日記取得エラー: \(error.localizedDescription)")
-                    isLoading = false
-                    return
-                }
+        do {
+            let snapshot = try await db.collection("users").document(userId)
+                .collection("characters").document(characterId)
+                .collection("diary")
+                .order(by: "date", descending: true)
+                .getDocuments()
 
-                guard let documents = snapshot?.documents else {
-                    isLoading = false
-                    return
-                }
+            diaries = snapshot.documents.compactMap { doc -> DiaryEntry? in
+                let data = doc.data()
+                guard let timestamp = data["date"] as? Timestamp else { return nil }
 
-                diaries = documents.compactMap { doc -> DiaryEntry? in
-                    let data = doc.data()
-                    guard let timestamp = data["date"] as? Timestamp else { return nil }
-
-                    return DiaryEntry(
-                        id: doc.documentID,
-                        content: data["content"] as? String ?? "",
-                        date: timestamp.dateValue(),
-                        userComment: data["user_comment"] as? String
-                    )
-                }
-
-                isLoading = false
+                return DiaryEntry(
+                    id: doc.documentID,
+                    content: data["content"] as? String ?? "",
+                    date: timestamp.dateValue(),
+                    userComment: data["user_comment"] as? String
+                )
             }
+        } catch {
+            print("❌ 日記取得エラー: \(error.localizedDescription)")
+        }
+
+        isLoading = false
     }
 }
 
