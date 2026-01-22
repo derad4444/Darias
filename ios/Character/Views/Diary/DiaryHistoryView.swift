@@ -1,86 +1,24 @@
 import SwiftUI
 import FirebaseFirestore
 
-// 日記データを管理するObservableObject
-class DiaryHistoryViewModel: ObservableObject {
-    @Published var diaries: [DiaryEntry] = []
-    @Published var isLoading = true
-
-    private let userId: String
-    private let characterId: String
-
-    init(userId: String, characterId: String) {
-        self.userId = userId
-        self.characterId = characterId
-        // 初期化時にデータをロード
-        fetchDiaries()
-    }
-
-    func fetchDiaries() {
-        let db = Firestore.firestore()
-
-        db.collection("users").document(userId)
-            .collection("characters").document(characterId)
-            .collection("diary")
-            .order(by: "date", descending: true)
-            .getDocuments { [weak self] snapshot, error in
-                DispatchQueue.main.async {
-                    guard let self = self else { return }
-
-                    if let error = error {
-                        print("❌ 日記取得エラー: \(error.localizedDescription)")
-                        self.isLoading = false
-                        return
-                    }
-
-                    guard let documents = snapshot?.documents else {
-                        self.isLoading = false
-                        return
-                    }
-
-                    self.diaries = documents.compactMap { doc -> DiaryEntry? in
-                        let data = doc.data()
-                        guard let timestamp = data["date"] as? Timestamp else { return nil }
-
-                        return DiaryEntry(
-                            id: doc.documentID,
-                            content: data["content"] as? String ?? "",
-                            date: timestamp.dateValue(),
-                            userComment: data["user_comment"] as? String
-                        )
-                    }
-
-                    self.isLoading = false
-                }
-            }
-    }
-}
-
 struct DiaryHistoryView: View {
     let userId: String
     let characterId: String
 
     @ObservedObject var colorSettings = ColorSettingsManager.shared
     @StateObject private var subscriptionManager = SubscriptionManager.shared
-    @StateObject private var viewModel: DiaryHistoryViewModel
 
+    @State private var diaries: [DiaryEntry] = []
+    @State private var isLoading = true
     @State private var searchText: String = ""
-    @State private var selectedDiaryId: String? = nil
-    @State private var showDiaryDetail = false
-
-    init(userId: String, characterId: String) {
-        self.userId = userId
-        self.characterId = characterId
-        // StateObjectを初期化時に作成
-        _viewModel = StateObject(wrappedValue: DiaryHistoryViewModel(userId: userId, characterId: characterId))
-    }
+    @State private var selectedDiary: DiaryEntry? = nil
 
     // 検索フィルタリング
     private var filteredDiaries: [DiaryEntry] {
         if searchText.isEmpty {
-            return viewModel.diaries
+            return diaries
         }
-        return viewModel.diaries.filter { diary in
+        return diaries.filter { diary in
             diary.content.localizedCaseInsensitiveContains(searchText)
         }
     }
@@ -114,7 +52,7 @@ struct DiaryHistoryView: View {
             .padding(.bottom, 8)
 
             // 日記一覧
-            if viewModel.isLoading {
+            if isLoading {
                 Spacer()
                 VStack(spacing: 16) {
                     ProgressView()
@@ -122,7 +60,7 @@ struct DiaryHistoryView: View {
                         .dynamicBody()
                 }
                 Spacer()
-            } else if viewModel.diaries.isEmpty {
+            } else if diaries.isEmpty {
                 VStack(spacing: 0) {
                     Spacer()
                     VStack(spacing: 16) {
@@ -168,8 +106,7 @@ struct DiaryHistoryView: View {
                         ForEach(filteredDiaries) { diary in
                             DiaryCardView(diary: diary)
                                 .onTapGesture {
-                                    selectedDiaryId = diary.id
-                                    showDiaryDetail = true
+                                    selectedDiary = diary
                                 }
                         }
 
@@ -202,6 +139,9 @@ struct DiaryHistoryView: View {
         }
         .navigationTitle("日記履歴")
         .navigationBarTitleDisplayMode(.inline)
+        .task {
+            await loadDiaries()
+        }
         .onAppear {
             subscriptionManager.startMonitoring()
             NotificationManager.shared.clearBadge()
@@ -209,15 +149,13 @@ struct DiaryHistoryView: View {
         .onDisappear {
             subscriptionManager.stopMonitoring()
         }
-        .sheet(isPresented: $showDiaryDetail) {
-            if let diaryId = selectedDiaryId {
-                NavigationStack {
-                    DiaryDetailView(
-                        diaryId: diaryId,
-                        characterId: characterId,
-                        userId: userId
-                    )
-                }
+        .fullScreenCover(item: $selectedDiary) { diary in
+            NavigationStack {
+                DiaryDetailView(
+                    diaryId: diary.id,
+                    characterId: characterId,
+                    userId: userId
+                )
             }
         }
     }
@@ -240,6 +178,37 @@ struct DiaryHistoryView: View {
             Spacer()
                 .frame(height: 20)
         }
+    }
+
+    @MainActor
+    private func loadDiaries() async {
+        isLoading = true
+
+        let db = Firestore.firestore()
+
+        do {
+            let snapshot = try await db.collection("users").document(userId)
+                .collection("characters").document(characterId)
+                .collection("diary")
+                .order(by: "date", descending: true)
+                .getDocuments()
+
+            diaries = snapshot.documents.compactMap { doc -> DiaryEntry? in
+                let data = doc.data()
+                guard let timestamp = data["date"] as? Timestamp else { return nil }
+
+                return DiaryEntry(
+                    id: doc.documentID,
+                    content: data["content"] as? String ?? "",
+                    date: timestamp.dateValue(),
+                    userComment: data["user_comment"] as? String
+                )
+            }
+        } catch {
+            print("❌ 日記取得エラー: \(error.localizedDescription)")
+        }
+
+        isLoading = false
     }
 }
 
