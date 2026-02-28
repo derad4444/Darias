@@ -1,7 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/calendar_datasource.dart';
 import '../../data/models/schedule_model.dart';
+import '../../data/models/holiday_model.dart';
+import '../../data/models/monthly_comment_model.dart';
 import 'auth_provider.dart';
+import 'character_provider.dart';
 
 /// CalendarDatasourceのプロバイダー
 final calendarDatasourceProvider = Provider<CalendarDatasource>((ref) {
@@ -140,6 +143,18 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
   void selectDay(DateTime day) {
     _ref.read(selectedDayProvider.notifier).state = day;
   }
+
+  /// 今日に移動
+  void goToToday() {
+    final now = DateTime.now();
+    changeMonth(DateTime(now.year, now.month, 1));
+    selectDay(now);
+  }
+
+  /// 指定した年月に移動
+  void goToMonth(int year, int month) {
+    changeMonth(DateTime(year, month, 1));
+  }
 }
 
 /// カレンダーコントローラーのプロバイダー
@@ -148,5 +163,91 @@ final calendarControllerProvider =
   return CalendarController(
     ref.watch(calendarDatasourceProvider),
     ref,
+  );
+});
+
+/// 祝日一覧のストリームプロバイダー
+final holidaysProvider = StreamProvider<List<HolidayModel>>((ref) {
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('holidays')
+      .snapshots()
+      .map((snapshot) => snapshot.docs.map((doc) => HolidayModel.fromFirestore(doc)).toList());
+});
+
+/// 特定の日付の祝日を取得
+final holidayForDateProvider = Provider.family<HolidayModel?, DateTime>((ref, date) {
+  final holidaysAsync = ref.watch(holidaysProvider);
+  return holidaysAsync.when(
+    data: (holidays) {
+      try {
+        return holidays.firstWhere((h) => h.isOnDate(date));
+      } catch (e) {
+        return null;
+      }
+    },
+    loading: () => null,
+    error: (e, st) => null,
+  );
+});
+
+/// 月次コメントのプロバイダー
+final monthlyCommentProvider = FutureProvider.family<String, DateTime>((ref, month) async {
+  final userId = ref.watch(currentUserIdProvider);
+  final characterId = ref.watch(currentCharacterIdProvider);
+
+  if (userId == null || characterId == null) {
+    return MonthlyCommentModel.defaultComment;
+  }
+
+  final firestore = ref.watch(firestoreProvider);
+  final monthId = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+
+  try {
+    final doc = await firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('monthlyComments')
+        .doc(monthId)
+        .get();
+
+    if (doc.exists) {
+      final comment = MonthlyCommentModel.fromFirestore(doc);
+      return comment.comment.isNotEmpty ? comment.comment : MonthlyCommentModel.defaultComment;
+    }
+    return MonthlyCommentModel.defaultComment;
+  } catch (e) {
+    return MonthlyCommentModel.defaultComment;
+  }
+});
+
+/// 検索テキストの状態
+final calendarSearchTextProvider = StateProvider<String>((ref) => '');
+
+/// 検索モードの状態
+final calendarSearchModeProvider = StateProvider<bool>((ref) => false);
+
+/// フィルターされたスケジュール（検索用）
+final filteredSchedulesProvider = Provider<List<ScheduleModel>>((ref) {
+  final searchText = ref.watch(calendarSearchTextProvider);
+  final schedulesAsync = ref.watch(allSchedulesProvider);
+
+  return schedulesAsync.when(
+    data: (schedules) {
+      if (searchText.isEmpty) {
+        return schedules;
+      }
+      final lowerSearch = searchText.toLowerCase();
+      return schedules.where((schedule) {
+        return schedule.title.toLowerCase().contains(lowerSearch) ||
+            schedule.memo.toLowerCase().contains(lowerSearch) ||
+            schedule.tag.toLowerCase().contains(lowerSearch);
+      }).toList()
+        ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    },
+    loading: () => [],
+    error: (e, st) => [],
   );
 });

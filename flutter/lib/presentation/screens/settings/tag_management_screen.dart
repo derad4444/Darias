@@ -1,313 +1,300 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// タグプロバイダー
+import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
+
+/// タグプロバイダー（Firestoreで同期）
 final tagsProvider = StateNotifierProvider<TagsNotifier, List<TagItem>>((ref) {
-  return TagsNotifier();
+  final userId = ref.watch(currentUserIdProvider);
+  final firestore = ref.watch(firestoreProvider);
+  return TagsNotifier(userId: userId, firestore: firestore);
 });
 
 class TagItem {
   final String id;
   final String name;
   final Color color;
-  final TagCategory category;
 
   const TagItem({
     required this.id,
     required this.name,
     required this.color,
-    required this.category,
   });
 
   TagItem copyWith({
     String? id,
     String? name,
     Color? color,
-    TagCategory? category,
   }) {
     return TagItem(
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
-      category: category ?? this.category,
     );
   }
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'color': color.value,
-        'category': category.name,
-      };
+  factory TagItem.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    return TagItem(
+      id: doc.id,
+      name: data['name'] as String? ?? '',
+      color: _hexToColor(data['colorHex'] as String? ?? '#2196f3'),
+    );
+  }
 
-  factory TagItem.fromJson(Map<String, dynamic> json) => TagItem(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        color: Color(json['color'] as int),
-        category: TagCategory.values.firstWhere(
-          (e) => e.name == json['category'],
-          orElse: () => TagCategory.general,
-        ),
-      );
-}
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'colorHex': _colorToHex(color),
+    };
+  }
 
-enum TagCategory {
-  general('全般', Icons.label),
-  todo('TODO', Icons.check_circle),
-  memo('メモ', Icons.note),
-  schedule('スケジュール', Icons.event);
+  static String _colorToHex(Color color) {
+    final r = (color.r * 255.0).round().clamp(0, 255);
+    final g = (color.g * 255.0).round().clamp(0, 255);
+    final b = (color.b * 255.0).round().clamp(0, 255);
+    return '#${r.toRadixString(16).padLeft(2, '0')}${g.toRadixString(16).padLeft(2, '0')}${b.toRadixString(16).padLeft(2, '0')}';
+  }
 
-  final String label;
-  final IconData icon;
-
-  const TagCategory(this.label, this.icon);
+  static Color _hexToColor(String hex) {
+    hex = hex.replaceFirst('#', '');
+    if (hex.length == 6) {
+      return Color(int.parse('ff$hex', radix: 16));
+    }
+    return Colors.blue;
+  }
 }
 
 class TagsNotifier extends StateNotifier<List<TagItem>> {
-  TagsNotifier() : super([]) {
-    _loadTags();
+  final String? userId;
+  final FirebaseFirestore firestore;
+  StreamSubscription? _subscription;
+
+  TagsNotifier({required this.userId, required this.firestore}) : super([]) {
+    _listenToTags();
   }
 
-  Future<void> _loadTags() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tagsJson = prefs.getStringList('tags') ?? [];
+  CollectionReference get _tagsCollection =>
+      firestore.collection('users').doc(userId).collection('tags');
 
-    if (tagsJson.isEmpty) {
-      // デフォルトタグを追加
-      state = _defaultTags;
-      await _saveTags();
-    } else {
-      state = tagsJson.map((json) {
-        final parts = json.split('|');
-        if (parts.length >= 4) {
-          return TagItem(
-            id: parts[0],
-            name: parts[1],
-            color: Color(int.parse(parts[2])),
-            category: TagCategory.values.firstWhere(
-              (e) => e.name == parts[3],
-              orElse: () => TagCategory.general,
-            ),
-          );
-        }
-        return null;
-      }).whereType<TagItem>().toList();
-    }
+  void _listenToTags() {
+    if (userId == null) return;
+    _subscription = _tagsCollection
+        .orderBy('name')
+        .snapshots()
+        .listen((snapshot) {
+      state = snapshot.docs.map((doc) => TagItem.fromFirestore(doc)).toList();
+    });
   }
 
-  Future<void> _saveTags() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tagsJson = state.map((t) => '${t.id}|${t.name}|${t.color.value}|${t.category.name}').toList();
-    await prefs.setStringList('tags', tagsJson);
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
-
-  static final _defaultTags = [
-    TagItem(id: '1', name: '仕事', color: Colors.blue, category: TagCategory.general),
-    TagItem(id: '2', name: 'プライベート', color: Colors.green, category: TagCategory.general),
-    TagItem(id: '3', name: '重要', color: Colors.red, category: TagCategory.general),
-    TagItem(id: '4', name: '買い物', color: Colors.orange, category: TagCategory.todo),
-    TagItem(id: '5', name: 'アイデア', color: Colors.purple, category: TagCategory.memo),
-  ];
 
   Future<void> addTag(TagItem tag) async {
-    state = [...state, tag];
-    await _saveTags();
+    if (userId == null) return;
+    await _tagsCollection.add(tag.toMap());
   }
 
   Future<void> updateTag(TagItem tag) async {
-    state = state.map((t) => t.id == tag.id ? tag : t).toList();
-    await _saveTags();
+    if (userId == null) return;
+    await _tagsCollection.doc(tag.id).update(tag.toMap());
   }
 
   Future<void> deleteTag(String id) async {
-    state = state.where((t) => t.id != id).toList();
-    await _saveTags();
-  }
-
-  Future<void> reorderTags(int oldIndex, int newIndex) async {
-    final tags = List<TagItem>.from(state);
-    final tag = tags.removeAt(oldIndex);
-    tags.insert(newIndex < oldIndex ? newIndex : newIndex - 1, tag);
-    state = tags;
-    await _saveTags();
+    if (userId == null) return;
+    await _tagsCollection.doc(id).delete();
   }
 }
 
-/// タグ管理画面
+/// iOS版TagSettingsViewと同じデザインのタグ管理画面
 class TagManagementScreen extends ConsumerWidget {
   const TagManagementScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tags = ref.watch(tagsProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
+    final colorSettings = ref.watch(colorSettingsProvider);
+    final textColor = colorSettings.textColor;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => context.pop(),
         ),
-        title: const Text('タグ管理'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: Text('タグ設定', style: TextStyle(color: textColor)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          TextButton(
+            onPressed: () => context.pop(),
+            child: Text(
+              '完了',
+              style: TextStyle(
+                color: accentColor,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
       ),
-      body: tags.isEmpty
-          ? _EmptyTagView(
-              onAdd: () => _showAddTagDialog(context, ref),
-            )
-          : _TagList(tags: tags),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddTagDialog(context, ref),
-        child: const Icon(Icons.add),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              // 既存タグ一覧
+              ...tags.map((tag) => _TagRow(
+                    tag: tag,
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    onEdit: () => _showEditTagSheet(context, ref, tag, accentColor, textColor),
+                    onDelete: () => ref.read(tagsProvider.notifier).deleteTag(tag.id),
+                  )),
+
+              const SizedBox(height: 16),
+
+              // 新規追加ボタン
+              GestureDetector(
+                onTap: () => _showAddTagSheet(context, ref, accentColor, textColor),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.add, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text(
+                        '新しいタグを追加',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  void _showAddTagDialog(BuildContext context, WidgetRef ref) {
-    showDialog(
+  void _showAddTagSheet(BuildContext context, WidgetRef ref, Color accentColor, Color textColor) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _TagEditDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _TagEditSheet(
+        accentColor: accentColor,
+        textColor: textColor,
         onSave: (tag) {
           ref.read(tagsProvider.notifier).addTag(tag);
         },
       ),
     );
   }
-}
 
-class _EmptyTagView extends StatelessWidget {
-  final VoidCallback onAdd;
-
-  const _EmptyTagView({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.label_off,
-              size: 80,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'タグがありません',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'タグを作成してデータを整理しましょう',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
-            ),
-            const SizedBox(height: 32),
-            FilledButton.icon(
-              onPressed: onAdd,
-              icon: const Icon(Icons.add),
-              label: const Text('タグを作成'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TagList extends ConsumerWidget {
-  final List<TagItem> tags;
-
-  const _TagList({required this.tags});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // カテゴリ別にグループ化
-    final groupedTags = <TagCategory, List<TagItem>>{};
-    for (final tag in tags) {
-      groupedTags.putIfAbsent(tag.category, () => []).add(tag);
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: TagCategory.values.map((category) {
-        final categoryTags = groupedTags[category] ?? [];
-        if (categoryTags.isEmpty) return const SizedBox.shrink();
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // カテゴリヘッダー
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Row(
-                children: [
-                  Icon(
-                    category.icon,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    category.label,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            // タグカード
-            ...categoryTags.map((tag) => _TagCard(
-                  tag: tag,
-                  onEdit: () => _showEditTagDialog(context, ref, tag),
-                  onDelete: () => _confirmDelete(context, ref, tag),
-                )),
-            const SizedBox(height: 16),
-          ],
-        );
-      }).toList(),
-    );
-  }
-
-  void _showEditTagDialog(BuildContext context, WidgetRef ref, TagItem tag) {
-    showDialog(
+  void _showEditTagSheet(BuildContext context, WidgetRef ref, TagItem tag, Color accentColor, Color textColor) {
+    showModalBottomSheet(
       context: context,
-      builder: (context) => _TagEditDialog(
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _TagEditSheet(
         tag: tag,
+        accentColor: accentColor,
+        textColor: textColor,
         onSave: (updatedTag) {
           ref.read(tagsProvider.notifier).updateTag(updatedTag);
         },
       ),
     );
   }
+}
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, TagItem tag) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('タグを削除'),
-        content: Text('「${tag.name}」を削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
+/// タグ行
+class _TagRow extends StatelessWidget {
+  final TagItem tag;
+  final Color textColor;
+  final Color accentColor;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _TagRow({
+    required this.tag,
+    required this.textColor,
+    required this.accentColor,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          // タグの色サンプル
+          Container(
+            width: 20,
+            height: 20,
+            decoration: BoxDecoration(
+              color: tag.color,
+              shape: BoxShape.circle,
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              ref.read(tagsProvider.notifier).deleteTag(tag.id);
-              Navigator.pop(context);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('削除'),
+          const SizedBox(width: 12),
+
+          // タグ名
+          Expanded(
+            child: Text(
+              tag.name,
+              style: TextStyle(
+                fontSize: 15,
+                color: textColor,
+              ),
+            ),
+          ),
+
+          // 編集ボタン
+          IconButton(
+            onPressed: onEdit,
+            icon: Icon(Icons.edit, color: accentColor),
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(8),
+          ),
+
+          // 削除ボタン
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete, color: Colors.red),
+            constraints: const BoxConstraints(),
+            padding: const EdgeInsets.all(8),
           ),
         ],
       ),
@@ -315,91 +302,273 @@ class _TagList extends ConsumerWidget {
   }
 }
 
-class _TagCard extends StatelessWidget {
-  final TagItem tag;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+/// タグ編集シート
+class _TagEditSheet extends ConsumerStatefulWidget {
+  final TagItem? tag;
+  final Color accentColor;
+  final Color textColor;
+  final Function(TagItem) onSave;
 
-  const _TagCard({
-    required this.tag,
-    required this.onEdit,
-    required this.onDelete,
+  const _TagEditSheet({
+    this.tag,
+    required this.accentColor,
+    required this.textColor,
+    required this.onSave,
+  });
+
+  @override
+  ConsumerState<_TagEditSheet> createState() => _TagEditSheetState();
+}
+
+class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
+  late TextEditingController _nameController;
+  late Color _selectedColor;
+
+  bool get isEditing => widget.tag != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.tag?.name ?? '');
+    _selectedColor = widget.tag?.color ?? Colors.blue;
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        gradient: backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // ヘッダー
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'キャンセル',
+                    style: TextStyle(color: widget.accentColor),
+                  ),
+                ),
+                Text(
+                  isEditing ? 'タグ編集' : '新規タグ',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: widget.textColor,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _nameController.text.trim().isEmpty ? null : _saveTag,
+                  child: Text(
+                    '保存',
+                    style: TextStyle(
+                      color: _nameController.text.trim().isEmpty
+                          ? Colors.grey
+                          : widget.accentColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // タグ名入力
+                _SectionCard(
+                  title: 'タグ名',
+                  textColor: widget.textColor,
+                  child: TextField(
+                    controller: _nameController,
+                    style: TextStyle(color: widget.textColor),
+                    decoration: InputDecoration(
+                      hintText: 'タグ名を入力',
+                      hintStyle: TextStyle(color: widget.textColor.withValues(alpha: 0.5)),
+                      border: InputBorder.none,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // タグ色選択
+                _SectionCard(
+                  title: 'タグ色',
+                  textColor: widget.textColor,
+                  child: Row(
+                    children: [
+                      Text(
+                        '色',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: widget.textColor,
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: _showColorPicker,
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: _selectedColor,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // プレビュー
+                _SectionCard(
+                  title: 'プレビュー',
+                  textColor: widget.textColor,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: _selectedColor,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _selectedColor,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          _nameController.text.isEmpty ? 'サンプルタグ' : _nameController.text,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showColorPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _ColorPickerSheet(
+        initialColor: _selectedColor,
+        onColorSelected: (color) {
+          setState(() => _selectedColor = color);
+        },
+      ),
+    );
+  }
+
+  void _saveTag() {
+    final trimmedName = _nameController.text.trim();
+    if (trimmedName.isEmpty) return;
+
+    final tag = TagItem(
+      id: widget.tag?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      name: trimmedName,
+      color: _selectedColor,
+    );
+    widget.onSave(tag);
+    Navigator.pop(context);
+  }
+}
+
+/// セクションカード
+class _SectionCard extends StatelessWidget {
+  final String title;
+  final Color textColor;
+  final Widget child;
+
+  const _SectionCard({
+    required this.title,
+    required this.textColor,
+    required this.child,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: tag.color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            Icons.label,
-            color: tag.color,
-          ),
-        ),
-        title: Text(tag.name),
-        subtitle: Text(tag.category.label),
-        trailing: PopupMenuButton(
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit),
-                  SizedBox(width: 8),
-                  Text('編集'),
-                ],
-              ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: textColor,
             ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('削除', style: TextStyle(color: Colors.red)),
-                ],
-              ),
-            ),
-          ],
-          onSelected: (value) {
-            if (value == 'edit') {
-              onEdit();
-            } else if (value == 'delete') {
-              onDelete();
-            }
-          },
-        ),
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
       ),
     );
   }
 }
 
-class _TagEditDialog extends StatefulWidget {
-  final TagItem? tag;
-  final Function(TagItem) onSave;
+/// カラーピッカーシート
+class _ColorPickerSheet extends StatefulWidget {
+  final Color initialColor;
+  final ValueChanged<Color> onColorSelected;
 
-  const _TagEditDialog({
-    this.tag,
-    required this.onSave,
+  const _ColorPickerSheet({
+    required this.initialColor,
+    required this.onColorSelected,
   });
 
   @override
-  State<_TagEditDialog> createState() => _TagEditDialogState();
+  State<_ColorPickerSheet> createState() => _ColorPickerSheetState();
 }
 
-class _TagEditDialogState extends State<_TagEditDialog> {
-  late TextEditingController _nameController;
+class _ColorPickerSheetState extends State<_ColorPickerSheet> {
   late Color _selectedColor;
-  late TagCategory _selectedCategory;
 
-  static const _colors = [
+  static const List<Color> _presetColors = [
     Colors.red,
     Colors.pink,
     Colors.purple,
@@ -416,131 +585,72 @@ class _TagEditDialogState extends State<_TagEditDialog> {
     Colors.amber,
     Colors.orange,
     Colors.deepOrange,
-    Colors.brown,
-    Colors.grey,
-    Colors.blueGrey,
   ];
 
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.tag?.name ?? '');
-    _selectedColor = widget.tag?.color ?? Colors.blue;
-    _selectedCategory = widget.tag?.category ?? TagCategory.general;
-  }
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    super.dispose();
+    _selectedColor = widget.initialColor;
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.tag == null ? 'タグを追加' : 'タグを編集'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // タグ名
-            TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'タグ名',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: true,
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 20),
 
-            // カテゴリ
-            Text(
-              'カテゴリ',
-              style: Theme.of(context).textTheme.titleSmall,
+          const Text(
+            'カラーを選択',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: TagCategory.values.map((category) {
-                final isSelected = _selectedCategory == category;
-                return FilterChip(
-                  label: Text(category.label),
-                  avatar: Icon(category.icon, size: 18),
-                  selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() => _selectedCategory = category);
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 20),
 
-            // 色選択
-            Text(
-              '色',
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _colors.map((color) {
-                final isSelected = _selectedColor.value == color.value;
-                return GestureDetector(
-                  onTap: () => setState(() => _selectedColor = color),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: color,
-                      shape: BoxShape.circle,
-                      border: isSelected
-                          ? Border.all(color: Colors.white, width: 3)
-                          : null,
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: color.withValues(alpha: 0.5),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : null,
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _presetColors.map((color) {
+              final isSelected = _selectedColor.toARGB32() == color.toARGB32();
+              return GestureDetector(
+                onTap: () {
+                  setState(() => _selectedColor = color);
+                  widget.onColorSelected(color);
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected ? Colors.black : Colors.grey.shade300,
+                      width: isSelected ? 3 : 1,
                     ),
-                    child: isSelected
-                        ? const Icon(Icons.check, color: Colors.white, size: 20)
-                        : null,
                   ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
+                  child: isSelected
+                      ? const Icon(Icons.check, color: Colors.white)
+                      : null,
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
-        ),
-        FilledButton(
-          onPressed: () {
-            if (_nameController.text.isEmpty) return;
-
-            final tag = TagItem(
-              id: widget.tag?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-              name: _nameController.text,
-              color: _selectedColor,
-              category: _selectedCategory,
-            );
-            widget.onSave(tag);
-            Navigator.pop(context);
-          },
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 }

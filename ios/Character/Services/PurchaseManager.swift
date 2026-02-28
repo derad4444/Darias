@@ -285,6 +285,11 @@ class PurchaseManager: ObservableObject {
 
             try await docRef.setData(subscriptionData, merge: true)
 
+            // ユーザードキュメントの subscriptionStatus フィールドも同期
+            try await db.collection("users").document(userId).updateData([
+                "subscriptionStatus": isPremium ? "premium" : "free"
+            ])
+
             Logger.success("Updated subscription status: isPremium=\(isPremium), endDate=\(endDate?.description ?? "nil")", category: Logger.subscription)
             print("✅ PurchaseManager: Successfully wrote to Firestore")
             print("📄 PurchaseManager: Data = \(subscriptionData)")

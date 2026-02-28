@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/big5_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/big5_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class Big5DiagnosisScreen extends ConsumerStatefulWidget {
   const Big5DiagnosisScreen({super.key});
@@ -48,43 +50,63 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
     final progressAsync = user?.characterId != null
         ? ref.watch(big5ProgressProvider(user!.characterId!))
         : null;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
         ),
         title: const Text('性格診断'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: Column(
-        children: [
-          // 進捗バー
-          if (progressAsync != null)
-            progressAsync.when(
-              data: (progress) => _ProgressSection(progress: progress),
-              loading: () => const LinearProgressIndicator(),
-              error: (e, st) => const SizedBox.shrink(),
-            ),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // 進捗バー
+              if (progressAsync != null)
+                progressAsync.when(
+                  data: (progress) => _ProgressSection(
+                    progress: progress,
+                    accentColor: accentColor,
+                  ),
+                  loading: () => LinearProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(accentColor),
+                  ),
+                  error: (e, st) => const SizedBox.shrink(),
+                ),
 
-          // メインコンテンツ
-          Expanded(
-            child: diagnosisState.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : diagnosisState.currentQuestion != null
-                    ? _QuestionSection(
-                        question: diagnosisState.currentQuestion!,
-                        onAnswer: _submitAnswer,
-                        lastReply: diagnosisState.lastReply,
+              // メインコンテンツ
+              Expanded(
+                child: diagnosisState.isLoading
+                    ? Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation(accentColor),
+                        ),
                       )
-                    : _StartSection(
-                        onStart: _startDiagnosis,
-                        lastReply: diagnosisState.lastReply,
-                        progress: progressAsync?.valueOrNull,
-                      ),
+                    : diagnosisState.currentQuestion != null
+                        ? _QuestionSection(
+                            question: diagnosisState.currentQuestion!,
+                            onAnswer: _submitAnswer,
+                            lastReply: diagnosisState.lastReply,
+                            accentColor: accentColor,
+                          )
+                        : _StartSection(
+                            onStart: _startDiagnosis,
+                            lastReply: diagnosisState.lastReply,
+                            progress: progressAsync?.valueOrNull,
+                            accentColor: accentColor,
+                          ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -93,8 +115,12 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
 /// 進捗表示セクション
 class _ProgressSection extends StatelessWidget {
   final Big5Progress progress;
+  final Color accentColor;
 
-  const _ProgressSection({required this.progress});
+  const _ProgressSection({
+    required this.progress,
+    required this.accentColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -102,9 +128,18 @@ class _ProgressSection extends StatelessWidget {
     final level = progress.analysisLevel;
 
     return Container(
+      margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -113,7 +148,9 @@ class _ProgressSection extends StatelessWidget {
             children: [
               Text(
                 '回答数: ${progress.answeredCount} / 100',
-                style: Theme.of(context).textTheme.bodyMedium,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.textPrimary,
+                ),
               ),
               if (level != null)
                 Container(
@@ -122,13 +159,13 @@ class _ProgressSection extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: accentColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${level.icon} ${level.displayName}',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onPrimary,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -140,7 +177,8 @@ class _ProgressSection extends StatelessWidget {
             child: LinearProgressIndicator(
               value: percentage,
               minHeight: 8,
-              backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation(accentColor),
             ),
           ),
         ],
@@ -154,11 +192,13 @@ class _QuestionSection extends StatelessWidget {
   final Big5Question question;
   final Function(int) onAnswer;
   final String? lastReply;
+  final Color accentColor;
 
   const _QuestionSection({
     required this.question,
     required this.onAnswer,
     this.lastReply,
+    required this.accentColor,
   });
 
   static const _answerOptions = [
@@ -173,6 +213,7 @@ class _QuestionSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -181,13 +222,20 @@ class _QuestionSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.cardShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Text(
                 lastReply!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  color: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -195,8 +243,18 @@ class _QuestionSection extends StatelessWidget {
           ],
 
           // 質問カード
-          Card(
-            elevation: 2,
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -206,13 +264,13 @@ class _QuestionSection extends StatelessWidget {
                     children: [
                       Icon(
                         Icons.psychology,
-                        color: Theme.of(context).colorScheme.primary,
+                        color: accentColor,
                       ),
                       const SizedBox(width: 8),
                       Text(
                         '性格診断',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.primary,
+                          color: accentColor,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -223,6 +281,7 @@ class _QuestionSection extends StatelessWidget {
                     question.question,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -239,6 +298,7 @@ class _QuestionSection extends StatelessWidget {
               text: option.text,
               emoji: option.emoji,
               onPressed: () => onAnswer(option.value),
+              accentColor: accentColor,
             ),
           )),
         ],
@@ -253,18 +313,20 @@ class _AnswerButton extends StatelessWidget {
   final String text;
   final String emoji;
   final VoidCallback onPressed;
+  final Color accentColor;
 
   const _AnswerButton({
     required this.value,
     required this.text,
     required this.emoji,
     required this.onPressed,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Theme.of(context).colorScheme.surface,
+      color: Colors.white.withValues(alpha: 0.9),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onPressed,
@@ -276,7 +338,7 @@ class _AnswerButton extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             border: Border.all(
-              color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.3),
+              color: Colors.grey.withValues(alpha: 0.2),
             ),
             borderRadius: BorderRadius.circular(12),
           ),
@@ -291,14 +353,14 @@ class _AnswerButton extends StatelessWidget {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary,
+                  color: accentColor,
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
                     '$value',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onPrimary,
+                    style: const TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -309,12 +371,14 @@ class _AnswerButton extends StatelessWidget {
               Expanded(
                 child: Text(
                   text,
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
               Icon(
                 Icons.chevron_right,
-                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.6),
+                color: accentColor.withValues(alpha: 0.6),
               ),
             ],
           ),
@@ -329,11 +393,13 @@ class _StartSection extends StatelessWidget {
   final VoidCallback onStart;
   final String? lastReply;
   final Big5Progress? progress;
+  final Color accentColor;
 
   const _StartSection({
     required this.onStart,
     this.lastReply,
     this.progress,
+    required this.accentColor,
   });
 
   @override
@@ -342,6 +408,7 @@ class _StartSection extends StatelessWidget {
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -350,13 +417,20 @@ class _StartSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.secondaryContainer,
+                color: Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.cardShadow,
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
               child: Text(
                 lastReply!,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  color: AppColors.textPrimary,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -368,7 +442,7 @@ class _StartSection extends StatelessWidget {
           Icon(
             Icons.psychology,
             size: 80,
-            color: Theme.of(context).colorScheme.primary,
+            color: accentColor,
           ),
           const SizedBox(height: 24),
 
@@ -376,6 +450,7 @@ class _StartSection extends StatelessWidget {
             'BIG5性格診断',
             style: Theme.of(context).textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 16),
@@ -387,13 +462,13 @@ class _StartSection extends StatelessWidget {
                 vertical: 8,
               ),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
+                color: accentColor.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 '${level.icon} ${level.displayName}達成',
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: accentColor,
                 ),
               ),
             ),
@@ -405,7 +480,7 @@ class _StartSection extends StatelessWidget {
                 ? '100問の質問に答えて、\nあなたの性格を分析しましょう'
                 : '${progress?.answeredCount ?? 0}問回答済み\n続きから診断を再開できます',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              color: AppColors.textSecondary,
             ),
             textAlign: TextAlign.center,
           ),
@@ -418,6 +493,8 @@ class _StartSection extends StatelessWidget {
               progress?.answeredCount == 0 ? '診断を開始' : '診断を続ける',
             ),
             style: FilledButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(
                 horizontal: 32,
                 vertical: 16,
@@ -427,7 +504,18 @@ class _StartSection extends StatelessWidget {
           const SizedBox(height: 16),
 
           // 説明
-          Card(
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.cardShadow,
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -437,12 +525,13 @@ class _StartSection extends StatelessWidget {
                     '診断について',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  _buildInfoRow(context, '20問', '基本プログラム解析'),
-                  _buildInfoRow(context, '50問', '学習進化解析'),
-                  _buildInfoRow(context, '100問', '人格解析（完全版）'),
+                  _buildInfoRow(context, '20問', '基本プログラム解析', accentColor),
+                  _buildInfoRow(context, '50問', '学習進化解析', accentColor),
+                  _buildInfoRow(context, '100問', '人格解析', accentColor),
                 ],
               ),
             ),
@@ -452,7 +541,7 @@ class _StartSection extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoRow(BuildContext context, String count, String description) {
+  Widget _buildInfoRow(BuildContext context, String count, String description, Color accentColor) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -464,14 +553,14 @@ class _StartSection extends StatelessWidget {
               vertical: 2,
             ),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer,
+              color: accentColor.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
               count,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
+                color: accentColor,
               ),
               textAlign: TextAlign.center,
             ),
@@ -480,7 +569,9 @@ class _StartSection extends StatelessWidget {
           Expanded(
             child: Text(
               description,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.textPrimary,
+              ),
             ),
           ),
         ],

@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/calendar_provider.dart';
@@ -28,35 +30,48 @@ class _DataExportScreenState extends ConsumerState<DataExportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: const Text('データエクスポート'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: const Text(
+          'データエクスポート',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 説明
-          Card(
-            child: Padding(
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
+          children: [
+            // 説明
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: colorScheme.primary),
+                      Icon(Icons.info_outline, color: accentColor),
                       const SizedBox(width: 8),
                       Text(
                         'データエクスポートについて',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
                             ),
                       ),
                     ],
@@ -66,109 +81,114 @@ class _DataExportScreenState extends ConsumerState<DataExportScreen> {
                     'アプリ内のデータをJSON形式でエクスポートできます。'
                     'エクスポートしたデータはバックアップとして保存したり、他のアプリで利用することができます。',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                          color: AppColors.textSecondary,
                         ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
 
-          // エクスポート対象の選択
-          Text(
-            'エクスポートするデータ',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-          ),
-          const SizedBox(height: 8),
-
-          _ExportOption(
-            icon: Icons.check_circle,
-            title: 'TODO',
-            subtitle: 'タスクとその完了状態',
-            value: _exportTodos,
-            onChanged: (value) => setState(() => _exportTodos = value),
-          ),
-          _ExportOption(
-            icon: Icons.note,
-            title: 'メモ',
-            subtitle: 'すべてのメモとタグ',
-            value: _exportMemos,
-            onChanged: (value) => setState(() => _exportMemos = value),
-          ),
-          _ExportOption(
-            icon: Icons.event,
-            title: 'スケジュール',
-            subtitle: 'すべての予定',
-            value: _exportSchedules,
-            onChanged: (value) => setState(() => _exportSchedules = value),
-          ),
-          _ExportOption(
-            icon: Icons.book,
-            title: '日記',
-            subtitle: 'すべての日記とコメント',
-            value: _exportDiaries,
-            onChanged: (value) => setState(() => _exportDiaries = value),
-          ),
-
-          const SizedBox(height: 24),
-
-          // エクスポートボタン
-          FilledButton.icon(
-            onPressed: _isExporting ||
-                    (!_exportTodos &&
-                        !_exportMemos &&
-                        !_exportSchedules &&
-                        !_exportDiaries)
-                ? null
-                : _exportData,
-            icon: _isExporting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.download),
-            label: const Text('エクスポート'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 注意事項
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'エクスポートしたデータには個人情報が含まれる可能性があります。'
-                    '安全な場所に保管してください。',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.amber.shade900,
-                        ),
+            // エクスポート対象の選択
+            Text(
+              'エクスポートするデータ',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
-                ),
-              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+
+            _ExportOption(
+              icon: Icons.check_circle,
+              title: 'TODO',
+              subtitle: 'タスクとその完了状態',
+              value: _exportTodos,
+              onChanged: (value) => setState(() => _exportTodos = value),
+              accentColor: accentColor,
+            ),
+            _ExportOption(
+              icon: Icons.note,
+              title: 'メモ',
+              subtitle: 'すべてのメモとタグ',
+              value: _exportMemos,
+              onChanged: (value) => setState(() => _exportMemos = value),
+              accentColor: accentColor,
+            ),
+            _ExportOption(
+              icon: Icons.event,
+              title: 'スケジュール',
+              subtitle: 'すべての予定',
+              value: _exportSchedules,
+              onChanged: (value) => setState(() => _exportSchedules = value),
+              accentColor: accentColor,
+            ),
+            _ExportOption(
+              icon: Icons.book,
+              title: '日記',
+              subtitle: 'すべての日記とコメント',
+              value: _exportDiaries,
+              onChanged: (value) => setState(() => _exportDiaries = value),
+              accentColor: accentColor,
+            ),
+
+            const SizedBox(height: 24),
+
+            // エクスポートボタン
+            FilledButton.icon(
+              onPressed: _isExporting ||
+                      (!_exportTodos &&
+                          !_exportMemos &&
+                          !_exportSchedules &&
+                          !_exportDiaries)
+                  ? null
+                  : _exportData,
+              icon: _isExporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.download),
+              label: const Text('エクスポート'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: accentColor,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 注意事項
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'エクスポートしたデータには個人情報が含まれる可能性があります。'
+                      '安全な場所に保管してください。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.amber.shade900,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -285,6 +305,7 @@ class _ExportOption extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final Color accentColor;
 
   const _ExportOption({
     required this.icon,
@@ -292,18 +313,30 @@ class _ExportOption extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: SwitchListTile(
-        secondary: Icon(icon),
-        title: Text(title),
-        subtitle: Text(subtitle),
+        secondary: Icon(icon, color: accentColor),
+        title: Text(
+          title,
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
         value: value,
         onChanged: (v) => onChanged(v),
+        activeColor: accentColor,
       ),
     );
   }

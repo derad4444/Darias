@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/theme_provider.dart';
 
 /// プレミアム機能の種類
 enum PremiumFeature {
@@ -100,36 +102,43 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   Widget build(BuildContext context) {
     final subscriptionState = ref.watch(subscriptionControllerProvider);
     final monthlyProduct = ref.watch(monthlyProductProvider);
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              colorScheme.surface,
-              colorScheme.surface.withValues(alpha: 0.95),
-            ],
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(
+              Icons.close,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
+        ],
+      ),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 20),
+            physics: const BouncingScrollPhysics(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 // ヘッダー
-                _buildHeader(context),
+                _buildHeader(context, accentColor),
                 const SizedBox(height: 24),
 
                 // 機能比較セクション
-                _buildFeatureComparisonSection(context),
+                _buildFeatureComparisonSection(context, accentColor),
                 const SizedBox(height: 24),
 
                 // 料金プランセクション
-                _buildPricingSection(context, monthlyProduct),
+                _buildPricingSection(context, monthlyProduct, accentColor),
                 const SizedBox(height: 24),
 
                 // 購入セクション
@@ -137,11 +146,12 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
                   context,
                   subscriptionState,
                   monthlyProduct,
+                  accentColor,
                 ),
                 const SizedBox(height: 24),
 
                 // 法的情報セクション
-                _buildLegalSection(context),
+                _buildLegalSection(context, accentColor),
                 const SizedBox(height: 40),
               ],
             ),
@@ -152,23 +162,9 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   }
 
   /// ヘッダーセクション
-  Widget _buildHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildHeader(BuildContext context, Color accentColor) {
     return Column(
       children: [
-        // 閉じるボタン
-        Align(
-          alignment: Alignment.centerRight,
-          child: IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(
-              Icons.close,
-              color: colorScheme.onSurface.withValues(alpha: 0.6),
-            ),
-          ),
-        ),
-
         // クラウンアイコン
         Icon(
           Icons.workspace_premium,
@@ -182,6 +178,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           'プレミアムにアップグレード',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
         ),
         const SizedBox(height: 8),
@@ -190,7 +187,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
         Text(
           '広告なしで快適なキャラクター体験を',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.8),
+                color: AppColors.textSecondary,
               ),
           textAlign: TextAlign.center,
         ),
@@ -199,7 +196,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   }
 
   /// 機能比較セクション
-  Widget _buildFeatureComparisonSection(BuildContext context) {
+  Widget _buildFeatureComparisonSection(BuildContext context, Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,28 +204,27 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           '機能比較',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
         ),
         const SizedBox(height: 12),
         ...PremiumFeature.values.map(
-          (feature) => _buildFeatureRow(context, feature),
+          (feature) => _buildFeatureRow(context, feature, accentColor),
         ),
       ],
     );
   }
 
   /// 機能行
-  Widget _buildFeatureRow(BuildContext context, PremiumFeature feature) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildFeatureRow(BuildContext context, PremiumFeature feature, Color accentColor) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.onSurface.withValues(alpha: 0.05),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: colorScheme.primary.withValues(alpha: 0.3),
+          color: accentColor.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -236,7 +232,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           // アイコン
           Icon(
             feature.icon,
-            color: colorScheme.primary,
+            color: accentColor,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -245,7 +241,9 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           Expanded(
             child: Text(
               feature.title,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
             ),
           ),
 
@@ -257,7 +255,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
                 Text(
                   '無料',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: AppColors.textLight,
                       ),
                 ),
                 Text(
@@ -281,7 +279,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
                 Text(
                   'プレミアム',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        color: AppColors.textLight,
                       ),
                 ),
                 Text(
@@ -303,9 +301,8 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   Widget _buildPricingSection(
     BuildContext context,
     dynamic monthlyProduct,
+    Color accentColor,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -313,6 +310,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           '料金プラン',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
         ),
         const SizedBox(height: 12),
@@ -320,10 +318,10 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.1),
+            color: accentColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: colorScheme.primary,
+              color: accentColor,
               width: 2,
             ),
           ),
@@ -334,14 +332,14 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
                 monthlyProduct?.price ?? '¥980',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: colorScheme.primary,
+                      color: accentColor,
                     ),
               ),
               const SizedBox(width: 4),
               Text(
                 '/ 月',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurface.withValues(alpha: 0.6),
+                      color: AppColors.textSecondary,
                     ),
               ),
             ],
@@ -356,9 +354,8 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
     BuildContext context,
     SubscriptionState state,
     dynamic monthlyProduct,
+    Color accentColor,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       children: [
         // ローディング中
@@ -383,8 +380,8 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
                     }
                   : null,
               style: ElevatedButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                foregroundColor: colorScheme.onPrimary,
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
@@ -417,7 +414,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
             },
             child: Text(
               '購入を復元',
-              style: TextStyle(color: colorScheme.primary),
+              style: TextStyle(color: accentColor),
             ),
           ),
         ],
@@ -429,7 +426,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
             child: Text(
               state.error!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.error,
+                    color: Colors.red,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -453,9 +450,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   }
 
   /// 法的情報セクション
-  Widget _buildLegalSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Widget _buildLegalSection(BuildContext context, Color accentColor) {
     return Column(
       children: [
         // 注意事項
@@ -463,7 +458,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           '• 購入確定時にApple ID/Google Playアカウントに課金されます\n'
           '• 設定からサブスクリプションを管理できます',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
+                color: AppColors.textLight,
               ),
           textAlign: TextAlign.center,
         ),
@@ -478,7 +473,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
               child: Text(
                 '利用規約',
                 style: TextStyle(
-                  color: colorScheme.primary,
+                  color: accentColor,
                   fontSize: 12,
                 ),
               ),
@@ -489,7 +484,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
               child: Text(
                 'プライバシーポリシー',
                 style: TextStyle(
-                  color: colorScheme.primary,
+                  color: accentColor,
                   fontSize: 12,
                 ),
               ),

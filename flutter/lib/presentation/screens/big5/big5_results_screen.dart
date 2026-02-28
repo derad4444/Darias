@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/big5_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/big5_provider.dart';
+import '../../providers/theme_provider.dart';
 
 /// BIG5診断結果画面
 class Big5ResultsScreen extends ConsumerWidget {
@@ -16,20 +18,26 @@ class Big5ResultsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userDocProvider).valueOrNull;
     final characterId = user?.characterId;
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     if (characterId == null) {
       return Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () => context.pop(),
           ),
           title: const Text('診断結果'),
-          backgroundColor: colorScheme.inversePrimary,
+          backgroundColor: Colors.transparent,
+          elevation: 0,
         ),
-        body: const Center(
-          child: Text('キャラクターが選択されていません'),
+        body: Container(
+          decoration: BoxDecoration(gradient: backgroundGradient),
+          child: const Center(
+            child: Text('キャラクターが選択されていません'),
+          ),
         ),
       );
     }
@@ -38,13 +46,15 @@ class Big5ResultsScreen extends ConsumerWidget {
     final analysisAsync = ref.watch(big5AnalysisDataProvider(characterId));
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.pop(),
         ),
         title: const Text('診断結果'),
-        backgroundColor: colorScheme.inversePrimary,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -55,14 +65,24 @@ class Big5ResultsScreen extends ConsumerWidget {
           ),
         ],
       ),
-      body: progressAsync.when(
-        data: (progress) => _ResultsBody(
-          progress: progress,
-          analysisAsync: analysisAsync,
-          characterId: characterId,
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: progressAsync.when(
+            data: (progress) => _ResultsBody(
+              progress: progress,
+              analysisAsync: analysisAsync,
+              characterId: characterId,
+              accentColor: accentColor,
+            ),
+            loading: () => Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation(accentColor),
+              ),
+            ),
+            error: (e, st) => Center(child: Text('エラー: $e')),
+          ),
         ),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(child: Text('エラー: $e')),
       ),
     );
   }
@@ -72,30 +92,42 @@ class _ResultsBody extends StatelessWidget {
   final Big5Progress progress;
   final AsyncValue<Big5AnalysisData?> analysisAsync;
   final String characterId;
+  final Color accentColor;
 
   const _ResultsBody({
     required this.progress,
     required this.analysisAsync,
     required this.characterId,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     if (progress.answeredCount < 20) {
-      return _NotEnoughDataView(progress: progress);
+      return _NotEnoughDataView(
+        progress: progress,
+        accentColor: accentColor,
+      );
     }
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // 診断レベル表示
-          _LevelCard(progress: progress),
+          _LevelCard(
+            progress: progress,
+            accentColor: accentColor,
+          ),
           const SizedBox(height: 16),
 
           // レーダーチャート
-          _RadarChartCard(scores: progress.currentScores),
+          _RadarChartCard(
+            scores: progress.currentScores,
+            accentColor: accentColor,
+          ),
           const SizedBox(height: 16),
 
           // 各特性の詳細スコア
@@ -108,12 +140,21 @@ class _ResultsBody extends StatelessWidget {
                 ? _AnalysisSection(
                     analysis: analysis,
                     level: progress.analysisLevel!,
+                    accentColor: accentColor,
                   )
                 : const SizedBox.shrink(),
-            loading: () => const Card(
+            loading: () => Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
               child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(child: CircularProgressIndicator()),
+                padding: const EdgeInsets.all(32),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation(accentColor),
+                  ),
+                ),
               ),
             ),
             error: (e, st) => const SizedBox.shrink(),
@@ -132,6 +173,8 @@ class _ResultsBody extends StatelessWidget {
                     : '100問まで続けて完全解析を解放',
               ),
               style: FilledButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
             ),
@@ -143,8 +186,12 @@ class _ResultsBody extends StatelessWidget {
 
 class _NotEnoughDataView extends StatelessWidget {
   final Big5Progress progress;
+  final Color accentColor;
 
-  const _NotEnoughDataView({required this.progress});
+  const _NotEnoughDataView({
+    required this.progress,
+    required this.accentColor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -157,20 +204,21 @@ class _NotEnoughDataView extends StatelessWidget {
             Icon(
               Icons.psychology,
               size: 80,
-              color: Colors.grey[400],
+              color: accentColor.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 24),
             Text(
               'データが不足しています',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 8),
             Text(
               '診断結果を表示するには\n最低20問の回答が必要です',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: Colors.grey[600],
+                    color: AppColors.textSecondary,
                   ),
               textAlign: TextAlign.center,
             ),
@@ -178,7 +226,7 @@ class _NotEnoughDataView extends StatelessWidget {
             Text(
               '現在: ${progress.answeredCount}問 / 20問',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
+                    color: accentColor,
                     fontWeight: FontWeight.bold,
                   ),
             ),
@@ -188,6 +236,8 @@ class _NotEnoughDataView extends StatelessWidget {
               icon: const Icon(Icons.play_arrow),
               label: const Text('診断を続ける'),
               style: FilledButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 16,
@@ -203,15 +253,29 @@ class _NotEnoughDataView extends StatelessWidget {
 
 class _LevelCard extends StatelessWidget {
   final Big5Progress progress;
+  final Color accentColor;
 
-  const _LevelCard({required this.progress});
+  const _LevelCard({
+    required this.progress,
+    required this.accentColor,
+  });
 
   @override
   Widget build(BuildContext context) {
     final level = progress.analysisLevel;
-    final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -231,12 +295,13 @@ class _LevelCard extends StatelessWidget {
                       level?.displayName ?? '',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
                     ),
                     Text(
                       '${progress.answeredCount}問回答済み',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
+                            color: AppColors.textSecondary,
                           ),
                     ),
                   ],
@@ -249,16 +314,32 @@ class _LevelCard extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: progress.answeredCount / 100,
                 minHeight: 8,
-                backgroundColor: colorScheme.surfaceContainerHighest,
+                backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                valueColor: AlwaysStoppedAnimation(accentColor),
               ),
             ),
             const SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _LevelMarker(count: 20, current: progress.answeredCount, label: '基本'),
-                _LevelMarker(count: 50, current: progress.answeredCount, label: '詳細'),
-                _LevelMarker(count: 100, current: progress.answeredCount, label: '完全'),
+                _LevelMarker(
+                  count: 20,
+                  current: progress.answeredCount,
+                  label: '基本',
+                  accentColor: accentColor,
+                ),
+                _LevelMarker(
+                  count: 50,
+                  current: progress.answeredCount,
+                  label: '詳細',
+                  accentColor: accentColor,
+                ),
+                _LevelMarker(
+                  count: 100,
+                  current: progress.answeredCount,
+                  label: '完全',
+                  accentColor: accentColor,
+                ),
               ],
             ),
           ],
@@ -272,39 +353,38 @@ class _LevelMarker extends StatelessWidget {
   final int count;
   final int current;
   final String label;
+  final Color accentColor;
 
   const _LevelMarker({
     required this.count,
     required this.current,
     required this.label,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final isAchieved = current >= count;
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       children: [
         Icon(
           isAchieved ? Icons.check_circle : Icons.circle_outlined,
           size: 20,
-          color: isAchieved ? colorScheme.primary : colorScheme.outline,
+          color: isAchieved ? accentColor : AppColors.textLight,
         ),
         const SizedBox(height: 4),
         Text(
           '$count問',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: isAchieved
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+                color: isAchieved ? accentColor : AppColors.textSecondary,
                 fontWeight: isAchieved ? FontWeight.bold : FontWeight.normal,
               ),
         ),
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: AppColors.textSecondary,
               ),
         ),
       ],
@@ -314,12 +394,27 @@ class _LevelMarker extends StatelessWidget {
 
 class _RadarChartCard extends StatelessWidget {
   final Big5Scores scores;
+  final Color accentColor;
 
-  const _RadarChartCard({required this.scores});
+  const _RadarChartCard({
+    required this.scores,
+    required this.accentColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -328,6 +423,7 @@ class _RadarChartCard extends StatelessWidget {
               '性格プロファイル',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 16),
@@ -337,9 +433,9 @@ class _RadarChartCard extends StatelessWidget {
                 size: const Size(250, 250),
                 painter: _RadarChartPainter(
                   scores: scores,
-                  primaryColor: Theme.of(context).colorScheme.primary,
-                  backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  textColor: Theme.of(context).colorScheme.onSurface,
+                  primaryColor: accentColor,
+                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                  textColor: AppColors.textPrimary,
                 ),
               ),
             ),
@@ -485,7 +581,18 @@ class _TraitScoresCard extends StatelessWidget {
       (Big5Trait.neuroticism, scores.neuroticism, Colors.red),
     ];
 
-    return Card(
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -495,6 +602,7 @@ class _TraitScoresCard extends StatelessWidget {
               '各特性スコア',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 16),
@@ -564,6 +672,7 @@ class _TraitScoreRow extends StatelessWidget {
                     trait.displayName,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
                         ),
                   ),
                 ],
@@ -617,10 +726,12 @@ class _TraitScoreRow extends StatelessWidget {
 class _AnalysisSection extends StatelessWidget {
   final Big5AnalysisData analysis;
   final Big5AnalysisLevel level;
+  final Color accentColor;
 
   const _AnalysisSection({
     required this.analysis,
     required this.level,
+    required this.accentColor,
   });
 
   @override
@@ -639,6 +750,7 @@ class _AnalysisSection extends StatelessWidget {
             '詳細解析',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
           ),
         ),
@@ -648,6 +760,7 @@ class _AnalysisSection extends StatelessWidget {
           return _AnalysisCategoryCard(
             category: category,
             detail: detail,
+            accentColor: accentColor,
           );
         }),
       ],
@@ -658,18 +771,29 @@ class _AnalysisSection extends StatelessWidget {
 class _AnalysisCategoryCard extends StatelessWidget {
   final Big5AnalysisCategory category;
   final Big5DetailedAnalysis detail;
+  final Color accentColor;
 
   const _AnalysisCategoryCard({
     required this.category,
     required this.detail,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.cardShadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -681,12 +805,13 @@ class _AnalysisCategoryCard extends StatelessWidget {
             category.displayName,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
           ),
           subtitle: Text(
             detail.personalityType,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.primary,
+                  color: accentColor,
                 ),
           ),
           children: [
@@ -697,7 +822,9 @@ class _AnalysisCategoryCard extends StatelessWidget {
                 children: [
                   Text(
                     detail.detailedText,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textPrimary,
+                    ),
                   ),
                   if (detail.keyPoints.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -705,6 +832,7 @@ class _AnalysisCategoryCard extends StatelessWidget {
                       'ポイント',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -716,13 +844,15 @@ class _AnalysisCategoryCard extends StatelessWidget {
                               Icon(
                                 Icons.check_circle,
                                 size: 16,
-                                color: colorScheme.primary,
+                                color: accentColor,
                               ),
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   point,
-                                  style: Theme.of(context).textTheme.bodySmall,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
                               ),
                             ],

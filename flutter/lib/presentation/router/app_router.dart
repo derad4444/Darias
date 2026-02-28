@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../data/models/diary_model.dart';
 import '../../data/models/memo_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/models/todo_model.dart';
 import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/main/main_shell_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/chat/chat_screen.dart';
@@ -17,7 +17,6 @@ import '../screens/todo/todo_detail_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/calendar/schedule_detail_screen.dart';
 import '../screens/diary/diary_list_screen.dart';
-import '../screens/diary/diary_detail_screen.dart';
 import '../screens/memo/memo_list_screen.dart';
 import '../screens/memo/memo_detail_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
@@ -39,7 +38,6 @@ import '../screens/settings/privacy_settings_screen.dart';
 import '../screens/settings/about_screen.dart';
 import '../screens/auth/change_password_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
-import '../screens/meeting/meeting_history_screen.dart';
 import '../screens/settings/tag_management_screen.dart';
 import '../screens/history/unified_history_screen.dart';
 import '../screens/meeting/character_explanation_screen.dart';
@@ -68,11 +66,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      // ホーム
+      // メイン（5タブ構成）
       GoRoute(
         path: '/',
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
+        name: 'main',
+        builder: (context, state) => const MainShellScreen(),
       ),
 
       // 認証
@@ -152,21 +150,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/diary',
         name: 'diary',
         builder: (context, state) => const DiaryListScreen(),
-      ),
-
-      // 日記詳細
-      GoRoute(
-        path: '/diary/detail',
-        name: 'diary-detail',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>;
-          final diary = extra['diary'] as DiaryModel;
-          final characterId = extra['characterId'] as String;
-          return DiaryDetailScreen(
-            diary: diary,
-            characterId: characterId,
-          );
-        },
       ),
 
       // メモ
@@ -322,12 +305,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-      // 会議履歴
-      GoRoute(
-        path: '/meeting-history',
-        name: 'meeting-history',
-        builder: (context, state) => const MeetingHistoryScreen(),
-      ),
 
       // タグ管理
       GoRoute(

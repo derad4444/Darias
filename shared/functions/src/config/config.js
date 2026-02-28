@@ -1,12 +1,16 @@
 // src/config/index.js
 
 const functions = require("firebase-functions");
-const {defineSecret} = require("firebase-functions/params");
 
-// 環境変数とシークレットの定義
-const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const GMAIL_USER = defineSecret("GMAIL_USER");
-const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
+// .env 環境変数の .value() 互換ラッパー
+function createEnvSecret(name) {
+  return {
+    value: () => process.env[name] || "",
+  };
+}
+const OPENAI_API_KEY = createEnvSecret("OPENAI_API_KEY");
+const GMAIL_USER = createEnvSecret("GMAIL_USER");
+const GMAIL_APP_PASSWORD = createEnvSecret("GMAIL_APP_PASSWORD");
 
 // アプリケーション設定
 const CONFIG = {

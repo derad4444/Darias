@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 
@@ -42,166 +43,233 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: const Text('プロフィール'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: Text('プロフィール', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, st) => Center(child: Text('エラー: $e')),
-        data: (user) {
-          if (user == null) {
-            return const Center(child: Text('ユーザー情報が見つかりません'));
-          }
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: userAsync.when(
+            loading: () => Center(child: CircularProgressIndicator(color: accentColor)),
+            error: (e, st) => Center(child: Text('エラー: $e')),
+            data: (user) {
+              if (user == null) {
+                return Center(
+                  child: Text(
+                    'ユーザー情報が見つかりません',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                );
+              }
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 上部バナー広告
-                if (shouldShowBannerAd) ...[
-                  const BannerAdContainer(),
-                  const SizedBox(height: 16),
-                ],
-
-                // プロフィールアバター
-                _buildAvatarSection(context, colorScheme, isPremium),
-                const SizedBox(height: 24),
-
-                // アカウント情報
-                _buildInfoCard(
-                  context,
-                  colorScheme,
-                  title: 'アカウント情報',
+              return SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _InfoRow(
-                      icon: Icons.email,
-                      label: 'メールアドレス',
-                      value: user.email,
-                    ),
-                    const Divider(height: 24),
-                    _InfoRow(
-                      icon: Icons.badge,
-                      label: '会員ステータス',
-                      value: isPremium ? 'プレミアム会員' : '無料会員',
-                      valueColor: isPremium ? Colors.amber : null,
-                    ),
-                    const Divider(height: 24),
-                    _InfoRow(
-                      icon: Icons.calendar_today,
-                      label: '登録日',
-                      value: _formatDate(user.createdAt),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // ニックネーム設定
-                _buildInfoCard(
-                  context,
-                  colorScheme,
-                  title: '表示名',
-                  children: [
-                    TextField(
-                      controller: _nicknameController,
-                      decoration: InputDecoration(
-                        labelText: 'ニックネーム',
-                        hintText: 'アプリ内での表示名を入力',
-                        filled: true,
-                        fillColor: colorScheme.surfaceContainerHighest,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        prefixIcon: const Icon(Icons.person_outline),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'この名前はアプリ内で表示されます',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurface.withValues(alpha: 0.6),
-                          ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // 選択中のキャラクター
-                if (user.characterId != null)
-                  _buildInfoCard(
-                    context,
-                    colorScheme,
-                    title: 'パートナー',
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Icon(
-                            Icons.smart_toy,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        title: Text(_getCharacterName(user.characterId!)),
-                        subtitle: const Text('選択中のキャラクター'),
-                        trailing: TextButton(
-                          onPressed: () => context.go('/character-select'),
-                          child: const Text('変更'),
-                        ),
-                      ),
+                    // 上部バナー広告
+                    if (shouldShowBannerAd) ...[
+                      const BannerAdContainer(),
+                      const SizedBox(height: 16),
                     ],
-                  ),
-                const SizedBox(height: 24),
 
-                // 保存ボタン
-                FilledButton.icon(
-                  onPressed: _isSaving ? null : _saveProfile,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                    // プロフィールアバター
+                    _buildAvatarSection(context, accentColor, isPremium),
+                    const SizedBox(height: 24),
+
+                    // アカウント情報
+                    _buildInfoCard(
+                      context,
+                      accentColor,
+                      title: 'アカウント情報',
+                      children: [
+                        _InfoRow(
+                          icon: Icons.email,
+                          label: 'メールアドレス',
+                          value: user.email,
+                          accentColor: accentColor,
+                        ),
+                        Divider(height: 24, color: AppColors.textLight.withValues(alpha: 0.3)),
+                        _InfoRow(
+                          icon: Icons.badge,
+                          label: '会員ステータス',
+                          value: isPremium ? 'プレミアム会員' : '無料会員',
+                          valueColor: isPremium ? Colors.amber : null,
+                          accentColor: accentColor,
+                        ),
+                        Divider(height: 24, color: AppColors.textLight.withValues(alpha: 0.3)),
+                        _InfoRow(
+                          icon: Icons.calendar_today,
+                          label: '登録日',
+                          value: _formatDate(user.createdAt),
+                          accentColor: accentColor,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ニックネーム設定
+                    _buildInfoCard(
+                      context,
+                      accentColor,
+                      title: '表示名',
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(12),
                           ),
-                        )
-                      : const Icon(Icons.save),
-                  label: const Text('保存'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
+                          child: TextField(
+                            controller: _nicknameController,
+                            decoration: InputDecoration(
+                              labelText: 'ニックネーム',
+                              hintText: 'アプリ内での表示名を入力',
+                              hintStyle: TextStyle(color: AppColors.textLight),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              prefixIcon: Icon(Icons.person_outline, color: accentColor),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'この名前はアプリ内で表示されます',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
-                // 下部バナー広告
-                if (shouldShowBannerAd) ...[
-                  const SizedBox(height: 24),
-                  const BannerAdContainer(),
-                ],
-              ],
-            ),
-          );
-        },
+                    // 選択中のキャラクター
+                    if (user.characterId != null)
+                      _buildInfoCard(
+                        context,
+                        accentColor,
+                        title: 'パートナー',
+                        children: [
+                          Row(
+                            children: [
+                              CircleAvatar(
+                                backgroundColor: accentColor.withValues(alpha: 0.1),
+                                child: Icon(
+                                  Icons.smart_toy,
+                                  color: accentColor,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _getCharacterName(user.characterId!),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.textPrimary,
+                                      ),
+                                    ),
+                                    Text(
+                                      '選択中のキャラクター',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => context.go('/character-select'),
+                                child: Text('変更', style: TextStyle(color: accentColor)),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 24),
+
+                    // 保存ボタン
+                    GestureDetector(
+                      onTap: _isSaving ? null : _saveProfile,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: accentColor.withValues(alpha: 0.3),
+                              blurRadius: 8,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            if (_isSaving)
+                              const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            else
+                              const Icon(Icons.save, color: Colors.white),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '保存',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // 下部バナー広告
+                    if (shouldShowBannerAd) ...[
+                      const SizedBox(height: 24),
+                      const BannerAdContainer(),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildAvatarSection(
-    BuildContext context,
-    ColorScheme colorScheme,
-    bool isPremium,
-  ) {
+  Widget _buildAvatarSection(BuildContext context, Color accentColor, bool isPremium) {
     return Center(
       child: Column(
         children: [
@@ -209,11 +277,11 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
             children: [
               CircleAvatar(
                 radius: 50,
-                backgroundColor: colorScheme.primaryContainer,
+                backgroundColor: accentColor.withValues(alpha: 0.1),
                 child: Icon(
                   Icons.person,
                   size: 50,
-                  color: colorScheme.onPrimaryContainer,
+                  color: accentColor,
                 ),
               ),
               if (isPremium)
@@ -242,8 +310,8 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                 const SnackBar(content: Text('プロフィール画像の変更機能は準備中です')),
               );
             },
-            icon: const Icon(Icons.camera_alt, size: 18),
-            label: const Text('写真を変更'),
+            icon: Icon(Icons.camera_alt, size: 18, color: accentColor),
+            label: Text('写真を変更', style: TextStyle(color: accentColor)),
           ),
         ],
       ),
@@ -252,27 +320,37 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
 
   Widget _buildInfoCard(
     BuildContext context,
-    ColorScheme colorScheme, {
+    Color accentColor, {
     required String title,
     required List<Widget> children,
   }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: accentColor,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 16),
-            ...children,
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          ...children,
+        ],
       ),
     );
   }
@@ -282,8 +360,6 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
   }
 
   String _getCharacterName(String characterId) {
-    // キャラクターIDからキャラクター名を取得
-    // 実際にはキャラクターマスターデータから取得する
     const characterNames = {
       'character_1': 'キャラクター1',
       'character_2': 'キャラクター2',
@@ -323,11 +399,13 @@ class _InfoRow extends StatelessWidget {
   final String label;
   final String value;
   final Color? valueColor;
+  final Color accentColor;
 
   const _InfoRow({
     required this.icon,
     required this.label,
     required this.value,
+    required this.accentColor,
     this.valueColor,
   });
 
@@ -335,11 +413,7 @@ class _InfoRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
+        Icon(icon, size: 20, color: accentColor),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -347,17 +421,19 @@ class _InfoRow extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: valueColor,
-                      fontWeight: valueColor != null ? FontWeight.bold : null,
-                    ),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: valueColor ?? AppColors.textPrimary,
+                  fontWeight: valueColor != null ? FontWeight.bold : null,
+                ),
               ),
             ],
           ),

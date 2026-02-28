@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 /// キャラクター性別
@@ -20,6 +21,7 @@ class FirebaseImageService {
 
   final FirebaseStorage _storage = FirebaseStorage.instance;
   Directory? _cacheDirectory;
+  bool _isInitialized = false;
 
   // キャッシュ設定
   static const int _maxCacheSize = 500 * 1024 * 1024; // 500MB
@@ -28,19 +30,33 @@ class FirebaseImageService {
   // ダウンロード中の画像を追跡
   final Map<String, Future<Uint8List>> _downloadTasks = {};
 
+  // メモリキャッシュ（Web用）
+  final Map<String, Uint8List> _memoryCache = {};
+
   FirebaseImageService._();
 
   /// 初期化
   Future<void> initialize() async {
-    final cacheDir = await getApplicationCacheDirectory();
-    _cacheDirectory = Directory('${cacheDir.path}/CharacterImages');
+    if (_isInitialized) return;
 
-    if (!await _cacheDirectory!.exists()) {
-      await _cacheDirectory!.create(recursive: true);
+    // Webではpath_providerが使えないのでメモリキャッシュのみ
+    if (!kIsWeb) {
+      try {
+        final cacheDir = await getApplicationCacheDirectory();
+        _cacheDirectory = Directory('${cacheDir.path}/CharacterImages');
+
+        if (!await _cacheDirectory!.exists()) {
+          await _cacheDirectory!.create(recursive: true);
+        }
+
+        // 起動時に期限切れキャッシュをクリーン
+        await _cleanExpiredCache();
+      } catch (e) {
+        debugPrint('Failed to initialize file cache: $e');
+      }
     }
 
-    // 起動時に期限切れキャッシュをクリーン
-    await _cleanExpiredCache();
+    _isInitialized = true;
   }
 
   /// 画像を取得（キャッシュ優先）
@@ -48,26 +64,46 @@ class FirebaseImageService {
     required String fileName,
     required CharacterGender gender,
   }) async {
-    final cacheKey = '${gender.value}_$fileName';
-
-    // 1. キャッシュチェック
-    final cachedImage = await _loadFromCache(cacheKey);
-    if (cachedImage != null) {
-      debugPrint('🖼️ キャッシュから画像取得: $fileName');
-      return cachedImage;
+    // 初期化されていない場合は初期化
+    if (!_isInitialized) {
+      await initialize();
     }
 
-    // 2. 既にダウンロード中かチェック
+    final cacheKey = '${gender.value}_$fileName';
+
+    // 1. メモリキャッシュチェック（Web/モバイル共通）
+    if (_memoryCache.containsKey(cacheKey)) {
+      debugPrint('🖼️ メモリキャッシュから画像取得: $fileName');
+      return _memoryCache[cacheKey]!;
+    }
+
+    // 2. ファイルキャッシュチェック（モバイルのみ）
+    if (!kIsWeb) {
+      final cachedImage = await _loadFromCache(cacheKey);
+      if (cachedImage != null) {
+        debugPrint('🖼️ ファイルキャッシュから画像取得: $fileName');
+        _memoryCache[cacheKey] = cachedImage;
+        return cachedImage;
+      }
+    }
+
+    // 3. 既にダウンロード中かチェック
     if (_downloadTasks.containsKey(cacheKey)) {
       debugPrint('⏳ ダウンロード中の画像を待機: $fileName');
       return _downloadTasks[cacheKey]!;
     }
 
-    // 3. 新規ダウンロードタスクを作成
+    // 4. 新規ダウンロードタスクを作成
     final task = _downloadImage(fileName: fileName, gender: gender)
         .then((data) async {
-      // キャッシュに保存
-      await _saveToCache(data, cacheKey);
+      // メモリキャッシュに保存
+      _memoryCache[cacheKey] = data;
+
+      // ファイルキャッシュに保存（モバイルのみ）
+      if (!kIsWeb) {
+        await _saveToCache(data, cacheKey);
+      }
+
       _downloadTasks.remove(cacheKey);
       return data;
     }).catchError((error) {
@@ -152,22 +188,49 @@ class FirebaseImageService {
 
     debugPrint('⬇️ Firebase Storageからダウンロード開始: $storagePath');
 
-    // 最大サイズ: 10MB
-    const maxSize = 10 * 1024 * 1024;
-
     try {
-      final data = await ref.getData(maxSize);
+      // Webの場合はgetDownloadURLを使用してHTTP経由でダウンロード
+      if (kIsWeb) {
+        final url = await ref.getDownloadURL();
+        debugPrint('📎 ダウンロードURL取得: $url');
 
-      if (data == null) {
-        throw FirebaseImageException.invalidImageData();
+        // HTTP経由で画像をダウンロード
+        final response = await _httpGet(url);
+        if (response != null) {
+          debugPrint('✅ ダウンロード完了: $storagePath');
+          return response;
+        }
+        throw FirebaseImageException.downloadFailed('HTTP download failed');
+      } else {
+        // モバイルの場合は直接getData
+        const maxSize = 10 * 1024 * 1024;
+        final data = await ref.getData(maxSize);
+
+        if (data == null) {
+          throw FirebaseImageException.invalidImageData();
+        }
+
+        debugPrint('✅ ダウンロード完了: $storagePath');
+        return data;
       }
-
-      debugPrint('✅ ダウンロード完了: $storagePath');
-      return data;
     } catch (e) {
       debugPrint('❌ ダウンロード失敗: $storagePath - $e');
       throw FirebaseImageException.downloadFailed(e.toString());
     }
+  }
+
+  /// HTTP経由で画像をダウンロード（Web用）
+  Future<Uint8List?> _httpGet(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        return response.bodyBytes;
+      }
+      debugPrint('HTTP download failed: ${response.statusCode}');
+    } catch (e) {
+      debugPrint('HTTP download error: $e');
+    }
+    return null;
   }
 
   /// キャッシュから画像を読み込み

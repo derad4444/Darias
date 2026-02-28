@@ -1,0 +1,569 @@
+# Firestore Database Schema (完全版)
+
+> このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
+
+**最終更新日**: 2026-02-11
+**トップレベルコレクション**: 8
+
+---
+
+## 目次
+
+1. [users](#users) - ユーザーデータ
+2. [Big5Analysis](#big5analysis) - BIG5性格解析マスターデータ
+3. [PersonalityStatsMetadata](#personalitystatsmetadata) - 性格統計メタデータ
+4. [shared_meetings](#shared_meetings) - 6人会議キャッシュ
+5. [contacts](#contacts) - お問い合わせデータ
+6. [ad_analytics](#ad_analytics) - 広告分析データ
+7. [holidays](#holidays) - 祝日データ
+8. [system](#system) - システム設定
+
+---
+
+## `users`
+
+**用途**: ユーザー情報とサブコレクション
+**ドキュメントID**: Firebase Auth UID
+
+**フィールド:**
+
+- **name**: `string` - ユーザー名
+- **email**: `string` - メールアドレス
+- **character_id**: `string` - 現在のキャラクターID
+- **created_at**: `timestamp` - アカウント作成日時
+- **updated_at**: `timestamp` - 最終更新日時
+- **emailSent**: `boolean` - 登録確認メール送信済みフラグ
+- **emailMessageId**: `string` - 送信メールID
+- **emailSentAt**: `timestamp` - メール送信日時
+- **subscriptionStatus**: `string` - サブスクリプション状態 (`"premium"` / `"free"`)。`subscription/current` と同期。Cloud Functions・iOS PurchaseManager が書き込み
+- **hasCompletedOnboarding**: `boolean` - オンボーディング完了フラグ
+- **characterGender**: `string` - キャラクター性別
+- **usage_tracking**: `map` - 利用状況追跡
+  - **chat_count_today**: `number` - 今日のチャット回数
+  - **last_chat_date**: `string` - 最終チャット日（YYYY-MM-DD）
+
+**アクセス権限**: ユーザー自身のデータのみ読み書き可
+
+---
+
+### `users/{userId}/characters`
+
+**用途**: ユーザーのキャラクター情報
+**ドキュメントID**: キャラクターID（UUID）
+
+**フィールド:**
+
+- **id**: `string` - キャラクターID
+- **name**: `string` - キャラクター名
+- **gender**: `string` - 性別（male/female）
+- **imageSource**: `string` - 画像ソース（local/remote/firebaseStorage）
+- **isDefault**: `boolean` - デフォルトキャラクターフラグ
+
+**サブコレクション:**
+
+#### `users/{userId}/characters/{characterId}/details`
+
+**ドキュメントID**: `current` (固定)
+**用途**: キャラクターの詳細情報と性格分析結果
+
+**フィールド:**
+
+- **created_at**: `timestamp` - 作成日時
+- **updated_at**: `timestamp` - 更新日時
+- **gender**: `string` - 性別（"male", "female", "neutral"）
+- **personalityKey**: `string` - 性格タイプキー（例: "O3_C3_E3_A4_N3_男性"）
+- **analysis_level**: `number` - 分析レベル（0, 20, 50, 100）
+- **points**: `number` - ポイント数
+- **confirmedBig5Scores**: `map` - 確定BIG5スコア
+  - **openness**: `number` (1-5) - 開放性
+  - **conscientiousness**: `number` (1-5) - 誠実性
+  - **extraversion**: `number` (1-5) - 外向性
+  - **agreeableness**: `number` (1-5) - 協調性
+  - **neuroticism**: `number` (1-5) - 神経症傾向
+- **big5Scores**: `map` - 前バージョンのBIG5スコア（後方互換性）
+- **strength**: `string` - 性格の強み
+- **weakness**: `string` - 性格の弱み
+- **aptitude**: `string` - 適性
+- **hobby**: `string` - 趣味
+- **skill**: `string` - スキル
+- **dream**: `string` - 夢・目標
+- **favorite_place**: `string` - お気に入りの場所
+- **favorite_color**: `string` - 好きな色
+- **favorite_word**: `string` - 好きな言葉
+- **favorite_entertainment_genre**: `string` - 好きなエンターテイメントジャンル
+- **word_tendency**: `string` - 言葉の傾向
+- **sixPersonalities**: `array<map>` - 6人会議用の6つの分身データ
+  - **characterId**: `string` - キャラクターID（original/opposite/ideal/shadow/child/wise）
+  - **name**: `string` - キャラクター名（今の自分/真逆の自分/理想の自分/本音の自分/子供の頃の自分/未来の自分）
+  - その他性格パラメータ
+- **generationStatus**: `map` - キャラクター生成ステータス
+  - **stage**: `number` - 生成ステージ（0/1/2/3）
+  - **status**: `string` - ステータス（not_started/generating/completed/failed）
+  - **message**: `string` - ステータスメッセージ
+  - **startedAt**: `timestamp` - 開始日時
+  - **completedAt**: `timestamp` - 完了日時
+  - **failedAt**: `timestamp` - 失敗日時
+  - **updatedAt**: `timestamp` - 更新日時
+
+#### `users/{userId}/characters/{characterId}/big5Progress`
+
+**ドキュメントID**: `current` (固定)
+**用途**: BIG5性格診断の進捗状況を追跡
+
+**フィールド:**
+
+- **currentQuestion**: `null` | `map` - 現在の質問（完了時はnull）
+  - **id**: `string` - 質問ID（例: "E1", "A5"）
+  - **question**: `string` - 質問文
+  - **trait**: `string` - 特性（extraversion, agreeableness, conscientiousness, neuroticism, openness）
+  - **direction**: `string` - 方向性（"positive", "negative"）
+- **answeredQuestions**: `array<map>` - 回答済み質問リスト（最大100問）
+  - **questionId**: `string` - 質問ID
+  - **question**: `string` - 質問文
+  - **trait**: `string` - 特性
+  - **direction**: `string` - 方向性
+  - **value**: `number` - 回答値（1-5）
+  - **answeredAt**: `timestamp` - 回答日時
+- **completed**: `boolean` - 完了フラグ（100問完了時にtrue）
+- **completedAt**: `timestamp` - 完了日時（完了時のみ）
+- **finalScores**: `map` - 最終BIG5スコア（完了時のみ）
+- **lastAskedAt**: `timestamp` - 最終質問日時
+
+**BIG5質問の段階:**
+- 段階1: 1-20問（基本分析）各特性4問ずつ
+- 段階2: 21-50問（詳細分析）各特性10問ずつ
+- 段階3: 51-100問（総合分析）各特性20問ずつ
+
+#### `users/{userId}/characters/{characterId}/posts`
+
+**用途**: チャット履歴の保存
+**ドキュメントID**: 自動生成
+
+**フィールド:**
+
+- **content**: `string` - ユーザーのメッセージ
+- **analysis_result**: `string` - キャラクターの返答（AI生成）
+- **timestamp**: `timestamp` - 投稿日時
+
+#### `users/{userId}/characters/{characterId}/meeting_history`
+
+**用途**: 6人会議の利用履歴
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **sharedMeetingId**: `string` - 共有会議ID（shared_meetingsへの参照）
+- **userConcern**: `string` - ユーザーの悩み内容
+- **concernCategory**: `string` - 悩みカテゴリ
+- **userBIG5**: `map` - 利用時のユーザーBIG5スコア
+- **cacheHit**: `boolean` - キャッシュから取得したかどうか
+- **createdAt**: `timestamp` - 利用日時
+
+#### `users/{userId}/characters/{characterId}/monthlyComments`
+
+**用途**: 月次コメント
+**ドキュメントID**: `YYYY-MM`（例: `2024-01`）
+
+**フィールド:**
+
+- **comment**: `string` - 月次コメント本文
+- **schedule_count**: `number` - その月の予定数
+- **review_month**: `timestamp` - レビュー対象月
+- **generated_at**: `timestamp` - 生成日時
+
+#### `users/{userId}/characters/{characterId}/generationStatus`
+
+**ドキュメントID**: `current` (固定)
+**用途**: キャラクター生成状態の追跡（detailsにも統合済み）
+
+---
+
+### `users/{userId}/schedules`
+
+**用途**: ユーザーの予定管理
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **id**: `string` - 予定ID
+- **title**: `string` - タイトル
+- **date**: `timestamp` - 下位互換性用（startDateと同値）
+- **startDate**: `timestamp` - 開始日時
+- **endDate**: `timestamp` - 終了日時
+- **isAllDay**: `boolean` - 終日フラグ
+- **location**: `string` - 場所
+- **memo**: `string` - メモ
+- **tag**: `string` - タグ
+- **repeatOption**: `string` - 繰り返しオプション
+- **recurringGroupId**: `string` - 繰り返し予定のグループID
+- **remindValue**: `number` - リマインダー値
+- **remindUnit**: `string` - リマインダー単位
+- **notificationSettings**: `map` - 通知設定
+- **created_at**: `timestamp` - 作成日時
+
+**インデックス:**
+- `recurringGroupId` (ASC) + `startDate` (ASC)
+- `startDate` (ASC) + `endDate` (ASC)
+
+---
+
+### `users/{userId}/todos`
+
+**用途**: Todoリスト
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **id**: `string` - TodoID
+- **title**: `string` - タイトル
+- **description**: `string` - 説明
+- **isCompleted**: `boolean` - 完了フラグ
+- **dueDate**: `timestamp` - 期限日時（オプショナル）
+- **priority**: `string` - 優先度（"高", "中", "低"）
+- **tag**: `string` - タグ
+- **createdAt**: `timestamp` - 作成日時
+- **updatedAt**: `timestamp` - 更新日時
+
+**インデックス:**
+- `isCompleted` (ASC) + `createdAt` (DESC)
+- `isCompleted` (ASC) + `updatedAt` (DESC)
+
+---
+
+### `users/{userId}/memos`
+
+**用途**: メモ機能
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **id**: `string` - メモID
+- **title**: `string` - タイトル
+- **content**: `string` - 内容
+- **isPinned**: `boolean` - ピン留めフラグ
+- **tag**: `string` - タグ
+- **createdAt**: `timestamp` - 作成日時
+- **updatedAt**: `timestamp` - 更新日時
+
+**インデックス:**
+- `isPinned` (DESC) + `updatedAt` (DESC)
+
+---
+
+### `users/{userId}/tags`
+
+**用途**: タグ設定（iOS/Flutter間で同期）
+**ドキュメントID**: 自動生成
+
+**フィールド:**
+
+- **name**: `string` - タグ名（例: "仕事", "プライベート"）
+- **colorHex**: `string` - タグ色（16進数、例: "#2196f3"）
+
+**インデックス:**
+- `name` (ASC)
+
+**備考:** 以前はiOS側はUserDefaults、Flutter側はSharedPreferencesにローカル保存していたが、クロスプラットフォーム同期のためFirestoreに移行。
+
+---
+
+### `users/{userId}/diary`
+
+**用途**: 日記機能
+**ドキュメントID**: 日付（例: `2024-01-15`）
+
+**フィールド:**
+
+- **id**: `string` - 日記ID（日付）
+- **title**: `string` - タイトル
+- **date**: `timestamp` - 日付
+- **content**: `string` - 本文
+- **created_date**: `date` - 作成日
+- **created_at**: `timestamp` - 作成日時
+
+**インデックス:**
+- `created_date` (ASC) + `created_at` (DESC)
+
+---
+
+### `users/{userId}/subscription`
+
+**ドキュメントID**: `current` (固定)
+**用途**: サブスクリプション情報
+
+**フィールド:**
+
+- **status**: `string` - ステータス（"active", "cancelled", "expired", "free"）
+- **plan**: `string` - プラン名（"free", "premium"）
+- **payment_method**: `string` - 支払い方法（"app_store"など）
+- **auto_renewal**: `boolean` - 自動更新フラグ
+- **start_date**: `timestamp` - 開始日
+- **end_date**: `timestamp | null` - 終了日
+- **updated_at**: `timestamp` - 更新日時
+
+---
+
+## `Big5Analysis`
+
+**用途**: BIG5性格診断の解析結果を保存（共有・キャッシュ用）
+**ドキュメントID**: `O{openness}_C{conscientiousness}_E{extraversion}_A{agreeableness}_N{neuroticism}_{gender}`
+
+**フィールド:**
+
+- **personality_key**: `string` - 性格タイプのキー
+- **gender**: `string` - 性別（"男性", "女性", "neutral"）
+- **last_updated**: `timestamp` - 最終更新日時
+- **big5_scores**: `map` - BIG5スコア
+  - **openness**: `number` (1-5) - 開放性
+  - **conscientiousness**: `number` (1-5) - 誠実性
+  - **extraversion**: `number` (1-5) - 外向性
+  - **agreeableness**: `number` (1-5) - 協調性
+  - **neuroticism**: `number` (1-5) - 神経症傾向
+- **analysis_20**: `map` - 20問完了時の基本分析
+  - **career**: `map` - キャリア分析
+    - **personality_type**: `string` - 性格タイプ名
+    - **key_points**: `array<string>` - 要点（3項目）
+    - **detailed_text**: `string` - 詳細テキスト
+  - **romance**: `map` - 恋愛分析
+  - **stress**: `map` - ストレス分析
+- **analysis_50**: `map` - 50問完了時の詳細分析
+  - **career**: `map` - キャリア分析
+  - **romance**: `map` - 恋愛分析
+  - **stress**: `map` - ストレス分析
+  - **learning**: `map` - 学習分析
+  - **decision**: `map` - 意思決定分析
+- **analysis_100**: `map` - 100問完了時の総合分析
+  - **career**: `map` - キャリア分析
+  - **romance**: `map` - 恋愛分析
+  - **stress**: `map` - ストレス分析
+  - **learning**: `map` - 学習分析
+  - **decision**: `map` - 意思決定分析
+
+**アクセス権限**: 認証済みユーザーは読み取り可、書き込みは不可（Cloud Functionのみ）
+
+---
+
+## `PersonalityStatsMetadata`
+
+**用途**: 性格タイプの統計情報を集計
+**ドキュメントID**: `summary` (固定)
+
+**フィールド:**
+
+- **total_completed_users**: `number` - 100問完了したユーザー数
+- **unique_personality_types**: `number` - ユニークな性格タイプ数
+- **gender_distribution**: `map` - 性別分布
+  - **male**: `number` - 男性ユーザー数
+  - **female**: `number` - 女性ユーザー数
+- **personality_counts**: `map` - 各性格タイプの人数
+  - **{personalityKey}**: `number` - 各性格タイプのユーザー数
+- **last_updated**: `timestamp` - 統計更新日時
+
+**アクセス権限**: 認証ユーザー読み取り可、書き込みは不可（Cloud Functionのみ）
+
+---
+
+## `shared_meetings`
+
+**用途**: 6人会議の共有・再利用データ（キャッシュ）
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **personalityKey**: `string` - 性格キー（キャッシュマッチング用）
+- **concernCategory**: `string` - 悩みカテゴリ（career, romance, money, health, family, future, hobby, study, moving, other）
+- **createdAt**: `timestamp` - 作成日時
+- **lastUsedAt**: `timestamp` - 最終利用日時
+- **usageCount**: `number` - 利用回数
+- **conversation**: `map` - 会議の会話内容
+  - **rounds**: `array<map>` - ラウンドごとの会話
+    - **roundNumber**: `number` - ラウンド番号
+    - **messages**: `array<map>` - メッセージリスト
+      - **characterId**: `string` - キャラクターID
+      - **characterName**: `string` - キャラクター名
+      - **text**: `string` - メッセージテキスト
+      - **timestamp**: `string` - タイムスタンプ
+  - **conclusion**: `map` - 結論
+    - **summary**: `string` - サマリー
+    - **recommendations**: `array<string>` - 推奨事項（3項目）
+    - **nextSteps**: `array<string>` - 次のステップ（3項目）
+- **ratings**: `map` - 評価情報
+  - **totalRatings**: `number` - 評価総数
+  - **ratingSum**: `number` - 評価合計値
+  - **avgRating**: `number` - 平均評価
+- **statsData**: `map` - 統計データ
+  - **personalityKey**: `string` - 性格タイプキー
+  - **similarCount**: `number` - 類似ユーザー数
+  - **totalUsers**: `number` - 総ユーザー数
+  - **percentile**: `number` - パーセンタイル
+  - **avgAge**: `number` - 平均年齢
+
+**インデックス:**
+- `personalityKey` (ASC) + `concernCategory` (ASC) + `usageCount` (DESC)
+
+**アクセス権限**: 認証済みユーザーは読み取り可、書き込みは不可（Cloud Functionのみ）
+
+---
+
+## `contacts`
+
+**用途**: ユーザーからのお問い合わせを保存
+**ドキュメントID**: UUID（クライアント生成）
+
+**フィールド:**
+
+- **userId**: `string` - ユーザーID
+- **userName**: `string` - ユーザー名
+- **userEmail**: `string` - ユーザーメールアドレス
+- **category**: `string` - カテゴリ（"bug", "feature", "other"など）
+- **categoryDisplay**: `string` - カテゴリ表示名
+- **subject**: `string` - 件名
+- **message**: `string` - メッセージ本文
+- **deviceInfo**: `map` - デバイス情報
+  - **appVersion**: `string` - アプリバージョン
+  - **deviceModel**: `string` - デバイスモデル
+  - **deviceName**: `string` - デバイス名
+  - **iosVersion**: `string` - iOSバージョン
+- **createdAt**: `timestamp` - 作成日時
+- **status**: `string` - ステータス（"sent", "processing", "resolved"など）
+- **userEmailSent**: `boolean` - ユーザーへの確認メール送信済みフラグ
+- **adminEmailSent**: `boolean` - 管理者への通知メール送信済みフラグ
+- **userEmailId**: `string` - ユーザー宛メールID
+- **adminEmailId**: `string` - 管理者宛メールID
+- **emailSentAt**: `timestamp` - メール送信日時
+
+**アクセス権限**: 認証済みユーザーは作成可、読み取り・更新・削除は不可
+
+---
+
+## `ad_analytics`
+
+**用途**: 広告表示・クリックのトラッキング
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **userId**: `string` - ユーザーID
+- **timestamp**: `timestamp` - イベント発生日時
+- **type**: `string` - イベントタイプ（例: "banner_impression", "interstitial_shown", "rewarded_earned"）
+- **screen**: `string` - 広告表示場所（例: "home", "settings"）
+- **user_tier**: `string` - ユーザー階層（"free", "premium"）
+- **metadata**: `map` - イベント固有のメタデータ（オプション）
+
+**アクセス権限**: 認証済みユーザーは作成可、読み取り・更新・削除は不可
+
+---
+
+## `holidays`
+
+**用途**: 日本の祝日情報を保存
+**ドキュメントID**: `YYYY-MM-DD` 形式
+
+**フィールド:**
+
+- **id**: `string` - 祝日ID（YYYY-MM-DD）
+- **name**: `string` - 祝日名（例: "元日", "成人の日"）
+- **dateString**: `string` - 日付文字列（YYYY-MM-DD）
+
+**アクセス権限**: 全ユーザー読み取り可、書き込みは不可（管理者のみ）
+
+---
+
+## `system`
+
+**用途**: アプリケーション全体の設定を格納
+**ドキュメントID**: 任意（例: `config`, `settings`）
+
+**アクセス権限**: 全ユーザー読み取り可、書き込みは不可（読み取り専用）
+
+---
+
+## データフロー
+
+```
+ユーザー登録
+    ↓
+users コレクションに作成
+    ↓
+性格診断開始（「性格診断して」）
+    ↓
+big5Progress/current に進捗記録
+    ↓
+20問完了 → Big5Analysis に基本分析を保存
+         → details に confirmedBig5Scores を更新
+    ↓
+50問完了 → Big5Analysis に詳細分析を保存
+    ↓
+100問完了 → Big5Analysis に総合分析を保存
+         → PersonalityStatsMetadata を更新
+         → sixPersonalities を事前計算
+    ↓
+6人会議利用
+    ↓
+shared_meetings でキャッシュ検索
+    ↓
+キャッシュヒット → 再利用、meeting_history に記録
+キャッシュミス → 新規生成、shared_meetings に保存、meeting_history に記録
+```
+
+---
+
+## データモデルの相互関係
+
+```
+users/{userId}
+├── characters/{characterId}
+│   ├── details/current
+│   │   ├── confirmedBig5Scores
+│   │   ├── personalityKey → Big5Analysis/{key} 参照
+│   │   └── sixPersonalities[]
+│   ├── big5Progress/current
+│   ├── posts/{docId}
+│   ├── meeting_history/{docId}
+│   │   └── sharedMeetingId → shared_meetings/{id} 参照
+│   └── monthlyComments/{YYYY-MM}
+├── subscription/current
+├── schedules/{docId}
+├── todos/{docId}
+├── memos/{docId}
+├── tags/{docId}
+└── diary/{docId}
+
+shared_meetings/{id}
+├── conversation
+│   ├── rounds[]
+│   │   └── messages[]
+│   └── conclusion
+├── statsData
+├── ratings
+└── personalityKey → Big5Analysis/{key} 参照
+
+PersonalityStatsMetadata/summary
+└── personality_counts {}
+
+Big5Analysis/{personalityKey}
+├── big5_scores {}
+├── analysis_20 {}
+├── analysis_50 {}
+└── analysis_100 {}
+```
+
+---
+
+## セキュリティルール要約
+
+| コレクション | 読み取り | 書き込み |
+|-------------|---------|---------|
+| `users/{userId}/**` | 本人のみ | 本人のみ |
+| `Big5Analysis` | 認証ユーザー | Cloud Functionのみ |
+| `PersonalityStatsMetadata` | 認証ユーザー | Cloud Functionのみ |
+| `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
+| `contacts` | 不可 | 認証ユーザー（作成のみ） |
+| `ad_analytics` | 不可 | 認証ユーザー（作成のみ） |
+| `holidays` | 全員 | 管理者のみ |
+| `system` | 全員 | 不可 |
+
+---
+
+**最終更新**: 2026-02-11
+**作成者**: Claude Code

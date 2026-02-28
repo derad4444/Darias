@@ -2,22 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/todo_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/todo_provider.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../settings/tag_management_screen.dart';
 
 /// Todo詳細・編集画面
 class TodoDetailScreen extends ConsumerStatefulWidget {
-  /// 編集対象のTodo（nullの場合は新規作成）
   final TodoModel? todo;
 
-  const TodoDetailScreen({
-    super.key,
-    this.todo,
-  });
+  const TodoDetailScreen({super.key, this.todo});
 
   @override
   ConsumerState<TodoDetailScreen> createState() => _TodoDetailScreenState();
@@ -40,8 +38,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
   void initState() {
     super.initState();
     _titleController = TextEditingController(text: widget.todo?.title ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.todo?.description ?? '');
+    _descriptionController = TextEditingController(text: widget.todo?.description ?? '');
 
     if (widget.todo != null) {
       final todo = widget.todo!;
@@ -62,120 +59,145 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
-    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: Text(_isNewTodo ? '新規TODO' : 'TODO編集'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: Text(
+          _isNewTodo ? '新規TODO' : 'TODO編集',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           TextButton(
-            onPressed: _titleController.text.isEmpty || _isSaving
-                ? null
-                : _saveTodo,
+            onPressed: _titleController.text.isEmpty || _isSaving ? null : _saveTodo,
             child: _isSaving
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: accentColor),
                   )
-                : const Text('保存'),
+                : Text('保存', style: TextStyle(color: accentColor, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 上部バナー広告
-            if (shouldShowBannerAd) ...[
-              const BannerAdContainer(),
-              const SizedBox(height: 16),
-            ],
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (shouldShowBannerAd) ...[
+                  const BannerAdContainer(),
+                  const SizedBox(height: 16),
+                ],
 
-            // タイトル
-            _buildSectionTitle('タイトル'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _titleController,
-              decoration: InputDecoration(
-                hintText: 'タイトルを入力',
-                filled: true,
-                fillColor: colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+                // タイトル
+                _buildSectionTitle('タイトル'),
+                const SizedBox(height: 8),
+                _buildTextField(
+                  controller: _titleController,
+                  hintText: 'タイトルを入力',
+                  accentColor: accentColor,
+                  onChanged: (_) => setState(() {}),
                 ),
-              ),
-              onChanged: (_) => setState(() {}),
+                const SizedBox(height: 16),
+
+                // 説明（残りスペースを埋める）
+                _buildSectionTitle('説明'),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: TextField(
+                      controller: _descriptionController,
+                      maxLines: null,
+                      expands: true,
+                      textAlignVertical: TextAlignVertical.top,
+                      decoration: InputDecoration(
+                        hintText: '説明を入力（任意）',
+                        hintStyle: TextStyle(color: AppColors.textLight),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // 期限設定
+                _buildDueDateSection(accentColor),
+                const SizedBox(height: 16),
+
+                // 優先度
+                _buildPrioritySection(accentColor),
+                const SizedBox(height: 16),
+
+                // タグ
+                _buildTagSection(accentColor),
+                const SizedBox(height: 16),
+
+                // 完了状態（編集時のみ）
+                if (!_isNewTodo) ...[
+                  _buildCompletedSection(accentColor),
+                  const SizedBox(height: 24),
+                ],
+
+                // 削除ボタン（編集時のみ）
+                if (!_isNewTodo) ...[
+                  GestureDetector(
+                    onTap: _showDeleteConfirmation,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delete, color: Colors.red, size: 20),
+                          SizedBox(width: 8),
+                          Text('TODOを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                if (shouldShowBannerAd) ...[
+                  const SizedBox(height: 16),
+                  const BannerAdContainer(),
+                ],
+              ],
             ),
-            const SizedBox(height: 16),
-
-            // 説明
-            _buildSectionTitle('説明'),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _descriptionController,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: '説明を入力（任意）',
-                filled: true,
-                fillColor: colorScheme.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 期限設定
-            _buildDueDateSection(colorScheme),
-            const SizedBox(height: 16),
-
-            // 優先度
-            _buildPrioritySection(colorScheme),
-            const SizedBox(height: 16),
-
-            // タグ
-            _buildTagSection(colorScheme),
-            const SizedBox(height: 16),
-
-            // 完了状態（編集時のみ）
-            if (!_isNewTodo) ...[
-              _buildCompletedSection(colorScheme),
-              const SizedBox(height: 24),
-            ],
-
-            // 削除ボタン（編集時のみ）
-            if (!_isNewTodo) ...[
-              OutlinedButton.icon(
-                onPressed: _showDeleteConfirmation,
-                icon: const Icon(Icons.delete, color: Colors.red),
-                label: const Text(
-                  'TODOを削除',
-                  style: TextStyle(color: Colors.red),
-                ),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  side: const BorderSide(color: Colors.red),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            // 下部バナー広告
-            if (shouldShowBannerAd) ...[
-              const SizedBox(height: 16),
-              const BannerAdContainer(),
-            ],
-          ],
+          ),
         ),
       ),
     );
@@ -184,28 +206,67 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-          ),
+      style: TextStyle(
+        fontSize: 13,
+        color: AppColors.textSecondary,
+      ),
     );
   }
 
-  Widget _buildDueDateSection(ColorScheme colorScheme) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hintText,
+    required Color accentColor,
+    int maxLines = 1,
+    void Function(String)? onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: TextStyle(color: AppColors.textLight),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: Colors.transparent,
+        ),
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  Widget _buildDueDateSection(Color accentColor) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         children: [
           Row(
             children: [
-              const Icon(Icons.schedule),
+              Icon(Icons.schedule, color: accentColor),
               const SizedBox(width: 12),
-              const Expanded(child: Text('期限を設定')),
+              Expanded(child: Text('期限を設定', style: TextStyle(color: AppColors.textPrimary))),
               Switch(
                 value: _hasDueDate,
+                activeColor: accentColor,
                 onChanged: (value) {
                   setState(() {
                     _hasDueDate = value;
@@ -218,19 +279,20 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
             ],
           ),
           if (_hasDueDate) ...[
-            const Divider(),
+            Divider(color: AppColors.textLight.withValues(alpha: 0.3)),
             InkWell(
               onTap: _selectDueDate,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.calendar_today, size: 20),
+                    Icon(Icons.calendar_today, size: 20, color: accentColor),
                     const SizedBox(width: 12),
                     Text(
                       _dueDate != null
                           ? DateFormat('yyyy/MM/dd HH:mm').format(_dueDate!)
                           : '日時を選択',
+                      style: TextStyle(color: AppColors.textPrimary),
                     ),
                   ],
                 ),
@@ -242,7 +304,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
     );
   }
 
-  Widget _buildPrioritySection(ColorScheme colorScheme) {
+  Widget _buildPrioritySection(Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -251,7 +313,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: colorScheme.surface,
+            color: Colors.white.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Row(
@@ -263,18 +325,15 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     decoration: BoxDecoration(
-                      color: isSelected
-                          ? _getPriorityColor(priority)
-                          : Colors.transparent,
+                      color: isSelected ? _getPriorityColor(priority) : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       priority.displayName,
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: isSelected ? Colors.white : null,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -287,50 +346,247 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
     );
   }
 
-  Widget _buildTagSection(ColorScheme colorScheme) {
+  Widget _buildTagSection(Color accentColor) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildSectionTitle('タグ'),
         const SizedBox(height: 8),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: colorScheme.surface,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: TextField(
-            decoration: const InputDecoration(
-              hintText: 'タグを入力（任意）',
-              border: InputBorder.none,
-              isDense: true,
-              contentPadding: EdgeInsets.zero,
+        GestureDetector(
+          onTap: () => _showTagSelection(accentColor),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-            onChanged: (value) => _tag = value,
-            controller: TextEditingController(text: _tag),
+            child: Row(
+              children: [
+                if (_tag.isNotEmpty) ...[
+                  Builder(builder: (context) {
+                    final tags = ref.watch(tagsProvider);
+                    final tagItem = tags.where((t) => t.name == _tag).firstOrNull;
+                    return Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: tagItem?.color ?? accentColor,
+                        shape: BoxShape.circle,
+                      ),
+                    );
+                  }),
+                  const SizedBox(width: 8),
+                ],
+                Expanded(
+                  child: _tag.isEmpty
+                      ? Text(
+                          'タグを選択',
+                          style: TextStyle(color: AppColors.textLight, fontSize: 15),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getTagColor(accentColor).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _tag,
+                            style: TextStyle(color: _getTagColor(accentColor), fontSize: 15),
+                          ),
+                        ),
+                ),
+                Icon(Icons.keyboard_arrow_down, color: AppColors.textLight),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildCompletedSection(ColorScheme colorScheme) {
+  Color _getTagColor(Color accentColor) {
+    final tags = ref.read(tagsProvider);
+    final tagItem = tags.where((t) => t.name == _tag).firstOrNull;
+    return tagItem?.color ?? accentColor;
+  }
+
+  void _showTagSelection(Color accentColor) {
+    final backgroundGradient = ref.read(backgroundGradientProvider);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.7,
+          decoration: BoxDecoration(
+            gradient: backgroundGradient,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // ヘッダー
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(sheetContext),
+                      child: Text('キャンセル', style: TextStyle(color: accentColor)),
+                    ),
+                    const Text(
+                      'タグ選択',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(width: 80),
+                  ],
+                ),
+              ),
+
+              // タグ一覧
+              Expanded(
+                child: Consumer(builder: (context, ref, _) {
+                  final tags = ref.watch(tagsProvider);
+                  return ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      // タグなしオプション
+                      _buildTagOption(
+                        sheetContext: sheetContext,
+                        name: 'タグなし',
+                        color: null,
+                        isSelected: _tag.isEmpty,
+                        accentColor: accentColor,
+                        onTap: () {
+                          setState(() => _tag = '');
+                          Navigator.pop(sheetContext);
+                        },
+                      ),
+                      const SizedBox(height: 8),
+
+                      // 既存タグ一覧
+                      ...tags.map((tag) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _buildTagOption(
+                              sheetContext: sheetContext,
+                              name: tag.name,
+                              color: tag.color,
+                              isSelected: _tag == tag.name,
+                              accentColor: accentColor,
+                              onTap: () {
+                                setState(() => _tag = tag.name);
+                                Navigator.pop(sheetContext);
+                              },
+                            ),
+                          )),
+
+                      const SizedBox(height: 16),
+
+                      // タグを管理ボタン
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          context.push('/tag-management');
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: accentColor,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.settings, color: Colors.white, size: 18),
+                              SizedBox(width: 8),
+                              Text('タグを管理', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                }),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTagOption({
+    required BuildContext sheetContext,
+    required String name,
+    required Color? color,
+    required bool isSelected,
+    required Color accentColor,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? accentColor : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: color,
+                shape: BoxShape.circle,
+                border: color == null
+                    ? Border.all(color: AppColors.textLight, width: 2)
+                    : null,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(name, style: const TextStyle(fontSize: 15)),
+            ),
+            if (isSelected)
+              Icon(Icons.check, color: accentColor, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompletedSection(Color accentColor) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(
             _isCompleted ? Icons.check_circle : Icons.circle_outlined,
-            color: _isCompleted ? Colors.green : Colors.grey,
+            color: _isCompleted ? Colors.green : AppColors.textLight,
           ),
           const SizedBox(width: 12),
-          const Expanded(child: Text('完了')),
+          Expanded(child: Text('完了', style: TextStyle(color: AppColors.textPrimary))),
           Switch(
             value: _isCompleted,
+            activeColor: accentColor,
             onChanged: (value) => setState(() => _isCompleted = value),
           ),
         ],
@@ -365,13 +621,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
 
       if (time != null && mounted) {
         setState(() {
-          _dueDate = DateTime(
-            date.year,
-            date.month,
-            date.day,
-            time.hour,
-            time.minute,
-          );
+          _dueDate = DateTime(date.year, date.month, date.day, time.hour, time.minute);
         });
       }
     }
@@ -384,12 +634,9 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
 
     try {
       final userId = ref.read(currentUserIdProvider);
-      if (userId == null) {
-        throw Exception('ユーザーが見つかりません');
-      }
+      if (userId == null) throw Exception('ユーザーが見つかりません');
 
       if (_isNewTodo) {
-        // 新規作成
         final newTodo = TodoModel.create(
           title: _titleController.text,
           description: _descriptionController.text,
@@ -399,7 +646,6 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         );
         await ref.read(todoControllerProvider.notifier).addTodo(newTodo);
       } else {
-        // 更新
         final updatedTodo = widget.todo!.copyWith(
           title: _titleController.text,
           description: _descriptionController.text,
@@ -412,9 +658,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         await ref.read(todoControllerProvider.notifier).updateTodo(updatedTodo);
       }
 
-      if (mounted) {
-        context.pop();
-      }
+      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -422,9 +666,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
 
@@ -432,6 +674,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('TODOを削除'),
         content: const Text('このTODOを削除してもよろしいですか？'),
         actions: [
@@ -457,9 +700,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
 
     try {
       await ref.read(todoControllerProvider.notifier).deleteTodo(widget.todo!.id);
-      if (mounted) {
-        context.pop();
-      }
+      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

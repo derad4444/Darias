@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/todo_model.dart';
 import '../../../data/models/memo_model.dart';
 import '../../../data/models/schedule_model.dart';
+import '../../providers/theme_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/calendar_provider.dart';
@@ -178,35 +180,48 @@ class _DataImportScreenState extends ConsumerState<DataImportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: const Text('データインポート'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: const Text(
+          'データインポート',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 説明
-          Card(
-            child: Padding(
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 100, 16, 16),
+          children: [
+            // 説明
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: colorScheme.primary),
+                      Icon(Icons.info_outline, color: accentColor),
                       const SizedBox(width: 8),
                       Text(
                         'データインポートについて',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
                             ),
                       ),
                     ],
@@ -216,83 +231,96 @@ class _DataImportScreenState extends ConsumerState<DataImportScreen> {
                     'エクスポートしたJSONデータを貼り付けて、データをインポートできます。'
                     'インポートされたデータは既存のデータに追加されます。',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                          color: AppColors.textSecondary,
                         ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // JSONテキストエリア
-          Text(
-            'JSONデータを貼り付け',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.primary,
-                ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _jsonController,
-            maxLines: 10,
-            decoration: InputDecoration(
-              hintText: '{"todos": [...], "memos": [...], ...}',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.paste),
-                onPressed: () async {
-                  final data = await Clipboard.getData('text/plain');
-                  if (data?.text != null) {
-                    _jsonController.text = data!.text!;
-                    _parseJson();
-                  }
-                },
-              ),
-            ),
-            onChanged: (_) => _parseJson(),
-          ),
-
-          if (_parseError != null) ...[
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error, color: Colors.red.shade700, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _parseError!,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.red.shade900,
-                          ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          // プレビュー
-          if (_parsedData != null) ...[
-            const SizedBox(height: 24),
+            // JSONテキストエリア
             Text(
-              'インポート内容のプレビュー',
+              'JSONデータを貼り付け',
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
+                    color: AppColors.textPrimary,
                   ),
             ),
             const SizedBox(height: 8),
-            Card(
-              child: Padding(
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                controller: _jsonController,
+                maxLines: 10,
+                style: const TextStyle(color: AppColors.textPrimary),
+                decoration: InputDecoration(
+                  hintText: '{"todos": [...], "memos": [...], ...}',
+                  hintStyle: const TextStyle(color: AppColors.textLight),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  suffixIcon: IconButton(
+                    icon: Icon(Icons.paste, color: accentColor),
+                    onPressed: () async {
+                      final data = await Clipboard.getData('text/plain');
+                      if (data?.text != null) {
+                        _jsonController.text = data!.text!;
+                        _parseJson();
+                      }
+                    },
+                  ),
+                ),
+                onChanged: (_) => _parseJson(),
+              ),
+            ),
+
+            if (_parseError != null) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error, color: Colors.red.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _parseError!,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Colors.red.shade900,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // プレビュー
+            if (_parsedData != null) ...[
+              const SizedBox(height: 24),
+              Text(
+                'インポート内容のプレビュー',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
@@ -300,18 +328,21 @@ class _DataImportScreenState extends ConsumerState<DataImportScreen> {
                       icon: Icons.check_circle,
                       label: 'TODO',
                       count: (_parsedData!['todos'] as List<dynamic>?)?.length ?? 0,
+                      accentColor: accentColor,
                     ),
                     const Divider(),
                     _PreviewRow(
                       icon: Icons.note,
                       label: 'メモ',
                       count: (_parsedData!['memos'] as List<dynamic>?)?.length ?? 0,
+                      accentColor: accentColor,
                     ),
                     const Divider(),
                     _PreviewRow(
                       icon: Icons.event,
                       label: 'スケジュール',
                       count: (_parsedData!['schedules'] as List<dynamic>?)?.length ?? 0,
+                      accentColor: accentColor,
                     ),
                     if (_parsedData!.containsKey('diaries')) ...[
                       const Divider(),
@@ -320,63 +351,65 @@ class _DataImportScreenState extends ConsumerState<DataImportScreen> {
                         label: '日記',
                         count: (_parsedData!['diaries'] as List<dynamic>?)?.length ?? 0,
                         note: '(日記はインポート対象外)',
+                        accentColor: accentColor,
                       ),
                     ],
                   ],
                 ),
               ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // インポートボタン
+            FilledButton.icon(
+              onPressed: _isImporting || _parsedData == null ? null : _importData,
+              icon: _isImporting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.upload),
+              label: const Text('インポート'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                backgroundColor: accentColor,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // 注意事項
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber.shade200),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'インポートされたデータは既存のデータに追加されます。'
+                      '重複するデータがあってもそのまま追加されますのでご注意ください。',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.amber.shade900,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-
-          const SizedBox(height: 24),
-
-          // インポートボタン
-          FilledButton.icon(
-            onPressed: _isImporting || _parsedData == null ? null : _importData,
-            icon: _isImporting
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.upload),
-            label: const Text('インポート'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // 注意事項
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'インポートされたデータは既存のデータに追加されます。'
-                    '重複するデータがあってもそのまま追加されますのでご注意ください。',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.amber.shade900,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -387,12 +420,14 @@ class _PreviewRow extends StatelessWidget {
   final String label;
   final int count;
   final String? note;
+  final Color accentColor;
 
   const _PreviewRow({
     required this.icon,
     required this.label,
     required this.count,
     this.note,
+    required this.accentColor,
   });
 
   @override
@@ -401,18 +436,19 @@ class _PreviewRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Icon(icon, size: 20),
+          Icon(icon, size: 20, color: accentColor),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(label),
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textPrimary),
+            ),
           ),
           Text(
             '$count件',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: count > 0
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey,
+                  color: count > 0 ? accentColor : AppColors.textLight,
                 ),
           ),
           if (note != null) ...[
@@ -420,7 +456,7 @@ class _PreviewRow extends StatelessWidget {
             Text(
               note!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
+                    color: AppColors.textLight,
                   ),
             ),
           ],

@@ -6,6 +6,14 @@
   "storage": {
     "rules": "storage.rules"
   },
+  "hosting": {
+    "public": "lp",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  },
   "functions": [
     {
       "source": "shared/functions",

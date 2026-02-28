@@ -149,7 +149,6 @@ DARIAS サポートチーム
 // Firestoreのusersコレクションに新しいドキュメントが作成されたときにトリガー
 const sendRegistrationEmail = onDocumentCreated({
   document: 'users/{userId}',
-  secrets: [GMAIL_USER, GMAIL_APP_PASSWORD]
 }, async (event) => {
   try {
     const snapshot = event.data;

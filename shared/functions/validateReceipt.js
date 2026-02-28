@@ -174,8 +174,7 @@ async function updateUserSubscription(userId, subscriptionInfo) {
 
   // ユーザードキュメントのサブスクリプション状態も更新
   await db.collection('users').doc(userId).update({
-    subscription_status: subscriptionInfo.status,
-    subscription_plan: subscriptionInfo.plan,
+    subscriptionStatus: subscriptionInfo.status === 'active' ? 'premium' : 'free',
     updated_at: admin.firestore.Timestamp.now()
   });
 }
@@ -215,8 +214,7 @@ exports.checkSubscriptionStatus = functions.scheduler.onSchedule({
       const userId = doc.ref.parent.parent.id;
       const userRef = db.collection('users').doc(userId);
       batch.update(userRef, {
-        subscription_status: 'expired',
-        subscription_plan: 'free',
+        subscriptionStatus: 'free',
         updated_at: now
       });
 
@@ -231,3 +229,120 @@ exports.checkSubscriptionStatus = functions.scheduler.onSchedule({
 
   return null;
 });
+
+/**
+ * Google Play レシートを検証し、サブスクリプション状態を更新
+ */
+exports.validateGooglePlayReceipt = functions.https.onCall(async (data, context) => {
+  // 認証チェック
+  if (!context.auth) {
+    console.error('validateGooglePlayReceipt: User not authenticated');
+    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+  }
+
+  const { purchaseToken, productId } = data;
+  const userId = context.auth.uid;
+
+  console.log(`validateGooglePlayReceipt called for user: ${userId}, product: ${productId}`);
+
+  if (!purchaseToken) {
+    throw new functions.https.HttpsError('invalid-argument', 'Purchase token is required');
+  }
+
+  if (!productId) {
+    throw new functions.https.HttpsError('invalid-argument', 'Product ID is required');
+  }
+
+  try {
+    // Google Play Developer API でレシート検証
+    const verificationResult = await verifyPurchaseWithGoogle(purchaseToken, productId);
+
+    console.log('Google Play verification result:', JSON.stringify(verificationResult, null, 2));
+
+    // サブスクリプション情報を構築
+    const now = Date.now();
+    const expiryTimeMillis = parseInt(verificationResult.expiryTimeMillis || '0');
+    const startTimeMillis = parseInt(verificationResult.startTimeMillis || now.toString());
+    const isActive = expiryTimeMillis > now && (
+      verificationResult.paymentState === 1 || // Payment received
+      verificationResult.paymentState === 2    // Free trial
+    );
+
+    const subscriptionInfo = {
+      plan: isActive ? 'premium' : 'free',
+      status: isActive ? 'active' : 'expired',
+      start_date: admin.firestore.Timestamp.fromMillis(startTimeMillis),
+      end_date: admin.firestore.Timestamp.fromMillis(expiryTimeMillis),
+      payment_method: 'google_play',
+      purchase_token: purchaseToken,
+      product_id: productId,
+      auto_renewal: verificationResult.autoRenewing === true,
+      updated_at: admin.firestore.Timestamp.now()
+    };
+
+    console.log('Parsed subscription info:', JSON.stringify(subscriptionInfo, null, 2));
+
+    // Firestoreにサブスクリプション情報を保存（既存関数を再利用）
+    await updateUserSubscription(userId, subscriptionInfo);
+
+    console.log('Google Play subscription updated successfully');
+
+    return {
+      success: true,
+      subscription: subscriptionInfo
+    };
+
+  } catch (error) {
+    console.error('Google Play receipt validation failed:', error);
+    console.error('Error stack:', error.stack);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError('internal', `Google Play receipt validation failed: ${error.message}`);
+  }
+});
+
+/**
+ * Google Play Developer API でサブスクリプション購入を検証
+ */
+async function verifyPurchaseWithGoogle(purchaseToken, productId) {
+  const { google } = require('googleapis');
+
+  // サービスアカウント認証情報を取得
+  const serviceAccountKey = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY;
+  if (!serviceAccountKey) {
+    throw new Error('GOOGLE_PLAY_SERVICE_ACCOUNT_KEY environment variable is not configured');
+  }
+
+  const packageName = process.env.GOOGLE_PLAY_PACKAGE_NAME;
+  if (!packageName) {
+    throw new Error('GOOGLE_PLAY_PACKAGE_NAME environment variable is not configured');
+  }
+
+  let credentials;
+  try {
+    credentials = JSON.parse(serviceAccountKey);
+  } catch (e) {
+    throw new Error('Failed to parse GOOGLE_PLAY_SERVICE_ACCOUNT_KEY: ' + e.message);
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ['https://www.googleapis.com/auth/androidpublisher'],
+  });
+
+  const androidPublisher = google.androidpublisher({
+    version: 'v3',
+    auth,
+  });
+
+  const response = await androidPublisher.purchases.subscriptions.get({
+    packageName,
+    subscriptionId: productId,
+    token: purchaseToken,
+  });
+
+  return response.data;
+}

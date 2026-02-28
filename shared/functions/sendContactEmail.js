@@ -23,7 +23,6 @@ const createTransporter = () => {
 
 const sendContactEmail = onDocumentCreated({
   document: 'contacts/{contactId}',
-  secrets: [GMAIL_USER, GMAIL_APP_PASSWORD]
 }, async (event) => {
     const snapshot = event.data;
     if (!snapshot) {

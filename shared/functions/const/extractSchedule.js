@@ -15,7 +15,6 @@ exports.extractSchedule = onCall(
       timeoutSeconds: 120,
       minInstances: 0,
       enforceAppCheck: false, // App Checkを無効化
-      secrets: ["OPENAI_API_KEY"],
     },
     async (request) => {
       const {data} = request;

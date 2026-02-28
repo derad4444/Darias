@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
+
 /// オンボーディング画面
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -71,7 +73,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 padding: const EdgeInsets.all(16),
                 child: TextButton(
                   onPressed: _completeOnboarding,
-                  child: const Text('スキップ'),
+                  child: Text(
+                    'スキップ',
+                    style: TextStyle(color: _pages[_currentPage].iconColor),
+                  ),
                 ),
               ),
             ),
@@ -80,6 +85,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
+                physics: const BouncingScrollPhysics(),
                 onPageChanged: (index) {
                   setState(() => _currentPage = index);
                 },
@@ -118,10 +124,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         backgroundColor: _pages[_currentPage].iconColor,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
                       child: Text(
                         _currentPage == _pages.length - 1 ? '始める' : '次へ',
-                        style: const TextStyle(fontSize: 16),
+                        style: const TextStyle(fontSize: 16, color: Colors.white),
                       ),
                     ),
                   ),
@@ -214,7 +223,7 @@ class _OnboardingPageWidget extends StatelessWidget {
           Text(
             page.description,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: Colors.black87,
+                  color: AppColors.textPrimary,
                   height: 1.6,
                 ),
             textAlign: TextAlign.center,

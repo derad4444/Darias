@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/models/character_model.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
+import '../../../core/theme/app_colors.dart';
 
 class CharacterSelectScreen extends ConsumerStatefulWidget {
   const CharacterSelectScreen({super.key});
@@ -78,85 +80,96 @@ class _CharacterSelectScreenState extends ConsumerState<CharacterSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('キャラクター選択'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 32),
-              Text(
-                'パートナーを選んでください',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'あなたの相棒となるキャラクターの性別を選択してください',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey,
-                    ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-
-              // 性別選択
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _GenderCard(
-                        gender: CharacterGender.male,
-                        isSelected: _selectedGender == CharacterGender.male,
-                        onTap: () {
-                          setState(() => _selectedGender = CharacterGender.male);
-                        },
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 32),
+                Text(
+                  'パートナーを選んでください',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _GenderCard(
-                        gender: CharacterGender.female,
-                        isSelected: _selectedGender == CharacterGender.female,
-                        onTap: () {
-                          setState(
-                              () => _selectedGender = CharacterGender.female);
-                        },
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'あなたの相棒となるキャラクターの性別を選択してください',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.grey,
                       ),
-                    ),
-                  ],
+                  textAlign: TextAlign.center,
                 ),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 48),
 
-              // 選択ボタン
-              FilledButton(
-                onPressed: _selectedGender == null || _isLoading
-                    ? null
-                    : _handleSelect,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
+                // 性別選択
+                Expanded(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _GenderCard(
+                          gender: CharacterGender.male,
+                          isSelected: _selectedGender == CharacterGender.male,
+                          accentColor: accentColor,
+                          onTap: () {
+                            setState(() => _selectedGender = CharacterGender.male);
+                          },
                         ),
-                      )
-                    : const Text('この相棒と始める'),
-              ),
-              const SizedBox(height: 16),
-            ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: _GenderCard(
+                          gender: CharacterGender.female,
+                          isSelected: _selectedGender == CharacterGender.female,
+                          accentColor: accentColor,
+                          onTap: () {
+                            setState(
+                                () => _selectedGender = CharacterGender.female);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // 選択ボタン
+                FilledButton(
+                  onPressed: _selectedGender == null || _isLoading
+                      ? null
+                      : _handleSelect,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: accentColor,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('この相棒と始める'),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
           ),
         ),
       ),
@@ -167,17 +180,20 @@ class _CharacterSelectScreenState extends ConsumerState<CharacterSelectScreen> {
 class _GenderCard extends StatelessWidget {
   final CharacterGender gender;
   final bool isSelected;
+  final Color accentColor;
   final VoidCallback onTap;
 
   const _GenderCard({
     required this.gender,
     required this.isSelected,
+    required this.accentColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final isMale = gender == CharacterGender.male;
+    final genderColor = isMale ? Colors.blue : Colors.pink;
 
     return GestureDetector(
       onTap: onTap,
@@ -185,15 +201,22 @@ class _GenderCard extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isMale ? Colors.blue[50] : Colors.pink[50])
-              : Colors.grey[100],
-          borderRadius: BorderRadius.circular(16),
+              ? Colors.white.withValues(alpha: 0.95)
+              : Colors.white.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected
-                ? (isMale ? Colors.blue : Colors.pink)
-                : Colors.grey[300]!,
+            color: isSelected ? accentColor : Colors.grey[300]!,
             width: isSelected ? 3 : 1,
           ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: accentColor.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -201,18 +224,14 @@ class _GenderCard extends StatelessWidget {
             Icon(
               isMale ? Icons.face : Icons.face_3,
               size: 80,
-              color: isSelected
-                  ? (isMale ? Colors.blue : Colors.pink)
-                  : Colors.grey,
+              color: isSelected ? genderColor : Colors.grey,
             ),
             const SizedBox(height: 16),
             Text(
               isMale ? '男性' : '女性',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: isSelected
-                        ? (isMale ? Colors.blue : Colors.pink)
-                        : Colors.grey[700],
+                    color: isSelected ? genderColor : Colors.grey[700],
                   ),
             ),
             const SizedBox(height: 4),

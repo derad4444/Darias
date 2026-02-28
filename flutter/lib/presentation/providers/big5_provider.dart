@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../../data/datasources/remote/big5_datasource.dart';
 import '../../data/models/big5_model.dart';
 import 'auth_provider.dart';
+import 'subscription_provider.dart';
 
 /// Big5Datasourceのプロバイダー
 final big5DatasourceProvider = Provider<Big5Datasource>((ref) {
@@ -64,8 +65,7 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
   /// 診断を開始
   Future<void> startDiagnosis(String characterId) async {
     final userId = _ref.read(currentUserIdProvider);
-    final user = _ref.read(userDocProvider).valueOrNull;
-    if (userId == null || user == null) return;
+    if (userId == null) return;
 
     state = state.copyWith(isLoading: true, error: null);
 
@@ -73,7 +73,7 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
       final result = await _datasource.startDiagnosis(
         userId: userId,
         characterId: characterId,
-        isPremium: user.isPremium,
+        isPremium: _ref.read(effectiveIsPremiumProvider),
       );
 
       state = state.copyWith(
@@ -95,8 +95,7 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
     required int answerValue,
   }) async {
     final userId = _ref.read(currentUserIdProvider);
-    final user = _ref.read(userDocProvider).valueOrNull;
-    if (userId == null || user == null) return;
+    if (userId == null) return;
 
     state = state.copyWith(isLoading: true, error: null);
 
@@ -105,7 +104,7 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
         userId: userId,
         characterId: characterId,
         answerValue: answerValue,
-        isPremium: user.isPremium,
+        isPremium: _ref.read(effectiveIsPremiumProvider),
       );
 
       state = state.copyWith(

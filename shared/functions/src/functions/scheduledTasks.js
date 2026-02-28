@@ -29,7 +29,6 @@ const scheduledDiaryGeneration = onSchedule(
       region: "asia-northeast1",
       memory: "1GiB",
       timeoutSeconds: 540,
-      secrets: ["OPENAI_API_KEY"],
     },
     async (event) => {
       // 実行時に依存関係を初期化

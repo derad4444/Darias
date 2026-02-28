@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/repeat_settings.dart';
+import '../../providers/theme_provider.dart';
 
 /// 繰り返し設定画面
-class RepeatSettingsScreen extends StatefulWidget {
+class RepeatSettingsScreen extends ConsumerStatefulWidget {
   final RepeatSettings initialSettings;
   final DateTime baseDate;
   final Function(RepeatSettings) onSave;
@@ -17,10 +20,10 @@ class RepeatSettingsScreen extends StatefulWidget {
   });
 
   @override
-  State<RepeatSettingsScreen> createState() => _RepeatSettingsScreenState();
+  ConsumerState<RepeatSettingsScreen> createState() => _RepeatSettingsScreenState();
 }
 
-class _RepeatSettingsScreenState extends State<RepeatSettingsScreen> {
+class _RepeatSettingsScreenState extends ConsumerState<RepeatSettingsScreen> {
   late RepeatType _selectedType;
   late RepeatEndType _selectedEndType;
   late DateTime _selectedEndDate;
@@ -37,63 +40,75 @@ class _RepeatSettingsScreenState extends State<RepeatSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: const Text('繰り返し設定'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: const Text('繰り返し設定', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           TextButton(
             onPressed: _save,
-            child: const Text('完了'),
+            child: Text('完了', style: TextStyle(color: accentColor)),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 繰り返しタイプ選択
-          _SectionHeader(title: '繰り返しパターン'),
-          ...RepeatType.values.map((type) => _RepeatTypeCard(
-                type: type,
-                isSelected: _selectedType == type,
-                previewText: _getPreviewText(type),
-                onTap: () {
-                  setState(() => _selectedType = type);
-                },
-              )),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            physics: const BouncingScrollPhysics(),
+            children: [
+              // 繰り返しタイプ選択
+              _SectionHeader(title: '繰り返しパターン', accentColor: accentColor),
+              ...RepeatType.values.map((type) => _RepeatTypeCard(
+                    type: type,
+                    isSelected: _selectedType == type,
+                    previewText: _getPreviewText(type),
+                    accentColor: accentColor,
+                    onTap: () {
+                      setState(() => _selectedType = type);
+                    },
+                  )),
 
-          // 終了条件（繰り返しありの場合のみ）
-          if (_selectedType != RepeatType.none) ...[
-            const SizedBox(height: 24),
-            _SectionHeader(title: '終了条件'),
-            _EndConditionSection(
-              selectedEndType: _selectedEndType,
-              selectedEndDate: _selectedEndDate,
-              selectedOccurrenceCount: _selectedOccurrenceCount,
-              onEndTypeChanged: (type) {
-                setState(() => _selectedEndType = type);
-              },
-              onEndDateChanged: (date) {
-                setState(() => _selectedEndDate = date);
-              },
-              onOccurrenceCountChanged: (count) {
-                setState(() => _selectedOccurrenceCount = count);
-              },
-            ),
+              // 終了条件（繰り返しありの場合のみ）
+              if (_selectedType != RepeatType.none) ...[
+                const SizedBox(height: 24),
+                _SectionHeader(title: '終了条件', accentColor: accentColor),
+                _EndConditionSection(
+                  selectedEndType: _selectedEndType,
+                  selectedEndDate: _selectedEndDate,
+                  selectedOccurrenceCount: _selectedOccurrenceCount,
+                  accentColor: accentColor,
+                  onEndTypeChanged: (type) {
+                    setState(() => _selectedEndType = type);
+                  },
+                  onEndDateChanged: (date) {
+                    setState(() => _selectedEndDate = date);
+                  },
+                  onOccurrenceCountChanged: (count) {
+                    setState(() => _selectedOccurrenceCount = count);
+                  },
+                ),
 
-            // プレビュー
-            const SizedBox(height: 24),
-            _PreviewSection(
-              dates: _generatePreviewDates(),
-            ),
-          ],
-        ],
+                // プレビュー
+                const SizedBox(height: 24),
+                _PreviewSection(
+                  dates: _generatePreviewDates(),
+                  accentColor: accentColor,
+                ),
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -150,8 +165,9 @@ class _RepeatSettingsScreenState extends State<RepeatSettingsScreen> {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
+  final Color accentColor;
 
-  const _SectionHeader({required this.title});
+  const _SectionHeader({required this.title, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -161,7 +177,7 @@ class _SectionHeader extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+              color: accentColor,
             ),
       ),
     );
@@ -172,25 +188,26 @@ class _RepeatTypeCard extends StatelessWidget {
   final RepeatType type;
   final bool isSelected;
   final String previewText;
+  final Color accentColor;
   final VoidCallback onTap;
 
   const _RepeatTypeCard({
     required this.type,
     required this.isSelected,
     required this.previewText,
+    required this.accentColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isSelected ? colorScheme.primary : Colors.transparent,
+        border: Border.all(
+          color: isSelected ? accentColor : Colors.transparent,
           width: 2,
         ),
       ),
@@ -209,6 +226,7 @@ class _RepeatTypeCard extends StatelessWidget {
                       type.displayName,
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
                           ),
                     ),
                     if (previewText.isNotEmpty) ...[
@@ -216,7 +234,7 @@ class _RepeatTypeCard extends StatelessWidget {
                       Text(
                         previewText,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
+                              color: AppColors.textSecondary,
                             ),
                       ),
                     ],
@@ -226,7 +244,7 @@ class _RepeatTypeCard extends StatelessWidget {
               if (isSelected)
                 Icon(
                   Icons.check_circle,
-                  color: colorScheme.primary,
+                  color: accentColor,
                 ),
             ],
           ),
@@ -240,6 +258,7 @@ class _EndConditionSection extends StatelessWidget {
   final RepeatEndType selectedEndType;
   final DateTime selectedEndDate;
   final int selectedOccurrenceCount;
+  final Color accentColor;
   final Function(RepeatEndType) onEndTypeChanged;
   final Function(DateTime) onEndDateChanged;
   final Function(int) onOccurrenceCountChanged;
@@ -248,6 +267,7 @@ class _EndConditionSection extends StatelessWidget {
     required this.selectedEndType,
     required this.selectedEndDate,
     required this.selectedOccurrenceCount,
+    required this.accentColor,
     required this.onEndTypeChanged,
     required this.onEndDateChanged,
     required this.onOccurrenceCountChanged,
@@ -255,31 +275,42 @@ class _EndConditionSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 終了タイプ選択
-        ...RepeatEndType.values.map((type) => RadioListTile<RepeatEndType>(
-              title: Text(type.displayName),
-              value: type,
-              groupValue: selectedEndType,
-              onChanged: (value) {
-                if (value != null) onEndTypeChanged(value);
-              },
-              contentPadding: EdgeInsets.zero,
-            )),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Column(
+            children: RepeatEndType.values.map((type) => RadioListTile<RepeatEndType>(
+                  title: Text(type.displayName, style: const TextStyle(color: AppColors.textPrimary)),
+                  value: type,
+                  groupValue: selectedEndType,
+                  activeColor: accentColor,
+                  onChanged: (value) {
+                    if (value != null) onEndTypeChanged(value);
+                  },
+                )).toList(),
+          ),
+        ),
 
         // 日付選択（日付で終了の場合）
         if (selectedEndType == RepeatEndType.onDate) ...[
           const SizedBox(height: 16),
-          Card(
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: ListTile(
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('終了日'),
+              leading: Icon(Icons.calendar_today, color: accentColor),
+              title: const Text('終了日', style: TextStyle(color: AppColors.textPrimary)),
               subtitle: Text(
                 '${selectedEndDate.year}/${selectedEndDate.month}/${selectedEndDate.day}',
+                style: const TextStyle(color: AppColors.textSecondary),
               ),
               onTap: () async {
                 final date = await showDatePicker(
@@ -299,29 +330,31 @@ class _EndConditionSection extends StatelessWidget {
         // 回数選択（回数で終了の場合）
         if (selectedEndType == RepeatEndType.afterOccurrences) ...[
           const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  const Icon(Icons.repeat),
-                  const SizedBox(width: 16),
-                  const Text('繰り返し回数'),
-                  const Spacer(),
-                  DropdownButton<int>(
-                    value: selectedOccurrenceCount,
-                    items: List.generate(50, (i) => i + 1)
-                        .map((count) => DropdownMenuItem(
-                              value: count,
-                              child: Text('$count回'),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      if (value != null) onOccurrenceCountChanged(value);
-                    },
-                  ),
-                ],
-              ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.9),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.repeat, color: accentColor),
+                const SizedBox(width: 16),
+                const Text('繰り返し回数', style: TextStyle(color: AppColors.textPrimary)),
+                const Spacer(),
+                DropdownButton<int>(
+                  value: selectedOccurrenceCount,
+                  items: List.generate(50, (i) => i + 1)
+                      .map((count) => DropdownMenuItem(
+                            value: count,
+                            child: Text('$count回', style: const TextStyle(color: AppColors.textPrimary)),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) onOccurrenceCountChanged(value);
+                  },
+                ),
+              ],
             ),
           ),
         ],
@@ -332,28 +365,27 @@ class _EndConditionSection extends StatelessWidget {
 
 class _PreviewSection extends StatelessWidget {
   final List<DateTime> dates;
+  final Color accentColor;
 
-  const _PreviewSection({required this.dates});
+  const _PreviewSection({required this.dates, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'プレビュー',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
+                color: AppColors.textSecondary,
               ),
         ),
         const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(8),
+            color: Colors.white.withValues(alpha: 0.9),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,14 +394,16 @@ class _PreviewSection extends StatelessWidget {
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Text(
                       _formatDate(date),
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: AppColors.textPrimary,
+                          ),
                     ),
                   )),
               if (dates.length > 5)
                 Text(
                   '...他${dates.length - 5}回',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                        color: AppColors.textLight,
                       ),
                 ),
             ],

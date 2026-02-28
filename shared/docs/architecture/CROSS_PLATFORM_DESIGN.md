@@ -43,11 +43,20 @@
 │  │   └─────────────┘  └─────────────┘  └─────────────┘           │  │
 │  │                                                                 │  │
 │  │   ┌─────────────────────────────────────────────┐             │  │
-│  │   │         Cloud Functions (Node.js)           │             │  │
-│  │   │  • generateSixPersonMeeting                 │             │  │
-│  │   │  • generateMonthlyReview                    │             │  │
-│  │   │  • sendRegistrationEmail                    │             │  │
-│  │   │  • scheduledTasks                           │             │  │
+│  │   │         Cloud Functions (Node.js 20)        │             │  │
+│  │   │  • generateCharacterReply (AI返信)          │             │  │
+│  │   │  • extractSchedule (予定抽出)               │             │  │
+│  │   │  • generateVoice (音声合成)                 │             │  │
+│  │   │  • generateBig5Analysis (BIG5解析)          │             │  │
+│  │   │  • generateOrReuseMeeting (6人会議)         │             │  │
+│  │   │  • validateAppStoreReceipt (iOS課金検証)    │             │  │
+│  │   │  • validateGooglePlayReceipt (Android検証)  │             │  │
+│  │   │  • checkSubscriptionStatus (日次期限チェック)│             │  │
+│  │   │  • scheduledDiaryGeneration (日記自動生成)   │             │  │
+│  │   │  • generateMonthlyReview (月次レビュー)      │             │  │
+│  │   │  • sendRegistrationEmail (登録メール)        │             │  │
+│  │   │  • sendContactEmail (問い合わせメール)       │             │  │
+│  │   │  → 詳細: docs/CLOUD_FUNCTIONS_DESIGN.md     │             │  │
 │  │   └─────────────────────────────────────────────┘             │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────────┘

@@ -1,68 +1,117 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/todo_model.dart';
 import '../../providers/todo_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class TodoListScreen extends ConsumerWidget {
   const TodoListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
     final filteredTodosAsync = ref.watch(filteredTodosProvider);
     final statsAsync = ref.watch(todoStatsProvider);
     final currentFilter = ref.watch(todoFilterProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.go('/'),
         ),
-        title: const Text('タスク'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+        title: Text('タスク', style: TextStyle(color: AppColors.textPrimary)),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: Column(
-        children: [
-          // フィルターセグメント
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SegmentedButton<TodoFilter>(
-              segments: TodoFilter.values.map((filter) {
-                return ButtonSegment<TodoFilter>(
-                  value: filter,
-                  label: Text(filter.displayName),
-                );
-              }).toList(),
-              selected: {currentFilter},
-              onSelectionChanged: (selected) {
-                ref.read(todoFilterProvider.notifier).state = selected.first;
-              },
-            ),
-          ),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // フィルターセグメント
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: TodoFilter.values.map((filter) {
+                      final isSelected = currentFilter == filter;
+                      return Expanded(
+                        child: GestureDetector(
+                          onTap: () => ref.read(todoFilterProvider.notifier).state = filter,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: isSelected ? accentColor : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              filter.displayName,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                                color: isSelected ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
 
-          // 統計カード
-          statsAsync.when(
-            data: (stats) => _StatsSection(stats: stats),
-            loading: () => const SizedBox.shrink(),
-            error: (e, st) => const SizedBox.shrink(),
-          ),
+              // 統計カード
+              statsAsync.when(
+                data: (stats) => _StatsSection(stats: stats, accentColor: accentColor),
+                loading: () => const SizedBox.shrink(),
+                error: (e, st) => const SizedBox.shrink(),
+              ),
 
-          // Todoリスト
-          Expanded(
-            child: filteredTodosAsync.when(
-              data: (todos) => todos.isEmpty
-                  ? _EmptyState(filter: currentFilter)
-                  : _TodoList(todos: todos),
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, st) => Center(child: Text('エラー: $e')),
-            ),
+              // Todoリスト
+              Expanded(
+                child: filteredTodosAsync.when(
+                  data: (todos) => todos.isEmpty
+                      ? _EmptyState(filter: currentFilter, accentColor: accentColor)
+                      : _TodoList(todos: todos, accentColor: accentColor),
+                  loading: () => Center(child: CircularProgressIndicator(color: accentColor)),
+                  error: (e, st) => Center(child: Text('エラー: $e')),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.push('/todo/detail'),
-        child: const Icon(Icons.add),
+      floatingActionButton: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: accentColor.withValues(alpha: 0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: FloatingActionButton(
+          onPressed: () => context.push('/todo/detail'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }
@@ -71,8 +120,9 @@ class TodoListScreen extends ConsumerWidget {
 /// 統計セクション
 class _StatsSection extends StatelessWidget {
   final TodoStats stats;
+  final Color accentColor;
 
-  const _StatsSection({required this.stats});
+  const _StatsSection({required this.stats, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -123,26 +173,30 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Column(
-          children: [
-            Text(
-              '$count',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.bold,
-              ),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '$count',
+            style: TextStyle(
+              fontSize: 24,
+              color: color,
+              fontWeight: FontWeight.bold,
             ),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+          ),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -151,8 +205,9 @@ class _StatCard extends StatelessWidget {
 /// 空状態
 class _EmptyState extends StatelessWidget {
   final TodoFilter filter;
+  final Color accentColor;
 
-  const _EmptyState({required this.filter});
+  const _EmptyState({required this.filter, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +218,7 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.checklist,
             size: 64,
-            color: Colors.grey[400],
+            color: AppColors.textLight.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
@@ -172,16 +227,18 @@ class _EmptyState extends StatelessWidget {
                 : filter == TodoFilter.incomplete
                     ? '未完了のタスクがありません'
                     : '完了済みのタスクがありません',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.grey[600],
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: 8),
           if (filter == TodoFilter.all)
             Text(
               '右下の+ボタンで追加できます',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[400],
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textLight,
               ),
             ),
         ],
@@ -193,17 +250,19 @@ class _EmptyState extends StatelessWidget {
 /// Todoリスト
 class _TodoList extends ConsumerWidget {
   final List<TodoModel> todos;
+  final Color accentColor;
 
-  const _TodoList({required this.todos});
+  const _TodoList({required this.todos, required this.accentColor});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return ListView.builder(
+      physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.all(16),
       itemCount: todos.length,
       itemBuilder: (context, index) {
         final todo = todos[index];
-        return _TodoItem(todo: todo);
+        return _TodoItem(todo: todo, accentColor: accentColor);
       },
     );
   }
@@ -212,8 +271,9 @@ class _TodoList extends ConsumerWidget {
 /// Todoアイテム
 class _TodoItem extends ConsumerWidget {
   final TodoModel todo;
+  final Color accentColor;
 
-  const _TodoItem({required this.todo});
+  const _TodoItem({required this.todo, required this.accentColor});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -223,95 +283,115 @@ class _TodoItem extends ConsumerWidget {
       TodoPriority.low => Colors.grey,
     };
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => _showEditDialog(context, ref),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              // チェックボックス
-              Checkbox(
-                value: todo.isCompleted,
-                onChanged: (value) {
-                  ref.read(todoControllerProvider.notifier).toggleComplete(
-                    todo.id,
-                    value ?? false,
-                  );
-                },
-              ),
-
-              // コンテンツ
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // タイトル
-                    Text(
-                      todo.title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        decoration: todo.isCompleted
-                            ? TextDecoration.lineThrough
-                            : null,
-                        color: todo.isCompleted
-                            ? Theme.of(context).colorScheme.onSurfaceVariant
-                            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/todo/detail', extra: todo),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                // チェックボックス
+                GestureDetector(
+                  onTap: () {
+                    ref.read(todoControllerProvider.notifier).toggleComplete(
+                      todo.id,
+                      !todo.isCompleted,
+                    );
+                  },
+                  child: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: todo.isCompleted ? accentColor : Colors.transparent,
+                      border: Border.all(
+                        color: todo.isCompleted ? accentColor : AppColors.textLight,
+                        width: 2,
                       ),
+                      borderRadius: BorderRadius.circular(6),
                     ),
+                    child: todo.isCompleted
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
 
-                    // 説明（あれば）
-                    if (todo.description.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                // コンテンツ
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        todo.description,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        todo.title,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          decoration: todo.isCompleted ? TextDecoration.lineThrough : null,
+                          color: todo.isCompleted ? AppColors.textLight : AppColors.textPrimary,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ],
-
-                    // 期限（あれば）
-                    if (todo.dueDate != null) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.schedule,
-                            size: 14,
-                            color: todo.isOverdue
-                                ? Colors.red
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                      if (todo.description.isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          todo.description,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _formatDate(todo.dueDate!),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: todo.isOverdue
-                                  ? Colors.red
-                                  : Theme.of(context).colorScheme.onSurfaceVariant,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      if (todo.dueDate != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.schedule,
+                              size: 14,
+                              color: todo.isOverdue ? Colors.red : AppColors.textSecondary,
                             ),
-                          ),
-                        ],
-                      ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _formatDate(todo.dueDate!),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: todo.isOverdue ? Colors.red : AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
 
-              // 優先度インジケーター
-              Container(
-                width: 4,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: priorityColor,
-                  borderRadius: BorderRadius.circular(2),
+                // 優先度インジケーター
+                Container(
+                  width: 4,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: priorityColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -330,242 +410,6 @@ class _TodoItem extends ConsumerWidget {
       return '明日';
     } else {
       return '${date.month}/${date.day}';
-    }
-  }
-
-  void _showEditDialog(BuildContext context, WidgetRef ref) {
-    context.push('/todo/detail', extra: todo);
-  }
-}
-
-/// Todo編集シート
-class _TodoEditSheet extends ConsumerStatefulWidget {
-  final TodoModel? todo;
-
-  const _TodoEditSheet({this.todo});
-
-  @override
-  ConsumerState<_TodoEditSheet> createState() => _TodoEditSheetState();
-}
-
-class _TodoEditSheetState extends ConsumerState<_TodoEditSheet> {
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
-  late TodoPriority _priority;
-  DateTime? _dueDate;
-
-  bool get isEditing => widget.todo != null;
-
-  @override
-  void initState() {
-    super.initState();
-    _titleController = TextEditingController(text: widget.todo?.title ?? '');
-    _descriptionController = TextEditingController(text: widget.todo?.description ?? '');
-    _priority = widget.todo?.priority ?? TodoPriority.medium;
-    _dueDate = widget.todo?.dueDate;
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // ヘッダー
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  isEditing ? 'タスクを編集' : '新しいタスク',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                if (isEditing)
-                  IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: _deleteTodo,
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // タイトル
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: 'タイトル',
-                border: OutlineInputBorder(),
-              ),
-              autofocus: !isEditing,
-            ),
-            const SizedBox(height: 16),
-
-            // 説明
-            TextField(
-              controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: '説明（任意）',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-            ),
-            const SizedBox(height: 16),
-
-            // 優先度
-            Row(
-              children: [
-                const Text('優先度: '),
-                const SizedBox(width: 8),
-                SegmentedButton<TodoPriority>(
-                  segments: TodoPriority.values.map((p) {
-                    return ButtonSegment<TodoPriority>(
-                      value: p,
-                      label: Text(p.displayName),
-                    );
-                  }).toList(),
-                  selected: {_priority},
-                  onSelectionChanged: (selected) {
-                    setState(() => _priority = selected.first);
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // 期限
-            Row(
-              children: [
-                const Text('期限: '),
-                const SizedBox(width: 8),
-                TextButton.icon(
-                  icon: const Icon(Icons.calendar_today),
-                  label: Text(
-                    _dueDate != null
-                        ? '${_dueDate!.year}/${_dueDate!.month}/${_dueDate!.day}'
-                        : '設定なし',
-                  ),
-                  onPressed: _selectDueDate,
-                ),
-                if (_dueDate != null)
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () => setState(() => _dueDate = null),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // 保存ボタン
-            FilledButton(
-              onPressed: _saveTodo,
-              child: Text(isEditing ? '更新' : '追加'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _selectDueDate() async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _dueDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      setState(() => _dueDate = picked);
-    }
-  }
-
-  Future<void> _saveTodo() async {
-    final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('タイトルを入力してください')),
-      );
-      return;
-    }
-
-    try {
-      if (isEditing) {
-        await ref.read(todoControllerProvider.notifier).updateTodo(
-          widget.todo!.copyWith(
-            title: title,
-            description: _descriptionController.text.trim(),
-            priority: _priority,
-            dueDate: _dueDate,
-          ),
-        );
-      } else {
-        await ref.read(todoControllerProvider.notifier).addTodo(
-          TodoModel.create(
-            title: title,
-            description: _descriptionController.text.trim(),
-            priority: _priority,
-            dueDate: _dueDate,
-          ),
-        );
-      }
-
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('エラー: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteTodo() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('削除確認'),
-        content: const Text('このタスクを削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('削除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && widget.todo != null) {
-      try {
-        await ref.read(todoControllerProvider.notifier).deleteTodo(
-          widget.todo!.id,
-        );
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('エラー: $e')),
-          );
-        }
-      }
     }
   }
 }

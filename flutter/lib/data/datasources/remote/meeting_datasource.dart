@@ -1,6 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import '../../models/meeting_model.dart';
+import '../../models/meeting_history_model.dart';
+import '../../models/six_person_meeting_model.dart';
+
+/// 会議エラー
+class MeetingError implements Exception {
+  final String message;
+  final MeetingErrorType type;
+
+  MeetingError(this.message, this.type);
+
+  @override
+  String toString() => message;
+}
+
+enum MeetingErrorType {
+  invalidResponse,
+  networkError,
+  firestoreError,
+  meetingNotFound,
+  invalidRating,
+  premiumRequired,
+  timeout,
+}
 
 class MeetingDatasource {
   final FirebaseFirestore _firestore;
@@ -18,7 +42,221 @@ class MeetingDatasource {
   CollectionReference<Map<String, dynamic>> get _meetingsCollection =>
       _firestore.collection('users').doc(_userId).collection('meetings');
 
-  /// 会議一覧を取得（リアルタイム）
+  /// 会議履歴コレクションを取得（iOS版と同じパス）
+  CollectionReference<Map<String, dynamic>> _meetingHistoryCollection(String characterId) =>
+      _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('characters')
+          .doc(characterId)
+          .collection('meeting_history');
+
+  /// shared_meetingsコレクション
+  CollectionReference<Map<String, dynamic>> get _sharedMeetingsCollection =>
+      _firestore.collection('shared_meetings');
+
+  // ===========================================
+  // iOS版と同じAPI: generateOrReuseMeeting
+  // ===========================================
+
+  /// 6人会議を生成または既存データを取得（iOS版と同じ）
+  Future<GenerateMeetingResponse> generateOrReuseMeeting({
+    required String characterId,
+    required String concern,
+    String? concernCategory,
+  }) async {
+    debugPrint('🗣️ generateOrReuseMeeting called');
+    debugPrint('   userId: $_userId');
+    debugPrint('   characterId: $characterId');
+    debugPrint('   concern: $concern');
+
+    try {
+      final callable = _functions.httpsCallable('generateOrReuseMeeting');
+
+      final params = <String, dynamic>{
+        'userId': _userId,
+        'characterId': characterId,
+        'concern': concern,
+      };
+
+      if (concernCategory != null) {
+        params['concernCategory'] = concernCategory;
+      }
+
+      final result = await callable.call<Map<String, dynamic>>(params);
+      final data = result.data;
+
+      debugPrint('✅ generateOrReuseMeeting success');
+      debugPrint('   meetingId: ${data['meetingId']}');
+      debugPrint('   cacheHit: ${data['cacheHit']}');
+      debugPrint('   duration: ${data['duration']}ms');
+
+      return GenerateMeetingResponse.fromMap(data);
+    } catch (e) {
+      debugPrint('❌ generateOrReuseMeeting error: $e');
+
+      // プレミアム制限エラーをチェック
+      final errorMessage = e.toString();
+      if (errorMessage.contains('無料ユーザーは1回のみ') ||
+          errorMessage.contains('プレミアムにアップグレード') ||
+          errorMessage.contains('プレミアムに')) {
+        throw MeetingError(
+          '無料プランでは自分会議は1回のみ利用可能です。プレミアムにアップグレードしてください。',
+          MeetingErrorType.premiumRequired,
+        );
+      }
+
+      throw MeetingError(
+        '会議の生成に失敗しました: $e',
+        MeetingErrorType.networkError,
+      );
+    }
+  }
+
+  /// 特定の会議データを取得（shared_meetingsから）
+  Future<SixPersonMeetingModel> fetchMeetingById(String meetingId) async {
+    debugPrint('🔍 fetchMeetingById: $meetingId');
+
+    try {
+      final doc = await _sharedMeetingsCollection.doc(meetingId).get();
+
+      if (!doc.exists) {
+        debugPrint('❌ Meeting not found: $meetingId');
+        throw MeetingError(
+          '会議データが見つかりません',
+          MeetingErrorType.meetingNotFound,
+        );
+      }
+
+      debugPrint('✅ Meeting found: $meetingId');
+      return SixPersonMeetingModel.fromFirestore(doc);
+    } catch (e) {
+      if (e is MeetingError) rethrow;
+      debugPrint('❌ fetchMeetingById error: $e');
+      throw MeetingError(
+        'データベースエラー: $e',
+        MeetingErrorType.firestoreError,
+      );
+    }
+  }
+
+  /// 会議履歴を取得（リアルタイム）- iOS版と同じパスを使用
+  Stream<List<MeetingHistoryModel>> watchMeetingHistory({
+    required String characterId,
+    int? limit,
+  }) {
+    debugPrint('🗂️ watchMeetingHistory called - userId: $_userId, characterId: $characterId');
+
+    var query = _meetingHistoryCollection(characterId)
+        .orderBy('createdAt', descending: true);
+
+    if (limit != null) {
+      query = query.limit(limit);
+    }
+
+    return query.snapshots().map((snapshot) {
+      debugPrint('🗂️ Got ${snapshot.docs.length} meeting history from Firestore');
+      return snapshot.docs
+          .map((doc) => MeetingHistoryModel.fromFirestore(doc))
+          .toList();
+    });
+  }
+
+  /// 会議履歴を取得（一度だけ）
+  Future<List<MeetingHistoryModel>> fetchMeetingHistory({
+    required String characterId,
+    int limit = 20,
+  }) async {
+    debugPrint('🗂️ fetchMeetingHistory called');
+    debugPrint('   userId: $_userId');
+    debugPrint('   characterId: $characterId');
+
+    try {
+      final snapshot = await _meetingHistoryCollection(characterId)
+          .orderBy('createdAt', descending: true)
+          .limit(limit)
+          .get();
+
+      debugPrint('✅ Got ${snapshot.docs.length} meeting histories');
+
+      return snapshot.docs
+          .map((doc) => MeetingHistoryModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('❌ fetchMeetingHistory error: $e');
+      throw MeetingError(
+        'データベースエラー: $e',
+        MeetingErrorType.firestoreError,
+      );
+    }
+  }
+
+  /// 会議に評価をつける
+  Future<void> rateMeeting(String meetingId, int rating) async {
+    if (rating < 1 || rating > 5) {
+      throw MeetingError(
+        '評価は1〜5の範囲で指定してください',
+        MeetingErrorType.invalidRating,
+      );
+    }
+
+    debugPrint('⭐ rateMeeting: $meetingId, rating: $rating');
+
+    try {
+      await _firestore.runTransaction((transaction) async {
+        final meetingRef = _sharedMeetingsCollection.doc(meetingId);
+        final doc = await transaction.get(meetingRef);
+
+        if (!doc.exists) {
+          throw MeetingError(
+            '会議データが見つかりません',
+            MeetingErrorType.meetingNotFound,
+          );
+        }
+
+        final data = doc.data()!;
+        final ratings = data['ratings'] as Map<String, dynamic>? ?? {};
+
+        final totalRatings = (ratings['totalRatings'] as int? ?? 0) + 1;
+        final ratingSum = (ratings['ratingSum'] as int? ?? 0) + rating;
+        final avgRating = ratingSum / totalRatings;
+
+        transaction.update(meetingRef, {
+          'ratings': {
+            'totalRatings': totalRatings,
+            'ratingSum': ratingSum,
+            'avgRating': avgRating,
+          },
+        });
+      });
+
+      debugPrint('✅ Rating saved successfully');
+    } catch (e) {
+      if (e is MeetingError) rethrow;
+      debugPrint('❌ rateMeeting error: $e');
+      throw MeetingError(
+        'データベースエラー: $e',
+        MeetingErrorType.firestoreError,
+      );
+    }
+  }
+
+  /// ユーザーの会議利用回数を取得
+  Future<int> getMeetingUsageCount(String characterId) async {
+    try {
+      final snapshot = await _meetingHistoryCollection(characterId).get();
+      return snapshot.docs.length;
+    } catch (e) {
+      debugPrint('❌ getMeetingUsageCount error: $e');
+      return 0;
+    }
+  }
+
+  // ===========================================
+  // 以下は旧API（互換性のため残す）
+  // ===========================================
+
+  /// 会議一覧を取得（リアルタイム）- 旧パス（互換性のため残す）
   Stream<List<MeetingModel>> watchMeetings() {
     return _meetingsCollection
         .orderBy('createdAt', descending: true)
@@ -54,85 +292,20 @@ class MeetingDatasource {
     await _meetingsCollection.doc(meetingId).delete();
   }
 
+  /// 会議履歴を削除
+  Future<void> deleteMeetingHistory({
+    required String characterId,
+    required String historyId,
+  }) async {
+    await _meetingHistoryCollection(characterId).doc(historyId).delete();
+  }
+
   /// メッセージを追加
   Future<void> addMessage(String meetingId, MeetingMessage message) async {
     await _meetingsCollection.doc(meetingId).update({
       'messages': FieldValue.arrayUnion([message.toMap()]),
       'updatedAt': FieldValue.serverTimestamp(),
     });
-  }
-
-  /// AI応答を生成（Cloud Functions経由）
-  Future<String> generateMeetingResponse({
-    required String meetingId,
-    required String topic,
-    required MeetingParticipant participant,
-    required List<MeetingMessage> previousMessages,
-  }) async {
-    try {
-      final callable = _functions.httpsCallable('generateMeetingResponse');
-      final result = await callable.call({
-        'meetingId': meetingId,
-        'topic': topic,
-        'participant': participant.toMap(),
-        'previousMessages': previousMessages.map((m) => m.toMap()).toList(),
-      });
-
-      return result.data['response'] as String? ?? '';
-    } catch (e) {
-      // Cloud Functionsがない場合はダミーレスポンス
-      return _generateDummyResponse(participant, topic, previousMessages);
-    }
-  }
-
-  /// ダミーレスポンスを生成（デモ用）
-  String _generateDummyResponse(
-    MeetingParticipant participant,
-    String topic,
-    List<MeetingMessage> previousMessages,
-  ) {
-    final responses = {
-      'leader': [
-        'この議題について、皆さんの意見を聞かせてください。',
-        'なるほど、良い視点ですね。他の方はいかがでしょうか？',
-        'それでは、ここまでの議論をまとめましょう。',
-        '建設的な議論ができていますね。次のステップを考えましょう。',
-      ],
-      'analyst': [
-        'データを見ると、この方向性には一定の根拠があります。',
-        '過去の事例を分析すると、成功率は約70%程度と見込まれます。',
-        '数値的な観点から見ると、リスクとリターンのバランスは妥当です。',
-        'もう少し詳細なデータが必要かもしれません。',
-      ],
-      'creative': [
-        '面白いアイデアがあります！こんな方法はどうでしょう？',
-        '既存の枠にとらわれず、新しいアプローチを試してみませんか？',
-        'ここにイノベーションのチャンスがあると思います！',
-        '発想を転換すると、もっと良い解決策が見つかるかも。',
-      ],
-      'critic': [
-        'ちょっと待ってください。この点にリスクがあります。',
-        '現実的に考えると、いくつかの課題があります。',
-        '良いアイデアですが、実現可能性について検討が必要です。',
-        '潜在的な問題点を指摘させてください。',
-      ],
-      'supporter': [
-        '皆さんの意見、どれも価値がありますね。',
-        'チームで協力すれば、きっと良い結果が出せます。',
-        'それぞれの強みを活かしたアプローチが良いと思います。',
-        '前向きに取り組めば、解決できない問題はありません。',
-      ],
-      'executor': [
-        '具体的なアクションプランを決めましょう。',
-        'まず最初のステップとして、これから着手すべきです。',
-        'スケジュールとリソースを明確にしましょう。',
-        '効率的に進めるために、優先順位をつけましょう。',
-      ],
-    };
-
-    final participantResponses = responses[participant.id] ?? responses['leader']!;
-    final index = previousMessages.length % participantResponses.length;
-    return participantResponses[index];
   }
 
   /// 会議をアーカイブ

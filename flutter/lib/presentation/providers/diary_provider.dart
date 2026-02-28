@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/diary_datasource.dart';
 import '../../data/models/diary_model.dart';
 import 'auth_provider.dart';
+import 'character_provider.dart';
 
 /// DiaryDatasourceのプロバイダー
 final diaryDatasourceProvider = Provider<DiaryDatasource>((ref) {
@@ -20,6 +21,35 @@ final diariesProvider = StreamProvider.family<List<DiaryModel>, String>((ref, ch
   return datasource.watchDiaries(
     userId: userId,
     characterId: characterId,
+  );
+});
+
+/// 現在のキャラクターの全日記リストプロバイダー
+final currentCharacterDiariesProvider = Provider<AsyncValue<List<DiaryModel>>>((ref) {
+  final characterId = ref.watch(currentCharacterIdProvider);
+  if (characterId == null || characterId.isEmpty) {
+    return const AsyncValue.data([]);
+  }
+  return ref.watch(diariesProvider(characterId));
+});
+
+/// 特定の日付の日記を取得するプロバイダー
+final diaryForDateProvider = Provider.family<DiaryModel?, DateTime>((ref, date) {
+  final diariesAsync = ref.watch(currentCharacterDiariesProvider);
+
+  return diariesAsync.whenOrNull(
+    data: (diaries) {
+      try {
+        return diaries.firstWhere(
+          (diary) =>
+              diary.date.year == date.year &&
+              diary.date.month == date.month &&
+              diary.date.day == date.day,
+        );
+      } catch (_) {
+        return null;
+      }
+    },
   );
 });
 

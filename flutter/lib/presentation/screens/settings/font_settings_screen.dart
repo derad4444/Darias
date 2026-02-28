@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/theme/app_colors.dart';
+import '../../providers/theme_provider.dart';
+
 /// フォント設定プロバイダー
 final fontSettingsProvider =
     StateNotifierProvider<FontSettingsNotifier, FontSettings>((ref) {
@@ -99,55 +102,73 @@ class FontSettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(fontSettingsProvider);
     final notifier = ref.read(fontSettingsProvider.notifier);
-    final colorScheme = Theme.of(context).colorScheme;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
           onPressed: () => context.pop(),
         ),
-        title: const Text('フォント設定'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: const Text(
+          'フォント設定',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
           TextButton(
             onPressed: () => notifier.reset(),
-            child: const Text('リセット'),
+            child: Text(
+              'リセット',
+              style: TextStyle(color: accentColor),
+            ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // フォントサイズ
-          _SectionHeader(title: 'フォントサイズ'),
-          _FontSizeSection(
-            value: settings.fontSize,
-            onChanged: notifier.setFontSize,
-          ),
-          const SizedBox(height: 24),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              // フォントサイズ
+              _SectionHeader(title: 'フォントサイズ', accentColor: accentColor),
+              _FontSizeSection(
+                value: settings.fontSize,
+                accentColor: accentColor,
+                onChanged: notifier.setFontSize,
+              ),
+              const SizedBox(height: 24),
 
-          // フォントファミリー
-          _SectionHeader(title: 'フォントの種類'),
-          _FontFamilySection(
-            selectedFamily: settings.fontFamily,
-            onChanged: notifier.setFontFamily,
-            families: _fontFamilies,
-          ),
-          const SizedBox(height: 24),
+              // フォントファミリー
+              _SectionHeader(title: 'フォントの種類', accentColor: accentColor),
+              _FontFamilySection(
+                selectedFamily: settings.fontFamily,
+                accentColor: accentColor,
+                onChanged: notifier.setFontFamily,
+                families: _fontFamilies,
+              ),
+              const SizedBox(height: 24),
 
-          // 行間
-          _SectionHeader(title: '行間'),
-          _LineHeightSection(
-            value: settings.lineHeight,
-            onChanged: notifier.setLineHeight,
-          ),
-          const SizedBox(height: 24),
+              // 行間
+              _SectionHeader(title: '行間', accentColor: accentColor),
+              _LineHeightSection(
+                value: settings.lineHeight,
+                accentColor: accentColor,
+                onChanged: notifier.setLineHeight,
+              ),
+              const SizedBox(height: 24),
 
-          // プレビュー
-          _SectionHeader(title: 'プレビュー'),
-          _PreviewSection(settings: settings),
-        ],
+              // プレビュー
+              _SectionHeader(title: 'プレビュー', accentColor: accentColor),
+              _PreviewSection(settings: settings, accentColor: accentColor),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -155,8 +176,9 @@ class FontSettingsScreen extends ConsumerWidget {
 
 class _SectionHeader extends StatelessWidget {
   final String title;
+  final Color accentColor;
 
-  const _SectionHeader({required this.title});
+  const _SectionHeader({required this.title, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +188,7 @@ class _SectionHeader extends StatelessWidget {
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+              color: AppColors.textPrimary,
             ),
       ),
     );
@@ -175,21 +197,21 @@ class _SectionHeader extends StatelessWidget {
 
 class _FontSizeSection extends StatelessWidget {
   final double value;
+  final Color accentColor;
   final ValueChanged<double> onChanged;
 
   const _FontSizeSection({
     required this.value,
+    required this.accentColor,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -197,23 +219,24 @@ class _FontSizeSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('A', style: TextStyle(fontSize: 14)),
+              const Text('A', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
               Expanded(
                 child: Slider(
                   value: value,
                   min: 0.7,
                   max: 1.4,
                   divisions: 7,
+                  activeColor: accentColor,
                   onChanged: onChanged,
                 ),
               ),
-              const Text('A', style: TextStyle(fontSize: 24)),
+              const Text('A', style: TextStyle(fontSize: 24, color: AppColors.textPrimary)),
             ],
           ),
           Text(
             _getSizeLabel(value),
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.primary,
+                  color: accentColor,
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -233,11 +256,13 @@ class _FontSizeSection extends StatelessWidget {
 
 class _FontFamilySection extends StatelessWidget {
   final String selectedFamily;
+  final Color accentColor;
   final ValueChanged<String> onChanged;
   final List<(String, String)> families;
 
   const _FontFamilySection({
     required this.selectedFamily,
+    required this.accentColor,
     required this.onChanged,
     required this.families,
   });
@@ -247,19 +272,21 @@ class _FontFamilySection extends StatelessWidget {
     return Column(
       children: families.map((family) {
         final isSelected = selectedFamily == family.$1;
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 8),
-          shape: RoundedRectangleBorder(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.transparent,
+            border: Border.all(
+              color: isSelected ? accentColor : Colors.transparent,
               width: 2,
             ),
           ),
           child: ListTile(
-            title: Text(family.$2),
+            title: Text(
+              family.$2,
+              style: const TextStyle(color: AppColors.textPrimary),
+            ),
             subtitle: Text(
               'これはサンプルテキストです',
               style: _getFontStyle(family.$1),
@@ -267,7 +294,7 @@ class _FontFamilySection extends StatelessWidget {
             trailing: isSelected
                 ? Icon(
                     Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: accentColor,
                   )
                 : null,
             onTap: () => onChanged(family.$1),
@@ -280,27 +307,27 @@ class _FontFamilySection extends StatelessWidget {
   TextStyle _getFontStyle(String family) {
     // フォントファミリーに応じたスタイルを返す
     // 実際のフォントファミリー設定は省略（システムに依存）
-    return const TextStyle();
+    return const TextStyle(color: AppColors.textSecondary);
   }
 }
 
 class _LineHeightSection extends StatelessWidget {
   final double value;
+  final Color accentColor;
   final ValueChanged<double> onChanged;
 
   const _LineHeightSection({
     required this.value,
+    required this.accentColor,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -308,23 +335,24 @@ class _LineHeightSection extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.format_line_spacing, size: 18),
+              const Icon(Icons.format_line_spacing, size: 18, color: AppColors.textSecondary),
               Expanded(
                 child: Slider(
                   value: value,
                   min: 1.0,
                   max: 2.0,
                   divisions: 10,
+                  activeColor: accentColor,
                   onChanged: onChanged,
                 ),
               ),
-              const Icon(Icons.format_line_spacing, size: 28),
+              const Icon(Icons.format_line_spacing, size: 28, color: AppColors.textPrimary),
             ],
           ),
           Text(
             '${(value * 100).toInt()}%',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.primary,
+                  color: accentColor,
                   fontWeight: FontWeight.bold,
                 ),
           ),
@@ -336,22 +364,19 @@ class _LineHeightSection extends StatelessWidget {
 
 class _PreviewSection extends StatelessWidget {
   final FontSettings settings;
+  final Color accentColor;
 
-  const _PreviewSection({required this.settings});
+  const _PreviewSection({required this.settings, required this.accentColor});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final baseFontSize = 14 * settings.fontSize;
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
+        color: Colors.white.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: colorScheme.outline.withValues(alpha: 0.3),
-        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -362,6 +387,7 @@ class _PreviewSection extends StatelessWidget {
               fontSize: baseFontSize * 1.5,
               fontWeight: FontWeight.bold,
               height: settings.lineHeight,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
@@ -372,6 +398,7 @@ class _PreviewSection extends StatelessWidget {
             style: TextStyle(
               fontSize: baseFontSize,
               height: settings.lineHeight,
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 12),
@@ -379,7 +406,7 @@ class _PreviewSection extends StatelessWidget {
             '補足テキスト（小さめ）',
             style: TextStyle(
               fontSize: baseFontSize * 0.85,
-              color: colorScheme.onSurfaceVariant,
+              color: AppColors.textSecondary,
               height: settings.lineHeight,
             ),
           ),

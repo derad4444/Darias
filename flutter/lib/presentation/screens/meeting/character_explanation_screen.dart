@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/theme_provider.dart';
+import '../../../core/theme/app_colors.dart';
 
 /// キャラクター説明画面
-class CharacterExplanationScreen extends StatelessWidget {
+class CharacterExplanationScreen extends ConsumerWidget {
   const CharacterExplanationScreen({super.key});
 
   static const List<_CharacterInfo> characters = [
@@ -87,33 +90,42 @@ class CharacterExplanationScreen extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
         ),
         title: const Text('自分会議の説明'),
-        backgroundColor: colorScheme.inversePrimary,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ヘッダー説明
-          _HeaderSection(),
-          const SizedBox(height: 24),
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: ListView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            children: [
+              // ヘッダー説明
+              _HeaderSection(accentColor: accentColor),
+              const SizedBox(height: 24),
 
-          // 各キャラクターの説明
-          ...characters.map((char) => _CharacterCard(character: char)),
+              // 各キャラクターの説明
+              ...characters.map((char) => _CharacterCard(character: char)),
 
-          // 補足説明
-          const SizedBox(height: 24),
-          _TipsSection(),
-          const SizedBox(height: 32),
-        ],
+              // 補足説明
+              const SizedBox(height: 24),
+              const _TipsSection(),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -138,6 +150,10 @@ class _CharacterInfo {
 }
 
 class _HeaderSection extends StatelessWidget {
+  final Color accentColor;
+
+  const _HeaderSection({required this.accentColor});
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -145,20 +161,21 @@ class _HeaderSection extends StatelessWidget {
         Icon(
           Icons.groups,
           size: 64,
-          color: Theme.of(context).colorScheme.primary,
+          color: accentColor,
         ),
         const SizedBox(height: 16),
         Text(
           '6人の自分について',
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
               ),
         ),
         const SizedBox(height: 8),
         Text(
           'あなたのBIG5性格診断データを基に、\n6つの異なる自分が多角的に議論します',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: AppColors.textSecondary,
               ),
           textAlign: TextAlign.center,
         ),
@@ -174,8 +191,12 @@ class _CharacterCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -207,14 +228,13 @@ class _CharacterCard extends StatelessWidget {
                         style:
                             Theme.of(context).textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
+                                  color: AppColors.textPrimary,
                                 ),
                       ),
                       Text(
                         character.description,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
+                              color: AppColors.textSecondary,
                             ),
                       ),
                     ],
@@ -222,7 +242,10 @@ class _CharacterCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 24),
+            Divider(
+              height: 24,
+              color: Colors.grey.withValues(alpha: 0.3),
+            ),
             // 特徴
             ...character.traits.map((trait) => Padding(
                   padding: const EdgeInsets.only(bottom: 6),
@@ -238,7 +261,9 @@ class _CharacterCard extends StatelessWidget {
                       Expanded(
                         child: Text(
                           trait,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AppColors.textPrimary,
+                              ),
                         ),
                       ),
                     ],
@@ -252,6 +277,8 @@ class _CharacterCard extends StatelessWidget {
 }
 
 class _TipsSection extends StatelessWidget {
+  const _TipsSection();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -277,16 +304,17 @@ class _TipsSection extends StatelessWidget {
                 '会議のポイント',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
                     ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          _BulletPoint(text: '今の自分と真逆の自分が異なる視点で議論'),
-          _BulletPoint(text: '理想の自分が目標達成の視点を提供'),
-          _BulletPoint(text: '本音の自分が率直な感情を表現'),
-          _BulletPoint(text: '子供の頃の自分が純粋な視点を追加'),
-          _BulletPoint(text: '未来の自分が長期的な視野で結論'),
+          const _BulletPoint(text: '今の自分と真逆の自分が異なる視点で議論'),
+          const _BulletPoint(text: '理想の自分が目標達成の視点を提供'),
+          const _BulletPoint(text: '本音の自分が率直な感情を表現'),
+          const _BulletPoint(text: '子供の頃の自分が純粋な視点を追加'),
+          const _BulletPoint(text: '未来の自分が長期的な視野で結論'),
         ],
       ),
     );
@@ -316,7 +344,9 @@ class _BulletPoint extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textPrimary,
+                  ),
             ),
           ),
         ],

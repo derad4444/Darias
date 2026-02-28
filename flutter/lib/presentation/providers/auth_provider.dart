@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../data/models/user_model.dart';
 
 /// Firebase Auth インスタンス
@@ -50,6 +51,8 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
   Future<void> signUp({
     required String email,
     required String password,
+    String? name,
+    String? characterGender,
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -60,18 +63,54 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
 
       // ユーザードキュメントを作成
       if (credential.user != null) {
+        final userId = credential.user!.uid;
         final now = DateTime.now();
+
+        // iOS版と同様にcharacterIdを生成
+        final characterId = const Uuid().v4();
+        final gender = characterGender ?? '女性';
+
         final user = UserModel(
-          id: credential.user!.uid,
+          id: userId,
           email: email,
+          name: name,
+          characterGender: gender,
+          characterId: characterId,
           createdAt: now,
           updatedAt: now,
         );
 
+        // ユーザードキュメントを保存
         await _firestore
             .collection('users')
-            .doc(credential.user!.uid)
+            .doc(userId)
             .set(user.toMap());
+
+        // iOS版と同様にキャラクター詳細情報を作成
+        final characterDetailData = {
+          'gender': gender,
+          'personalityKey': 'O5_C4_A2_E2_N2_$gender',
+          'confirmedBig5Scores': {
+            'openness': 5,
+            'conscientiousness': 4,
+            'agreeableness': 2,
+            'extraversion': 2,
+            'neuroticism': 2,
+          },
+          'analysis_level': 0,
+          'points': 0,
+          'created_at': Timestamp.fromDate(now),
+          'updated_at': Timestamp.fromDate(now),
+        };
+
+        await _firestore
+            .collection('users')
+            .doc(userId)
+            .collection('characters')
+            .doc(characterId)
+            .collection('details')
+            .doc('current')
+            .set(characterDetailData);
       }
 
       state = const AsyncValue.data(null);
