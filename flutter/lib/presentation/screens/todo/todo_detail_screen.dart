@@ -14,8 +14,9 @@ import '../settings/tag_management_screen.dart';
 /// Todo詳細・編集画面
 class TodoDetailScreen extends ConsumerStatefulWidget {
   final TodoModel? todo;
+  final String initialTag;
 
-  const TodoDetailScreen({super.key, this.todo});
+  const TodoDetailScreen({super.key, this.todo, this.initialTag = ''});
 
   @override
   ConsumerState<TodoDetailScreen> createState() => _TodoDetailScreenState();
@@ -47,6 +48,8 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
       _priority = todo.priority;
       _tag = todo.tag;
       _isCompleted = todo.isCompleted;
+    } else {
+      _tag = widget.initialTag;
     }
   }
 

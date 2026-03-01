@@ -19,22 +19,26 @@ class TagItem {
   final String id;
   final String name;
   final Color color;
+  final String memo;
 
   const TagItem({
     required this.id,
     required this.name,
     required this.color,
+    this.memo = '',
   });
 
   TagItem copyWith({
     String? id,
     String? name,
     Color? color,
+    String? memo,
   }) {
     return TagItem(
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
+      memo: memo ?? this.memo,
     );
   }
 
@@ -44,6 +48,7 @@ class TagItem {
       id: doc.id,
       name: data['name'] as String? ?? '',
       color: _hexToColor(data['colorHex'] as String? ?? '#2196f3'),
+      memo: data['memo'] as String? ?? '',
     );
   }
 
@@ -51,6 +56,7 @@ class TagItem {
     return {
       'name': name,
       'colorHex': _colorToHex(color),
+      'memo': memo,
     };
   }
 
@@ -83,12 +89,19 @@ class TagsNotifier extends StateNotifier<List<TagItem>> {
       firestore.collection('users').doc(userId).collection('tags');
 
   void _listenToTags() {
-    if (userId == null) return;
+    if (userId == null) {
+      print('⚠️ TagsNotifier: userId is null, skipping');
+      return;
+    }
+    print('🏷️ TagsNotifier: listening to tags for userId=$userId');
     _subscription = _tagsCollection
         .orderBy('name')
         .snapshots()
         .listen((snapshot) {
+      print('🏷️ TagsNotifier: received ${snapshot.docs.length} tags');
       state = snapshot.docs.map((doc) => TagItem.fromFirestore(doc)).toList();
+    }, onError: (error) {
+      print('❌ TagsNotifier error: $error');
     });
   }
 
@@ -254,30 +267,38 @@ class _TagRow extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.2),
+        color: tag.color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
+        border: Border(left: BorderSide(color: tag.color, width: 4)),
       ),
       child: Row(
         children: [
-          // タグの色サンプル
-          Container(
-            width: 20,
-            height: 20,
-            decoration: BoxDecoration(
-              color: tag.color,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 12),
-
-          // タグ名
+          // タグ名・メモ
           Expanded(
-            child: Text(
-              tag.name,
-              style: TextStyle(
-                fontSize: 15,
-                color: textColor,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tag.name,
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: textColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (tag.memo.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    tag.memo,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: textColor.withValues(alpha: 0.6),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
             ),
           ),
 
@@ -322,6 +343,7 @@ class _TagEditSheet extends ConsumerStatefulWidget {
 
 class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
   late TextEditingController _nameController;
+  late TextEditingController _memoController;
   late Color _selectedColor;
 
   bool get isEditing => widget.tag != null;
@@ -330,12 +352,14 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.tag?.name ?? '');
+    _memoController = TextEditingController(text: widget.tag?.memo ?? '');
     _selectedColor = widget.tag?.color ?? Colors.blue;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _memoController.dispose();
     super.dispose();
   }
 
@@ -442,38 +466,23 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
 
                 const SizedBox(height: 16),
 
-                // プレビュー
+                // メモ
                 _SectionCard(
-                  title: 'プレビュー',
+                  title: 'メモ',
                   textColor: widget.textColor,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: _selectedColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _selectedColor,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Text(
-                          _nameController.text.isEmpty ? 'サンプルタグ' : _nameController.text,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
+                  child: TextField(
+                    controller: _memoController,
+                    style: TextStyle(color: widget.textColor),
+                    maxLines: 5,
+                    minLines: 3,
+                    decoration: InputDecoration(
+                      hintText: 'メモを入力（任意）',
+                      hintStyle: TextStyle(color: widget.textColor.withValues(alpha: 0.5)),
+                      border: InputBorder.none,
+                    ),
                   ),
                 ),
+
               ],
             ),
           ),
@@ -506,6 +515,7 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
       id: widget.tag?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
       name: trimmedName,
       color: _selectedColor,
+      memo: _memoController.text.trim(),
     );
     widget.onSave(tag);
     Navigator.pop(context);
@@ -569,22 +579,47 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
   late Color _selectedColor;
 
   static const List<Color> _presetColors = [
+    // 赤系
+    Color(0xFFEF9A9A), // red light
     Colors.red,
+    Color(0xFFB71C1C), // red dark
+    // ピンク系
+    Color(0xFFF48FB1), // pink light
     Colors.pink,
+    Color(0xFF880E4F), // pink dark
+    // 紫系
+    Color(0xFFCE93D8), // purple light
     Colors.purple,
     Colors.deepPurple,
+    // 藍系
+    Color(0xFF9FA8DA), // indigo light
     Colors.indigo,
+    // 青系
+    Color(0xFF90CAF9), // blue light
     Colors.blue,
     Colors.lightBlue,
+    // シアン・ティール系
     Colors.cyan,
     Colors.teal,
+    Color(0xFF004D40), // teal dark
+    // 緑系
+    Color(0xFFA5D6A7), // green light
     Colors.green,
+    Color(0xFF1B5E20), // green dark
     Colors.lightGreen,
+    // 黄・オレンジ系
     Colors.lime,
     Colors.yellow,
     Colors.amber,
     Colors.orange,
     Colors.deepOrange,
+    // ブラウン・グレー系
+    Color(0xFF795548), // brown
+    Color(0xFF5D4037), // brown dark
+    Color(0xFF607D8B), // blue grey
+    Color(0xFF455A64), // blue grey dark
+    Color(0xFF9E9E9E), // grey
+    Color(0xFF424242), // grey dark
   ];
 
   @override

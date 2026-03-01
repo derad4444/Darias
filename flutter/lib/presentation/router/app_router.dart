@@ -118,8 +118,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/todo/detail',
         name: 'todo-detail',
         builder: (context, state) {
-          final todo = state.extra as TodoModel?;
-          return TodoDetailScreen(todo: todo);
+          final extra = state.extra;
+          if (extra is TodoModel) {
+            return TodoDetailScreen(todo: extra);
+          }
+          final map = extra as Map<String, dynamic>?;
+          return TodoDetailScreen(
+            todo: null,
+            initialTag: map?['initialTag'] as String? ?? '',
+          );
         },
       ),
 
@@ -164,8 +171,15 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/memo/detail',
         name: 'memo-detail',
         builder: (context, state) {
-          final memo = state.extra as MemoModel?;
-          return MemoDetailScreen(memo: memo);
+          final extra = state.extra;
+          if (extra is MemoModel) {
+            return MemoDetailScreen(memo: extra);
+          }
+          final map = extra as Map<String, dynamic>?;
+          return MemoDetailScreen(
+            memo: null,
+            initialTag: map?['initialTag'] as String? ?? '',
+          );
         },
       ),
 

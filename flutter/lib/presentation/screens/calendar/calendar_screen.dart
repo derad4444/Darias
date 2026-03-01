@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/models/schedule_model.dart';
@@ -545,7 +546,11 @@ class _CalendarHeader extends StatelessWidget {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _YearMonthPicker(
+      isScrollControlled: true,
+      useSafeArea: true,
+      enableDrag: false,
+      isDismissible: false,
+      builder: (context) => _YearMonthPickerSheet(
         initialYear: month.year,
         initialMonth: month.month,
         accentColor: accentColor,
@@ -607,9 +612,29 @@ class _CalendarHeader extends StatelessWidget {
             ),
           ),
 
-          // 検索ボタンと次月ボタン
+          // 今日・検索・次月ボタン
           Row(
             children: [
+              // 今日ボタン
+              GestureDetector(
+                onTap: onTodayTap,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '今日',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: accentColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
               // 検索ボタン
               GestureDetector(
                 onTap: onSearchTap,
@@ -657,8 +682,8 @@ class _CalendarHeader extends StatelessWidget {
   }
 }
 
-/// 年月ピッカー（iOS版と同様のホイールスタイル）
-class _YearMonthPicker extends StatefulWidget {
+/// 年月ピッカーシート（スクロールホイール + ダブルタップ自由入力）
+class _YearMonthPickerSheet extends StatefulWidget {
   final int initialYear;
   final int initialMonth;
   final Color accentColor;
@@ -667,7 +692,7 @@ class _YearMonthPicker extends StatefulWidget {
   final Function(int year, int month) onSelected;
   final VoidCallback onClose;
 
-  const _YearMonthPicker({
+  const _YearMonthPickerSheet({
     required this.initialYear,
     required this.initialMonth,
     required this.accentColor,
@@ -678,49 +703,40 @@ class _YearMonthPicker extends StatefulWidget {
   });
 
   @override
-  State<_YearMonthPicker> createState() => _YearMonthPickerState();
+  State<_YearMonthPickerSheet> createState() => _YearMonthPickerSheetState();
 }
 
-class _YearMonthPickerState extends State<_YearMonthPicker> {
+class _YearMonthPickerSheetState extends State<_YearMonthPickerSheet> {
   late int _selectedYear;
   late int _selectedMonth;
-  late FixedExtentScrollController _yearController;
-  late FixedExtentScrollController _monthController;
-
-  static const int _startYear = 1900;
-  static const int _endYear = 2100;
 
   @override
   void initState() {
     super.initState();
     _selectedYear = widget.initialYear;
     _selectedMonth = widget.initialMonth;
-    _yearController = FixedExtentScrollController(
-      initialItem: widget.initialYear - _startYear,
-    );
-    _monthController = FixedExtentScrollController(
-      initialItem: widget.initialMonth - 1,
-    );
-  }
-
-  @override
-  void dispose() {
-    _yearController.dispose();
-    _monthController.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 280,
+      height: MediaQuery.of(context).size.height,
       decoration: BoxDecoration(
         gradient: widget.backgroundGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
+          // ハンドル
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: widget.textColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           // ヘッダー
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -729,10 +745,7 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
               children: [
                 TextButton(
                   onPressed: widget.onClose,
-                  child: Text(
-                    'キャンセル',
-                    style: TextStyle(color: widget.textColor.withValues(alpha: 0.7)),
-                  ),
+                  child: Text('キャンセル', style: TextStyle(color: widget.textColor.withOpacity(0.7))),
                 ),
                 Text(
                   '年月を選択',
@@ -744,92 +757,310 @@ class _YearMonthPickerState extends State<_YearMonthPicker> {
                 ),
                 TextButton(
                   onPressed: () => widget.onSelected(_selectedYear, _selectedMonth),
-                  child: Text(
-                    '決定',
-                    style: TextStyle(
-                      color: widget.accentColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: Text('決定', style: TextStyle(color: widget.accentColor, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),
           ),
-
-          // ピッカー
+          // ホイールセレクター
           Expanded(
-            child: Row(
-              children: [
-                // 年ピッカー
-                Expanded(
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _yearController,
-                    itemExtent: 40,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (index) {
-                      setState(() {
-                        _selectedYear = _startYear + index;
-                      });
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                      childCount: _endYear - _startYear + 1,
-                      builder: (context, index) {
-                        final year = _startYear + index;
-                        final isSelected = year == _selectedYear;
-                        return Center(
-                          child: Text(
-                            '$year年',
-                            style: TextStyle(
-                              fontSize: isSelected ? 18 : 16,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected
-                                  ? widget.textColor
-                                  : widget.textColor.withValues(alpha: 0.5),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-                // 月ピッカー
-                Expanded(
-                  child: ListWheelScrollView.useDelegate(
-                    controller: _monthController,
-                    itemExtent: 40,
-                    physics: const FixedExtentScrollPhysics(),
-                    onSelectedItemChanged: (index) {
-                      setState(() {
-                        _selectedMonth = index + 1;
-                      });
-                    },
-                    childDelegate: ListWheelChildBuilderDelegate(
-                      childCount: 12,
-                      builder: (context, index) {
-                        final month = index + 1;
-                        final isSelected = month == _selectedMonth;
-                        return Center(
-                          child: Text(
-                            '$month月',
-                            style: TextStyle(
-                              fontSize: isSelected ? 18 : 16,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              color: isSelected
-                                  ? widget.textColor
-                                  : widget.textColor.withValues(alpha: 0.5),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
+            child: _CalendarYearMonthSelector(
+              year: _selectedYear,
+              month: _selectedMonth,
+              textColor: widget.textColor,
+              accentColor: widget.accentColor,
+              onChanged: (year, month) {
+                setState(() {
+                  _selectedYear = year;
+                  _selectedMonth = month;
+                });
+              },
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 年月セレクター（スクロールホイール + ダブルタップ自由入力）
+class _CalendarYearMonthSelector extends StatefulWidget {
+  final int year;
+  final int month;
+  final Color textColor;
+  final Color accentColor;
+  final void Function(int year, int month) onChanged;
+
+  const _CalendarYearMonthSelector({
+    required this.year,
+    required this.month,
+    required this.textColor,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  @override
+  State<_CalendarYearMonthSelector> createState() => _CalendarYearMonthSelectorState();
+}
+
+class _CalendarYearMonthSelectorState extends State<_CalendarYearMonthSelector> {
+  late FixedExtentScrollController _yearController;
+  late FixedExtentScrollController _monthController;
+  bool _isEditingYear = false;
+  bool _isEditingMonth = false;
+  late TextEditingController _yearTextController;
+  late TextEditingController _monthTextController;
+
+  static final int _baseYear = DateTime.now().year - 5;
+  static const int _yearCount = 20; // -5年 ~ +14年
+
+  @override
+  void initState() {
+    super.initState();
+    _yearController = FixedExtentScrollController(
+      initialItem: widget.year - _baseYear,
+    );
+    _monthController = FixedExtentScrollController(
+      initialItem: widget.month - 1,
+    );
+    _yearTextController = TextEditingController();
+    _monthTextController = TextEditingController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CalendarYearMonthSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.year != widget.year && !_isEditingYear) {
+      final targetIndex = widget.year - _baseYear;
+      if (targetIndex >= 0 && targetIndex < _yearCount) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _yearController.hasClients) {
+            _yearController.jumpToItem(targetIndex);
+          }
+        });
+      }
+    }
+    if (oldWidget.month != widget.month && !_isEditingMonth) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _monthController.hasClients) {
+          _monthController.jumpToItem(widget.month - 1);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _monthController.dispose();
+    _yearTextController.dispose();
+    _monthTextController.dispose();
+    super.dispose();
+  }
+
+  void _startEditingYear() {
+    setState(() {
+      _isEditingYear = true;
+      _yearTextController.text = widget.year.toString();
+    });
+    Future.microtask(() {
+      _yearTextController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _yearTextController.text.length,
+      );
+    });
+  }
+
+  void _finishEditingYear() {
+    final parsed = int.tryParse(_yearTextController.text);
+    if (parsed != null) {
+      final clamped = parsed.clamp(_baseYear, _baseYear + _yearCount - 1);
+      widget.onChanged(clamped, widget.month);
+    }
+    setState(() => _isEditingYear = false);
+  }
+
+  void _startEditingMonth() {
+    setState(() {
+      _isEditingMonth = true;
+      _monthTextController.text = widget.month.toString();
+    });
+    Future.microtask(() {
+      _monthTextController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _monthTextController.text.length,
+      );
+    });
+  }
+
+  void _finishEditingMonth() {
+    final parsed = int.tryParse(_monthTextController.text);
+    if (parsed != null && parsed >= 1 && parsed <= 12) {
+      widget.onChanged(widget.year, parsed);
+    }
+    setState(() => _isEditingMonth = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          // 年
+          Expanded(
+            flex: 3,
+            child: _isEditingYear
+                ? _buildTextField(
+                    controller: _yearTextController,
+                    maxLength: 4,
+                    onFinish: _finishEditingYear,
+                    suffix: '年',
+                    hintText: '$_baseYear〜${_baseYear + _yearCount - 1}',
+                  )
+                : GestureDetector(
+                    onDoubleTap: _startEditingYear,
+                    child: _buildWheel(
+                      controller: _yearController,
+                      itemCount: _yearCount,
+                      labelBuilder: (index) => '${_baseYear + index}年',
+                      selectedIndex: widget.year - _baseYear,
+                      onChanged: (index) {
+                        widget.onChanged(_baseYear + index, widget.month);
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          // 月
+          Expanded(
+            flex: 2,
+            child: _isEditingMonth
+                ? _buildTextField(
+                    controller: _monthTextController,
+                    maxLength: 2,
+                    onFinish: _finishEditingMonth,
+                    suffix: '月',
+                  )
+                : GestureDetector(
+                    onDoubleTap: _startEditingMonth,
+                    child: _buildWheel(
+                      controller: _monthController,
+                      itemCount: 12,
+                      labelBuilder: (index) => '${index + 1}月',
+                      selectedIndex: widget.month - 1,
+                      onChanged: (index) {
+                        widget.onChanged(widget.year, index + 1);
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required int maxLength,
+    required VoidCallback onFinish,
+    required String suffix,
+    String? hintText,
+  }) {
+    return Center(
+      child: SizedBox(
+        width: hintText != null ? 120 : 80,
+        height: 44,
+        child: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          autofocus: true,
+          maxLength: maxLength,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+          ],
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: widget.textColor,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            suffixText: suffix,
+            suffixStyle: TextStyle(
+              fontSize: 14,
+              color: widget.textColor.withOpacity(0.6),
+            ),
+            hintText: hintText,
+            hintStyle: TextStyle(
+              fontSize: 11,
+              color: widget.textColor.withOpacity(0.3),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor, width: 2),
+            ),
+          ),
+          onSubmitted: (_) => onFinish(),
+          onTapOutside: (_) => onFinish(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWheel({
+    required FixedExtentScrollController controller,
+    required int itemCount,
+    required String Function(int) labelBuilder,
+    required int selectedIndex,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Stack(
+      children: [
+        Center(
+          child: Container(
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        ListWheelScrollView.useDelegate(
+          controller: controller,
+          itemExtent: 36,
+          physics: const FixedExtentScrollPhysics(),
+          diameterRatio: 1.5,
+          perspective: 0.003,
+          onSelectedItemChanged: onChanged,
+          childDelegate: ListWheelChildBuilderDelegate(
+            childCount: itemCount,
+            builder: (context, index) {
+              final isSelected = index == selectedIndex;
+              return Center(
+                child: Text(
+                  labelBuilder(index),
+                  style: TextStyle(
+                    fontSize: isSelected ? 18 : 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected
+                        ? widget.textColor
+                        : widget.textColor.withOpacity(0.4),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

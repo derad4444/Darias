@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../data/models/repeat_settings.dart';
 import '../../../data/models/schedule_model.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../settings/tag_management_screen.dart';
+import 'repeat_settings_screen.dart';
 
 /// スケジュール詳細・編集画面（iOS版と同じデザイン）
 class ScheduleDetailScreen extends ConsumerStatefulWidget {
@@ -37,30 +41,18 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   late DateTime _startDate;
   late DateTime _endDate;
   bool _isAllDay = false;
-  String _repeatOption = '';
+  late RepeatSettings _repeatSettings;
   String _tag = '';
   int _remindValue = 0;
   String _remindUnit = '';
   bool _isSaving = false;
 
+  /// どのピッカーが展開中か（null=全て閉じ）
+  String? _expandedPicker; // 'start' or 'end'
+  /// 年月セレクターが展開中か
+  bool _showYearMonthPicker = false;
+
   bool get _isNewSchedule => widget.schedule == null;
-
-  // リピートオプション
-  static const List<Map<String, String>> _repeatOptions = [
-    {'value': '', 'label': 'なし'},
-    {'value': 'daily', 'label': '毎日'},
-    {'value': 'weekly', 'label': '毎週'},
-    {'value': 'monthly', 'label': '毎月'},
-    {'value': 'yearly', 'label': '毎年'},
-  ];
-
-  // リマインド単位
-  static const List<Map<String, String>> _remindUnits = [
-    {'value': '', 'label': 'なし'},
-    {'value': 'minutes', 'label': '分前'},
-    {'value': 'hours', 'label': '時間前'},
-    {'value': 'days', 'label': '日前'},
-  ];
 
   @override
   void initState() {
@@ -76,24 +68,46 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       _startDate = schedule.startDate;
       _endDate = schedule.endDate;
       _isAllDay = schedule.isAllDay;
-      _repeatOption = schedule.repeatOption;
+      _repeatSettings = RepeatSettings(
+        type: _repeatOptionToType(schedule.repeatOption),
+        weekday: schedule.startDate.weekday,
+        dayOfMonth: schedule.startDate.day,
+      );
       _tag = schedule.tag;
       _remindValue = schedule.remindValue;
       _remindUnit = schedule.remindUnit;
     } else {
-      // 新規作成時の初期値（iOS版と同じロジック）
-      final initialDate = widget.initialDate ?? DateTime.now();
+      // 新規作成時の初期値：現在時刻
       final now = DateTime.now();
-      final nextHour = now.hour + 1;
+      final initialDate = widget.initialDate ?? now;
 
       _startDate = DateTime(
         initialDate.year,
         initialDate.month,
         initialDate.day,
-        nextHour,
-        0,
+        now.hour,
+        now.minute,
       );
       _endDate = _startDate.add(const Duration(hours: 1));
+      _repeatSettings = RepeatSettings();
+    }
+  }
+
+  /// repeatOption文字列をRepeatTypeに変換
+  static RepeatType _repeatOptionToType(String option) {
+    switch (option) {
+      case 'daily':
+        return RepeatType.daily;
+      case 'weekly':
+        return RepeatType.weekly;
+      case 'monthly':
+        return RepeatType.monthly;
+      case 'monthStart':
+        return RepeatType.monthStart;
+      case 'monthEnd':
+        return RepeatType.monthEnd;
+      default:
+        return RepeatType.none;
     }
   }
 
@@ -192,37 +206,60 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                             const SizedBox(height: 16),
 
                             // 開始
-                            _buildDateRow(
+                            _buildInlineDateRow(
                               label: '開始',
+                              dateTime: _startDate,
+                              pickerKey: 'start',
                               textColor: textColor,
-                              child: _buildDateTimePicker(
-                                dateTime: _startDate,
-                                textColor: textColor,
-                                onChanged: (dateTime) {
-                                  setState(() {
-                                    _startDate = dateTime;
-                                    if (_endDate.isBefore(_startDate)) {
-                                      _endDate = _startDate.add(const Duration(hours: 1));
-                                    }
-                                  });
-                                },
-                              ),
+                              accentColor: accentColor,
+                              onDateChanged: (date) {
+                                setState(() {
+                                  _startDate = DateTime(
+                                    date.year, date.month, date.day,
+                                    _startDate.hour, _startDate.minute,
+                                  );
+                                  if (_endDate.isBefore(_startDate)) {
+                                    _endDate = _startDate.add(const Duration(hours: 1));
+                                  }
+                                });
+                              },
+                              onTimeChanged: (time) {
+                                setState(() {
+                                  _startDate = DateTime(
+                                    _startDate.year, _startDate.month, _startDate.day,
+                                    time.hour, time.minute,
+                                  );
+                                  if (_endDate.isBefore(_startDate)) {
+                                    _endDate = _startDate.add(const Duration(hours: 1));
+                                  }
+                                });
+                              },
                             ),
                             const SizedBox(height: 16),
 
                             // 終了
-                            _buildDateRow(
+                            _buildInlineDateRow(
                               label: '終了',
+                              dateTime: _endDate,
+                              pickerKey: 'end',
                               textColor: textColor,
-                              child: _buildDateTimePicker(
-                                dateTime: _endDate,
-                                textColor: textColor,
-                                onChanged: (dateTime) {
-                                  setState(() {
-                                    _endDate = dateTime;
-                                  });
-                                },
-                              ),
+                              accentColor: accentColor,
+                              onDateChanged: (date) {
+                                setState(() {
+                                  _endDate = DateTime(
+                                    date.year, date.month, date.day,
+                                    _endDate.hour, _endDate.minute,
+                                  );
+                                });
+                              },
+                              onTimeChanged: (time) {
+                                setState(() {
+                                  _endDate = DateTime(
+                                    _endDate.year, _endDate.month, _endDate.day,
+                                    time.hour, time.minute,
+                                  );
+                                });
+                              },
                             ),
                           ],
                         ),
@@ -235,7 +272,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                         textColor: textColor,
                         child: _buildNavigationRow(
                           icon: Icons.repeat,
-                          label: _getRepeatLabel(_repeatOption),
+                          label: _repeatSettings.getDescription(_startDate),
                           textColor: textColor,
                           onTap: () => _showRepeatPicker(accentColor, textColor),
                         ),
@@ -288,12 +325,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                             const SizedBox(height: 16),
 
                             // タグ
-                            _buildNavigationRow(
-                              icon: Icons.label_outline,
-                              label: _tag.isEmpty ? 'タグを選択' : _tag,
-                              textColor: textColor,
-                              onTap: () => _showTagPicker(accentColor, textColor),
-                            ),
+                            _buildTagRow(textColor, accentColor),
                             const SizedBox(height: 16),
 
                             // メモ
@@ -455,53 +487,229 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     );
   }
 
-  /// 日時ピッカー
-  Widget _buildDateTimePicker({
+  /// インライン展開式の日付行（iOS compact DatePicker風）
+  Widget _buildInlineDateRow({
+    required String label,
     required DateTime dateTime,
+    required String pickerKey,
     required Color textColor,
-    required ValueChanged<DateTime> onChanged,
+    required Color accentColor,
+    required ValueChanged<DateTime> onDateChanged,
+    required ValueChanged<TimeOfDay> onTimeChanged,
   }) {
-    return GestureDetector(
-      onTap: () async {
-        final date = await showDatePicker(
-          context: context,
-          initialDate: dateTime,
-          firstDate: DateTime.now().subtract(const Duration(days: 365)),
-          lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
-        );
+    final isExpanded = _expandedPicker == pickerKey;
 
-        if (date != null && mounted) {
-          if (_isAllDay) {
-            onChanged(date);
-          } else {
-            final time = await showTimePicker(
-              context: context,
-              initialTime: TimeOfDay.fromDateTime(dateTime),
-            );
-
-            if (time != null && mounted) {
-              onChanged(DateTime(
-                date.year,
-                date.month,
-                date.day,
-                time.hour,
-                time.minute,
-              ));
-            }
-          }
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(8),
+    return Column(
+      children: [
+        // ラベル + 日付表示行
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _expandedPicker = isExpanded ? null : pickerKey;
+            });
+          },
+          behavior: HitTestBehavior.opaque,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 60,
+                child: Text(label, style: TextStyle(color: textColor)),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isExpanded
+                      ? accentColor.withOpacity(0.15)
+                      : Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: isExpanded
+                      ? Border.all(color: accentColor.withOpacity(0.5))
+                      : null,
+                ),
+                child: Text(
+                  _isAllDay
+                      ? DateFormat('yyyy/MM/dd (E)', 'ja').format(dateTime)
+                      : DateFormat('yyyy/MM/dd (E) HH:mm', 'ja').format(dateTime),
+                  style: TextStyle(
+                    color: isExpanded ? accentColor : textColor,
+                    fontWeight: isExpanded ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: Text(
-          _isAllDay
-              ? DateFormat('yyyy/MM/dd (E)', 'ja').format(dateTime)
-              : DateFormat('yyyy/MM/dd (E) HH:mm', 'ja').format(dateTime),
-          style: TextStyle(color: textColor),
+
+        // インラインカレンダー（展開時）
+        if (isExpanded) ...[
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                // 年月ラベル（タップで年月セレクター展開）
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                            final newMonth = dateTime.month - 1;
+                            if (newMonth < 1) {
+                              onDateChanged(DateTime(dateTime.year - 1, 12, dateTime.day));
+                            } else {
+                              final maxDay = DateTime(dateTime.year, newMonth + 1, 0).day;
+                              onDateChanged(DateTime(dateTime.year, newMonth, dateTime.day > maxDay ? maxDay : dateTime.day));
+                            }
+                          },
+                          child: Icon(Icons.chevron_left, color: textColor.withOpacity(0.6), size: 24),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _showYearMonthPicker = !_showYearMonthPicker;
+                            });
+                          },
+                          child: Row(
+                            children: [
+                              Text(
+                                DateFormat('yyyy年 M月', 'ja').format(dateTime),
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: _showYearMonthPicker ? accentColor : textColor,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                _showYearMonthPicker
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: _showYearMonthPicker ? accentColor : textColor.withOpacity(0.5),
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            final newMonth = dateTime.month + 1;
+                            if (newMonth > 12) {
+                              onDateChanged(DateTime(dateTime.year + 1, 1, dateTime.day));
+                            } else {
+                              final maxDay = DateTime(dateTime.year, newMonth + 1, 0).day;
+                              onDateChanged(DateTime(dateTime.year, newMonth, dateTime.day > maxDay ? maxDay : dateTime.day));
+                            }
+                          },
+                          child: Icon(Icons.chevron_right, color: textColor.withOpacity(0.6), size: 24),
+                        ),
+                      ],
+                    ),
+                  ),
+                // 年・月スクロールセレクター（展開時のみ）
+                if (_showYearMonthPicker)
+                  _YearMonthSelector(
+                    year: dateTime.year,
+                    month: dateTime.month,
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    onChanged: (year, month) {
+                      final maxDay = DateTime(year, month + 1, 0).day;
+                      final day = dateTime.day > maxDay ? maxDay : dateTime.day;
+                      onDateChanged(DateTime(year, month, day));
+                    },
+                  ),
+                // カレンダー（ヘッダー非表示）
+                ClipRect(
+                  child: SizedBox(
+                    height: 300,
+                    child: Stack(
+                      children: [
+                        Positioned(
+                          top: -48,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: Theme.of(context).colorScheme.copyWith(
+                                primary: accentColor,
+                                onSurface: textColor,
+                              ),
+                            ),
+                            child: CalendarDatePicker(
+                              key: ValueKey('${dateTime.year}-${dateTime.month}'),
+                              initialDate: dateTime,
+                              firstDate: DateTime(DateTime.now().year - 1),
+                              lastDate: DateTime(DateTime.now().year + 5, 12, 31),
+                              onDateChanged: onDateChanged,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // 時間ピッカー（終日でない場合）
+                if (!_isAllDay) ...[
+                  Divider(color: textColor.withOpacity(0.2), height: 1),
+                  _buildInlineTimePicker(
+                    time: TimeOfDay.fromDateTime(dateTime),
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    onChanged: onTimeChanged,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  /// インライン時間ピッカー（スクロールホイール + タップで自由入力）
+  Widget _buildInlineTimePicker({
+    required TimeOfDay time,
+    required Color textColor,
+    required Color accentColor,
+    required ValueChanged<TimeOfDay> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: SizedBox(
+        height: 120,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.access_time, color: textColor.withOpacity(0.7), size: 20),
+            const SizedBox(width: 16),
+            // 時スクロール
+            _TimeWheelPicker(
+              value: time.hour,
+              maxValue: 23,
+              textColor: textColor,
+              accentColor: accentColor,
+              onChanged: (h) => onChanged(TimeOfDay(hour: h, minute: time.minute)),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(':', style: TextStyle(color: textColor, fontSize: 22, fontWeight: FontWeight.bold)),
+            ),
+            // 分スクロール
+            _TimeWheelPicker(
+              value: time.minute,
+              maxValue: 59,
+              textColor: textColor,
+              accentColor: accentColor,
+              onChanged: (m) => onChanged(TimeOfDay(hour: time.hour, minute: m)),
+            ),
+          ],
         ),
       ),
     );
@@ -566,38 +774,38 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     );
   }
 
-  String _getRepeatLabel(String value) {
-    final option = _repeatOptions.firstWhere(
-      (o) => o['value'] == value,
-      orElse: () => _repeatOptions.first,
-    );
-    return option['label']!;
-  }
-
   String _getNotificationLabel() {
     if (_remindValue <= 0 || _remindUnit.isEmpty) {
       return 'なし';
     }
-    final unitLabel = _remindUnits.firstWhere(
-      (u) => u['value'] == _remindUnit,
-      orElse: () => _remindUnits.first,
-    )['label']!;
-    return '$_remindValue$unitLabel';
+    switch (_remindUnit) {
+      case 'minutes':
+        return '$_remindValue分前';
+      case 'hours':
+        return '$_remindValue時間前';
+      case 'days':
+        return '$_remindValue日前';
+      default:
+        return 'なし';
+    }
   }
 
   void _showRepeatPicker(Color accentColor, Color textColor) {
+    final gradient = ref.read(backgroundGradientProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _PickerBottomSheet(
-        title: '繰り返し',
-        options: _repeatOptions.map((o) => o['label']!).toList(),
-        selectedIndex: _repeatOptions.indexWhere((o) => o['value'] == _repeatOption),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _RepeatPickerSheet(
+        initialSettings: _repeatSettings,
+        baseDate: _startDate,
         accentColor: accentColor,
         textColor: textColor,
-        onSelected: (index) {
+        backgroundGradient: gradient,
+        onSave: (settings) {
           setState(() {
-            _repeatOption = _repeatOptions[index]['value']!;
+            _repeatSettings = settings;
           });
         },
       ),
@@ -605,14 +813,18 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   }
 
   void _showNotificationPicker(Color accentColor, Color textColor) {
+    final gradient = ref.read(backgroundGradientProvider);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => _NotificationPickerSheet(
         remindValue: _remindValue,
         remindUnit: _remindUnit,
         accentColor: accentColor,
         textColor: textColor,
+        backgroundGradient: gradient,
         onSave: (value, unit) {
           setState(() {
             _remindValue = value;
@@ -623,23 +835,140 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     );
   }
 
+  /// タグ表示行（カラーサークル付き）
+  Widget _buildTagRow(Color textColor, Color accentColor) {
+    final tags = ref.watch(tagsProvider);
+    final matchingTag = _tag.isEmpty
+        ? null
+        : tags.where((t) => t.name == _tag).firstOrNull;
+
+    return GestureDetector(
+      onTap: () => _showTagPicker(accentColor, textColor),
+      behavior: HitTestBehavior.opaque,
+      child: Row(
+        children: [
+          Icon(
+            Icons.label_outline,
+            color: textColor.withOpacity(0.7),
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          if (matchingTag != null) ...[
+            Container(
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: matchingTag.color,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              _tag.isEmpty ? 'タグを選択' : _tag,
+              style: TextStyle(color: textColor),
+            ),
+          ),
+          Icon(
+            Icons.chevron_right,
+            color: textColor.withOpacity(0.7),
+            size: 20,
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showTagPicker(Color accentColor, Color textColor) {
-    final tags = ['仕事', 'プライベート', '家族', '健康', '趣味', 'その他'];
+    final tags = ref.read(tagsProvider);
+    final gradient = ref.read(backgroundGradientProvider);
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => _PickerBottomSheet(
-        title: 'タグを選択',
-        options: ['なし', ...tags],
-        selectedIndex: _tag.isEmpty ? 0 : tags.indexOf(_tag) + 1,
-        accentColor: accentColor,
-        textColor: textColor,
-        onSelected: (index) {
-          setState(() {
-            _tag = index == 0 ? '' : tags[index - 1];
-          });
-        },
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ハンドル
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // タイトル
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'タグを選択',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+            ),
+            // タグなし
+            ListTile(
+              leading: Icon(Icons.label_off_outlined, color: textColor.withOpacity(0.5)),
+              title: Text(
+                'なし',
+                style: TextStyle(
+                  color: _tag.isEmpty ? accentColor : textColor,
+                  fontWeight: _tag.isEmpty ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+              trailing: _tag.isEmpty
+                  ? Icon(Icons.check, color: accentColor)
+                  : null,
+              onTap: () {
+                setState(() => _tag = '');
+                Navigator.pop(context);
+              },
+            ),
+            // Firestoreタグ一覧
+            ...tags.map((tag) {
+              final isSelected = _tag == tag.name;
+              return ListTile(
+                leading: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: tag.color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                title: Text(
+                  tag.name,
+                  style: TextStyle(
+                    color: isSelected ? accentColor : textColor,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+                trailing: isSelected
+                    ? Icon(Icons.check, color: accentColor)
+                    : null,
+                onTap: () {
+                  setState(() => _tag = tag.name);
+                  Navigator.pop(context);
+                },
+              );
+            }),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
@@ -669,7 +998,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           location: _locationController.text,
           memo: _memoController.text,
           tag: _tag,
-          repeatOption: _repeatOption,
+          repeatOption: _repeatSettings.type.name == 'none' ? '' : _repeatSettings.type.name,
           remindValue: _remindValue,
           remindUnit: _remindUnit,
         );
@@ -684,7 +1013,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           location: _locationController.text,
           memo: _memoController.text,
           tag: _tag,
-          repeatOption: _repeatOption,
+          repeatOption: _repeatSettings.type.name == 'none' ? '' : _repeatSettings.type.name,
           remindValue: _remindValue,
           remindUnit: _remindUnit,
         );
@@ -753,94 +1082,13 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   }
 }
 
-/// 選択ピッカーのボトムシート
-class _PickerBottomSheet extends StatelessWidget {
-  final String title;
-  final List<String> options;
-  final int selectedIndex;
-  final Color accentColor;
-  final Color textColor;
-  final ValueChanged<int> onSelected;
-
-  const _PickerBottomSheet({
-    required this.title,
-    required this.options,
-    required this.selectedIndex,
-    required this.accentColor,
-    required this.textColor,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // ハンドル
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-
-          // タイトル
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-
-          // オプション
-          ...options.asMap().entries.map((entry) {
-            final index = entry.key;
-            final option = entry.value;
-            final isSelected = index == selectedIndex;
-
-            return ListTile(
-              title: Text(
-                option,
-                style: TextStyle(
-                  color: isSelected ? accentColor : Colors.black87,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-              trailing: isSelected
-                  ? Icon(Icons.check, color: accentColor)
-                  : null,
-              onTap: () {
-                onSelected(index);
-                Navigator.pop(context);
-              },
-            );
-          }),
-
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-}
-
-/// 通知設定ピッカー
+/// 通知設定ピッカー（iOS版同様の+/-ボタン+ピルボタンUI）
 class _NotificationPickerSheet extends StatefulWidget {
   final int remindValue;
   final String remindUnit;
   final Color accentColor;
   final Color textColor;
+  final Gradient backgroundGradient;
   final void Function(int value, String unit) onSave;
 
   const _NotificationPickerSheet({
@@ -848,36 +1096,47 @@ class _NotificationPickerSheet extends StatefulWidget {
     required this.remindUnit,
     required this.accentColor,
     required this.textColor,
+    required this.backgroundGradient,
     required this.onSave,
   });
 
   @override
-  State<_NotificationPickerSheet> createState() => _NotificationPickerSheetState();
+  State<_NotificationPickerSheet> createState() =>
+      _NotificationPickerSheetState();
 }
 
 class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
   late int _value;
   late String _unit;
-
-  static const List<Map<String, String>> _units = [
-    {'value': '', 'label': 'なし'},
-    {'value': 'minutes', 'label': '分前'},
-    {'value': 'hours', 'label': '時間前'},
-    {'value': 'days', 'label': '日前'},
-  ];
+  late bool _isEnabled;
 
   @override
   void initState() {
     super.initState();
-    _value = widget.remindValue;
-    _unit = widget.remindUnit;
+    _value = widget.remindValue > 0 ? widget.remindValue : 10;
+    _unit = widget.remindUnit.isNotEmpty ? widget.remindUnit : 'minutes';
+    _isEnabled = widget.remindValue > 0 && widget.remindUnit.isNotEmpty;
+  }
+
+  int get _maxValue {
+    switch (_unit) {
+      case 'minutes':
+        return 59;
+      case 'hours':
+        return 23;
+      case 'days':
+        return 30;
+      default:
+        return 59;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      height: MediaQuery.of(context).size.height,
       decoration: BoxDecoration(
-        color: Colors.white,
+        gradient: widget.backgroundGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
@@ -889,7 +1148,7 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: widget.textColor.withOpacity(0.3),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -902,18 +1161,23 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('キャンセル'),
+                  child: Text('キャンセル', style: TextStyle(color: widget.textColor)),
                 ),
-                const Text(
+                Text(
                   '通知',
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
+                    color: widget.textColor,
                   ),
                 ),
                 TextButton(
                   onPressed: () {
-                    widget.onSave(_value, _unit);
+                    if (_isEnabled) {
+                      widget.onSave(_value, _unit);
+                    } else {
+                      widget.onSave(0, '');
+                    }
                     Navigator.pop(context);
                   },
                   child: Text(
@@ -925,56 +1189,87 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
             ),
           ),
 
-          // 値と単位の選択
+          // ON/OFFトグル
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '通知',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: widget.textColor),
+                ),
+                Switch(
+                  value: _isEnabled,
+                  activeColor: widget.accentColor,
+                  onChanged: (value) {
+                    setState(() => _isEnabled = value);
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // -/値/+ コントロール
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // マイナスボタン
+                _buildStepperButton(
+                  icon: Icons.remove,
+                  onTap: _value > 1
+                      ? () => setState(() => _value--)
+                      : null,
+                  accentColor: widget.accentColor,
+                ),
+                // 値表示
+                Container(
+                  width: 80,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 12),
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '$_value',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: widget.textColor,
+                    ),
+                  ),
+                ),
+                // プラスボタン
+                _buildStepperButton(
+                  icon: Icons.add,
+                  onTap: _value < _maxValue
+                      ? () => setState(() => _value++)
+                      : null,
+                  accentColor: widget.accentColor,
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // 分・時間・日のピルボタン
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               children: [
-                // 数値入力
-                SizedBox(
-                  width: 80,
-                  child: TextField(
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    controller: TextEditingController(
-                      text: _value > 0 ? _value.toString() : '',
-                    ),
-                    onChanged: (text) {
-                      _value = int.tryParse(text) ?? 0;
-                    },
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // 単位選択
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: _unit,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    ),
-                    items: _units.map((u) {
-                      return DropdownMenuItem(
-                        value: u['value'],
-                        child: Text(u['label']!),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _unit = value ?? '';
-                      });
-                    },
-                  ),
-                ),
+                _buildUnitPill('minutes', '分前'),
+                const SizedBox(width: 8),
+                _buildUnitPill('hours', '時間前'),
+                const SizedBox(width: 8),
+                _buildUnitPill('days', '日前'),
               ],
             ),
           ),
@@ -982,6 +1277,969 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
           const SizedBox(height: 30),
         ],
       ),
+    );
+  }
+
+  Widget _buildStepperButton({
+    required IconData icon,
+    required VoidCallback? onTap,
+    required Color accentColor,
+  }) {
+    final isDisabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: isDisabled ? Colors.white.withOpacity(0.2) : accentColor.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: isDisabled ? Colors.grey[400] : accentColor,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUnitPill(String unitValue, String label) {
+    final isSelected = _unit == unitValue;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _unit = unitValue;
+            // 単位変更時に値が上限を超えていたら調整
+            final newMax = unitValue == 'minutes'
+                ? 59
+                : unitValue == 'hours'
+                    ? 23
+                    : 30;
+            if (_value > newMax) _value = newMax;
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? widget.accentColor : Colors.white.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: isSelected ? Colors.white : widget.textColor,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              fontSize: 14,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// スクロールホイール式の時間ピッカー（タップで自由入力対応）
+class _TimeWheelPicker extends StatefulWidget {
+  final int value;
+  final int maxValue;
+  final Color textColor;
+  final Color accentColor;
+  final ValueChanged<int> onChanged;
+
+  const _TimeWheelPicker({
+    required this.value,
+    required this.maxValue,
+    required this.textColor,
+    required this.accentColor,
+    required this.onChanged,
+  });
+
+  @override
+  State<_TimeWheelPicker> createState() => _TimeWheelPickerState();
+}
+
+class _TimeWheelPickerState extends State<_TimeWheelPicker> {
+  late FixedExtentScrollController _scrollController;
+  bool _isEditing = false;
+  late TextEditingController _textController;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = FixedExtentScrollController(initialItem: widget.value);
+    _textController = TextEditingController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TimeWheelPicker oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value && !_isEditing) {
+      _scrollController.jumpToItem(widget.value);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _textController.dispose();
+    super.dispose();
+  }
+
+  void _startEditing() {
+    setState(() {
+      _isEditing = true;
+      _textController.text = widget.value.toString().padLeft(2, '0');
+    });
+    // テキストを全選択状態にする
+    Future.microtask(() {
+      _textController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _textController.text.length,
+      );
+    });
+  }
+
+  void _finishEditing() {
+    final parsed = int.tryParse(_textController.text);
+    if (parsed != null && parsed >= 0 && parsed <= widget.maxValue) {
+      widget.onChanged(parsed);
+    }
+    setState(() => _isEditing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isEditing) {
+      return SizedBox(
+        width: 56,
+        height: 44,
+        child: TextField(
+          controller: _textController,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          autofocus: true,
+          maxLength: 2,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            _MaxValueFormatter(widget.maxValue),
+          ],
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: widget.textColor,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor, width: 2),
+            ),
+          ),
+          onSubmitted: (_) => _finishEditing(),
+          onTapOutside: (_) => _finishEditing(),
+        ),
+      );
+    }
+
+    return GestureDetector(
+      onTap: _startEditing,
+      child: SizedBox(
+        width: 56,
+        height: 120,
+        child: Stack(
+          children: [
+            // 選択中ハイライト
+            Center(
+              child: Container(
+                height: 36,
+                decoration: BoxDecoration(
+                  color: widget.accentColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            // ホイール
+            ListWheelScrollView.useDelegate(
+              controller: _scrollController,
+              itemExtent: 36,
+              physics: const FixedExtentScrollPhysics(),
+              diameterRatio: 1.5,
+              perspective: 0.003,
+              onSelectedItemChanged: (index) {
+                widget.onChanged(index);
+              },
+              childDelegate: ListWheelChildBuilderDelegate(
+                childCount: widget.maxValue + 1,
+                builder: (context, index) {
+                  final isSelected = index == widget.value;
+                  return Center(
+                    child: Text(
+                      index.toString().padLeft(2, '0'),
+                      style: TextStyle(
+                        fontSize: isSelected ? 22 : 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                        color: isSelected
+                            ? widget.textColor
+                            : widget.textColor.withOpacity(0.4),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 最大値を超える入力を制限するフォーマッター
+class _MaxValueFormatter extends TextInputFormatter {
+  final int maxValue;
+  _MaxValueFormatter(this.maxValue);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) return newValue;
+    final parsed = int.tryParse(newValue.text);
+    if (parsed == null) return oldValue;
+    if (parsed > maxValue) return oldValue;
+    return newValue;
+  }
+}
+
+/// 繰り返し設定ボトムシート
+class _RepeatPickerSheet extends StatefulWidget {
+  final RepeatSettings initialSettings;
+  final DateTime baseDate;
+  final Color accentColor;
+  final Color textColor;
+  final Gradient backgroundGradient;
+  final Function(RepeatSettings) onSave;
+
+  const _RepeatPickerSheet({
+    required this.initialSettings,
+    required this.baseDate,
+    required this.accentColor,
+    required this.textColor,
+    required this.backgroundGradient,
+    required this.onSave,
+  });
+
+  @override
+  State<_RepeatPickerSheet> createState() => _RepeatPickerSheetState();
+}
+
+class _RepeatPickerSheetState extends State<_RepeatPickerSheet> {
+  late RepeatType _selectedType;
+  late RepeatEndType _selectedEndType;
+  late DateTime _selectedEndDate;
+  late int _selectedOccurrenceCount;
+  bool _showEndDateCalendar = false;
+  bool _showEndDateYearMonth = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedType = widget.initialSettings.type;
+    _selectedEndType = widget.initialSettings.endType;
+    _selectedEndDate = widget.initialSettings.endDate;
+    _selectedOccurrenceCount = widget.initialSettings.occurrenceCount;
+  }
+
+  String _getPreviewText(RepeatType type) {
+    switch (type) {
+      case RepeatType.none:
+        return '';
+      case RepeatType.daily:
+        return '毎日同じ時間に実行';
+      case RepeatType.weekly:
+        const weekdays = ['月', '火', '水', '木', '金', '土', '日'];
+        final name = '${weekdays[(widget.baseDate.weekday - 1) % 7]}曜日';
+        return '毎週$nameに実行';
+      case RepeatType.monthly:
+        return '毎月${widget.baseDate.day}日に実行';
+      case RepeatType.monthStart:
+        return '毎月1日に実行';
+      case RepeatType.monthEnd:
+        return '毎月の最終日に実行';
+    }
+  }
+
+  bool get _isEndDateInPast {
+    if (_selectedType == RepeatType.none) return false;
+    if (_selectedEndType != RepeatEndType.onDate) return false;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return _selectedEndDate.isBefore(today);
+  }
+
+  void _save() {
+    if (_isEndDateInPast) return;
+    final settings = RepeatSettings(
+      type: _selectedType,
+      weekday: widget.baseDate.weekday,
+      dayOfMonth: widget.baseDate.day,
+      endType: _selectedEndType,
+      endDate: _selectedEndDate,
+      occurrenceCount: _selectedOccurrenceCount,
+    );
+    widget.onSave(settings);
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height,
+      decoration: BoxDecoration(
+        gradient: widget.backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        children: [
+          // ハンドル
+          Container(
+            margin: const EdgeInsets.only(top: 12),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: widget.textColor.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          // ヘッダー
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('キャンセル', style: TextStyle(color: widget.textColor)),
+                ),
+                Text(
+                  '繰り返し設定',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: widget.textColor,
+                  ),
+                ),
+                TextButton(
+                  onPressed: _isEndDateInPast ? null : _save,
+                  child: Text('完了', style: TextStyle(
+                    color: _isEndDateInPast ? widget.textColor.withOpacity(0.3) : widget.accentColor,
+                  )),
+                ),
+              ],
+            ),
+          ),
+          // コンテンツ
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              physics: const BouncingScrollPhysics(),
+              children: [
+                // 繰り返しパターン
+                ...RepeatType.values.map((type) {
+                  final isSelected = _selectedType == type;
+                  final preview = _getPreviewText(type);
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedType = type),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(isSelected ? 0.5 : 0.25),
+                        borderRadius: BorderRadius.circular(12),
+                        border: isSelected
+                            ? Border.all(color: widget.accentColor, width: 2)
+                            : null,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  type.displayName,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w500,
+                                    color: widget.textColor,
+                                  ),
+                                ),
+                                if (preview.isNotEmpty) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    preview,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: widget.textColor.withOpacity(0.6),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(Icons.check_circle, color: widget.accentColor),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
+                // 終了条件（繰り返しありの場合）
+                if (_selectedType != RepeatType.none) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '終了条件',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: widget.accentColor,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.25),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      children: RepeatEndType.values.map((type) {
+                        return RadioListTile<RepeatEndType>(
+                          title: Text(type.displayName, style: TextStyle(color: widget.textColor)),
+                          value: type,
+                          groupValue: _selectedEndType,
+                          activeColor: widget.accentColor,
+                          onChanged: (value) {
+                            if (value != null) setState(() => _selectedEndType = value);
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  // 日付選択
+                  if (_selectedEndType == RepeatEndType.onDate) ...[
+                    const SizedBox(height: 12),
+                    // 終了日ラベル（タップで展開）
+                    GestureDetector(
+                      onTap: () {
+                        setState(() => _showEndDateCalendar = !_showEndDateCalendar);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(_showEndDateCalendar ? 0.4 : 0.25),
+                          borderRadius: BorderRadius.circular(12),
+                          border: _showEndDateCalendar
+                              ? Border.all(color: widget.accentColor.withOpacity(0.5))
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, color: widget.accentColor, size: 20),
+                            const SizedBox(width: 12),
+                            Text('終了日', style: TextStyle(color: widget.textColor)),
+                            const Spacer(),
+                            Text(
+                              DateFormat('yyyy/MM/dd (E)', 'ja').format(_selectedEndDate),
+                              style: TextStyle(
+                                color: _showEndDateCalendar ? widget.accentColor : widget.textColor.withOpacity(0.7),
+                                fontWeight: _showEndDateCalendar ? FontWeight.w600 : FontWeight.normal,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // 過去日付の警告
+                    if (_isEndDateInPast)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 16),
+                            const SizedBox(width: 6),
+                            Text(
+                              '終了日は今日以降の日付を選択してください',
+                              style: TextStyle(color: Colors.orange, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // インラインカレンダー（展開時）
+                    if (_showEndDateCalendar) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            // 年月ラベル（< 2026年2月 >）
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      final m = _selectedEndDate.month - 1;
+                                      if (m < 1) {
+                                        setState(() => _selectedEndDate = DateTime(_selectedEndDate.year - 1, 12, 1));
+                                      } else {
+                                        final maxDay = DateTime(_selectedEndDate.year, m + 1, 0).day;
+                                        final day = _selectedEndDate.day > maxDay ? maxDay : _selectedEndDate.day;
+                                        setState(() => _selectedEndDate = DateTime(_selectedEndDate.year, m, day));
+                                      }
+                                    },
+                                    child: Icon(Icons.chevron_left, color: widget.textColor.withOpacity(0.6), size: 24),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      setState(() => _showEndDateYearMonth = !_showEndDateYearMonth);
+                                    },
+                                    child: Row(
+                                      children: [
+                                        Text(
+                                          DateFormat('yyyy年 M月', 'ja').format(_selectedEndDate),
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: _showEndDateYearMonth ? widget.accentColor : widget.textColor,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          _showEndDateYearMonth
+                                              ? Icons.keyboard_arrow_up
+                                              : Icons.keyboard_arrow_down,
+                                          color: _showEndDateYearMonth ? widget.accentColor : widget.textColor.withOpacity(0.5),
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTap: () {
+                                      final m = _selectedEndDate.month + 1;
+                                      if (m > 12) {
+                                        setState(() => _selectedEndDate = DateTime(_selectedEndDate.year + 1, 1, 1));
+                                      } else {
+                                        final maxDay = DateTime(_selectedEndDate.year, m + 1, 0).day;
+                                        final day = _selectedEndDate.day > maxDay ? maxDay : _selectedEndDate.day;
+                                        setState(() => _selectedEndDate = DateTime(_selectedEndDate.year, m, day));
+                                      }
+                                    },
+                                    child: Icon(Icons.chevron_right, color: widget.textColor.withOpacity(0.6), size: 24),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // 年月セレクター
+                            if (_showEndDateYearMonth)
+                              _YearMonthSelector(
+                                year: _selectedEndDate.year,
+                                month: _selectedEndDate.month,
+                                textColor: widget.textColor,
+                                accentColor: widget.accentColor,
+                                baseYear: DateTime.now().year,
+                                yearCount: 20,
+                                onChanged: (year, month) {
+                                  final maxDay = DateTime(year, month + 1, 0).day;
+                                  final day = _selectedEndDate.day > maxDay ? maxDay : _selectedEndDate.day;
+                                  setState(() => _selectedEndDate = DateTime(year, month, day));
+                                },
+                              ),
+                            // カレンダー（ヘッダー非表示）
+                            ClipRect(
+                              child: SizedBox(
+                                height: 300,
+                                child: Stack(
+                                  children: [
+                                    Positioned(
+                                      top: -48,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      child: Theme(
+                                        data: Theme.of(context).copyWith(
+                                          colorScheme: Theme.of(context).colorScheme.copyWith(
+                                            primary: widget.accentColor,
+                                            onSurface: widget.textColor,
+                                          ),
+                                        ),
+                                        child: CalendarDatePicker(
+                                          key: ValueKey('end-${_selectedEndDate.year}-${_selectedEndDate.month}'),
+                                          initialDate: _selectedEndDate,
+                                          firstDate: DateTime(DateTime.now().year, 1, 1),
+                                          lastDate: DateTime(DateTime.now().year + 20, 12, 31),
+                                          onDateChanged: (date) {
+                                            setState(() => _selectedEndDate = date);
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+
+                  // 回数選択
+                  if (_selectedEndType == RepeatEndType.afterOccurrences) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.25),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.repeat, color: widget.accentColor, size: 20),
+                          const SizedBox(width: 12),
+                          Text('繰り返し回数', style: TextStyle(color: widget.textColor)),
+                          const Spacer(),
+                          DropdownButton<int>(
+                            value: _selectedOccurrenceCount,
+                            dropdownColor: Colors.white,
+                            items: List.generate(50, (i) => i + 1)
+                                .map((count) => DropdownMenuItem(
+                                      value: count,
+                                      child: Text('$count回'),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) setState(() => _selectedOccurrenceCount = value);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 年・月スクロールセレクター
+class _YearMonthSelector extends StatefulWidget {
+  final int year;
+  final int month;
+  final Color textColor;
+  final Color accentColor;
+  final void Function(int year, int month) onChanged;
+  final int? baseYear;
+  final int? yearCount;
+
+  const _YearMonthSelector({
+    required this.year,
+    required this.month,
+    required this.textColor,
+    required this.accentColor,
+    required this.onChanged,
+    this.baseYear,
+    this.yearCount,
+  });
+
+  @override
+  State<_YearMonthSelector> createState() => _YearMonthSelectorState();
+}
+
+class _YearMonthSelectorState extends State<_YearMonthSelector> {
+  late FixedExtentScrollController _yearController;
+  late FixedExtentScrollController _monthController;
+  bool _isEditingYear = false;
+  bool _isEditingMonth = false;
+  late TextEditingController _yearTextController;
+  late TextEditingController _monthTextController;
+
+  late final int _baseYear;
+  late final int _yearCount;
+
+  @override
+  void initState() {
+    super.initState();
+    _baseYear = widget.baseYear ?? (DateTime.now().year - 1);
+    _yearCount = widget.yearCount ?? 7;
+    _yearController = FixedExtentScrollController(
+      initialItem: widget.year - _baseYear,
+    );
+    _monthController = FixedExtentScrollController(
+      initialItem: widget.month - 1,
+    );
+    _yearTextController = TextEditingController();
+    _monthTextController = TextEditingController();
+  }
+
+  @override
+  void didUpdateWidget(covariant _YearMonthSelector oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.year != widget.year && !_isEditingYear) {
+      final targetIndex = widget.year - _baseYear;
+      if (targetIndex >= 0 && targetIndex < _yearCount) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _yearController.hasClients) {
+            _yearController.jumpToItem(targetIndex);
+          }
+        });
+      }
+    }
+    if (oldWidget.month != widget.month && !_isEditingMonth) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _monthController.hasClients) {
+          _monthController.jumpToItem(widget.month - 1);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _yearController.dispose();
+    _monthController.dispose();
+    _yearTextController.dispose();
+    _monthTextController.dispose();
+    super.dispose();
+  }
+
+  void _startEditingYear() {
+    setState(() {
+      _isEditingYear = true;
+      _yearTextController.text = widget.year.toString();
+    });
+    Future.microtask(() {
+      _yearTextController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _yearTextController.text.length,
+      );
+    });
+  }
+
+  void _finishEditingYear() {
+    final parsed = int.tryParse(_yearTextController.text);
+    if (parsed != null) {
+      final minYear = _baseYear;
+      final maxYear = _baseYear + _yearCount - 1;
+      final clamped = parsed.clamp(minYear, maxYear);
+      widget.onChanged(clamped, widget.month);
+    }
+    setState(() => _isEditingYear = false);
+  }
+
+  void _startEditingMonth() {
+    setState(() {
+      _isEditingMonth = true;
+      _monthTextController.text = widget.month.toString();
+    });
+    Future.microtask(() {
+      _monthTextController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _monthTextController.text.length,
+      );
+    });
+  }
+
+  void _finishEditingMonth() {
+    final parsed = int.tryParse(_monthTextController.text);
+    if (parsed != null && parsed >= 1 && parsed <= 12) {
+      widget.onChanged(widget.year, parsed);
+    }
+    setState(() => _isEditingMonth = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 100,
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          // 年
+          Expanded(
+            flex: 3,
+            child: _isEditingYear
+                ? _buildTextField(
+                    controller: _yearTextController,
+                    maxLength: 4,
+                    onFinish: _finishEditingYear,
+                    suffix: '年',
+                    hintText: '$_baseYear〜${_baseYear + _yearCount - 1}',
+                  )
+                : GestureDetector(
+                    onDoubleTap: _startEditingYear,
+                    child: _buildWheel(
+                      controller: _yearController,
+                      itemCount: _yearCount,
+                      labelBuilder: (index) => '${_baseYear + index}年',
+                      selectedIndex: widget.year - _baseYear,
+                      onChanged: (index) {
+                        widget.onChanged(_baseYear + index, widget.month);
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          // 月
+          Expanded(
+            flex: 2,
+            child: _isEditingMonth
+                ? _buildTextField(
+                    controller: _monthTextController,
+                    maxLength: 2,
+                    maxValue: 12,
+                    onFinish: _finishEditingMonth,
+                    suffix: '月',
+                  )
+                : GestureDetector(
+                    onDoubleTap: _startEditingMonth,
+                    child: _buildWheel(
+                      controller: _monthController,
+                      itemCount: 12,
+                      labelBuilder: (index) => '${index + 1}月',
+                      selectedIndex: widget.month - 1,
+                      onChanged: (index) {
+                        widget.onChanged(widget.year, index + 1);
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required int maxLength,
+    required VoidCallback onFinish,
+    required String suffix,
+    int? maxValue,
+    String? hintText,
+  }) {
+    return Center(
+      child: SizedBox(
+        width: hintText != null ? 120 : 80,
+        height: 44,
+        child: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          textAlign: TextAlign.center,
+          autofocus: true,
+          maxLength: maxLength,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            if (maxValue != null) _MaxValueFormatter(maxValue),
+          ],
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: widget.textColor,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            suffixText: suffix,
+            suffixStyle: TextStyle(
+              fontSize: 14,
+              color: widget.textColor.withOpacity(0.6),
+            ),
+            hintText: hintText,
+            hintStyle: TextStyle(
+              fontSize: 11,
+              color: widget.textColor.withOpacity(0.3),
+            ),
+            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(color: widget.accentColor, width: 2),
+            ),
+          ),
+          onSubmitted: (_) => onFinish(),
+          onTapOutside: (_) => onFinish(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWheel({
+    required FixedExtentScrollController controller,
+    required int itemCount,
+    required String Function(int) labelBuilder,
+    required int selectedIndex,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Stack(
+      children: [
+        // 選択中ハイライト
+        Center(
+          child: Container(
+            height: 36,
+            decoration: BoxDecoration(
+              color: widget.accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        ),
+        ListWheelScrollView.useDelegate(
+          controller: controller,
+          itemExtent: 36,
+          physics: const FixedExtentScrollPhysics(),
+          diameterRatio: 1.5,
+          perspective: 0.003,
+          onSelectedItemChanged: onChanged,
+          childDelegate: ListWheelChildBuilderDelegate(
+            childCount: itemCount,
+            builder: (context, index) {
+              final isSelected = index == selectedIndex;
+              return Center(
+                child: Text(
+                  labelBuilder(index),
+                  style: TextStyle(
+                    fontSize: isSelected ? 18 : 14,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected
+                        ? widget.textColor
+                        : widget.textColor.withOpacity(0.4),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

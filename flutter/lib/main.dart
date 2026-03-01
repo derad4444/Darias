@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_colors.dart';
@@ -61,6 +62,14 @@ class DariasApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'DARIAS',
       debugShowCheckedModeBanner: false,
+      // 日本語ロケール設定
+      locale: const Locale('ja', 'JP'),
+      supportedLocales: const [Locale('ja', 'JP')],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       // iOS風の動作を有効化
       theme: _buildLightTheme(colorSeed),
       darkTheme: _buildDarkTheme(colorSeed),

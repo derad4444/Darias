@@ -14,9 +14,13 @@ class MemoDetailScreen extends ConsumerStatefulWidget {
   /// 編集対象のメモ（nullの場合は新規作成）
   final MemoModel? memo;
 
+  /// 新規作成時に自動セットするタグ
+  final String initialTag;
+
   const MemoDetailScreen({
     super.key,
     this.memo,
+    this.initialTag = '',
   });
 
   @override
@@ -40,7 +44,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
     _titleController = TextEditingController(text: widget.memo?.title ?? '');
     _contentController =
         TextEditingController(text: widget.memo?.content ?? '');
-    _selectedTag = widget.memo?.tag ?? '';
+    _selectedTag = widget.memo?.tag ?? widget.initialTag;
 
     if (widget.memo != null) {
       _isPinned = widget.memo!.isPinned;

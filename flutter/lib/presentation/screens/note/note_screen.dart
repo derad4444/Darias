@@ -6,12 +6,19 @@ import '../../providers/theme_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../settings/tag_management_screen.dart';
 
 /// ノートのセグメント
 enum NoteSegment { memo, todo }
 
 /// 現在選択されているセグメント
 final noteSegmentProvider = StateProvider<NoteSegment>((ref) => NoteSegment.memo);
+
+/// メモタブで選択中のタグフィルター
+final memoSelectedTagProvider = StateProvider<String>((ref) => 'すべて');
+
+/// タスクタブで選択中のタグフィルター
+final todoSelectedTagProvider = StateProvider<String>((ref) => 'すべて');
 
 /// iOS版NoteViewと同じ構成のノート画面
 class NoteScreen extends ConsumerWidget {
@@ -36,9 +43,13 @@ class NoteScreen extends ConsumerWidget {
             color: accentColor,
             onPressed: () {
               if (selectedSegment == NoteSegment.memo) {
-                context.push('/memo/detail');
+                final selectedTag = ref.read(memoSelectedTagProvider);
+                final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
+                context.push('/memo/detail', extra: {'initialTag': initialTag});
               } else {
-                context.push('/todo/detail');
+                final selectedTag = ref.read(todoSelectedTagProvider);
+                final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
+                context.push('/todo/detail', extra: {'initialTag': initialTag});
               }
             },
           ),
@@ -176,7 +187,9 @@ class _MemoContentView extends ConsumerStatefulWidget {
 
 class _MemoContentViewState extends ConsumerState<_MemoContentView> {
   final TextEditingController _searchController = TextEditingController();
-  String _selectedTag = 'すべて';
+
+  String get _selectedTag => ref.read(memoSelectedTagProvider);
+  set _selectedTag(String value) => ref.read(memoSelectedTagProvider.notifier).state = value;
 
   @override
   void dispose() {
@@ -188,6 +201,9 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
   Widget build(BuildContext context) {
     final accentColor = ref.watch(accentColorProvider);
     final memosAsync = ref.watch(memosProvider);
+    final selectedTag = ref.watch(memoSelectedTagProvider);
+    final tags = ref.watch(tagsProvider);
+    final tagColorMap = {for (final t in tags) t.name: t.color};
 
     return memosAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -203,19 +219,17 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                   m.content.toLowerCase().contains(query))
               .toList();
         }
-        if (_selectedTag != 'すべて') {
+        if (selectedTag != 'すべて') {
           filteredMemos =
-              filteredMemos.where((m) => m.tag == _selectedTag).toList();
+              filteredMemos.where((m) => m.tag == selectedTag).toList();
         }
 
-        // 利用可能なタグ
-        final availableTags = ['すべて'] +
-            memos
-                .map((m) => m.tag)
-                .where((t) => t.isNotEmpty)
-                .toSet()
-                .toList()
-              ..sort();
+        // 利用可能なタグ（「すべて」を先頭固定、出現順を維持）
+        final tagSet = <String>{};
+        for (final m in memos) {
+          if (m.tag.isNotEmpty) tagSet.add(m.tag);
+        }
+        final availableTags = ['すべて'] + tagSet.toList();
 
         return Column(
           children: [
@@ -266,11 +280,12 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: availableTags.map((tag) {
-                    final isSelected = _selectedTag == tag;
+                    final isSelected = selectedTag == tag;
+                    final chipColor = tag == 'すべて' ? accentColor : (tagColorMap[tag] ?? accentColor);
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
-                        onTap: () => setState(() => _selectedTag = tag),
+                        onTap: () => ref.read(memoSelectedTagProvider.notifier).state = tag,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -278,7 +293,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? accentColor
+                                ? chipColor
                                 : Colors.white.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -286,7 +301,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                             tag,
                             style: TextStyle(
                               fontSize: 13,
-                              color: isSelected ? Colors.white : accentColor,
+                              color: isSelected ? Colors.white : chipColor,
                             ),
                           ),
                         ),
@@ -332,6 +347,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                             tag: memo.tag,
                             isPinned: memo.isPinned,
                             accentColor: accentColor,
+                            tagColor: tagColorMap[memo.tag],
                             onTap: () => context.push('/memo/detail', extra: memo),
                           ),
                         );
@@ -352,6 +368,7 @@ class _MemoCard extends StatelessWidget {
   final String tag;
   final bool isPinned;
   final Color accentColor;
+  final Color? tagColor;
   final VoidCallback onTap;
 
   const _MemoCard({
@@ -360,18 +377,25 @@ class _MemoCard extends StatelessWidget {
     required this.tag,
     required this.isPinned,
     required this.accentColor,
+    this.tagColor,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasTagColor = tagColor != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: hasTagColor
+              ? tagColor!.withValues(alpha: 0.05)
+              : Colors.white.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(16),
+          border: hasTagColor
+              ? Border(left: BorderSide(color: tagColor!, width: 4))
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -409,12 +433,12 @@ class _MemoCard extends StatelessWidget {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.1),
+                      color: (tagColor ?? accentColor).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       tag,
-                      style: TextStyle(fontSize: 11, color: accentColor),
+                      style: TextStyle(fontSize: 11, color: tagColor ?? accentColor),
                     ),
                   ),
               ],
@@ -448,12 +472,14 @@ class _TodoContentView extends ConsumerStatefulWidget {
 
 class _TodoContentViewState extends ConsumerState<_TodoContentView> {
   String _selectedFilter = 'すべて';
-  String _selectedTag = 'すべて';
 
   @override
   Widget build(BuildContext context) {
     final accentColor = ref.watch(accentColorProvider);
     final todosAsync = ref.watch(todosProvider);
+    final selectedTag = ref.watch(todoSelectedTagProvider);
+    final tags = ref.watch(tagsProvider);
+    final tagColorMap = {for (final t in tags) t.name: t.color};
 
     return todosAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -466,9 +492,9 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
         } else if (_selectedFilter == '完了済み') {
           filteredTodos = filteredTodos.where((t) => t.isCompleted).toList();
         }
-        if (_selectedTag != 'すべて') {
+        if (selectedTag != 'すべて') {
           filteredTodos =
-              filteredTodos.where((t) => t.tag == _selectedTag).toList();
+              filteredTodos.where((t) => t.tag == selectedTag).toList();
         }
 
         // 統計
@@ -479,14 +505,12 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
         }).length;
         final completedCount = todos.where((t) => t.isCompleted).length;
 
-        // 利用可能なタグ
-        final availableTags = ['すべて'] +
-            todos
-                .map((t) => t.tag)
-                .where((t) => t.isNotEmpty)
-                .toSet()
-                .toList()
-              ..sort();
+        // 利用可能なタグ（「すべて」を先頭固定、出現順を維持）
+        final tagSet = <String>{};
+        for (final t in todos) {
+          if (t.tag.isNotEmpty) tagSet.add(t.tag);
+        }
+        final availableTags = ['すべて'] + tagSet.toList();
 
         return Column(
           children: [
@@ -539,11 +563,12 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
                   children: availableTags.map((tag) {
-                    final isSelected = _selectedTag == tag;
+                    final isSelected = selectedTag == tag;
+                    final chipColor = tag == 'すべて' ? accentColor : (tagColorMap[tag] ?? accentColor);
                     return Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
-                        onTap: () => setState(() => _selectedTag = tag),
+                        onTap: () => ref.read(todoSelectedTagProvider.notifier).state = tag,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,
@@ -551,7 +576,7 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? accentColor
+                                ? chipColor
                                 : Colors.white.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -559,7 +584,7 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                             tag,
                             style: TextStyle(
                               fontSize: 13,
-                              color: isSelected ? Colors.white : accentColor,
+                              color: isSelected ? Colors.white : chipColor,
                             ),
                           ),
                         ),
@@ -638,6 +663,7 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                             priority: todo.priority.displayName,
                             tag: todo.tag,
                             accentColor: accentColor,
+                            tagColor: tagColorMap[todo.tag],
                             onTap: () => context.push('/todo/detail', extra: todo),
                             onToggle: () {
                               ref.read(todoControllerProvider.notifier).toggleComplete(
@@ -709,6 +735,7 @@ class _TodoRow extends StatelessWidget {
   final String priority;
   final String tag;
   final Color accentColor;
+  final Color? tagColor;
   final VoidCallback onTap;
   final VoidCallback onToggle;
 
@@ -719,6 +746,7 @@ class _TodoRow extends StatelessWidget {
     required this.priority,
     required this.tag,
     required this.accentColor,
+    this.tagColor,
     required this.onTap,
     required this.onToggle,
   });
@@ -729,13 +757,19 @@ class _TodoRow extends StatelessWidget {
         dueDate!.isBefore(DateTime.now()) &&
         !isCompleted;
 
+    final hasTagColor = tagColor != null;
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
+          color: hasTagColor
+              ? tagColor!.withValues(alpha: 0.05)
+              : Colors.white.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(12),
+          border: hasTagColor
+              ? Border(left: BorderSide(color: tagColor!, width: 4))
+              : null,
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.05),
@@ -796,19 +830,48 @@ class _TodoRow extends StatelessWidget {
                 ],
               ),
             ),
-            // 優先度
-            if (priority == '高')
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
+            // タグと優先度
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (tag.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: (tagColor ?? accentColor).withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      tag,
+                      style: TextStyle(fontSize: 11, color: tagColor ?? accentColor),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: priority == '高'
+                        ? Colors.red.withValues(alpha: 0.1)
+                        : priority == '中'
+                            ? Colors.orange.withValues(alpha: 0.1)
+                            : Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    priority,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: priority == '高'
+                          ? Colors.red
+                          : priority == '中'
+                              ? Colors.orange
+                              : Colors.blue,
+                    ),
+                  ),
                 ),
-                child: const Text(
-                  '高',
-                  style: TextStyle(fontSize: 11, color: Colors.red),
-                ),
-              ),
+              ],
+            ),
           ],
         ),
       ),
