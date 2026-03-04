@@ -7,8 +7,10 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/models/repeat_settings.dart';
 import '../../../data/models/schedule_model.dart';
+import '../../../data/services/notification_service.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/ad_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../settings/tag_management_screen.dart';
@@ -1003,6 +1005,10 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           remindUnit: _remindUnit,
         );
         await ref.read(calendarControllerProvider.notifier).addSchedule(newSchedule);
+        // 通知スケジュール（予定通知が有効な場合）
+        if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+          await NotificationService().scheduleForSchedule(newSchedule);
+        }
       } else {
         // 更新
         final updatedSchedule = widget.schedule!.copyWith(
@@ -1020,6 +1026,11 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         await ref
             .read(calendarControllerProvider.notifier)
             .updateSchedule(updatedSchedule);
+        // 通知を更新（古い通知を削除して再スケジュール）
+        await NotificationService().cancelScheduleNotification(updatedSchedule.id);
+        if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+          await NotificationService().scheduleForSchedule(updatedSchedule);
+        }
       }
 
       if (mounted) {
@@ -1066,6 +1077,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     if (widget.schedule == null) return;
 
     try {
+      // 通知をキャンセル
+      await NotificationService().cancelScheduleNotification(widget.schedule!.id);
       await ref
           .read(calendarControllerProvider.notifier)
           .deleteSchedule(widget.schedule!.id);

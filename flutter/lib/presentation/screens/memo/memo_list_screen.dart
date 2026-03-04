@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/memo_model.dart';
+import '../../../utils/memo_content_utils.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -203,7 +204,7 @@ class _MemoCard extends ConsumerWidget {
                 if (memo.content.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
-                    memo.content,
+                    extractPlainText(memo.content),
                     style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textSecondary,

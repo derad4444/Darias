@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_colors.dart';
@@ -35,10 +36,8 @@ void main() async {
     await AdService().initialize();
   }
 
-  // 通知サービス初期化（Webでは不要）
-  if (!kIsWeb) {
-    await NotificationService().initialize();
-  }
+  // 通知サービス初期化
+  await NotificationService().initialize();
 
   // 日本語ロケールの日付フォーマット初期化
   await initializeDateFormatting('ja');
@@ -69,6 +68,7 @@ class DariasApp extends ConsumerWidget {
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
+        FlutterQuillLocalizations.delegate,
       ],
       // iOS風の動作を有効化
       theme: _buildLightTheme(colorSeed),

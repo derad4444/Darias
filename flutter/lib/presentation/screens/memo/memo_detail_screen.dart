@@ -1,8 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/memo_model.dart';
+import '../../../utils/memo_content_utils.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
@@ -11,10 +16,7 @@ import '../settings/tag_management_screen.dart';
 
 /// メモ詳細・編集画面
 class MemoDetailScreen extends ConsumerStatefulWidget {
-  /// 編集対象のメモ（nullの場合は新規作成）
   final MemoModel? memo;
-
-  /// 新規作成時に自動セットするタグ
   final String initialTag;
 
   const MemoDetailScreen({
@@ -27,37 +29,83 @@ class MemoDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<MemoDetailScreen> createState() => _MemoDetailScreenState();
 }
 
-class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
+class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
+    with WidgetsBindingObserver {
   late final TextEditingController _titleController;
-  late final TextEditingController _contentController;
+  late final QuillController _quillController;
+  late final FocusNode _editorFocusNode;
+  late final ScrollController _editorScrollController;
+
   String _selectedTag = '';
-
   bool _isPinned = false;
-  bool _isEditMode = true;
   bool _isSaving = false;
+  bool _isDisposed = false;
 
-  bool get _isNewMemo => widget.memo == null;
+  /// 自動保存用タイマー
+  Timer? _debounceTimer;
+
+  /// 新規作成後に保存済みメモを追跡（ID取得のため）
+  MemoModel? _savedMemo;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     _titleController = TextEditingController(text: widget.memo?.title ?? '');
-    _contentController =
-        TextEditingController(text: widget.memo?.content ?? '');
+    _quillController = buildQuillController(widget.memo?.content ?? '');
+    _editorFocusNode = FocusNode();
+    _editorScrollController = ScrollController();
     _selectedTag = widget.memo?.tag ?? widget.initialTag;
 
     if (widget.memo != null) {
       _isPinned = widget.memo!.isPinned;
-      // 既存メモはプレビューモードで開始
-      _isEditMode = false;
     }
+
+    // 変更を検知して自動保存スケジュール
+    _titleController.addListener(_onContentChanged);
+    _quillController.addListener(_onContentChanged);
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
+    WidgetsBinding.instance.removeObserver(this);
+    _debounceTimer?.cancel();
+    // 画面離脱時に未保存の変更を即時保存（setState は呼ばれない）
+    _saveNow();
     _titleController.dispose();
-    _contentController.dispose();
+    _quillController.dispose();
+    _editorFocusNode.dispose();
+    _editorScrollController.dispose();
     super.dispose();
+  }
+
+  /// アプリがバックグラウンドに入ったときに保存
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _debounceTimer?.cancel();
+      _saveNow();
+    }
+  }
+
+  void _onContentChanged() {
+    _scheduleSave();
+  }
+
+  /// 2秒後に自動保存（入力が続く間はリセット）
+  void _scheduleSave() {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(seconds: 2), _saveNow);
+  }
+
+  /// 即時保存（画面離脱・バックグラウンド時に呼ぶ）
+  void _saveNow() {
+    _debounceTimer?.cancel();
+    if (_titleController.text.isNotEmpty) {
+      _persistMemo();
+    }
   }
 
   @override
@@ -66,186 +114,170 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
     final accentColor = ref.watch(accentColorProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.close, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
-        ),
-        title: Text(
-          _isNewMemo ? '新規メモ' : 'メモ編集',
-          style: TextStyle(color: AppColors.textPrimary),
-        ),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          if (_isEditMode)
-            TextButton(
-              onPressed: _titleController.text.isEmpty || _isSaving
-                  ? null
-                  : _saveMemo,
-              child: _isSaving
-                  ? SizedBox(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          _debounceTimer?.cancel();
+          _saveNow();
+        }
+      },
+      child: Scaffold(
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: Icon(Icons.close, color: AppColors.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(
+            widget.memo == null && _savedMemo == null ? '新規メモ' : 'メモ編集',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          actions: [
+            _isSaving
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: accentColor),
-                    )
-                  : Text('保存', style: TextStyle(color: accentColor, fontWeight: FontWeight.w600)),
-            )
-          else
-            TextButton(
-              onPressed: () => setState(() => _isEditMode = true),
-              child: Text('編集', style: TextStyle(color: accentColor, fontWeight: FontWeight.w600)),
-            ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(gradient: backgroundGradient),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 上部バナー広告
-                if (shouldShowBannerAd) ...[
-                  const BannerAdContainer(),
+                    ),
+                  )
+                : TextButton(
+                    onPressed: _titleController.text.isEmpty ? null : _saveAndPop,
+                    child: Text('保存', style: TextStyle(color: accentColor, fontWeight: FontWeight.w600)),
+                  ),
+          ],
+        ),
+        body: Container(
+          decoration: BoxDecoration(gradient: backgroundGradient),
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (shouldShowBannerAd) ...[
+                    const BannerAdContainer(),
+                    const SizedBox(height: 16),
+                  ],
+
+                  _buildSectionTitle('タイトル'),
+                  const SizedBox(height: 8),
+                  _buildTitleField(accentColor),
                   const SizedBox(height: 16),
-                ],
 
-                // タイトル
-                _buildSectionTitle('タイトル'),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _titleController,
-                  hintText: 'タイトルを入力',
-                  accentColor: accentColor,
-                  readOnly: !_isEditMode,
-                  onChanged: (_) => setState(() {}),
-                ),
-                const SizedBox(height: 16),
+                  _buildSectionTitle('内容'),
+                  const SizedBox(height: 8),
+                  Expanded(child: _buildEditorArea(accentColor)),
+                  const SizedBox(height: 16),
 
-                // 内容（残りスペースを埋める）
-                _buildSectionTitle('内容'),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: _isEditMode
-                      ? _buildEditableContent(accentColor)
-                      : _buildPreviewContent(),
-                ),
-                const SizedBox(height: 16),
+                  _buildSectionTitle('タグ'),
+                  const SizedBox(height: 8),
+                  GestureDetector(
+                    onTap: () => _showTagSelection(accentColor),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          if (_selectedTag.isNotEmpty) ...[
+                            Builder(builder: (context) {
+                              final tags = ref.watch(tagsProvider);
+                              final tagItem = tags.where((t) => t.name == _selectedTag).firstOrNull;
+                              return Container(
+                                width: 16,
+                                height: 16,
+                                decoration: BoxDecoration(
+                                  color: tagItem?.color ?? accentColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              );
+                            }),
+                            const SizedBox(width: 8),
+                          ],
+                          Expanded(
+                            child: Text(
+                              _selectedTag.isEmpty ? 'タグを選択' : _selectedTag,
+                              style: TextStyle(
+                                color: _selectedTag.isEmpty ? AppColors.textLight : AppColors.textPrimary,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
+                          Icon(Icons.keyboard_arrow_down, color: AppColors.textLight),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-                // タグ
-                _buildSectionTitle('タグ'),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _isEditMode ? () => _showTagSelection(accentColor) : null,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  Container(
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Row(
                       children: [
-                        if (_selectedTag.isNotEmpty) ...[
-                          Builder(builder: (context) {
-                            final tags = ref.watch(tagsProvider);
-                            final tagItem = tags.where((t) => t.name == _selectedTag).firstOrNull;
-                            return Container(
-                              width: 16,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: tagItem?.color ?? accentColor,
-                                shape: BoxShape.circle,
-                              ),
-                            );
-                          }),
-                          const SizedBox(width: 8),
-                        ],
-                        Expanded(
-                          child: Text(
-                            _selectedTag.isEmpty ? 'タグを選択' : _selectedTag,
-                            style: TextStyle(
-                              color: _selectedTag.isEmpty ? AppColors.textLight : AppColors.textPrimary,
-                              fontSize: 15,
-                            ),
-                          ),
-                        ),
                         Icon(
-                          Icons.keyboard_arrow_down,
-                          color: AppColors.textLight,
+                          _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          color: _isPinned ? accentColor : AppColors.textLight,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(child: Text('ピン留め', style: TextStyle(color: AppColors.textPrimary))),
+                        Switch(
+                          value: _isPinned,
+                          activeTrackColor: accentColor,
+                          onChanged: (value) {
+                            setState(() => _isPinned = value);
+                            _saveNow();
+                          },
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 16),
 
-                // ピン留め
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                        color: _isPinned ? accentColor : AppColors.textLight,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text('ピン留め', style: TextStyle(color: AppColors.textPrimary))),
-                      Switch(
-                        value: _isPinned,
-                        activeColor: accentColor,
-                        onChanged: _isEditMode
-                            ? (value) => setState(() => _isPinned = value)
-                            : null,
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 削除ボタン（編集時のみ）
-                if (!_isNewMemo) ...[
-                  const SizedBox(height: 8),
-                  GestureDetector(
-                    onTap: _showDeleteConfirmation,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.delete, color: Colors.red, size: 20),
-                          SizedBox(width: 8),
-                          Text('メモを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
-                        ],
+                  if (widget.memo != null || _savedMemo != null) ...[
+                    const SizedBox(height: 8),
+                    GestureDetector(
+                      onTap: _showDeleteConfirmation,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.delete, color: Colors.red, size: 20),
+                            SizedBox(width: 8),
+                            Text('メモを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
 
-                // 下部バナー広告
-                if (shouldShowBannerAd) ...[
-                  const SizedBox(height: 24),
-                  const BannerAdContainer(),
+                  if (shouldShowBannerAd) ...[
+                    const SizedBox(height: 24),
+                    const BannerAdContainer(),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -256,21 +288,11 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 13,
-        color: AppColors.textSecondary,
-      ),
+      style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
     );
   }
 
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String hintText,
-    required Color accentColor,
-    bool readOnly = false,
-    int maxLines = 1,
-    void Function(String)? onChanged,
-  }) {
+  Widget _buildTitleField(Color accentColor) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.9),
@@ -284,11 +306,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
         ],
       ),
       child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        readOnly: readOnly,
+        controller: _titleController,
+        maxLines: 1,
         decoration: InputDecoration(
-          hintText: hintText,
+          hintText: 'タイトルを入力',
           hintStyle: TextStyle(color: AppColors.textLight),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -297,19 +318,20 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
           filled: true,
           fillColor: Colors.transparent,
         ),
-        onChanged: onChanged,
+        onChanged: (_) => setState(() {}),
       ),
     );
   }
 
-  Widget _buildEditableContent(Color accentColor) {
+  Widget _buildEditorArea(Color accentColor) {
     return Column(
       children: [
+        _MemoToolbar(controller: _quillController, accentColor: accentColor),
         Expanded(
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.9),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.05),
@@ -318,195 +340,79 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                 ),
               ],
             ),
-            child: TextField(
-              controller: _contentController,
-              maxLines: null,
-              expands: true,
-              textAlignVertical: TextAlignVertical.top,
-              decoration: InputDecoration(
-                hintText: '内容を入力',
-                hintStyle: TextStyle(color: AppColors.textLight),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.transparent,
+            child: QuillEditor(
+              controller: _quillController,
+              focusNode: _editorFocusNode,
+              scrollController: _editorScrollController,
+              config: const QuillEditorConfig(
+                placeholder: '内容を入力',
+                padding: EdgeInsets.all(12),
+                expands: true,
+                scrollable: true,
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // マークダウンツールバー
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _buildMarkdownButton(
-                icon: Icons.format_bold,
-                label: '太字',
-                accentColor: accentColor,
-                onPressed: () => _insertMarkdown('**', '太字'),
-              ),
-              _buildMarkdownButton(
-                icon: Icons.format_list_bulleted,
-                label: '箇条書き',
-                accentColor: accentColor,
-                onPressed: () => _insertMarkdown('- ', '', isPrefix: true),
-              ),
-              _buildMarkdownButton(
-                icon: Icons.format_list_numbered,
-                label: '番号',
-                accentColor: accentColor,
-                onPressed: () => _insertMarkdown('1. ', '', isPrefix: true),
-              ),
-              _buildMarkdownButton(
-                icon: Icons.title,
-                label: '見出し',
-                accentColor: accentColor,
-                onPressed: () => _insertMarkdown('# ', '', isPrefix: true),
-              ),
-              _buildMarkdownButton(
-                icon: Icons.format_quote,
-                label: '引用',
-                accentColor: accentColor,
-                onPressed: () => _insertMarkdown('> ', '', isPrefix: true),
-              ),
-            ],
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMarkdownButton({
-    required IconData icon,
-    required String label,
-    required Color accentColor,
-    required VoidCallback onPressed,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [accentColor, accentColor.withValues(alpha: 0.8)],
-            ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: Colors.white, size: 16),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: const TextStyle(color: Colors.white, fontSize: 10),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreviewContent() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: SingleChildScrollView(
-        physics: const BouncingScrollPhysics(),
-        child: _contentController.text.isEmpty
-            ? Text(
-                '内容がありません',
-                style: TextStyle(color: AppColors.textLight),
-              )
-            : Text(
-                _contentController.text,
-                style: TextStyle(color: AppColors.textPrimary),
-              ),
-      ),
-    );
-  }
-
-  void _insertMarkdown(String syntax, String placeholder, {bool isPrefix = false}) {
-    final text = _contentController.text;
-    final selection = _contentController.selection;
-
-    String newText;
-    int newCursorPosition;
-
-    if (isPrefix) {
-      // プレフィックス型（箇条書き、見出しなど）
-      final insertText = '\n$syntax$placeholder';
-      newText = text.substring(0, selection.start) +
-          insertText +
-          text.substring(selection.end);
-      newCursorPosition = selection.start + insertText.length;
-    } else {
-      // ラップ型（太字など）
-      final insertText = '$syntax$placeholder$syntax';
-      newText = text.substring(0, selection.start) +
-          insertText +
-          text.substring(selection.end);
-      newCursorPosition = selection.start + syntax.length + placeholder.length;
-    }
-
-    _contentController.value = TextEditingValue(
-      text: newText,
-      selection: TextSelection.collapsed(offset: newCursorPosition),
-    );
-  }
-
-  Future<void> _saveMemo() async {
+  /// Firestore に保存（画面遷移なし）
+  Future<void> _persistMemo() async {
     if (_titleController.text.isEmpty) return;
+    if (_isSaving) return;
 
-    setState(() => _isSaving = true);
+    if (!_isDisposed && mounted) setState(() => _isSaving = true);
 
     try {
-      if (_isNewMemo) {
+      final contentJson = jsonEncode(
+        _quillController.document.toDelta().toJson(),
+      );
+
+      final existingMemo = widget.memo ?? _savedMemo;
+      if (existingMemo == null) {
         // 新規作成
         final newMemo = MemoModel.create(
           title: _titleController.text,
-          content: _contentController.text,
+          content: contentJson,
           tag: _selectedTag,
           isPinned: _isPinned,
         );
-        await ref.read(memoControllerProvider.notifier).addMemo(newMemo);
+        final id = await ref.read(memoControllerProvider.notifier).addMemo(newMemo);
+        if (id != null && !_isDisposed) {
+          _savedMemo = newMemo.copyWith(
+            id: id,
+            content: contentJson,
+          );
+        }
       } else {
         // 更新
-        final updatedMemo = widget.memo!.copyWith(
-          title: _titleController.text,
-          content: _contentController.text,
-          tag: _selectedTag,
-          isPinned: _isPinned,
-          updatedAt: DateTime.now(),
+        await ref.read(memoControllerProvider.notifier).updateMemo(
+          existingMemo.copyWith(
+            title: _titleController.text,
+            content: contentJson,
+            tag: _selectedTag,
+            isPinned: _isPinned,
+            updatedAt: DateTime.now(),
+          ),
         );
-        await ref.read(memoControllerProvider.notifier).updateMemo(updatedMemo);
-      }
-
-      if (mounted) {
-        context.pop();
       }
     } catch (e) {
-      if (mounted) {
+      if (!_isDisposed && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存に失敗しました: $e')),
+          SnackBar(content: Text('自動保存に失敗しました: $e')),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
+      if (!_isDisposed && mounted) setState(() => _isSaving = false);
     }
+  }
+
+  /// 手動保存ボタン：保存後に画面を閉じる
+  Future<void> _saveAndPop() async {
+    _debounceTimer?.cancel();
+    await _persistMemo();
+    if (mounted) context.pop();
   }
 
   void _showTagSelection(Color accentColor) {
@@ -525,7 +431,6 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
           ),
           child: Column(
             children: [
-              // ヘッダー
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                 child: Row(
@@ -543,15 +448,12 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                   ],
                 ),
               ),
-
-              // タグ一覧
               Expanded(
                 child: Consumer(builder: (context, ref, _) {
                   final tags = ref.watch(tagsProvider);
                   return ListView(
                     padding: const EdgeInsets.all(16),
                     children: [
-                      // タグなしオプション
                       _buildTagOption(
                         sheetContext: sheetContext,
                         name: 'タグなし',
@@ -561,11 +463,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                         onTap: () {
                           setState(() => _selectedTag = '');
                           Navigator.pop(sheetContext);
+                          _saveNow();
                         },
                       ),
                       const SizedBox(height: 8),
-
-                      // 既存タグ一覧
                       ...tags.map((tag) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: _buildTagOption(
@@ -577,13 +478,11 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                               onTap: () {
                                 setState(() => _selectedTag = tag.name);
                                 Navigator.pop(sheetContext);
+                                _saveNow();
                               },
                             ),
                           )),
-
                       const SizedBox(height: 16),
-
-                      // タグを管理ボタン
                       GestureDetector(
                         onTap: () {
                           Navigator.pop(sheetContext);
@@ -638,7 +537,6 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
         ),
         child: Row(
           children: [
-            // タグ色
             Container(
               width: 24,
               height: 24,
@@ -651,16 +549,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
               ),
             ),
             const SizedBox(width: 12),
-            // タグ名
             Expanded(
-              child: Text(
-                name,
-                style: const TextStyle(fontSize: 15),
-              ),
+              child: Text(name, style: const TextStyle(fontSize: 15)),
             ),
-            // チェックマーク
-            if (isSelected)
-              Icon(Icons.check, color: accentColor, size: 20),
+            if (isSelected) Icon(Icons.check, color: accentColor, size: 20),
           ],
         ),
       ),
@@ -693,13 +585,12 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
   }
 
   Future<void> _deleteMemo() async {
-    if (widget.memo == null) return;
+    final target = widget.memo ?? _savedMemo;
+    if (target == null) return;
 
     try {
-      await ref.read(memoControllerProvider.notifier).deleteMemo(widget.memo!.id);
-      if (mounted) {
-        context.pop();
-      }
+      await ref.read(memoControllerProvider.notifier).deleteMemo(target.id);
+      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -707,5 +598,318 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
         );
       }
     }
+  }
+}
+
+// ─────────────────────────────────────────
+// カスタムツールバー
+// ─────────────────────────────────────────
+
+class _MemoToolbar extends StatefulWidget {
+  final QuillController controller;
+  final Color accentColor;
+
+  const _MemoToolbar({required this.controller, required this.accentColor});
+
+  @override
+  State<_MemoToolbar> createState() => _MemoToolbarState();
+}
+
+class _MemoToolbarState extends State<_MemoToolbar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_rebuild);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  void _rebuild() => setState(() {});
+
+  // ── アクティブ判定 ──
+
+  bool _isInline(Attribute attr) {
+    final a = widget.controller.getSelectionStyle().attributes[attr.key];
+    return a != null && a.value != null;
+  }
+
+  bool _isHeader(int level) {
+    final a = widget.controller.getSelectionStyle().attributes[Attribute.header.key];
+    return a?.value == level;
+  }
+
+  bool _isList(String type) {
+    final a = widget.controller.getSelectionStyle().attributes[Attribute.list.key];
+    return a?.value == type;
+  }
+
+  bool _isBlockQuote() =>
+      widget.controller.getSelectionStyle().attributes.containsKey(Attribute.blockQuote.key);
+
+  String? _currentColor() =>
+      widget.controller.getSelectionStyle().attributes[Attribute.color.key]?.value as String?;
+
+  // ── トグル操作 ──
+
+  void _toggleInline(Attribute attr) {
+    widget.controller.formatSelection(
+      _isInline(attr) ? Attribute.clone(attr, null) : attr,
+    );
+  }
+
+  void _toggleHeader(int level) {
+    widget.controller.formatSelection(
+      _isHeader(level) ? Attribute.clone(Attribute.header, null) : HeaderAttribute(level: level),
+    );
+  }
+
+  void _toggleList(Attribute attr, String type) {
+    widget.controller.formatSelection(
+      _isList(type) ? Attribute.clone(Attribute.list, null) : attr,
+    );
+  }
+
+  void _toggleBlockQuote() {
+    widget.controller.formatSelection(
+      _isBlockQuote() ? Attribute.clone(Attribute.blockQuote, null) : Attribute.blockQuote,
+    );
+  }
+
+  void _showColorPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ColorPaletteSheet(
+        currentHex: _currentColor(),
+        accentColor: widget.accentColor,
+        onSelected: (hex) {
+          widget.controller.formatSelection(
+            hex == null
+                ? Attribute.clone(Attribute.color, null)
+                : ColorAttribute(hex),
+          );
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ac = widget.accentColor;
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        border: Border(bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.15))),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          children: [
+            _Btn(icon: Icons.looks_one_rounded,    isActive: _isHeader(1),           ac: ac, onTap: () => _toggleHeader(1)),
+            _Btn(icon: Icons.looks_two_rounded,    isActive: _isHeader(2),           ac: ac, onTap: () => _toggleHeader(2)),
+            const _Divider(),
+            _Btn(icon: Icons.format_bold,          isActive: _isInline(Attribute.bold),        ac: ac, onTap: () => _toggleInline(Attribute.bold)),
+            _Btn(icon: Icons.format_italic,        isActive: _isInline(Attribute.italic),      ac: ac, onTap: () => _toggleInline(Attribute.italic)),
+            _Btn(icon: Icons.format_underline,     isActive: _isInline(Attribute.underline),   ac: ac, onTap: () => _toggleInline(Attribute.underline)),
+            _Btn(icon: Icons.format_strikethrough, isActive: _isInline(Attribute.strikeThrough), ac: ac, onTap: () => _toggleInline(Attribute.strikeThrough)),
+            const _Divider(),
+            _Btn(icon: Icons.format_list_bulleted, isActive: _isList('bullet'),  ac: ac, onTap: () => _toggleList(Attribute.ul, 'bullet')),
+            _Btn(icon: Icons.format_list_numbered, isActive: _isList('ordered'), ac: ac, onTap: () => _toggleList(Attribute.ol, 'ordered')),
+            _Btn(icon: Icons.format_quote,         isActive: _isBlockQuote(),    ac: ac, onTap: _toggleBlockQuote),
+            const _Divider(),
+            _ColorBtn(currentHex: _currentColor(), ac: ac, onTap: _showColorPicker),
+            const _Divider(),
+            _Btn(icon: Icons.undo, isActive: false, ac: ac,
+              onTap: widget.controller.hasUndo ? widget.controller.undo : null),
+            _Btn(icon: Icons.redo, isActive: false, ac: ac,
+              onTap: widget.controller.hasRedo ? widget.controller.redo : null),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── ツールバーパーツ ──
+
+class _Btn extends StatelessWidget {
+  final IconData icon;
+  final bool isActive;
+  final Color ac;
+  final VoidCallback? onTap;
+
+  const _Btn({required this.icon, required this.isActive, required this.ac, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+        padding: const EdgeInsets.all(6),
+        decoration: BoxDecoration(
+          color: isActive ? ac.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Icon(icon, size: 18,
+          color: onTap == null
+              ? Colors.grey.withValues(alpha: 0.35)
+              : isActive ? ac : Colors.grey[600]),
+      ),
+    );
+  }
+}
+
+class _ColorBtn extends StatelessWidget {
+  final String? currentHex;
+  final Color ac;
+  final VoidCallback onTap;
+
+  const _ColorBtn({required this.currentHex, required this.ac, required this.onTap});
+
+  Color get _dotColor {
+    if (currentHex == null) return Colors.black;
+    try {
+      return Color(int.parse('FF${currentHex!.replaceFirst('#', '')}', radix: 16));
+    } catch (_) {
+      return Colors.black;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+        padding: const EdgeInsets.all(6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.format_color_text, size: 16, color: Colors.grey[600]),
+            const SizedBox(height: 2),
+            Container(
+              width: 16, height: 3,
+              decoration: BoxDecoration(
+                color: _dotColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 1, height: 20,
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      color: Colors.grey.withValues(alpha: 0.25),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// カラーパレット ボトムシート
+// ─────────────────────────────────────────
+
+class _ColorPaletteSheet extends StatelessWidget {
+  final String? currentHex;
+  final Color accentColor;
+  final void Function(String?) onSelected;
+
+  const _ColorPaletteSheet({
+    required this.currentHex,
+    required this.accentColor,
+    required this.onSelected,
+  });
+
+  static const _palette = [
+    ('黒',     '#000000', Color(0xFF000000)),
+    ('グレー',  '#757575', Color(0xFF757575)),
+    ('赤',     '#E53935', Color(0xFFE53935)),
+    ('オレンジ','#F4511E', Color(0xFFF4511E)),
+    ('黄',     '#F6BF26', Color(0xFFF6BF26)),
+    ('緑',     '#33B679', Color(0xFF33B679)),
+    ('水色',   '#039BE5', Color(0xFF039BE5)),
+    ('青',     '#4285F4', Color(0xFF4285F4)),
+    ('紫',     '#7986CB', Color(0xFF7986CB)),
+    ('ピンク',  '#E67C73', Color(0xFFE67C73)),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('テキストカラー',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              // 色なし
+              GestureDetector(
+                onTap: () => onSelected(null),
+                child: Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey[300]!, width: 2),
+                    color: currentHex == null ? accentColor.withValues(alpha: 0.1) : null,
+                  ),
+                  child: Icon(Icons.format_color_reset, size: 20,
+                      color: currentHex == null ? accentColor : Colors.grey),
+                ),
+              ),
+              ..._palette.map((c) {
+                final isSelected = currentHex == c.$2;
+                return GestureDetector(
+                  onTap: () => onSelected(c.$2),
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: c.$3,
+                      shape: BoxShape.circle,
+                      border: isSelected
+                          ? Border.all(color: accentColor, width: 3)
+                          : Border.all(color: Colors.black.withValues(alpha: 0.08), width: 1),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 4),
+                      ],
+                    ),
+                    child: isSelected
+                        ? const Icon(Icons.check, color: Colors.white, size: 20)
+                        : null,
+                  ),
+                );
+              }),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }

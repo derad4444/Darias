@@ -26,19 +26,20 @@ class MemoController extends StateNotifier<AsyncValue<void>> {
 
   MemoController(this._datasource, this._ref) : super(const AsyncValue.data(null));
 
-  /// メモを追加
-  Future<void> addMemo(MemoModel memo) async {
+  /// メモを追加（作成されたドキュメントIDを返す）
+  Future<String?> addMemo(MemoModel memo) async {
     final userId = _ref.read(currentUserIdProvider);
-    if (userId == null) return;
+    if (userId == null) return null;
 
     state = const AsyncValue.loading();
 
     try {
-      await _datasource.addMemo(
+      final id = await _datasource.addMemo(
         userId: userId,
         memo: memo,
       );
       state = const AsyncValue.data(null);
+      return id;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       rethrow;

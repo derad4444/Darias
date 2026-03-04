@@ -8,6 +8,28 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 
+/// タグの使用件数（メモ・タスク・予定）
+final tagUsageCountProvider = FutureProvider.autoDispose
+    .family<Map<String, int>, String>((ref, tagName) async {
+  final userId = ref.read(currentUserIdProvider);
+  if (userId == null) return {'memo': 0, 'todo': 0, 'schedule': 0};
+
+  final firestore = ref.read(firestoreProvider);
+  final base = firestore.collection('users').doc(userId);
+
+  final results = await Future.wait([
+    base.collection('memos').where('tag', isEqualTo: tagName).get(),
+    base.collection('todos').where('tag', isEqualTo: tagName).get(),
+    base.collection('schedules').where('tag', isEqualTo: tagName).get(),
+  ]);
+
+  return {
+    'memo': results[0].docs.length,
+    'todo': results[1].docs.length,
+    'schedule': results[2].docs.length,
+  };
+});
+
 /// タグプロバイダー（Firestoreで同期）
 final tagsProvider = StateNotifierProvider<TagsNotifier, List<TagItem>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
@@ -483,6 +505,16 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
                   ),
                 ),
 
+                // 使用件数（編集時のみ）
+                if (isEditing) ...[
+                  const SizedBox(height: 16),
+                  _TagUsageCard(
+                    tagName: widget.tag!.name,
+                    textColor: widget.textColor,
+                    accentColor: widget.accentColor,
+                  ),
+                ],
+
               ],
             ),
           ),
@@ -519,6 +551,109 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
     );
     widget.onSave(tag);
     Navigator.pop(context);
+  }
+}
+
+/// タグ使用件数カード
+class _TagUsageCard extends ConsumerWidget {
+  final String tagName;
+  final Color textColor;
+  final Color accentColor;
+
+  const _TagUsageCard({
+    required this.tagName,
+    required this.textColor,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final countAsync = ref.watch(tagUsageCountProvider(tagName));
+
+    return _SectionCard(
+      title: '使用件数',
+      textColor: textColor,
+      child: countAsync.when(
+        data: (counts) => Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _CountItem(
+              label: '予定',
+              count: counts['schedule'] ?? 0,
+              icon: Icons.calendar_today_outlined,
+              color: accentColor,
+              textColor: textColor,
+            ),
+            _CountItem(
+              label: 'メモ',
+              count: counts['memo'] ?? 0,
+              icon: Icons.note_outlined,
+              color: accentColor,
+              textColor: textColor,
+            ),
+            _CountItem(
+              label: 'タスク',
+              count: counts['todo'] ?? 0,
+              icon: Icons.check_circle_outline,
+              color: accentColor,
+              textColor: textColor,
+            ),
+          ],
+        ),
+        loading: () => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: CircularProgressIndicator(color: accentColor, strokeWidth: 2),
+          ),
+        ),
+        error: (_, __) => Text(
+          '取得に失敗しました',
+          style: TextStyle(color: textColor.withValues(alpha: 0.5), fontSize: 13),
+        ),
+      ),
+    );
+  }
+}
+
+class _CountItem extends StatelessWidget {
+  final String label;
+  final int count;
+  final IconData icon;
+  final Color color;
+  final Color textColor;
+
+  const _CountItem({
+    required this.label,
+    required this.count,
+    required this.icon,
+    required this.color,
+    required this.textColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 6),
+        Text(
+          '$count件',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: textColor,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: textColor.withValues(alpha: 0.6),
+          ),
+        ),
+      ],
+    );
   }
 }
 

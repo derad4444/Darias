@@ -1,217 +1,314 @@
+import 'dart:async';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_app_badger/flutter_app_badger.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:timezone/timezone.dart' as tz;
 
-/// プッシュ通知サービス
+import '../../data/models/schedule_model.dart';
+import 'notification_web_helper_stub.dart'
+    if (dart.library.html) 'notification_web_helper.dart';
+
+/// プッシュ通知・ローカル通知サービス
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+  FlutterLocalNotificationsPlugin? _localPlugin;
 
-  String? _fcmToken;
-  String? get fcmToken => _fcmToken;
+  static const int _diaryNotificationId = 9999;
+  static const String _scheduleChannelId = 'schedule_channel';
+  static const String _diaryChannelId = 'diary_channel';
 
-  /// 初期化
+  // Web: タイマーベースのスケジューリング（アプリ起動中のみ有効）
+  final Map<String, Timer> _webTimers = {};
+  Timer? _webDiaryTimer;
+
+  // ────────────────────────────────────────
+  // 初期化
+  // ────────────────────────────────────────
+
   Future<void> initialize() async {
     if (kIsWeb) {
-      debugPrint('NotificationService: Web platform - skipping initialization');
+      // Web: FCMフォアグラウンドメッセージのみ設定
+      FirebaseMessaging.onMessage.listen(_onForegroundMessage);
       return;
     }
 
+    tz_data.initializeTimeZones();
     try {
-      // 通知許可をリクエスト
-      final settings = await _messaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        carPlay: false,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      debugPrint('NotificationService: Permission status: ${settings.authorizationStatus}');
-
-      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
-          settings.authorizationStatus == AuthorizationStatus.provisional) {
-        // FCMトークンを取得
-        await _getFcmToken();
-
-        // トークンリフレッシュを監視
-        _messaging.onTokenRefresh.listen(_onTokenRefresh);
-
-        // フォアグラウンドメッセージハンドラを設定
-        FirebaseMessaging.onMessage.listen(_onForegroundMessage);
-
-        // バックグラウンド/終了状態からの起動を処理
-        FirebaseMessaging.onMessageOpenedApp.listen(_onMessageOpenedApp);
-
-        // アプリが終了状態から起動した場合の初期メッセージをチェック
-        final initialMessage = await _messaging.getInitialMessage();
-        if (initialMessage != null) {
-          _handleInitialMessage(initialMessage);
-        }
-
-        debugPrint('NotificationService: Initialization complete');
-      } else {
-        debugPrint('NotificationService: Permission denied');
-      }
-    } catch (e) {
-      debugPrint('NotificationService: Initialization failed: $e');
+      tz.setLocalLocation(tz.getLocation('Asia/Tokyo'));
+    } catch (_) {
+      tz.setLocalLocation(tz.UTC);
     }
+
+    _localPlugin = FlutterLocalNotificationsPlugin();
+
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
+
+    await _localPlugin!.initialize(
+      const InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      ),
+    );
+
+    // Android 通知チャンネル作成
+    await _localPlugin!
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(const AndroidNotificationChannel(
+          _scheduleChannelId,
+          'スケジュール通知',
+          description: '予定のリマインダー',
+          importance: Importance.high,
+        ));
+    await _localPlugin!
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(const AndroidNotificationChannel(
+          _diaryChannelId,
+          '日記通知',
+          description: 'キャラクターの日記通知',
+          importance: Importance.defaultImportance,
+        ));
+
+    // FCM フォアグラウンドメッセージ
+    FirebaseMessaging.onMessage.listen(_onForegroundMessage);
   }
 
-  /// FCMトークンを取得
-  Future<void> _getFcmToken() async {
-    try {
-      _fcmToken = await _messaging.getToken();
-      debugPrint('NotificationService: FCM Token: $_fcmToken');
-    } catch (e) {
-      debugPrint('NotificationService: Failed to get FCM token: $e');
-    }
-  }
+  // ────────────────────────────────────────
+  // 通知許可
+  // ────────────────────────────────────────
 
-  /// トークンリフレッシュ時のコールバック
-  void _onTokenRefresh(String token) {
-    debugPrint('NotificationService: Token refreshed: $token');
-    _fcmToken = token;
-    // TODO: サーバーにトークンを送信
-  }
-
-  /// フォアグラウンドメッセージハンドラ
-  void _onForegroundMessage(RemoteMessage message) {
-    debugPrint('NotificationService: Foreground message received');
-    debugPrint('  Title: ${message.notification?.title}');
-    debugPrint('  Body: ${message.notification?.body}');
-    debugPrint('  Data: ${message.data}');
-
-    // TODO: ローカル通知を表示するか、アプリ内で通知を表示
-    _notificationCallback?.call(message);
-  }
-
-  /// バックグラウンド/終了状態から通知タップで起動した時のハンドラ
-  void _onMessageOpenedApp(RemoteMessage message) {
-    debugPrint('NotificationService: App opened from notification');
-    debugPrint('  Data: ${message.data}');
-
-    _handleNotificationTap(message);
-  }
-
-  /// 終了状態から起動した場合の初期メッセージ処理
-  void _handleInitialMessage(RemoteMessage message) {
-    debugPrint('NotificationService: Initial message');
-    debugPrint('  Data: ${message.data}');
-
-    _handleNotificationTap(message);
-  }
-
-  /// 通知タップ時の処理
-  void _handleNotificationTap(RemoteMessage message) {
-    final data = message.data;
-    final type = data['type'];
-
-    // 通知タイプに応じて画面遷移
-    switch (type) {
-      case 'chat':
-        _navigationCallback?.call('/chat');
-        break;
-      case 'diary':
-        _navigationCallback?.call('/diary');
-        break;
-      case 'todo':
-        _navigationCallback?.call('/todo');
-        break;
-      case 'schedule':
-        _navigationCallback?.call('/calendar');
-        break;
-      default:
-        _navigationCallback?.call('/');
-    }
-  }
-
-  // コールバック
-  Function(RemoteMessage)? _notificationCallback;
-  Function(String)? _navigationCallback;
-
-  /// フォアグラウンド通知コールバックを設定
-  void setNotificationCallback(Function(RemoteMessage) callback) {
-    _notificationCallback = callback;
-  }
-
-  /// ナビゲーションコールバックを設定
-  void setNavigationCallback(Function(String) callback) {
-    _navigationCallback = callback;
-  }
-
-  /// 通知許可状態を確認
+  /// 現在の許可状態を取得
   Future<AuthorizationStatus> getPermissionStatus() async {
+    if (kIsWeb) {
+      return isWebNotificationGranted
+          ? AuthorizationStatus.authorized
+          : AuthorizationStatus.notDetermined;
+    }
     final settings = await _messaging.getNotificationSettings();
     return settings.authorizationStatus;
   }
 
-  /// 通知許可をリクエスト
+  /// 許可をリクエスト
   Future<bool> requestPermission() async {
-    final settings = await _messaging.requestPermission(
+    if (kIsWeb) {
+      return await requestWebNotificationPermission();
+    }
+
+    final iosPlugin = _localPlugin
+        ?.resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin>();
+    final iosGranted = await iosPlugin?.requestPermissions(
       alert: true,
-      announcement: false,
       badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
       sound: true,
     );
 
-    return settings.authorizationStatus == AuthorizationStatus.authorized ||
-        settings.authorizationStatus == AuthorizationStatus.provisional;
+    final androidPlugin = _localPlugin
+        ?.resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.requestNotificationsPermission();
+
+    return iosGranted ?? true;
   }
 
-  /// トピックを購読
-  Future<void> subscribeToTopic(String topic) async {
-    try {
-      await _messaging.subscribeToTopic(topic);
-      debugPrint('NotificationService: Subscribed to topic: $topic');
-    } catch (e) {
-      debugPrint('NotificationService: Failed to subscribe to topic: $e');
-    }
-  }
+  // ────────────────────────────────────────
+  // 予定通知
+  // ────────────────────────────────────────
 
-  /// トピック購読を解除
-  Future<void> unsubscribeFromTopic(String topic) async {
-    try {
-      await _messaging.unsubscribeFromTopic(topic);
-      debugPrint('NotificationService: Unsubscribed from topic: $topic');
-    } catch (e) {
-      debugPrint('NotificationService: Failed to unsubscribe from topic: $e');
-    }
-  }
+  /// 予定のリマインダーをスケジュール
+  Future<void> scheduleForSchedule(ScheduleModel schedule) async {
+    if (schedule.remindValue <= 0 || schedule.remindUnit.isEmpty) return;
 
-  /// バッジをクリア
-  Future<void> clearBadge() async {
+    final notifyAt = _calcNotifyTime(schedule);
+    if (notifyAt == null || notifyAt.isBefore(DateTime.now())) return;
+
+    final title = '予定: ${schedule.title}';
+    final body = _remindLabel(schedule.remindValue, schedule.remindUnit);
+
     if (kIsWeb) {
+      _cancelWebTimer(schedule.id);
+      final delay = notifyAt.difference(DateTime.now());
+      _webTimers[schedule.id] = Timer(delay, () {
+        showWebNotification(title, body: body);
+      });
       return;
     }
 
-    try {
-      final isSupported = await FlutterAppBadger.isAppBadgeSupported();
-      if (isSupported) {
-        await FlutterAppBadger.removeBadge();
-        debugPrint('NotificationService: Badge cleared');
-      }
-    } catch (e) {
-      debugPrint('NotificationService: Failed to clear badge: $e');
+    await _localPlugin?.cancel(schedule.id.hashCode);
+    await _localPlugin?.zonedSchedule(
+      schedule.id.hashCode,
+      title,
+      body,
+      tz.TZDateTime.from(notifyAt, tz.local),
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _scheduleChannelId,
+          'スケジュール通知',
+          importance: Importance.high,
+          priority: Priority.high,
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  /// 予定の通知をキャンセル
+  Future<void> cancelScheduleNotification(String scheduleId) async {
+    if (kIsWeb) {
+      _cancelWebTimer(scheduleId);
+      return;
     }
+    await _localPlugin?.cancel(scheduleId.hashCode);
+  }
+
+  // ────────────────────────────────────────
+  // 日記通知（毎日23:55）
+  // ────────────────────────────────────────
+
+  /// 日記通知を毎日23:55にスケジュール
+  Future<void> scheduleDailyDiaryNotification(String characterName) async {
+    if (kIsWeb) {
+      _scheduleWebDiary(characterName);
+      return;
+    }
+
+    await _localPlugin?.cancel(_diaryNotificationId);
+
+    final now = DateTime.now();
+    var notifyAt = DateTime(now.year, now.month, now.day, 23, 55);
+    if (notifyAt.isBefore(now)) {
+      notifyAt = notifyAt.add(const Duration(days: 1));
+    }
+
+    await _localPlugin?.zonedSchedule(
+      _diaryNotificationId,
+      '${characterName}の日記',
+      'キャラクターが今日の日記を書きました',
+      tz.TZDateTime.from(notifyAt, tz.local),
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          _diaryChannelId,
+          '日記通知',
+          importance: Importance.defaultImportance,
+        ),
+        iOS: const DarwinNotificationDetails(),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time, // 毎日繰り返し
+    );
+  }
+
+  /// 日記通知をキャンセル
+  Future<void> cancelDailyDiaryNotification() async {
+    if (kIsWeb) {
+      _webDiaryTimer?.cancel();
+      _webDiaryTimer = null;
+      return;
+    }
+    await _localPlugin?.cancel(_diaryNotificationId);
+  }
+
+  // ────────────────────────────────────────
+  // FCM トピック購読
+  // ────────────────────────────────────────
+
+  Future<void> subscribeToTopic(String topic) async {
+    try {
+      await _messaging.subscribeToTopic(topic);
+    } catch (e) {
+      debugPrint('NotificationService: subscribeToTopic failed: $e');
+    }
+  }
+
+  Future<void> unsubscribeFromTopic(String topic) async {
+    try {
+      await _messaging.unsubscribeFromTopic(topic);
+    } catch (e) {
+      debugPrint('NotificationService: unsubscribeFromTopic failed: $e');
+    }
+  }
+
+  // ────────────────────────────────────────
+  // プライベートヘルパー
+  // ────────────────────────────────────────
+
+  DateTime? _calcNotifyTime(ScheduleModel schedule) {
+    switch (schedule.remindUnit) {
+      case 'minutes':
+        return schedule.startDate
+            .subtract(Duration(minutes: schedule.remindValue));
+      case 'hours':
+        return schedule.startDate
+            .subtract(Duration(hours: schedule.remindValue));
+      case 'days':
+        return schedule.startDate
+            .subtract(Duration(days: schedule.remindValue));
+      default:
+        return null;
+    }
+  }
+
+  String _remindLabel(int value, String unit) {
+    switch (unit) {
+      case 'minutes':
+        return '$value分前';
+      case 'hours':
+        return '$value時間前';
+      case 'days':
+        return '$value日前';
+      default:
+        return '';
+    }
+  }
+
+  void _cancelWebTimer(String scheduleId) {
+    _webTimers[scheduleId]?.cancel();
+    _webTimers.remove(scheduleId);
+  }
+
+  void _scheduleWebDiary(String characterName) {
+    _webDiaryTimer?.cancel();
+    final now = DateTime.now();
+    var notifyAt = DateTime(now.year, now.month, now.day, 23, 55);
+    if (notifyAt.isBefore(now)) {
+      notifyAt = notifyAt.add(const Duration(days: 1));
+    }
+    _webDiaryTimer = Timer(notifyAt.difference(now), () {
+      showWebNotification('${characterName}の日記',
+          body: 'キャラクターが今日の日記を書きました');
+      // 翌日のためにもう一度スケジュール
+      _scheduleWebDiary(characterName);
+    });
+  }
+
+  /// バッジをクリア
+  Future<void> clearBadge() async {}
+
+  void _onForegroundMessage(dynamic message) {
+    debugPrint('NotificationService: foreground message received');
   }
 }
 
-/// バックグラウンドメッセージハンドラ（トップレベル関数として定義）
+/// バックグラウンドメッセージハンドラ（トップレベル）
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  debugPrint('NotificationService: Background message received');
-  debugPrint('  Title: ${message.notification?.title}');
-  debugPrint('  Body: ${message.notification?.body}');
-  debugPrint('  Data: ${message.data}');
-
-  // バックグラウンド処理（必要に応じて）
+Future<void> firebaseMessagingBackgroundHandler(dynamic message) async {
+  debugPrint('NotificationService: background message received');
 }

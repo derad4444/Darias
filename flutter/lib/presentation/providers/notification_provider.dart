@@ -1,7 +1,9 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/services/notification_service.dart';
+import 'character_provider.dart';
 
 /// NotificationServiceのプロバイダー
 final notificationServiceProvider = Provider<NotificationService>((ref) {
@@ -9,82 +11,93 @@ final notificationServiceProvider = Provider<NotificationService>((ref) {
 });
 
 /// 通知許可状態のプロバイダー
-final notificationPermissionProvider = FutureProvider<AuthorizationStatus>((ref) async {
+final notificationPermissionProvider =
+    FutureProvider<AuthorizationStatus>((ref) async {
   final service = ref.watch(notificationServiceProvider);
   return await service.getPermissionStatus();
 });
 
-/// FCMトークンのプロバイダー
-final fcmTokenProvider = Provider<String?>((ref) {
-  final service = ref.watch(notificationServiceProvider);
-  return service.fcmToken;
-});
+// ────────────────────────────────────────
+// 通知設定モデル
+// ────────────────────────────────────────
 
-/// 通知設定状態
 class NotificationSettings {
-  final bool chatNotifications;
+  final bool scheduleNotifications;
   final bool diaryNotifications;
-  final bool reminderNotifications;
-  final bool promotionNotifications;
 
   const NotificationSettings({
-    this.chatNotifications = true,
+    this.scheduleNotifications = true,
     this.diaryNotifications = true,
-    this.reminderNotifications = true,
-    this.promotionNotifications = false,
   });
 
   NotificationSettings copyWith({
-    bool? chatNotifications,
+    bool? scheduleNotifications,
     bool? diaryNotifications,
-    bool? reminderNotifications,
-    bool? promotionNotifications,
   }) {
     return NotificationSettings(
-      chatNotifications: chatNotifications ?? this.chatNotifications,
+      scheduleNotifications:
+          scheduleNotifications ?? this.scheduleNotifications,
       diaryNotifications: diaryNotifications ?? this.diaryNotifications,
-      reminderNotifications: reminderNotifications ?? this.reminderNotifications,
-      promotionNotifications: promotionNotifications ?? this.promotionNotifications,
     );
   }
 }
 
-/// 通知設定のプロバイダー
-final notificationSettingsProvider = StateNotifierProvider<NotificationSettingsNotifier, NotificationSettings>((ref) {
+// ────────────────────────────────────────
+// 通知設定プロバイダー
+// ────────────────────────────────────────
+
+final notificationSettingsProvider =
+    StateNotifierProvider<NotificationSettingsNotifier, NotificationSettings>(
+        (ref) {
   return NotificationSettingsNotifier(ref);
 });
 
-class NotificationSettingsNotifier extends StateNotifier<NotificationSettings> {
+class NotificationSettingsNotifier
+    extends StateNotifier<NotificationSettings> {
   final Ref _ref;
 
-  NotificationSettingsNotifier(this._ref) : super(const NotificationSettings());
+  static const _keySchedule = 'notification_schedule';
+  static const _keyDiary = 'notification_diary';
 
-  void setChatNotifications(bool value) {
-    state = state.copyWith(chatNotifications: value);
-    _updateTopicSubscription('chat', value);
+  NotificationSettingsNotifier(this._ref)
+      : super(const NotificationSettings()) {
+    _loadSettings();
   }
 
-  void setDiaryNotifications(bool value) {
-    state = state.copyWith(diaryNotifications: value);
-    _updateTopicSubscription('diary', value);
+  Future<void> _loadSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = NotificationSettings(
+      scheduleNotifications: prefs.getBool(_keySchedule) ?? true,
+      diaryNotifications: prefs.getBool(_keyDiary) ?? true,
+    );
   }
 
-  void setReminderNotifications(bool value) {
-    state = state.copyWith(reminderNotifications: value);
-    _updateTopicSubscription('reminder', value);
-  }
-
-  void setPromotionNotifications(bool value) {
-    state = state.copyWith(promotionNotifications: value);
-    _updateTopicSubscription('promotion', value);
-  }
-
-  void _updateTopicSubscription(String topic, bool subscribe) {
+  Future<void> setScheduleNotifications(bool value) async {
+    state = state.copyWith(scheduleNotifications: value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keySchedule, value);
+    // 予定通知はスケジュール保存時に個別に設定されるため、ここではトピック購読のみ
     final service = _ref.read(notificationServiceProvider);
-    if (subscribe) {
-      service.subscribeToTopic(topic);
+    if (value) {
+      service.subscribeToTopic('schedule');
     } else {
-      service.unsubscribeFromTopic(topic);
+      service.unsubscribeFromTopic('schedule');
+    }
+  }
+
+  Future<void> setDiaryNotifications(bool value) async {
+    state = state.copyWith(diaryNotifications: value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyDiary, value);
+
+    final service = _ref.read(notificationServiceProvider);
+    if (value) {
+      // キャラクター名を取得して日記通知をスケジュール
+      final character = _ref.read(currentCharacterProvider).valueOrNull;
+      final name = character?.name ?? 'キャラクター';
+      await service.scheduleDailyDiaryNotification(name);
+    } else {
+      await service.cancelDailyDiaryNotification();
     }
   }
 }

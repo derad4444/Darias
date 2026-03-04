@@ -9,6 +9,7 @@ import '../../providers/calendar_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
+import '../../widgets/draggable_fab.dart';
 import '../diary/diary_detail_screen.dart';
 
 /// iOS版CalendarViewと同じデザインのカレンダー画面
@@ -90,7 +91,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final holidaysAsync = ref.watch(holidaysProvider);
 
     return Scaffold(
-      body: Container(
+      body: DraggableFabStack(
+        visible: !isSearchMode,
+        onTap: () => context.push('/calendar/detail', extra: {
+          'schedule': null,
+          'initialDate': selectedDay,
+        }),
+        accentColor: accentColor,
+        child: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
           child: Stack(
@@ -234,34 +242,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
           ),
         ),
       ),
-      floatingActionButton: isSearchMode
-          ? null
-          : Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [accentColor, accentColor.withValues(alpha: 0.8)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: accentColor.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton(
-                onPressed: () => context.push('/calendar/detail', extra: {
-                  'schedule': null,
-                  'initialDate': selectedDay,
-                }),
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                child: const Icon(Icons.add, color: Colors.white),
-              ),
-            ),
+      ),
     );
   }
 }

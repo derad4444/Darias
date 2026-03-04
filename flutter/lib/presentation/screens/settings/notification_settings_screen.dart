@@ -2,11 +2,10 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 
-/// 通知設定画面
+/// 通知設定画面（iOS版に準拠）
 class NotificationSettingsScreen extends ConsumerWidget {
   const NotificationSettingsScreen({super.key});
 
@@ -16,15 +15,16 @@ class NotificationSettingsScreen extends ConsumerWidget {
     final accentColor = ref.watch(accentColorProvider);
     final permissionAsync = ref.watch(notificationPermissionProvider);
     final settings = ref.watch(notificationSettingsProvider);
+    final textColor = ref.watch(colorSettingsProvider).textColor;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => context.pop(),
         ),
-        title: Text('通知設定', style: TextStyle(color: AppColors.textPrimary)),
+        title: Text('通知設定', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -37,88 +37,53 @@ class NotificationSettingsScreen extends ConsumerWidget {
             children: [
               // 通知許可状態
               permissionAsync.when(
-                data: (status) => _PermissionStatusCard(
+                data: (status) => _PermissionCard(
                   status: status,
                   accentColor: accentColor,
+                  textColor: textColor,
                 ),
                 loading: () => Center(child: CircularProgressIndicator(color: accentColor)),
-                error: (e, st) => _PermissionStatusCard(
+                error: (e, st) => _PermissionCard(
                   status: AuthorizationStatus.notDetermined,
                   accentColor: accentColor,
-                  error: e.toString(),
+                  textColor: textColor,
                 ),
               ),
 
               const SizedBox(height: 16),
 
-              // 通知カテゴリー設定
-              _buildSectionTitle('通知カテゴリー'),
-              const SizedBox(height: 8),
+              // 予定の通知
+              _NotificationToggle(
+                icon: Icons.calendar_month_outlined,
+                title: '予定の通知',
+                subtitle: '予定の開始時刻前に通知',
+                value: settings.scheduleNotifications,
+                accentColor: accentColor,
+                textColor: textColor,
+                onChanged: (value) {
+                  ref.read(notificationSettingsProvider.notifier).setScheduleNotifications(value);
+                },
+              ),
 
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    _NotificationToggle(
-                      icon: Icons.chat,
-                      title: 'チャット通知',
-                      subtitle: 'キャラクターからのメッセージを受け取る',
-                      value: settings.chatNotifications,
-                      accentColor: accentColor,
-                      onChanged: (value) {
-                        ref.read(notificationSettingsProvider.notifier).setChatNotifications(value);
-                      },
-                    ),
-                    Divider(height: 1, color: AppColors.textLight.withValues(alpha: 0.2)),
-                    _NotificationToggle(
-                      icon: Icons.book,
-                      title: '日記通知',
-                      subtitle: '新しい日記が生成されたときに通知',
-                      value: settings.diaryNotifications,
-                      accentColor: accentColor,
-                      onChanged: (value) {
-                        ref.read(notificationSettingsProvider.notifier).setDiaryNotifications(value);
-                      },
-                    ),
-                    Divider(height: 1, color: AppColors.textLight.withValues(alpha: 0.2)),
-                    _NotificationToggle(
-                      icon: Icons.alarm,
-                      title: 'リマインダー',
-                      subtitle: 'TODOや予定のリマインダー',
-                      value: settings.reminderNotifications,
-                      accentColor: accentColor,
-                      onChanged: (value) {
-                        ref.read(notificationSettingsProvider.notifier).setReminderNotifications(value);
-                      },
-                    ),
-                    Divider(height: 1, color: AppColors.textLight.withValues(alpha: 0.2)),
-                    _NotificationToggle(
-                      icon: Icons.campaign,
-                      title: 'お知らせ・キャンペーン',
-                      subtitle: 'アプリからのお知らせやキャンペーン情報',
-                      value: settings.promotionNotifications,
-                      accentColor: accentColor,
-                      onChanged: (value) {
-                        ref.read(notificationSettingsProvider.notifier).setPromotionNotifications(value);
-                      },
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 12),
+
+              // 日記の通知
+              _NotificationToggle(
+                icon: Icons.book_outlined,
+                title: '日記の通知',
+                subtitle: '毎日23:55に日記作成を通知',
+                value: settings.diaryNotifications,
+                accentColor: accentColor,
+                textColor: textColor,
+                onChanged: (value) {
+                  ref.read(notificationSettingsProvider.notifier).setDiaryNotifications(value);
+                },
               ),
 
               const SizedBox(height: 24),
 
-              // 説明テキスト
-              Text(
-                '通知を完全にオフにするには、デバイスの設定アプリからDARIASの通知設定を変更してください。',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textLight,
-                ),
-              ),
+              // 通知についての説明
+              _InfoCard(textColor: textColor),
 
               const SizedBox(height: 32),
             ],
@@ -127,27 +92,18 @@ class NotificationSettingsScreen extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: TextStyle(
-        fontSize: 13,
-        color: AppColors.textSecondary,
-      ),
-    );
-  }
 }
 
-class _PermissionStatusCard extends ConsumerWidget {
+/// 通知許可状態カード
+class _PermissionCard extends ConsumerWidget {
   final AuthorizationStatus status;
   final Color accentColor;
-  final String? error;
+  final Color textColor;
 
-  const _PermissionStatusCard({
+  const _PermissionCard({
     required this.status,
     required this.accentColor,
-    this.error,
+    required this.textColor,
   });
 
   @override
@@ -158,118 +114,86 @@ class _PermissionStatusCard extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        border: Border.all(
+          color: isAuthorized
+              ? Colors.green.withValues(alpha: 0.3)
+              : Colors.orange.withValues(alpha: 0.3),
+        ),
       ),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isAuthorized
-                      ? Colors.green.withValues(alpha: 0.1)
-                      : Colors.orange.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  isAuthorized
-                      ? Icons.notifications_active
-                      : Icons.notifications_off,
-                  color: isAuthorized ? Colors.green : Colors.orange,
-                  size: 28,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      isAuthorized ? '通知が有効です' : '通知が無効です',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      isAuthorized
-                          ? 'アプリからの通知を受け取れます'
-                          : '通知を有効にすると、大切なお知らせを受け取れます',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Icon(
+            isAuthorized
+                ? Icons.check_circle
+                : Icons.warning_amber_rounded,
+            color: isAuthorized ? Colors.green : Colors.orange,
+            size: 26,
           ),
-          if (!isAuthorized) ...[
-            const SizedBox(height: 16),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isAuthorized ? '通知が許可されています' : '通知が許可されていません',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isAuthorized
+                      ? '通知を受け取ることができます'
+                      : 'デバイスの設定から通知を許可してください',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: textColor.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isAuthorized)
             GestureDetector(
               onTap: () async {
                 final service = ref.read(notificationServiceProvider);
-                final granted = await service.requestPermission();
-                if (granted) {
-                  ref.invalidate(notificationPermissionProvider);
-                }
+                await service.requestPermission();
+                ref.invalidate(notificationPermissionProvider);
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accentColor, accentColor.withValues(alpha: 0.8)],
+                  color: accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '設定',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: accentColor,
+                    fontWeight: FontWeight.w500,
                   ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.notifications, color: Colors.white, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      '通知を有効にする',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                    ),
-                  ],
                 ),
               ),
             ),
-          ],
-          if (error != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              error!,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 12,
-              ),
-            ),
-          ],
         ],
       ),
     );
   }
 }
 
+/// 通知トグル行
 class _NotificationToggle extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
   final bool value;
   final Color accentColor;
+  final Color textColor;
   final ValueChanged<bool> onChanged;
 
   const _NotificationToggle({
@@ -278,17 +202,23 @@ class _NotificationToggle extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.accentColor,
+    required this.textColor,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
       child: Row(
         children: [
-          Icon(icon, color: accentColor),
-          const SizedBox(width: 16),
+          Icon(icon, color: accentColor, size: 26),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -297,8 +227,8 @@ class _NotificationToggle extends StatelessWidget {
                   title,
                   style: TextStyle(
                     fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -306,7 +236,7 @@ class _NotificationToggle extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: textColor.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -314,11 +244,74 @@ class _NotificationToggle extends StatelessWidget {
           ),
           Switch(
             value: value,
-            activeColor: accentColor,
+            activeTrackColor: accentColor,
             onChanged: onChanged,
           ),
         ],
       ),
+    );
+  }
+}
+
+/// 通知についての説明カード
+class _InfoCard extends StatelessWidget {
+  final Color textColor;
+
+  const _InfoCard({required this.textColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: textColor.withValues(alpha: 0.7),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '通知について',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _bullet('予定の通知：各予定に設定した時刻に通知されます', textColor),
+          const SizedBox(height: 6),
+          _bullet('日記の通知：キャラクターが日記を書いたことを毎日お知らせします', textColor),
+          const SizedBox(height: 6),
+          _bullet('通知をオフにしても、アプリ内で予定や日記を確認できます', textColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _bullet(String text, Color textColor) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('• ', style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 12)),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(color: textColor.withValues(alpha: 0.7), fontSize: 12),
+          ),
+        ),
+      ],
     );
   }
 }

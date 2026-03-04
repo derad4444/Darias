@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../utils/memo_content_utils.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/draggable_fab.dart';
 import '../settings/tag_management_screen.dart';
 
 /// ノートのセグメント
@@ -30,6 +32,18 @@ class NoteScreen extends ConsumerWidget {
     final accentColor = ref.watch(accentColorProvider);
     final backgroundGradient = ref.watch(backgroundGradientProvider);
 
+    void onFabTap() {
+      if (selectedSegment == NoteSegment.memo) {
+        final selectedTag = ref.read(memoSelectedTagProvider);
+        final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
+        context.push('/memo/detail', extra: {'initialTag': initialTag});
+      } else {
+        final selectedTag = ref.read(todoSelectedTagProvider);
+        final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
+        context.push('/todo/detail', extra: {'initialTag': initialTag});
+      }
+    }
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -37,48 +51,32 @@ class NoteScreen extends ConsumerWidget {
         elevation: 0,
         title: const Text('ノート'),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            color: accentColor,
-            onPressed: () {
-              if (selectedSegment == NoteSegment.memo) {
-                final selectedTag = ref.read(memoSelectedTagProvider);
-                final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
-                context.push('/memo/detail', extra: {'initialTag': initialTag});
-              } else {
-                final selectedTag = ref.read(todoSelectedTagProvider);
-                final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
-                context.push('/todo/detail', extra: {'initialTag': initialTag});
-              }
-            },
-          ),
-        ],
       ),
-      body: Container(
-        decoration: BoxDecoration(gradient: backgroundGradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // セグメントコントロール
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: _SegmentControl(
-                  selectedSegment: selectedSegment,
-                  accentColor: accentColor,
-                  onSegmentChanged: (segment) {
-                    ref.read(noteSegmentProvider.notifier).state = segment;
-                  },
+      body: DraggableFabStack(
+        onTap: onFabTap,
+        accentColor: accentColor,
+        child: Container(
+          decoration: BoxDecoration(gradient: backgroundGradient),
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: _SegmentControl(
+                    selectedSegment: selectedSegment,
+                    accentColor: accentColor,
+                    onSegmentChanged: (segment) {
+                      ref.read(noteSegmentProvider.notifier).state = segment;
+                    },
+                  ),
                 ),
-              ),
-
-              // 選択されたビューを表示
-              Expanded(
-                child: selectedSegment == NoteSegment.memo
-                    ? const _MemoContentView()
-                    : const _TodoContentView(),
-              ),
-            ],
+                Expanded(
+                  child: selectedSegment == NoteSegment.memo
+                      ? const _MemoContentView()
+                      : const _TodoContentView(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -216,7 +214,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
           filteredMemos = filteredMemos
               .where((m) =>
                   m.title.toLowerCase().contains(query) ||
-                  m.content.toLowerCase().contains(query))
+                  extractPlainText(m.content).toLowerCase().contains(query))
               .toList();
         }
         if (selectedTag != 'すべて') {
@@ -343,7 +341,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _MemoCard(
                             title: memo.title,
-                            content: memo.content,
+                            content: extractPlainText(memo.content),
                             tag: memo.tag,
                             isPinned: memo.isPinned,
                             accentColor: accentColor,
