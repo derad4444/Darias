@@ -362,14 +362,16 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     if (_titleController.text.isEmpty) return;
     if (_isSaving) return;
 
-    if (!_isDisposed && mounted) setState(() => _isSaving = true);
+    // mounted/disposed に関わらずフラグをセット（並行保存防止）
+    _isSaving = true;
+    if (!_isDisposed && mounted) setState(() {});
 
     try {
       final contentJson = jsonEncode(
         _quillController.document.toDelta().toJson(),
       );
 
-      final existingMemo = widget.memo ?? _savedMemo;
+      final existingMemo = (widget.memo != null && widget.memo!.id.isNotEmpty) ? widget.memo : _savedMemo;
       if (existingMemo == null) {
         // 新規作成
         final newMemo = MemoModel.create(
@@ -398,13 +400,15 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
         );
       }
     } catch (e) {
+      debugPrint('🔴 メモ自動保存エラー: $e');
       if (!_isDisposed && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('自動保存に失敗しました: $e')),
         );
       }
     } finally {
-      if (!_isDisposed && mounted) setState(() => _isSaving = false);
+      _isSaving = false;
+      if (!_isDisposed && mounted) setState(() {});
     }
   }
 

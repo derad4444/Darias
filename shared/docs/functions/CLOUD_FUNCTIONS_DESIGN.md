@@ -4,7 +4,7 @@
 
 **最終更新日**: 2026-03-07
 **ランタイム**: Node.js 20
-**関数数**: 16
+**関数数**: 17
 
 ---
 
@@ -29,7 +29,7 @@
 │           Cloud Functions (Node.js 20)        │
 │                                               │
 │  ┌─────────────┐  ┌────────────────────────┐ │
-│  │ onCall (7)   │  │ onSchedule (5)         │ │
+│  │ onCall (8)   │  │ onSchedule (5)         │ │
 │  │ クライアント  │  │ 定期バッチ処理          │ │
 │  │ から直接呼出  │  │ (日次/月次/年次)        │ │
 │  └──────┬──────┘  └───────────┬────────────┘ │
@@ -61,7 +61,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 7 関数
+### HTTP Callable (`onCall`) - 8 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -113,7 +113,42 @@
 - `details/current` の `confirmedBig5Scores`, `analysis_level`, `sixPersonalities` を更新（100問完了時）
 - `PersonalityStatsMetadata` を更新（100問完了時・バックグラウンド）
 
-#### 2. `extractSchedule`
+#### 2. `answerAppQuestion`
+- **ソース**: `const/answerAppQuestion.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: アプリの使い方に関する質問、またはユーザー自身のデータ（予定・タスク・メモ）に関する質問に回答する
+- **リソース**: memory `256MiB` / timeout `60秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: `OPENAI_API_KEY`
+- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `userId` | `string` | Firebase Auth UID |
+| `userMessage` | `string` | ユーザーのメッセージ |
+| `dataTypes` | `array<string>` | Firestoreから取得するデータ種別（`"schedules"` / `"todos"` / `"memos"`） |
+
+**返却値:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `reply` | `string` | 回答テキスト（100文字以内） |
+
+**処理内容:**
+1. `dataTypes` に指定されたコレクションから必要なデータを Firestore より取得
+   - `schedules`: 前後30日の予定（最大20件）
+   - `todos`: 未完了タスク（最大20件）
+   - `memos`: 最新メモ（最大10件）
+2. アプリガイド + 取得データをシステムプロンプトに組み込んで `gpt-4o-mini` で回答生成
+3. Firestore への書き込みは行わない（読み取り専用）
+
+**モデル:** `gpt-4o-mini`（固定。質問応答はプレミアム/フリー問わず同一モデル）
+
+---
+
+#### 3. `extractSchedule`
 - **ソース**: `const/extractSchedule.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: ユーザーメッセージから予定情報を OpenAI で抽出
@@ -122,7 +157,7 @@
 - **secrets**: `OPENAI_API_KEY`
 - **その他**: `minInstances: 0`, `enforceAppCheck: false`
 
-#### 3. `generateVoice`
+#### 4. `generateVoice`
 - **ソース**: `const/generateVoice.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: テキストを Google Cloud TTS で音声化し Storage に保存
@@ -131,7 +166,7 @@
 - **secrets**: なし
 - **その他**: `minInstances: 0`
 
-#### 4. `generateBig5Analysis` (エクスポート名: `generateBig5AnalysisCallable`)
+#### 5. `generateBig5Analysis` (エクスポート名: `generateBig5AnalysisCallable`)
 - **ソース**: `const/generateBig5Analysis.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: BIG5 性格診断スコアから解析データを生成・キャッシュ
@@ -139,7 +174,7 @@
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 
-#### 5. `validateAppStoreReceipt`
+#### 6. `validateAppStoreReceipt`
 - **ソース**: `validateReceipt.js`
 - **API バージョン**: **v1** (`firebase-functions` — `functions.https.onCall`)
 - **概要**: Apple App Store レシート検証 → サブスクリプション更新
@@ -147,7 +182,7 @@
 - **リージョン**: 未指定（v1 デフォルト: us-central1）
 - **secrets**: なし（`process.env.APPLE_SHARED_SECRET` または `functions.config().apple.shared_secret` を実行時に参照）
 
-#### 6. `validateGooglePlayReceipt`
+#### 7. `validateGooglePlayReceipt`
 - **ソース**: `validateReceipt.js`
 - **API バージョン**: **v1** (`firebase-functions` — `functions.https.onCall`)
 - **概要**: Google Play レシート検証 → サブスクリプション更新
@@ -155,7 +190,7 @@
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし（`process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY`、`process.env.GOOGLE_PLAY_PACKAGE_NAME` を実行時に参照）
 
-#### 7. `generateOrReuseMeeting`
+#### 8. `generateOrReuseMeeting`
 - **ソース**: `src/functions/generateSixPersonMeeting.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: 6人会議の AI 会話を生成（キャッシュ再利用あり）
@@ -169,7 +204,7 @@
 
 Cloud Scheduler による定期実行バッチ。
 
-#### 8. `scheduledHolidays`
+#### 9. `scheduledHolidays`
 - **ソース**: `src/functions/scheduledTasks.js`
 - **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
 - **概要**: 当年＋翌年の日本の祝日を Firestore に登録
@@ -178,7 +213,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: `asia-northeast1`
 - **secrets**: なし
 
-#### 9. `scheduledDiaryGeneration`
+#### 10. `scheduledDiaryGeneration`
 - **ソース**: `src/functions/scheduledTasks.js` → `const/generateDiary.js`
 - **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
 - **概要**: 全ユーザーの当日アクティビティを集約し、アクティビティ型日記を自動生成（並列5件ずつ）
@@ -190,7 +225,7 @@ Cloud Scheduler による定期実行バッチ。
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string` を Firestore に保存
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 
-#### 10. `generateMonthlyReview`
+#### 11. `generateMonthlyReview`
 - **ソース**: `src/functions/generateMonthlyReview.js`
 - **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
 - **概要**: 前月のスケジュールからキャラ別月次レビューを生成
@@ -199,7 +234,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: `asia-northeast1`
 - **secrets**: なし
 
-#### 11. `checkSubscriptionStatus`
+#### 12. `checkSubscriptionStatus`
 - **ソース**: `validateReceipt.js`
 - **API バージョン**: **v1** (`firebase-functions` — `functions.scheduler.onSchedule`)
 - **概要**: 期限切れサブスクリプションを検出し free に更新
@@ -208,7 +243,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし
 
-#### 12. `backfillSixPersonalities`
+#### 13. `backfillSixPersonalities`
 - **ソース**: `src/functions/generateSixPersonMeeting.js`
 - **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
 - **概要**: 6性格バリアントが未生成のユーザーを補完
@@ -223,7 +258,7 @@ Cloud Scheduler による定期実行バッチ。
 
 Firestore ドキュメント作成時に自動実行。
 
-#### 13. `sendRegistrationEmail`
+#### 14. `sendRegistrationEmail`
 - **ソース**: `src/functions/sendRegistrationEmail.js`
 - **API バージョン**: v2 (`firebase-functions/v2/firestore`)
 - **トリガーパス**: `users/{userId}`
@@ -232,7 +267,7 @@ Firestore ドキュメント作成時に自動実行。
 - **リージョン**: 未指定（v2 デフォルト）
 - **secrets**: `GMAIL_USER`, `GMAIL_APP_PASSWORD`（オブジェクト参照）
 
-#### 14. `sendContactEmail`
+#### 15. `sendContactEmail`
 - **ソース**: `sendContactEmail.js`
 - **API バージョン**: v2 (`firebase-functions/v2/firestore`)
 - **トリガーパス**: `contacts/{contactId}`
@@ -247,7 +282,7 @@ Firestore ドキュメント作成時に自動実行。
 
 REST API として直接アクセス可能。
 
-#### 15. `generateMonthlyReviewHttp`
+#### 16. `generateMonthlyReviewHttp`
 - **ソース**: `src/functions/generateMonthlyReview.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: 月次レビューのテスト・手動実行用 HTTP エンドポイント
@@ -255,7 +290,7 @@ REST API として直接アクセス可能。
 - **リージョン**: `asia-northeast1`
 - **secrets**: なし
 
-#### 16. `health`
+#### 17. `health`
 - **ソース**: `health.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: ヘルスチェック（Cloud Run モニタリング用）

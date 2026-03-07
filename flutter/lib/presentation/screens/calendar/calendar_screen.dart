@@ -1112,65 +1112,145 @@ class _CalendarGrid extends StatelessWidget {
     final firstDay = DateTime(month.year, month.month, 1);
     final lastDay = DateTime(month.year, month.month + 1, 0);
     final daysInMonth = lastDay.day;
-    final firstWeekday = firstDay.weekday % 7; // 日曜始まり
+    final firstWeekday = firstDay.weekday % 7; // 0=日曜始まり
     final today = DateTime.now();
-
-    // 6週分のセルを生成
-    final List<Widget> rows = [];
-    int dayCounter = 1 - firstWeekday;
-
-    for (int week = 0; week < 6; week++) {
-      final List<Widget> weekCells = [];
-
-      for (int weekday = 0; weekday < 7; weekday++) {
-        if (dayCounter < 1 || dayCounter > daysInMonth) {
-          // 空セル
-          weekCells.add(Expanded(child: Container()));
-        } else {
-          final date = DateTime(month.year, month.month, dayCounter);
-          weekCells.add(
-            Expanded(
-              child: _CalendarDayCell(
-                date: date,
-                isToday: date.year == today.year &&
-                    date.month == today.month &&
-                    date.day == today.day,
-                isSelected: selectedDay != null &&
-                    date.year == selectedDay!.year &&
-                    date.month == selectedDay!.month &&
-                    date.day == selectedDay!.day,
-                schedules: _getSchedulesForDate(date),
-                holiday: holidays.where((h) => h.isOnDate(date)).firstOrNull,
-                accentColor: accentColor,
-                textColor: textColor,
-                onTap: () => onDaySelected(date),
-              ),
-            ),
-          );
-        }
-        dayCounter++;
-      }
-
-      rows.add(
-        Expanded(
-          child: Row(children: weekCells),
-        ),
-      );
-    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: Column(children: rows),
-    );
-  }
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cellWidth = constraints.maxWidth / 7;
 
-  List<ScheduleModel> _getSchedulesForDate(DateTime date) {
-    return schedules.where((s) {
-      final startDay = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
-      final endDay = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
-      return !date.isBefore(startDay) && !date.isAfter(endDay);
-    }).toList()
-      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+          // グリッド上の実際の日付（月外も含む）
+          DateTime gridDate(int week, int wd) =>
+              firstDay.add(Duration(days: week * 7 + wd - firstWeekday));
+
+          bool isInMonth(DateTime d) =>
+              d.year == month.year && d.month == month.month;
+
+          final List<Widget> rows = [];
+
+          for (int week = 0; week < 6; week++) {
+            final weekStart = gridDate(week, 0);
+            final weekEnd = gridDate(week, 6);
+
+            // この週と重なる複数日予定
+            final multiDaySchedules = schedules.where((s) {
+              final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
+              final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
+              return sd != ed && !ed.isBefore(weekStart) && !sd.isAfter(weekEnd);
+            }).toList()
+              ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
+            final multiDaySlotCount = multiDaySchedules.length;
+
+            // 各セル（1日のみの予定）
+            final List<Widget> cells = [];
+            for (int wd = 0; wd < 7; wd++) {
+              final date = gridDate(week, wd);
+              if (!isInMonth(date)) {
+                cells.add(Expanded(child: Container()));
+              } else {
+                final dateOnly = DateTime(date.year, date.month, date.day);
+                final singleDaySchedules = schedules.where((s) {
+                  final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
+                  final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
+                  return sd == ed && sd == dateOnly;
+                }).toList()
+                  ..sort((a, b) => a.startDate.compareTo(b.startDate));
+                final holiday = holidays.where((h) => h.isOnDate(date)).firstOrNull;
+
+                cells.add(Expanded(
+                  child: _CalendarDayCell(
+                    date: date,
+                    isToday: date.year == today.year &&
+                        date.month == today.month &&
+                        date.day == today.day,
+                    isSelected: selectedDay != null &&
+                        date.year == selectedDay!.year &&
+                        date.month == selectedDay!.month &&
+                        date.day == selectedDay!.day,
+                    schedules: singleDaySchedules,
+                    holiday: holiday,
+                    multiDaySlotCount: multiDaySlotCount,
+                    accentColor: accentColor,
+                    textColor: textColor,
+                    onTap: () => onDaySelected(date),
+                  ),
+                ));
+              }
+            }
+
+            // 複数日予定のオーバーレイバー
+            const barH = 14.0;
+            const barGap = 2.0;
+            const dateAreaH = 32.0; // SizedBox(2) + Container(28) + 2
+
+            final List<Widget> bars = [];
+            for (int slot = 0; slot < multiDaySchedules.length; slot++) {
+              final schedule = multiDaySchedules[slot];
+              final sd = DateTime(schedule.startDate.year, schedule.startDate.month, schedule.startDate.day);
+              final ed = DateTime(schedule.endDate.year, schedule.endDate.month, schedule.endDate.day);
+              final isVisualStart = !sd.isBefore(weekStart);
+              final isVisualEnd = !ed.isAfter(weekEnd);
+              final startWd = isVisualStart ? sd.difference(weekStart).inDays : 0;
+              final endWd = isVisualEnd ? ed.difference(weekStart).inDays : 6;
+              final left = isVisualStart ? startWd * cellWidth + 1 : 0.0;
+              final right = isVisualEnd ? (6 - endWd) * cellWidth + 1 : 0.0;
+              final top = dateAreaH + slot * (barH + barGap);
+              const r = Radius.circular(2);
+
+              bars.add(Positioned(
+                left: left,
+                right: right,
+                top: top,
+                height: barH,
+                child: GestureDetector(
+                  onTap: () => onDaySelected(sd.isBefore(weekStart) ? weekStart : sd),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.only(
+                        topLeft: isVisualStart ? r : Radius.zero,
+                        bottomLeft: isVisualStart ? r : Radius.zero,
+                        topRight: isVisualEnd ? r : Radius.zero,
+                        bottomRight: isVisualEnd ? r : Radius.zero,
+                      ),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    alignment: Alignment.centerLeft,
+                    child: isVisualStart
+                        ? Text(
+                            schedule.title,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : null,
+                  ),
+                ),
+              ));
+            }
+
+            rows.add(Expanded(
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Row(children: cells),
+                  ...bars,
+                ],
+              ),
+            ));
+          }
+
+          return Column(children: rows);
+        },
+      ),
+    );
   }
 }
 
@@ -1179,8 +1259,9 @@ class _CalendarDayCell extends StatelessWidget {
   final DateTime date;
   final bool isToday;
   final bool isSelected;
-  final List<ScheduleModel> schedules;
+  final List<ScheduleModel> schedules; // 1日のみの予定
   final HolidayModel? holiday;
+  final int multiDaySlotCount; // 複数日予定のプレースホルダー数
   final Color accentColor;
   final Color textColor;
   final VoidCallback onTap;
@@ -1191,6 +1272,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.isSelected,
     required this.schedules,
     this.holiday,
+    required this.multiDaySlotCount,
     required this.accentColor,
     required this.textColor,
     required this.onTap,
@@ -1248,10 +1330,7 @@ class _CalendarDayCell extends StatelessWidget {
 
             // 予定・祝日表示エリア
             Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 1),
-                child: _buildScheduleItems(),
-              ),
+              child: _buildScheduleItems(),
             ),
           ],
         ),
@@ -1261,27 +1340,25 @@ class _CalendarDayCell extends StatelessWidget {
 
   Widget _buildScheduleItems() {
     final List<Widget> items = [];
+
+    // 複数日予定オーバーレイ用のプレースホルダー（高さを確保）
+    for (int i = 0; i < multiDaySlotCount; i++) {
+      items.add(const SizedBox(height: 16)); // barH(14) + barGap(2)
+    }
+
     int displayedCount = 0;
     const maxDisplay = 2;
 
     // 祝日
     if (holiday != null && displayedCount < maxDisplay) {
-      items.add(_ScheduleBar(
-        title: holiday!.name,
-        color: Colors.red,
-        isHoliday: true,
-      ));
+      items.add(_ScheduleBar(title: holiday!.name, color: Colors.red, isHoliday: true));
       displayedCount++;
     }
 
-    // 予定
+    // 1日のみの予定
     for (final schedule in schedules) {
       if (displayedCount >= maxDisplay) break;
-      items.add(_ScheduleBar(
-        title: schedule.title,
-        color: accentColor,
-        isHoliday: false,
-      ));
+      items.add(_ScheduleBar(title: schedule.title, color: accentColor, isHoliday: false));
       displayedCount++;
     }
 
@@ -1315,7 +1392,7 @@ class _CalendarDayCell extends StatelessWidget {
   }
 }
 
-/// 予定バー（iOS版と同様）
+/// 予定バー（1日のみ）
 class _ScheduleBar extends StatelessWidget {
   final String title;
   final Color color;
@@ -1331,7 +1408,7 @@ class _ScheduleBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(top: 1),
+      margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
       decoration: BoxDecoration(
         color: color.withValues(alpha: isHoliday ? 0.2 : 0.8),

@@ -33,7 +33,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
   bool _isCompleted = false;
   bool _isSaving = false;
 
-  bool get _isNewTodo => widget.todo == null;
+  bool get _isNewTodo => widget.todo == null || widget.todo!.id.isEmpty;
 
   @override
   void initState() {

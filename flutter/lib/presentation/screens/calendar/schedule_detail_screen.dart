@@ -54,7 +54,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   /// 年月セレクターが展開中か
   bool _showYearMonthPicker = false;
 
-  bool get _isNewSchedule => widget.schedule == null;
+  bool get _isNewSchedule => widget.schedule == null || widget.schedule!.id.isEmpty;
 
   @override
   void initState() {

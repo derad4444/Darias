@@ -6,6 +6,30 @@ import '../../models/post_model.dart';
 import '../../models/schedule_model.dart';
 import '../../models/todo_model.dart';
 
+/// 質問パターン（最優先で検出 → アプリQ&A）
+const _questionKeywords = [
+  '？',
+  '?',
+  'どうやって',
+  'どうする',
+  'どうすれば',
+  '教えて',
+  '使い方',
+  '方法',
+  'できる',
+  'やり方',
+  'わからない',
+  'わかんない',
+  'どこ',
+  'なに',
+  'なんで',
+];
+
+/// ユーザーデータ参照キーワード（質問と組み合わせてFirestoreから取得）
+const _scheduleDataKeywords = ['予定', 'スケジュール', 'カレンダー'];
+const _todoDataKeywords = ['タスク', 'TODO', 'todo', 'やること'];
+const _memoDataKeywords = ['メモ一覧', 'メモ見せて', 'メモある'];
+
 /// 予定関連のキーワード（iOS版と同じ）
 const _scheduleKeywords = [
   '予定',
@@ -71,6 +95,20 @@ class ChatDatasource {
     FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _functions = functions ?? FirebaseFunctions.instanceFor(region: 'asia-northeast1');
+
+  /// 質問パターンが含まれているかチェック（最優先）
+  bool _containsQuestionPattern(String message) {
+    return _questionKeywords.any((keyword) => message.contains(keyword));
+  }
+
+  /// ユーザーデータ参照が必要なキーワードを検出（質問時のみ使用）
+  List<String> _detectDataTypes(String message) {
+    final types = <String>[];
+    if (_scheduleDataKeywords.any((kw) => message.contains(kw))) types.add('schedules');
+    if (_todoDataKeywords.any((kw) => message.contains(kw))) types.add('todos');
+    if (_memoDataKeywords.any((kw) => message.contains(kw))) types.add('memos');
+    return types;
+  }
 
   /// 予定キーワードが含まれているかチェック
   bool _containsScheduleKeyword(String message) {
@@ -150,7 +188,7 @@ class ChatDatasource {
   }
 
   /// メッセージを送信して検出結果も含めて返す
-  /// 優先順: メモ → タスク → スケジュール → 通常チャット
+  /// 優先順: 質問 → メモ → タスク → スケジュール → 通常チャット
   Future<SendMessageResult> sendMessageWithScheduleDetection({
     required String userId,
     required String characterId,
@@ -159,7 +197,14 @@ class ChatDatasource {
   }) async {
     final trimmed = message.trim();
 
-    // ① メモキーワード検出（postsには保存しない：日記はmemosコレクションから直接読む）
+    // ① 質問パターン検出（最優先：アプリQ&A / ユーザーデータ参照）
+    if (_containsQuestionPattern(trimmed)) {
+      debugPrint('❓ 質問パターン検出: "$trimmed"');
+      final reply = await _answerAppQuestion(userId: userId, userMessage: trimmed);
+      return SendMessageResult(reply: reply);
+    }
+
+    // ② メモキーワード検出（postsには保存しない：日記はmemosコレクションから直接読む）
     if (_containsMemoKeyword(trimmed)) {
       debugPrint('📝 メモキーワード検出: "$trimmed"');
       final memo = _extractMemoFromMessage(trimmed);
@@ -170,7 +215,7 @@ class ChatDatasource {
       );
     }
 
-    // ② タスクキーワード検出（postsには保存しない：日記はtodosコレクションから直接読む）
+    // ③ タスクキーワード検出（postsには保存しない：日記はtodosコレクションから直接読む）
     if (_containsTodoKeyword(trimmed)) {
       debugPrint('✅ タスクキーワード検出: "$trimmed"');
       final todo = _extractTodoFromMessage(trimmed);
@@ -181,7 +226,7 @@ class ChatDatasource {
       );
     }
 
-    // ③ スケジュールキーワード検出（postsには保存しない：日記はschedulesコレクションから直接読む）
+    // ④ スケジュールキーワード検出（postsには保存しない：日記はschedulesコレクションから直接読む）
     if (_containsScheduleKeyword(trimmed)) {
       debugPrint('📅 予定キーワード検出: "$trimmed"');
       try {
@@ -204,7 +249,7 @@ class ChatDatasource {
       }
     }
 
-    // ④ 通常のキャラクター返答
+    // ⑤ 通常のキャラクター返答
     final chatHistory = await _fetchRecentChatHistory(userId, characterId);
 
     final callable = _functions.httpsCallable('generateCharacterReply');
@@ -229,6 +274,26 @@ class ChatDatasource {
     return SendMessageResult(reply: reply);
   }
 
+  /// アプリQ&A / ユーザーデータ参照（Cloud Function呼び出し）
+  Future<String> _answerAppQuestion({
+    required String userId,
+    required String userMessage,
+  }) async {
+    try {
+      final dataTypes = _detectDataTypes(userMessage);
+      final callable = _functions.httpsCallable('answerAppQuestion');
+      final result = await callable.call<Map<String, dynamic>>({
+        'userId': userId,
+        'userMessage': userMessage,
+        'dataTypes': dataTypes,
+      });
+      return result.data['reply'] as String? ?? 'うまく答えられなかったよ、ごめんね。';
+    } catch (e) {
+      debugPrint('⚠️ answerAppQuestionエラー: $e');
+      return 'うまく答えられなかったよ、ごめんね。';
+    }
+  }
+
   /// Cloud Functionで予定を抽出
   Future<ScheduleModel?> _extractSchedule({
     required String userId,
@@ -249,22 +314,13 @@ class ChatDatasource {
     if (scheduleData == null) return null;
 
     final title = scheduleData['title'] as String? ?? '';
-    final startDateStr = scheduleData['startDate'] as String?;
-    final endDateStr = scheduleData['endDate'] as String?;
     final isAllDay = scheduleData['isAllDay'] as bool? ?? true;
     final location = scheduleData['location'] as String? ?? '';
     final memo = scheduleData['memo'] as String? ?? '';
 
-    DateTime startDate;
-    DateTime endDate;
-
-    try {
-      startDate = startDateStr != null ? DateTime.parse(startDateStr) : DateTime.now();
-      endDate = endDateStr != null ? DateTime.parse(endDateStr) : startDate;
-    } catch (e) {
-      startDate = DateTime.now();
-      endDate = startDate;
-    }
+    // startDate/endDate はISO文字列またはTimestampオブジェクト（{_seconds, _nanoseconds}）で返ることがある
+    final startDate = _parseDateField(scheduleData['startDate']) ?? DateTime.now();
+    final endDate = _parseDateField(scheduleData['endDate']) ?? startDate;
 
     return ScheduleModel(
       id: '',
@@ -275,6 +331,26 @@ class ChatDatasource {
       location: location,
       memo: memo,
     );
+  }
+
+  /// 日付フィールドをパース（ISO文字列 or Timestampオブジェクト対応）
+  DateTime? _parseDateField(dynamic value) {
+    if (value == null) return null;
+    if (value is String) {
+      try {
+        return DateTime.parse(value);
+      } catch (_) {
+        return null;
+      }
+    }
+    // FirebaseのTimestampがMapとして返ってくる場合
+    if (value is Map) {
+      final seconds = value['_seconds'] as int? ?? value['seconds'] as int?;
+      if (seconds != null) {
+        return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      }
+    }
+    return null;
   }
 
   /// 最近のチャット履歴を取得（2件）

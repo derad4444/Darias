@@ -80,6 +80,11 @@ Object.defineProperty(exports, "backfillSixPersonalities", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "answerAppQuestion", {
+  get: () => require("./const/answerAppQuestion").answerAppQuestion,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;
