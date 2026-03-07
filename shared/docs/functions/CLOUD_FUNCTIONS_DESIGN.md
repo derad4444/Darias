@@ -68,11 +68,50 @@
 #### 1. `generateCharacterReply`
 - **ソース**: `const/generateCharacterReply.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: OpenAI でキャラクター応答を生成（感情検出付き）
+- **概要**: チャットメッセージを受け取り、内容に応じて複数の処理を振り分けてAI返答を生成する
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 - **その他**: `minInstances: 0`, `enforceAppCheck: false`
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `characterId` | `string` | キャラクターID |
+| `userMessage` | `string` | ユーザーのメッセージ（100文字まで処理） |
+| `userId` | `string` | Firebase Auth UID |
+| `isPremium` | `boolean` | プレミアムユーザーフラグ |
+| `chatHistory` | `array<{userMessage, aiResponse}>` | 直近2件の会話履歴 |
+
+**返却値:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `reply` | `string` | AI返答テキスト |
+| `emotion` | `string` | 感情表現（`""` = normal, `"_smile"`, `"_angry"`, `"_cry"`, `"_sleep"`) |
+| `isBig5Question` | `boolean` | BIG5回答モード中かどうか |
+| `voiceUrl` | `string` | 音声URL（現在は常に `""`。音声生成は一時無効化中） |
+| `questionId` / `questionText` / `progress` | `string` | BIG5質問モード時のみ |
+| `big5Completed` / `newScores` | - | 100問完了時のみ |
+
+**処理の振り分けロジック（優先順）:**
+
+1. **無意味な入力検出** → フォールバック返答を返す（3文字未満・記号のみ・繰り返し文字等）
+2. **予定照会** (`今日/明日の予定`) → `users/{uid}/schedules` を照会して返答
+3. **BIG5診断トリガー** (`性格診断して` / `性格解析して`) → 次の質問を返し `big5Progress` を更新
+4. **BIG5回答** (1-5の数字 かつ `currentQuestion` が存在) → 回答を記録し段階完了処理、次の質問を返す
+5. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
+
+**モデル選択:**
+- Premium ユーザー: `gpt-4o-2024-11-20`
+- Free ユーザー: `gpt-4o-mini`
+
+**副作用（Firestore書き込み）:**
+- `posts/{docId}` へチャット履歴を保存（通常チャット時のみ）
+- `big5Progress/current` を更新（BIG5回答・トリガー時）
+- `details/current` の `confirmedBig5Scores`, `analysis_level`, `sixPersonalities` を更新（100問完了時）
+- `PersonalityStatsMetadata` を更新（100問完了時・バックグラウンド）
 
 #### 2. `extractSchedule`
 - **ソース**: `const/extractSchedule.js`

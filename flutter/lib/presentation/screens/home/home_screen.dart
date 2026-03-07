@@ -13,6 +13,7 @@ import '../../../data/models/schedule_model.dart';
 import '../../../data/models/todo_model.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../../data/datasources/remote/chat_datasource.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/ad_provider.dart';
@@ -31,11 +32,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _chatController = TextEditingController();
   bool _isWaitingForReply = false;
   late String _displayedMessage;
+  // ダイアログ表示中フラグ（多重表示防止）
+  bool _isShowingDialog = false;
 
-  // 検出された保留中アイテム（確認カード表示用）
-  ScheduleModel? _pendingSchedule;
-  MemoModel? _pendingMemo;
-  TodoModel? _pendingTodo;
 
   /// iOS版と同じ初期メッセージリスト
   static const List<String> _initialMessages = [
@@ -94,15 +93,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     message: _displayedMessage,
                     maxWidth: size.width * 0.8,
                   ),
-                ),
-
-              // 確認カード（スケジュール・メモ・タスク検出時）
-              if (_pendingSchedule != null || _pendingMemo != null || _pendingTodo != null)
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  top: size.height * 0.21,
-                  child: _buildConfirmationCard(accentColor),
                 ),
 
               // 下部UI（キャラクター画像 + 操作エリア）
@@ -238,10 +228,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() {
       _isWaitingForReply = true;
       _chatController.clear();
-      // 前の確認カードをクリア
-      _pendingSchedule = null;
-      _pendingMemo = null;
-      _pendingTodo = null;
     });
 
     // 性格診断トリガー
@@ -259,11 +245,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       setState(() {
         _displayedMessage = result?.reply ?? 'お返事がありませんでした';
-        _pendingSchedule = result?.detectedSchedule;
-        _pendingMemo = result?.detectedMemo;
-        _pendingTodo = result?.detectedTodo;
         _isWaitingForReply = false;
       });
+      if (mounted && result != null && !_isShowingDialog) {
+        if (result.scheduleDetected || result.memoDetected || result.todoDetected) {
+          _showActionConfirmDialog(result);
+        }
+      }
     } catch (e) {
       setState(() {
         _displayedMessage = 'エラーが発生しました。もう一度試してください。';
@@ -272,52 +260,96 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  /// 確認カードウィジェット
-  Widget _buildConfirmationCard(Color accentColor) {
-    if (_pendingSchedule != null) {
-      final s = _pendingSchedule!;
-      final dateStr = s.isAllDay
-          ? '${s.startDate.month}月${s.startDate.day}日（終日）'
-          : '${s.startDate.month}月${s.startDate.day}日 '
-              '${s.startDate.hour.toString().padLeft(2, '0')}:'
-              '${s.startDate.minute.toString().padLeft(2, '0')}';
-      return _ActionConfirmationCard(
-        icon: Icons.calendar_today,
-        label: '予定を追加する？',
-        title: s.title,
-        subtitle: dateStr,
-        accentColor: accentColor,
-        onConfirm: _saveSchedule,
-        onSkip: () => setState(() => _pendingSchedule = null),
-      );
-    }
-    if (_pendingMemo != null) {
-      return _ActionConfirmationCard(
-        icon: Icons.notes,
-        label: 'メモに保存する？',
-        title: _pendingMemo!.title,
-        accentColor: accentColor,
-        onConfirm: _saveMemo,
-        onSkip: () => setState(() => _pendingMemo = null),
-      );
-    }
-    if (_pendingTodo != null) {
-      return _ActionConfirmationCard(
-        icon: Icons.check_circle_outline,
-        label: 'タスクに追加する？',
-        title: _pendingTodo!.title,
-        accentColor: accentColor,
-        onConfirm: _saveTodo,
-        onSkip: () => setState(() => _pendingTodo = null),
-      );
-    }
-    return const SizedBox.shrink();
+  /// iOS版スタイルの確認ダイアログを表示
+  void _showActionConfirmDialog(SendMessageResult result) {
+    _isShowingDialog = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.4),
+      builder: (dialogContext) {
+        final accentColor = ref.read(accentColorProvider);
+        if (result.scheduleDetected && result.detectedSchedule != null) {
+          final s = result.detectedSchedule!;
+          final dateStr = s.isAllDay
+              ? '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日（終日）'
+              : '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日 '
+                  '${s.startDate.hour.toString().padLeft(2, '0')}:'
+                  '${s.startDate.minute.toString().padLeft(2, '0')}';
+          return _ActionConfirmDialog(
+            icon: Icons.calendar_today,
+            title: '予定を追加しますか？',
+            rows: [
+              _DialogInfoRow(icon: Icons.text_format, label: '予定', content: s.title),
+              _DialogInfoRow(icon: Icons.calendar_month, label: '開始', content: dateStr),
+              if (s.location.isNotEmpty)
+                _DialogInfoRow(icon: Icons.location_on, label: '場所', content: s.location),
+            ],
+            accentColor: accentColor,
+            showEditButton: true,
+            onAdd: () async {
+              Navigator.of(dialogContext).pop();
+              await _saveScheduleModel(s);
+            },
+            onEdit: () {
+              Navigator.of(dialogContext).pop();
+              context.push('/calendar/detail', extra: {
+                'schedule': s,
+                'initialDate': s.startDate,
+              });
+            },
+            onCancel: () => Navigator.of(dialogContext).pop(),
+          );
+        }
+        if (result.memoDetected && result.detectedMemo != null) {
+          final m = result.detectedMemo!;
+          return _ActionConfirmDialog(
+            icon: Icons.notes,
+            title: 'メモを保存しますか？',
+            rows: [
+              _DialogInfoRow(icon: Icons.text_snippet, label: 'メモ', content: m.title),
+            ],
+            accentColor: accentColor,
+            showEditButton: true,
+            onAdd: () async {
+              Navigator.of(dialogContext).pop();
+              await _saveMemoModel(m);
+            },
+            onEdit: () {
+              Navigator.of(dialogContext).pop();
+              context.push('/memo/detail', extra: m);
+            },
+            onCancel: () => Navigator.of(dialogContext).pop(),
+          );
+        }
+        if (result.todoDetected && result.detectedTodo != null) {
+          final t = result.detectedTodo!;
+          return _ActionConfirmDialog(
+            icon: Icons.check_circle_outline,
+            title: 'タスクを追加しますか？',
+            rows: [
+              _DialogInfoRow(icon: Icons.text_snippet, label: 'タスク', content: t.title),
+            ],
+            accentColor: accentColor,
+            showEditButton: true,
+            onAdd: () async {
+              Navigator.of(dialogContext).pop();
+              await _saveTodoModel(t);
+            },
+            onEdit: () {
+              Navigator.of(dialogContext).pop();
+              context.push('/todo/detail', extra: t);
+            },
+            onCancel: () => Navigator.of(dialogContext).pop(),
+          );
+        }
+        // フォールバック（通常は到達しない）
+        return const SizedBox.shrink();
+      },
+    ).whenComplete(() => _isShowingDialog = false);
   }
 
-  Future<void> _saveSchedule() async {
-    final schedule = _pendingSchedule;
-    if (schedule == null) return;
-    setState(() => _pendingSchedule = null);
+  Future<void> _saveScheduleModel(ScheduleModel schedule) async {
     try {
       await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
       if (mounted) {
@@ -334,10 +366,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  Future<void> _saveMemo() async {
-    final memo = _pendingMemo;
-    if (memo == null) return;
-    setState(() => _pendingMemo = null);
+  Future<void> _saveMemoModel(MemoModel memo) async {
     try {
       await ref.read(memoControllerProvider.notifier).addMemo(memo);
       if (mounted) {
@@ -354,10 +383,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  Future<void> _saveTodo() async {
-    final todo = _pendingTodo;
-    if (todo == null) return;
-    setState(() => _pendingTodo = null);
+  Future<void> _saveTodoModel(TodoModel todo) async {
     try {
       await ref.read(todoControllerProvider.notifier).addTodo(todo);
       if (mounted) {
@@ -586,115 +612,187 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
   }
 }
 
-/// アクション確認カード（スケジュール・メモ・タスク共通）
-class _ActionConfirmationCard extends StatelessWidget {
+/// iOS版ScheduleConfirmationPopupと同じスタイルのアクション確認ダイアログ
+class _DialogInfoRow {
   final IconData icon;
   final String label;
-  final String title;
-  final String? subtitle;
-  final Color accentColor;
-  final VoidCallback onConfirm;
-  final VoidCallback onSkip;
+  final String content;
+  const _DialogInfoRow({required this.icon, required this.label, required this.content});
+}
 
-  const _ActionConfirmationCard({
+class _ActionConfirmDialog extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final List<_DialogInfoRow> rows;
+  final Color accentColor;
+  final bool showEditButton;
+  final VoidCallback onAdd;
+  final VoidCallback? onEdit;
+  final VoidCallback onCancel;
+
+  const _ActionConfirmDialog({
     required this.icon,
-    required this.label,
     required this.title,
-    this.subtitle,
+    required this.rows,
     required this.accentColor,
-    required this.onConfirm,
-    required this.onSkip,
+    required this.showEditButton,
+    required this.onAdd,
+    this.onEdit,
+    required this.onCancel,
   });
+
+  Widget _buildButton({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+    Color? textColor,
+    bool isFullWidth = false,
+  }) {
+    final btn = GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: isFullWidth ? double.infinity : null,
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: textColor ?? Colors.white,
+          ),
+        ),
+      ),
+    );
+    return btn;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            child: Icon(icon, size: 18, color: accentColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: accentColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (subtitle != null)
-                  Text(
-                    subtitle!,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: onSkip,
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(
-              'スキップ',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-          ),
-          const SizedBox(width: 4),
-          FilledButton(
-            onPressed: onConfirm,
-            style: FilledButton.styleFrom(
-              backgroundColor: accentColor,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ヘッダー
+            Icon(icon, size: 32, color: accentColor),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
             ),
-            child: const Text('追加', style: TextStyle(fontSize: 13)),
-          ),
-        ],
+            const SizedBox(height: 16),
+
+            // 情報セクション（iOS版ScheduleInfoRowと同じ縦積みレイアウト）
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEEEEEE),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int i = 0; i < rows.length; i++) ...[
+                    if (i > 0) const SizedBox(height: 12),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // アイコン（左固定）
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Icon(rows[i].icon, size: 14, color: Colors.blue),
+                        ),
+                        const SizedBox(width: 12),
+                        // ラベル（上）+ 内容（下）縦積み
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                rows[i].label,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                rows[i].content,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // アクションボタン行（編集＋追加する）
+            Row(
+              children: [
+                if (showEditButton) ...[
+                  Expanded(
+                    child: _buildButton(
+                      label: '編集',
+                      color: Colors.orange,
+                      onPressed: onEdit ?? () {},
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: _buildButton(
+                    label: '追加する',
+                    color: Colors.blue,
+                    onPressed: onAdd,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            // キャンセルボタン（全幅・グレー）
+            _buildButton(
+              label: 'キャンセル',
+              color: const Color(0xFFDDDDDD),
+              textColor: Colors.black87,
+              onPressed: onCancel,
+              isFullWidth: true,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1407,105 +1505,115 @@ class _ChatInputArea extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: controller,
+      builder: (context, textValue, _) {
+        final hasText = textValue.text.isNotEmpty;
+        final length = textValue.text.length;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
             children: [
-              // テキスト入力
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isWaitingForReply ? 0.1 : 0.2),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          enabled: !isWaitingForReply,
-                          maxLines: 3,
-                          minLines: 1,
-                          maxLength: 100,
-                          decoration: InputDecoration(
-                            hintText: isWaitingForReply ? '返答を待っています...' : '性格診断して',
-                            hintStyle: TextStyle(color: Colors.grey),
-                            border: InputBorder.none,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                            counterText: '',
-                          ),
-                          onSubmitted: (_) => onSend(),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // テキスト入力
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: isWaitingForReply ? 0.1 : 0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.4),
                         ),
                       ),
-                      if (controller.text.isNotEmpty)
-                        IconButton(
-                          icon: Icon(
-                            Icons.clear,
-                            color: Colors.grey.withValues(alpha: 0.6),
-                            size: 20,
-                          ),
-                          onPressed: () => controller.clear(),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // 送信ボタン
-              GestureDetector(
-                onTap: isWaitingForReply ? null : onSend,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: !isWaitingForReply && controller.text.isNotEmpty
-                        ? accentColor.withValues(alpha: 0.85)
-                        : Colors.grey.withValues(alpha: 0.5),
-                    shape: BoxShape.circle,
-                    boxShadow: !isWaitingForReply && controller.text.isNotEmpty
-                        ? [
-                            BoxShadow(
-                              color: accentColor.withValues(alpha: 0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: controller,
+                              enabled: !isWaitingForReply,
+                              maxLines: 3,
+                              minLines: 1,
+                              maxLength: 100,
+                              decoration: InputDecoration(
+                                hintText: isWaitingForReply ? '返答を待っています...' : '性格診断して',
+                                hintStyle: TextStyle(color: Colors.grey),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
+                                counterText: '',
+                              ),
+                              onSubmitted: (_) => onSend(),
                             ),
-                          ]
-                        : null,
+                          ),
+                          if (hasText)
+                            GestureDetector(
+                              onTap: () => controller.clear(),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Icon(
+                                  Icons.cancel,
+                                  color: Colors.grey.withValues(alpha: 0.6),
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: Icon(
-                    isWaitingForReply ? Icons.hourglass_empty : Icons.send,
-                    color: Colors.white,
-                    size: 20,
+                  const SizedBox(width: 8),
+                  // 送信ボタン
+                  GestureDetector(
+                    onTap: isWaitingForReply ? null : onSend,
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: !isWaitingForReply && hasText
+                            ? accentColor.withValues(alpha: 0.85)
+                            : Colors.grey.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                        boxShadow: !isWaitingForReply && hasText
+                            ? [
+                                BoxShadow(
+                                  color: accentColor.withValues(alpha: 0.3),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Icon(
+                        isWaitingForReply ? Icons.hourglass_empty : Icons.send,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              // 文字数カウント
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '$length/100文字',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: length >= 100
+                        ? Colors.red
+                        : AppColors.textLight.withValues(alpha: 0.7),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          // 文字数カウント
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              '${controller.text.length}/100文字',
-              style: TextStyle(
-                fontSize: 11,
-                color: controller.text.length >= 100
-                    ? Colors.red
-                    : AppColors.textLight.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

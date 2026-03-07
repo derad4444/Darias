@@ -38,9 +38,7 @@
 - **subscriptionStatus**: `string` - サブスクリプション状態 (`"premium"` / `"free"`)。`subscription/current` と同期。Cloud Functions・iOS PurchaseManager が書き込み
 - **hasCompletedOnboarding**: `boolean` - オンボーディング完了フラグ
 - **characterGender**: `string` - キャラクター性別
-- **usage_tracking**: `map` - 利用状況追跡
-  - **chat_count_today**: `number` - 今日のチャット回数
-  - **last_chat_date**: `string` - 最終チャット日（YYYY-MM-DD）
+- ~~**usage_tracking**~~: *(未使用 / 廃止予定)* かつて日次チャット回数追跡に利用する想定だったが、現在の Cloud Function・クライアントどちらも更新していない。実質的に空 or 存在しないドキュメントがほとんど。
 
 **アクセス権限**: ユーザー自身のデータのみ読み書き可
 
@@ -141,9 +139,13 @@
 
 **フィールド:**
 
-- **content**: `string` - ユーザーのメッセージ
-- **analysis_result**: `string` - キャラクターの返答（AI生成）
+- **content**: `string` - ユーザーのメッセージ（最大100文字。クライアントUI＆Cloud Function 双方で制限）
+- **analysis_result**: `string` - キャラクターの返答（AI生成、最大150トークン相当）
 - **timestamp**: `timestamp` - 投稿日時
+
+**備考:**
+- メモ・タスク・予定の検出メッセージは `posts` に保存されない（各コレクションに直接保存）
+- 書き込みは `generateCharacterReply` Cloud Function が通常チャット返答時のみ行う
 
 #### `users/{userId}/characters/{characterId}/meeting_history`
 
@@ -599,5 +601,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-03-07
+**最終更新**: 2026-03-07（usage_tracking 廃止予定に更新・posts フィールド詳細追加）
 **作成者**: Claude Code

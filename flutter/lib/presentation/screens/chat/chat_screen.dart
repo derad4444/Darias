@@ -151,63 +151,126 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
               // 入力欄（検索モードでない場合のみ表示）
               if (!isSearchMode)
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.9),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 4,
-                        offset: const Offset(0, -2),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _messageController,
+                  builder: (context, textValue, _) {
+                    final hasText = textValue.text.isNotEmpty;
+                    final length = textValue.text.length;
+                    return Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 4,
+                            offset: const Offset(0, -2),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _messageController,
-                            decoration: InputDecoration(
-                              hintText: 'メッセージを入力...',
-                              hintStyle: TextStyle(color: AppColors.textLight),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(24),
-                                borderSide: BorderSide.none,
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[200],
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
+                      child: SafeArea(
+                        top: false,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.grey.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _messageController,
+                                        enabled: !_isSending,
+                                        maxLines: 3,
+                                        minLines: 1,
+                                        maxLength: 100,
+                                        decoration: InputDecoration(
+                                          hintText: _isSending ? '返答を待っています...' : 'メッセージを入力...',
+                                          hintStyle: TextStyle(color: AppColors.textLight),
+                                          border: InputBorder.none,
+                                          contentPadding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 12,
+                                          ),
+                                          counterText: '',
+                                        ),
+                                        onSubmitted: (_) => _sendMessage(),
+                                      ),
+                                    ),
+                                    if (hasText)
+                                      GestureDetector(
+                                        onTap: () => _messageController.clear(),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                                          child: Icon(
+                                            Icons.cancel,
+                                            color: Colors.grey.withValues(alpha: 0.6),
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _sendMessage(),
-                          ),
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: _isSending ? null : _sendMessage,
+                              child: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: !_isSending && hasText
+                                      ? accentColor.withValues(alpha: 0.85)
+                                      : Colors.grey.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                  boxShadow: !_isSending && hasText
+                                      ? [
+                                          BoxShadow(
+                                            color: accentColor.withValues(alpha: 0.3),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ]
+                                      : null,
+                                ),
+                                child: Icon(
+                                  _isSending ? Icons.hourglass_empty : Icons.send,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 8),
-                        IconButton.filled(
-                          onPressed: _isSending ? null : _sendMessage,
-                          style: IconButton.styleFrom(
-                            backgroundColor: accentColor,
-                          ),
-                          icon: _isSending
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.send, color: Colors.white),
+                            const SizedBox(height: 4),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Text(
+                                '$length/100文字',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: length >= 100
+                                      ? Colors.red
+                                      : AppColors.textLight.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
             ],
           ),
