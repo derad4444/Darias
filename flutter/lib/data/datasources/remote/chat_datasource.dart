@@ -159,43 +159,29 @@ class ChatDatasource {
   }) async {
     final trimmed = message.trim();
 
-    // ① メモキーワード検出
+    // ① メモキーワード検出（postsには保存しない：日記はmemosコレクションから直接読む）
     if (_containsMemoKeyword(trimmed)) {
       debugPrint('📝 メモキーワード検出: "$trimmed"');
       final memo = _extractMemoFromMessage(trimmed);
-      const reply = 'メモしておくね！';
-      await _savePost(
-        userId: userId,
-        characterId: characterId,
-        content: trimmed,
-        reply: reply,
-      );
       return SendMessageResult(
-        reply: reply,
+        reply: 'メモしておくね！',
         detectedMemo: memo,
         memoDetected: true,
       );
     }
 
-    // ② タスクキーワード検出
+    // ② タスクキーワード検出（postsには保存しない：日記はtodosコレクションから直接読む）
     if (_containsTodoKeyword(trimmed)) {
       debugPrint('✅ タスクキーワード検出: "$trimmed"');
       final todo = _extractTodoFromMessage(trimmed);
-      const reply = 'タスクに追加しておくね！';
-      await _savePost(
-        userId: userId,
-        characterId: characterId,
-        content: trimmed,
-        reply: reply,
-      );
       return SendMessageResult(
-        reply: reply,
+        reply: 'タスクに追加しておくね！',
         detectedTodo: todo,
         todoDetected: true,
       );
     }
 
-    // ③ スケジュールキーワード検出
+    // ③ スケジュールキーワード検出（postsには保存しない：日記はschedulesコレクションから直接読む）
     if (_containsScheduleKeyword(trimmed)) {
       debugPrint('📅 予定キーワード検出: "$trimmed"');
       try {
@@ -206,15 +192,8 @@ class ChatDatasource {
 
         if (extractResult != null) {
           debugPrint('✅ 予定抽出成功: ${extractResult.title}');
-          const reply = '予定楽しんでね！';
-          await _savePost(
-            userId: userId,
-            characterId: characterId,
-            content: trimmed,
-            reply: reply,
-          );
           return SendMessageResult(
-            reply: reply,
+            reply: '予定楽しんでね！',
             detectedSchedule: extractResult,
             scheduleDetected: true,
           );
