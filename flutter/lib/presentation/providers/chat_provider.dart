@@ -4,7 +4,6 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../../data/datasources/remote/chat_datasource.dart';
 import '../../data/models/post_model.dart';
 import 'auth_provider.dart';
-import 'calendar_provider.dart';
 import 'subscription_provider.dart';
 
 /// ChatDatasourceのプロバイダー
@@ -35,8 +34,8 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
 
   ChatController(this._datasource, this._ref) : super(const AsyncValue.data(null));
 
-  /// メッセージを送信
-  Future<String?> sendMessage({
+  /// メッセージを送信し、検出結果を返す（保存は呼び出し元が確認後に行う）
+  Future<SendMessageResult?> sendMessage({
     required String characterId,
     required String message,
   }) async {
@@ -46,7 +45,6 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
     state = const AsyncValue.loading();
 
     try {
-      // 予定検出付きでメッセージ送信
       final result = await _datasource.sendMessageWithScheduleDetection(
         userId: userId,
         characterId: characterId,
@@ -54,23 +52,10 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
         isPremium: _ref.read(effectiveIsPremiumProvider),
       );
 
-      // 予定が検出された場合、カレンダーに追加
-      if (result.scheduleDetected && result.detectedSchedule != null) {
-        debugPrint('📅 予定をカレンダーに追加: ${result.detectedSchedule!.title}');
-        try {
-          await _ref.read(calendarControllerProvider.notifier).addSchedule(
-            result.detectedSchedule!,
-          );
-          debugPrint('✅ カレンダーへの追加成功');
-        } catch (e) {
-          debugPrint('⚠️ カレンダーへの追加失敗: $e');
-          // 予定追加に失敗してもチャットは続ける
-        }
-      }
-
       state = const AsyncValue.data(null);
-      return result.reply;
+      return result;
     } catch (e, st) {
+      debugPrint('⚠️ sendMessage error: $e');
       state = AsyncValue.error(e, st);
       rethrow;
     }

@@ -8,7 +8,13 @@ import '../../../data/services/firebase_image_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/big5_provider.dart';
+import '../../../data/models/memo_model.dart';
+import '../../../data/models/schedule_model.dart';
+import '../../../data/models/todo_model.dart';
+import '../../providers/calendar_provider.dart';
 import '../../providers/chat_provider.dart';
+import '../../providers/memo_provider.dart';
+import '../../providers/todo_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
@@ -25,6 +31,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final TextEditingController _chatController = TextEditingController();
   bool _isWaitingForReply = false;
   late String _displayedMessage;
+
+  // 検出された保留中アイテム（確認カード表示用）
+  ScheduleModel? _pendingSchedule;
+  MemoModel? _pendingMemo;
+  TodoModel? _pendingTodo;
 
   /// iOS版と同じ初期メッセージリスト
   static const List<String> _initialMessages = [
@@ -83,6 +94,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     message: _displayedMessage,
                     maxWidth: size.width * 0.8,
                   ),
+                ),
+
+              // 確認カード（スケジュール・メモ・タスク検出時）
+              if (_pendingSchedule != null || _pendingMemo != null || _pendingTodo != null)
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  top: size.height * 0.21,
+                  child: _buildConfirmationCard(accentColor),
                 ),
 
               // 下部UI（キャラクター画像 + 操作エリア）
@@ -218,6 +238,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() {
       _isWaitingForReply = true;
       _chatController.clear();
+      // 前の確認カードをクリア
+      _pendingSchedule = null;
+      _pendingMemo = null;
+      _pendingTodo = null;
     });
 
     // 性格診断トリガー
@@ -229,12 +253,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
-      final reply = await ref.read(chatControllerProvider.notifier).sendMessage(
+      final result = await ref.read(chatControllerProvider.notifier).sendMessage(
         characterId: characterId,
         message: message,
       );
       setState(() {
-        _displayedMessage = reply ?? 'お返事がありませんでした';
+        _displayedMessage = result?.reply ?? 'お返事がありませんでした';
+        _pendingSchedule = result?.detectedSchedule;
+        _pendingMemo = result?.detectedMemo;
+        _pendingTodo = result?.detectedTodo;
         _isWaitingForReply = false;
       });
     } catch (e) {
@@ -242,6 +269,108 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _displayedMessage = 'エラーが発生しました。もう一度試してください。';
         _isWaitingForReply = false;
       });
+    }
+  }
+
+  /// 確認カードウィジェット
+  Widget _buildConfirmationCard(Color accentColor) {
+    if (_pendingSchedule != null) {
+      final s = _pendingSchedule!;
+      final dateStr = s.isAllDay
+          ? '${s.startDate.month}月${s.startDate.day}日（終日）'
+          : '${s.startDate.month}月${s.startDate.day}日 '
+              '${s.startDate.hour.toString().padLeft(2, '0')}:'
+              '${s.startDate.minute.toString().padLeft(2, '0')}';
+      return _ActionConfirmationCard(
+        icon: Icons.calendar_today,
+        label: '予定を追加する？',
+        title: s.title,
+        subtitle: dateStr,
+        accentColor: accentColor,
+        onConfirm: _saveSchedule,
+        onSkip: () => setState(() => _pendingSchedule = null),
+      );
+    }
+    if (_pendingMemo != null) {
+      return _ActionConfirmationCard(
+        icon: Icons.notes,
+        label: 'メモに保存する？',
+        title: _pendingMemo!.title,
+        accentColor: accentColor,
+        onConfirm: _saveMemo,
+        onSkip: () => setState(() => _pendingMemo = null),
+      );
+    }
+    if (_pendingTodo != null) {
+      return _ActionConfirmationCard(
+        icon: Icons.check_circle_outline,
+        label: 'タスクに追加する？',
+        title: _pendingTodo!.title,
+        accentColor: accentColor,
+        onConfirm: _saveTodo,
+        onSkip: () => setState(() => _pendingTodo = null),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _saveSchedule() async {
+    final schedule = _pendingSchedule;
+    if (schedule == null) return;
+    setState(() => _pendingSchedule = null);
+    try {
+      await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('予定を追加しました')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('予定の追加に失敗しました')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveMemo() async {
+    final memo = _pendingMemo;
+    if (memo == null) return;
+    setState(() => _pendingMemo = null);
+    try {
+      await ref.read(memoControllerProvider.notifier).addMemo(memo);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('メモに保存しました')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('メモの保存に失敗しました')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveTodo() async {
+    final todo = _pendingTodo;
+    if (todo == null) return;
+    setState(() => _pendingTodo = null);
+    try {
+      await ref.read(todoControllerProvider.notifier).addTodo(todo);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('タスクに追加しました')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('タスクの追加に失敗しました')),
+        );
+      }
     }
   }
 
@@ -450,6 +579,120 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
               fontSize: 16,
               color: AppColors.textLight.withValues(alpha: 0.7),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// アクション確認カード（スケジュール・メモ・タスク共通）
+class _ActionConfirmationCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String title;
+  final String? subtitle;
+  final Color accentColor;
+  final VoidCallback onConfirm;
+  final VoidCallback onSkip;
+
+  const _ActionConfirmationCard({
+    required this.icon,
+    required this.label,
+    required this.title,
+    this.subtitle,
+    required this.accentColor,
+    required this.onConfirm,
+    required this.onSkip,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 18, color: accentColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: accentColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(
+            onPressed: onSkip,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'スキップ',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ),
+          const SizedBox(width: 4),
+          FilledButton(
+            onPressed: onConfirm,
+            style: FilledButton.styleFrom(
+              backgroundColor: accentColor,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: const Text('追加', style: TextStyle(fontSize: 13)),
           ),
         ],
       ),
