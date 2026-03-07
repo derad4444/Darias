@@ -4,6 +4,9 @@ import 'package:share_plus/share_plus.dart';
 import '../../../data/models/diary_model.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
+import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 
 /// 日記詳細をシートで表示するヘルパー
 void showDiaryDetailSheet({
@@ -60,6 +63,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final backgroundGradient = ref.watch(backgroundGradientProvider);
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return DraggableScrollableSheet(
       initialChildSize: 1.0,
@@ -115,10 +119,22 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   children: [
+                    // 広告バナー（日記の上）
+                    if (shouldShowBannerAd)
+                      BannerAdContainer(
+                        adUnitId: AdConfig.diaryDetailTopBannerAdUnitId,
+                        padding: const EdgeInsets.only(bottom: 8),
+                      ),
                     widget.diary.isActivityType
                         ? _buildActivityCard()
                         : _buildLegacyDiaryCard(),
                     _buildCommentSection(),
+                    // 広告バナー（コメント欄の下）
+                    if (shouldShowBannerAd)
+                      BannerAdContainer(
+                        adUnitId: AdConfig.diaryDetailBottomBannerAdUnitId,
+                        padding: const EdgeInsets.only(top: 8),
+                      ),
                     const SizedBox(height: 32),
                   ],
                 ),

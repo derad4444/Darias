@@ -16,9 +16,11 @@ import '../../providers/chat_provider.dart';
 import '../../../data/datasources/remote/chat_datasource.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
+import '../../../data/services/ad_service.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/voice_service.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -34,6 +36,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   late String _displayedMessage;
   // ダイアログ表示中フラグ（多重表示防止）
   bool _isShowingDialog = false;
+  bool _isPlayingVoice = false;
 
 
   /// iOS版と同じ初期メッセージリスト
@@ -89,9 +92,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   left: 20,
                   right: 20,
                   top: size.height * 0.08,
-                  child: _SpeechBubble(
-                    message: _displayedMessage,
-                    maxWidth: size.width * 0.8,
+                  child: Column(
+                    children: [
+                      _SpeechBubble(
+                        message: _displayedMessage,
+                        maxWidth: size.width * 0.8,
+                      ),
+                      const SizedBox(height: 6),
+                      GestureDetector(
+                        onTap: _isPlayingVoice ? null : _playVoice,
+                        child: _isPlayingVoice
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white70,
+                                ),
+                              )
+                            : const Icon(
+                                Icons.volume_up_outlined,
+                                size: 22,
+                                color: Colors.white70,
+                              ),
+                      ),
+                    ],
                   ),
                 ),
 
@@ -204,9 +229,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     // バナー広告（無料ユーザーのみ）
                     if (shouldShowBannerAd) ...[
                       const SizedBox(height: 8),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        child: BannerAdContainer(),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: BannerAdContainer(adUnitId: AdConfig.homeScreenBannerAdUnitId),
                       ),
                     ],
 
@@ -219,6 +244,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _playVoice() async {
+    if (_isPlayingVoice || _displayedMessage.isEmpty) return;
+    final gender = ref.read(characterDetailsProvider).valueOrNull?.gender ?? '女性';
+    setState(() => _isPlayingVoice = true);
+    await VoiceService.shared.generateAndPlay(
+      text: _displayedMessage,
+      gender: gender,
+      onError: (_) {
+        if (mounted) setState(() => _isPlayingVoice = false);
+      },
+    );
+    if (mounted) setState(() => _isPlayingVoice = false);
   }
 
   void _sendMessage() async {

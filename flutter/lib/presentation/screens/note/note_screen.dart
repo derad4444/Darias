@@ -8,6 +8,9 @@ import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/draggable_fab.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
+import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 
 /// ノートのセグメント
@@ -202,6 +205,7 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
     final selectedTag = ref.watch(memoSelectedTagProvider);
     final tags = ref.watch(tagsProvider);
     final tagColorMap = {for (final t in tags) t.name: t.color};
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return memosAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -334,8 +338,35 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: filteredMemos.length,
+                      itemCount: filteredMemos.length + (shouldShowBannerAd ? 2 : 0),
                       itemBuilder: (context, index) {
+                        if (shouldShowBannerAd) {
+                          if (index == 0) {
+                            return BannerAdContainer(
+                              adUnitId: AdConfig.memoTopBannerAdUnitId,
+                              padding: const EdgeInsets.only(bottom: 8),
+                            );
+                          }
+                          if (index == filteredMemos.length + 1) {
+                            return BannerAdContainer(
+                              adUnitId: AdConfig.memoBottomBannerAdUnitId,
+                              padding: const EdgeInsets.only(top: 8),
+                            );
+                          }
+                          final memo = filteredMemos[index - 1];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _MemoCard(
+                              title: memo.title,
+                              content: extractPlainText(memo.content),
+                              tag: memo.tag,
+                              isPinned: memo.isPinned,
+                              accentColor: accentColor,
+                              tagColor: tagColorMap[memo.tag],
+                              onTap: () => context.push('/memo/detail', extra: memo),
+                            ),
+                          );
+                        }
                         final memo = filteredMemos[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -478,6 +509,7 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
     final selectedTag = ref.watch(todoSelectedTagProvider);
     final tags = ref.watch(tagsProvider);
     final tagColorMap = {for (final t in tags) t.name: t.color};
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return todosAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -649,8 +681,42 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                     )
                   : ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: filteredTodos.length,
+                      itemCount: filteredTodos.length + (shouldShowBannerAd ? 2 : 0),
                       itemBuilder: (context, index) {
+                        if (shouldShowBannerAd) {
+                          if (index == 0) {
+                            return BannerAdContainer(
+                              adUnitId: AdConfig.taskTopBannerAdUnitId,
+                              padding: const EdgeInsets.only(bottom: 8),
+                            );
+                          }
+                          if (index == filteredTodos.length + 1) {
+                            return BannerAdContainer(
+                              adUnitId: AdConfig.taskBottomBannerAdUnitId,
+                              padding: const EdgeInsets.only(top: 8),
+                            );
+                          }
+                          final todo = filteredTodos[index - 1];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _TodoRow(
+                              title: todo.title,
+                              isCompleted: todo.isCompleted,
+                              dueDate: todo.dueDate,
+                              priority: todo.priority.displayName,
+                              tag: todo.tag,
+                              accentColor: accentColor,
+                              tagColor: tagColorMap[todo.tag],
+                              onTap: () => context.push('/todo/detail', extra: todo),
+                              onToggle: () {
+                                ref.read(todoControllerProvider.notifier).toggleComplete(
+                                      todo.id,
+                                      !todo.isCompleted,
+                                    );
+                              },
+                            ),
+                          );
+                        }
                         final todo = filteredTodos[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8),

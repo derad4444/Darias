@@ -10,6 +10,7 @@ import '../../providers/character_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 
 /// Big5解析カテゴリー
 enum Big5AnalysisCategory {
@@ -298,9 +299,9 @@ class _CharacterDetailBody extends ConsumerWidget {
 
           // 1つ目のバナー広告（キャラクター画像の上）
           if (shouldShowBannerAd)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: BannerAdWidget(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: BannerAdWidget(adUnitId: AdConfig.characterDetailTopBannerAdUnitId),
             ),
 
           const SizedBox(height: 16),
@@ -359,9 +360,9 @@ class _CharacterDetailBody extends ConsumerWidget {
 
           // 2つ目のバナー広告（性格表示の一番下）
           if (shouldShowBannerAd)
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: BannerAdWidget(),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: BannerAdWidget(adUnitId: AdConfig.characterDetailBottomBannerAdUnitId),
             ),
 
           const SizedBox(height: 32),

@@ -38,7 +38,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
     // Webプラットフォームでは広告を表示しない
     if (kIsWeb) return;
 
-    final adUnitId = widget.adUnitId ?? AdConfig.bannerAdUnitId;
+    final adUnitId = widget.adUnitId ?? AdConfig.homeScreenBannerAdUnitId;
 
     _bannerAd = BannerAd(
       adUnitId: adUnitId,

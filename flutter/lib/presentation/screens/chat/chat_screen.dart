@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/voice_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/character_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../data/models/post_model.dart';
@@ -281,6 +283,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   Widget _buildChatList(String characterId, String searchText, Color accentColor) {
     final chatHistoryAsync = ref.watch(chatHistoryProvider(characterId));
+    final characterGender = ref.watch(characterDetailsProvider).valueOrNull?.gender ?? '女性';
 
     return chatHistoryAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -381,6 +384,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 isUser: item.isUser,
                 timestamp: item.timestamp,
                 accentColor: accentColor,
+                characterGender: characterGender,
               );
             }
             return const SizedBox.shrink();
@@ -552,18 +556,46 @@ class _ChatMessage {
   });
 }
 
-class _ChatBubble extends StatelessWidget {
+class _ChatBubble extends StatefulWidget {
   final String message;
   final bool isUser;
   final DateTime timestamp;
   final Color accentColor;
+  final String characterGender;
 
   const _ChatBubble({
     required this.message,
     required this.isUser,
     required this.timestamp,
     required this.accentColor,
+    required this.characterGender,
   });
+
+  @override
+  State<_ChatBubble> createState() => _ChatBubbleState();
+}
+
+class _ChatBubbleState extends State<_ChatBubble> {
+  bool _isLoadingVoice = false;
+
+  Future<void> _playVoice() async {
+    if (_isLoadingVoice) return;
+    setState(() => _isLoadingVoice = true);
+
+    await VoiceService.shared.generateAndPlay(
+      text: widget.message,
+      gender: widget.characterGender,
+      onError: (msg) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: Colors.red),
+          );
+        }
+      },
+    );
+
+    if (mounted) setState(() => _isLoadingVoice = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -571,9 +603,10 @@ class _ChatBubble extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         mainAxisAlignment:
-            isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+            widget.isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          if (!isUser) ...[
+          if (!widget.isUser) ...[
             CircleAvatar(
               radius: 16,
               backgroundColor: Colors.grey[300],
@@ -582,31 +615,59 @@ class _ChatBubble extends StatelessWidget {
             const SizedBox(width: 8),
           ],
           Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 10,
-              ),
-              decoration: BoxDecoration(
-                color: isUser
-                    ? accentColor
-                    : Colors.white.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: isUser ? Colors.white : AppColors.textPrimary,
+            child: Column(
+              crossAxisAlignment: widget.isUser
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isUser
+                        ? widget.accentColor
+                        : Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(
+                    widget.message,
+                    style: TextStyle(
+                      color: widget.isUser ? Colors.white : AppColors.textPrimary,
+                    ),
+                  ),
                 ),
-              ),
+                // キャラクターのメッセージのみ音声再生ボタンを表示
+                if (!widget.isUser) ...[
+                  const SizedBox(height: 4),
+                  GestureDetector(
+                    onTap: _isLoadingVoice ? null : _playVoice,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: _isLoadingVoice
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              Icons.volume_up_outlined,
+                              size: 18,
+                              color: AppColors.textLight,
+                            ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-          if (isUser) ...[
+          if (widget.isUser) ...[
             const SizedBox(width: 8),
             CircleAvatar(
               radius: 16,
-              backgroundColor: accentColor.withValues(alpha: 0.3),
-              child: Icon(Icons.person, size: 20, color: accentColor),
+              backgroundColor: widget.accentColor.withValues(alpha: 0.3),
+              child: Icon(Icons.person, size: 20, color: widget.accentColor),
             ),
           ],
         ],

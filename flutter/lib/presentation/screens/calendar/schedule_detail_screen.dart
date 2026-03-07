@@ -13,6 +13,7 @@ import '../../providers/ad_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 import 'repeat_settings_screen.dart';
 
@@ -148,7 +149,11 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                     children: [
                       // 上部バナー広告
                       if (shouldShowBannerAd) ...[
-                        const BannerAdContainer(),
+                        BannerAdContainer(
+                          adUnitId: _isNewSchedule
+                              ? AdConfig.scheduleAddTopBannerAdUnitId
+                              : AdConfig.scheduleEditTopBannerAdUnitId,
+                        ),
                         const SizedBox(height: 20),
                       ],
 
@@ -366,7 +371,11 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                       // 下部バナー広告
                       if (shouldShowBannerAd) ...[
                         const SizedBox(height: 20),
-                        const BannerAdContainer(),
+                        BannerAdContainer(
+                          adUnitId: _isNewSchedule
+                              ? AdConfig.scheduleAddBottomBannerAdUnitId
+                              : AdConfig.scheduleEditBottomBannerAdUnitId,
+                        ),
                       ],
 
                       // 削除ボタン（編集時のみ）

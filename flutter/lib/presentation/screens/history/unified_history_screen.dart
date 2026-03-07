@@ -7,11 +7,14 @@ import '../../../data/models/diary_model.dart';
 import '../../../data/models/meeting_history_model.dart';
 import '../../../data/models/post_model.dart';
 import '../../../data/models/six_person_meeting_model.dart';
+import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
 import '../diary/diary_detail_screen.dart';
 
 /// 履歴タブ
@@ -136,6 +139,7 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
   Widget build(BuildContext context) {
     print('📜 _ChatHistoryTab - characterId: ${widget.characterId}');
     final messagesAsync = ref.watch(chatHistoryProvider(widget.characterId ?? ''));
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return Column(
       children: [
@@ -275,6 +279,9 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
             error: (e, st) => Center(child: Text('エラー: $e', style: const TextStyle(color: AppColors.textPrimary))),
           ),
         ),
+
+        // バナー広告（無料ユーザーのみ、チャット履歴の最下部）
+        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.chatHistoryBannerAdUnitId),
       ],
     );
   }
@@ -374,10 +381,7 @@ class _ChatBubble extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey,
-                  ),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ],
             ),
@@ -1198,6 +1202,7 @@ class _DiaryHistoryTabState extends ConsumerState<_DiaryHistoryTab> {
   @override
   Widget build(BuildContext context) {
     final diariesAsync = ref.watch(diariesProvider(widget.characterId ?? ''));
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return Column(
       children: [
@@ -1305,6 +1310,9 @@ class _DiaryHistoryTabState extends ConsumerState<_DiaryHistoryTab> {
             error: (e, st) => Center(child: Text('エラー: $e', style: const TextStyle(color: AppColors.textPrimary))),
           ),
         ),
+
+        // バナー広告（無料ユーザーのみ、日記履歴の最下部）
+        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.chatHistoryBannerAdUnitId),
       ],
     );
   }

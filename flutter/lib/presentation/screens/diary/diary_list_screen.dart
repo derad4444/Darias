@@ -6,6 +6,9 @@ import '../../../data/models/diary_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
+import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 import 'diary_detail_screen.dart';
 
 /// 検索テキストのプロバイダー
@@ -109,6 +112,7 @@ class _DiaryListScreenState extends ConsumerState<DiaryListScreen> {
                                           diaries: filteredDiaries,
                                           characterId: characterId,
                                           accentColor: accentColor,
+                                          shouldShowBannerAd: ref.watch(shouldShowBannerAdProvider),
                                         ),
                             ),
                           ],
@@ -240,11 +244,13 @@ class _DiaryList extends StatelessWidget {
   final List<DiaryModel> diaries;
   final String characterId;
   final Color accentColor;
+  final bool shouldShowBannerAd;
 
   const _DiaryList({
     required this.diaries,
     required this.characterId,
     required this.accentColor,
+    required this.shouldShowBannerAd,
   });
 
   @override
@@ -252,8 +258,14 @@ class _DiaryList extends StatelessWidget {
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      itemCount: diaries.length,
+      itemCount: diaries.length + (shouldShowBannerAd ? 1 : 0),
       itemBuilder: (context, index) {
+        if (shouldShowBannerAd && index == diaries.length) {
+          return BannerAdContainer(
+            adUnitId: AdConfig.chatHistoryBannerAdUnitId,
+            padding: const EdgeInsets.only(top: 16, bottom: 20),
+          );
+        }
         final diary = diaries[index];
         return _DiaryCard(
           diary: diary,

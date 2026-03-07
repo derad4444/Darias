@@ -9,6 +9,7 @@ import '../../providers/todo_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 
 /// Todo詳細・編集画面
@@ -101,7 +102,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (shouldShowBannerAd) ...[
-                  const BannerAdContainer(),
+                  BannerAdContainer(adUnitId: AdConfig.taskAddTopBannerAdUnitId),
                   const SizedBox(height: 16),
                 ],
 
@@ -196,7 +197,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
 
                 if (shouldShowBannerAd) ...[
                   const SizedBox(height: 16),
-                  const BannerAdContainer(),
+                  BannerAdContainer(adUnitId: AdConfig.taskAddBottomBannerAdUnitId),
                 ],
               ],
             ),

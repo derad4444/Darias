@@ -10,6 +10,9 @@ import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../widgets/draggable_fab.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
+import '../../providers/ad_provider.dart';
+import '../../../data/services/ad_service.dart';
 import '../diary/diary_detail_screen.dart';
 
 /// iOS版CalendarViewと同じデザインのカレンダー画面
@@ -1556,6 +1559,7 @@ class _ScheduleList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final schedules = ref.watch(daySchedulesProvider(day));
     final holiday = ref.watch(holidayForDateProvider(day));
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return Column(
       children: [
@@ -1621,6 +1625,9 @@ class _ScheduleList extends ConsumerWidget {
                   },
                 ),
         ),
+
+        // バナー広告（無料ユーザーのみ）
+        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.calendarScreenBannerAdUnitId),
       ],
     );
   }

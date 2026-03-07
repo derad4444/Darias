@@ -9,6 +9,7 @@ import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/ad_service.dart';
 
 /// iOS版OptionViewと同じデザインの設定画面
 class SettingsScreen extends ConsumerWidget {
@@ -50,7 +51,7 @@ class SettingsScreen extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: const BannerAdContainer(),
+                    child: BannerAdContainer(adUnitId: AdConfig.settingsTopBannerAdUnitId),
                   ),
                 ),
 
@@ -111,7 +112,7 @@ class SettingsScreen extends ConsumerWidget {
                     if (shouldShowBannerAd)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: const BannerAdContainer(),
+                        child: BannerAdContainer(adUnitId: AdConfig.settingsBottomBannerAdUnitId),
                       ),
 
                     // ログアウト
