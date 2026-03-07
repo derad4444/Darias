@@ -84,6 +84,34 @@ ${diaryStyle}で日記を200-400文字で作成。日記本文のみ出力。`;
   },
 
   /**
+   * Activity-based Diary Generation
+   * Summarizes user's in-app activities as facts + character's encouraging comment
+   */
+  activityDiary: (characterType, big5, gender, scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary, meetingSummary, big5ProgressSummary) => {
+    const parts = [];
+    if (scheduleSummary) parts.push(`予定: ${scheduleSummary}`);
+    if (chatSummary) parts.push(`会話: ${chatSummary}`);
+    if (completedTodoSummary) parts.push(`完了タスク: ${completedTodoSummary}`);
+    if (createdTodoSummary) parts.push(`作成タスク: ${createdTodoSummary}`);
+    if (memoSummary) parts.push(`メモ: ${memoSummary}`);
+    if (meetingSummary) parts.push(`相談: ${meetingSummary}`);
+    if (big5ProgressSummary) parts.push(`性格診断: ${big5ProgressSummary}`);
+    const activitiesText = parts.length > 0 ? parts.join("\n") : "特になし";
+
+    return `今日ユーザーがアプリ内で行ったこと:
+${activitiesText}
+
+キャラクター:${characterType} 性格:${formatBig5Short(big5)} 性別:${getGenderCode(gender)}
+
+以下のJSON形式のみで出力:
+{"facts":["事実1","事実2"],"ai_comment":"コメント"}
+
+factsは今日の活動を事実ベースで2〜5件（例:「タスク『報告書』を完了した」「メモ『アイデア』を記録した」）。
+ai_commentは上記の事実に具体的に触れ、キャラクターらしいトーンで前向きに50〜100文字。
+活動がない場合はfactsを空配列にし、ai_commentで一言声がけ。`;
+  },
+
+  /**
    * Schedule Extraction - GPT-4o-mini optimized
    * Enhanced for better Japanese date/time understanding
    */

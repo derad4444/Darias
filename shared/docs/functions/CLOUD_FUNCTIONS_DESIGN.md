@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-02-15
+**最終更新日**: 2026-03-07
 **ランタイム**: Node.js 20
 **関数数**: 16
 
@@ -140,13 +140,16 @@ Cloud Scheduler による定期実行バッチ。
 - **secrets**: なし
 
 #### 9. `scheduledDiaryGeneration`
-- **ソース**: `src/functions/scheduledTasks.js`
+- **ソース**: `src/functions/scheduledTasks.js` → `const/generateDiary.js`
 - **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
-- **概要**: 全ユーザーの日記を自動生成（並列5件ずつ）
+- **概要**: 全ユーザーの当日アクティビティを集約し、アクティビティ型日記を自動生成（並列5件ずつ）
 - **スケジュール**: `50 23 * * *` (毎日 23:50 JST)
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
+- **収集データ**: スケジュール / チャット / 完了Todo / 作成Todo / メモ / 性格診断セッション / 6人会議
+- **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string` を Firestore に保存
+- **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 
 #### 10. `generateMonthlyReview`
 - **ソース**: `src/functions/generateMonthlyReview.js`
@@ -240,6 +243,7 @@ shared/functions/
 │   ├── extractSchedule.js            # 予定抽出
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateBig5Analysis.js       # BIG5 解析
+│   ├── generateDiary.js              # アクティビティ型日記生成（scheduledDiaryGeneration から呼出）
 │   └── big5Questions.js              # BIG5 質問定義・スコア計算
 │
 └── src/
@@ -248,7 +252,7 @@ shared/functions/
     ├── clients/
     │   └── openai.js                 # OpenAI クライアント初期化・安全呼出ラッパー
     ├── prompts/
-    │   └── templates.js              # OpenAI プロンプトテンプレート
+    │   └── templates.js              # OpenAI プロンプトテンプレート（diary / activityDiary / characterReply / big5Analysis 等）
     ├── functions/                     # スケジュール系・複合関数
     │   ├── scheduledTasks.js          # 祝日登録 + 日記自動生成
     │   ├── generateMonthlyReview.js   # 月次レビュー
@@ -346,4 +350,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-02-15*
+*最終更新: 2026-03-07*

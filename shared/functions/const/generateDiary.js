@@ -85,21 +85,73 @@ async function generateDiary(characterId, userId) {
     return `・「${data.content}」`;
   }).join("\n");
 
-  // 今日完了したToDo取得（上位2件）
-  const todoSnap = await db.collection("users").doc(userId)
+  // 今日完了したToDo取得（上位3件）
+  const completedTodoSnap = await db.collection("users").doc(userId)
       .collection("todos")
       .where("isCompleted", "==", true)
       .where("updatedAt", ">=", today)
       .where("updatedAt", "<", tomorrow)
       .orderBy("updatedAt", "desc")
-      .limit(2)
+      .limit(3)
       .get();
 
-  // ToDoの文字列整形
-  const todoSummary = todoSnap.docs.map((doc) => {
+  // 完了ToDoの文字列整形
+  const completedTodoSummary = completedTodoSnap.docs.map((doc) => {
     const data = doc.data();
     return `・${data.title}`;
   }).join("\n");
+
+  // 今日作成したToDo取得（上位3件）
+  const createdTodoSnap = await db.collection("users").doc(userId)
+      .collection("todos")
+      .where("createdAt", ">=", today)
+      .where("createdAt", "<", tomorrow)
+      .orderBy("createdAt", "desc")
+      .limit(3)
+      .get();
+
+  // 作成ToDoの文字列整形
+  const createdTodoSummary = createdTodoSnap.docs.map((doc) => {
+    const data = doc.data();
+    return `・${data.title}`;
+  }).join("\n");
+
+  // 今日作成・更新したメモ取得（上位3件）
+  const memoSnap = await db.collection("users").doc(userId)
+      .collection("characters").doc(characterId)
+      .collection("memos")
+      .where("createdAt", ">=", today)
+      .where("createdAt", "<", tomorrow)
+      .orderBy("createdAt", "desc")
+      .limit(3)
+      .get();
+
+  // メモの文字列整形
+  const memoSummary = memoSnap.docs.map((doc) => {
+    const data = doc.data();
+    return `・${data.title}`;
+  }).join("\n");
+
+  // 今日の性格診断進捗取得（BIG5回答セッション）
+  let big5ProgressSummary = "";
+  try {
+    const big5Snap = await db.collection("users").doc(userId)
+        .collection("characters").doc(characterId)
+        .collection("big5_sessions")
+        .where("createdAt", ">=", today)
+        .where("createdAt", "<", tomorrow)
+        .limit(1)
+        .get();
+    if (!big5Snap.empty) {
+      const sessionData = big5Snap.docs[0].data();
+      const answeredCount = sessionData.answeredCount || sessionData.answers?.length || 0;
+      if (answeredCount > 0) {
+        big5ProgressSummary = `・性格診断を${answeredCount}問回答`;
+      }
+    }
+  } catch (e) {
+    // big5_sessionsが存在しない場合はスキップ
+  }
 
   // 今日の会議（6人会議）取得
   const meetingSnap = await db.collection("users").doc(userId)
@@ -158,16 +210,18 @@ async function generateDiary(characterId, userId) {
     diaryStyle = "logic+emotion view,tech+feeling mix,session→chat learning,logical→emotional";
   }
 
-  // 最適化されたプロンプト作成
-  const prompt = OPTIMIZED_PROMPTS.diary(
+  // アクティビティベースのプロンプト作成
+  const prompt = OPTIMIZED_PROMPTS.activityDiary(
       characterType,
       big5,
       gender,
       scheduleSummary,
       chatSummary,
-      todoSummary,
+      completedTodoSummary,
+      createdTodoSummary,
+      memoSummary,
       meetingSummary,
-      diaryStyle,
+      big5ProgressSummary,
   );
 
   // OpenAI呼び出し
@@ -182,11 +236,24 @@ async function generateDiary(characterId, userId) {
     model: model,
     messages: [{role: "user", content: prompt}],
     temperature: 0.8,
+    response_format: {type: "json_object"},
   });
 
-  // AIからの返答を取得（プレーンテキスト）
-  const diaryContent = response.choices[0].message.content.trim();
-  console.log("GPT Response:", diaryContent);
+  // AIからの返答をJSONとして取得
+  const rawResponse = response.choices[0].message.content.trim();
+  console.log("GPT Response:", rawResponse);
+
+  let facts = [];
+  let aiComment = "";
+
+  try {
+    const parsed = JSON.parse(rawResponse);
+    facts = Array.isArray(parsed.facts) ? parsed.facts : [];
+    aiComment = typeof parsed.ai_comment === "string" ? parsed.ai_comment : "";
+  } catch (e) {
+    console.warn("Failed to parse GPT JSON response, using raw as ai_comment:", e);
+    aiComment = rawResponse;
+  }
 
   // Firestoreに保存
   const diaryRef = db.collection("users").doc(userId)
@@ -204,11 +271,14 @@ async function generateDiary(characterId, userId) {
 
   console.log(`📅 Creating diary with created_date: ${createdDate} (JST)`);
 
-  // Firestore登録用データ構築（タグ削除）
+  // Firestore登録用データ構築
   const diaryDoc = {
     id: diaryRef.id,
     date: admin.firestore.Timestamp.now(),
-    content: diaryContent,
+    content: "",
+    diary_type: "activity",
+    facts: facts,
+    ai_comment: aiComment,
     user_comment: "",
     created_at: admin.firestore.Timestamp.now(),
     created_date: createdDate,

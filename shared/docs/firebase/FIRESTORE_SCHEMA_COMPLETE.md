@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-02-11
+**最終更新日**: 2026-03-07
 **トップレベルコレクション**: 8
 
 ---
@@ -159,6 +159,48 @@
 - **cacheHit**: `boolean` - キャッシュから取得したかどうか
 - **createdAt**: `timestamp` - 利用日時
 
+#### `users/{userId}/characters/{characterId}/diary`
+
+**用途**: キャラクターごとの日記（毎日23:50 JSTにCloud Functionが自動生成）
+**ドキュメントID**: 自動生成UUID
+
+**フィールド:**
+
+- **id**: `string` - 日記ID
+- **date**: `timestamp` - 日記の日付
+- **content**: `string` - 本文（従来型日記のみ。アクティビティ型は空文字）
+- **user_comment**: `string` - ユーザーが追記したコメント
+- **created_at**: `timestamp` - 作成日時
+- **created_date**: `string` - 作成日（YYYY-MM-DD形式、JST）
+- **diary_type**: `string` *(アクティビティ型のみ)* - 日記種別。`"activity"` 固定
+- **facts**: `array<string>` *(アクティビティ型のみ)* - 当日の活動を事実ベースでまとめた箇条書きリスト（2〜5件）
+  - 例: `["タスク「報告書作成」を完了した", "メモ「アイデアメモ」を記録した"]`
+- **ai_comment**: `string` *(アクティビティ型のみ)* - キャラクターが事実に基づいて生成した前向きな一言コメント（50〜100文字）
+
+**diary_type の種別:**
+
+| diary_type | 説明 |
+|------------|------|
+| *(フィールドなし)* | 従来型：AIがキャラクターとして書いた日記本文（`content` フィールドに格納） |
+| `"activity"` | アクティビティ型：当日の活動事実（`facts`）＋AIコメント（`ai_comment`）|
+
+**収集データソース（アクティビティ型）:**
+
+| データ | コレクション | 条件 |
+|--------|------------|------|
+| スケジュール | `users/{uid}/schedules` | `startDate` が当日 |
+| チャット | `users/{uid}/characters/{cid}/posts` | `timestamp` が当日 |
+| 完了Todo | `users/{uid}/todos` | `isCompleted==true` かつ `updatedAt` が当日（上位3件） |
+| 作成Todo | `users/{uid}/todos` | `createdAt` が当日（上位3件） |
+| メモ | `users/{uid}/characters/{cid}/memos` | `createdAt` が当日（上位3件） |
+| 性格診断 | `users/{uid}/characters/{cid}/big5_sessions` | `createdAt` が当日 |
+| 6人会議 | `users/{uid}/characters/{cid}/meeting_history` | `createdAt` が当日（上位2件） |
+
+**インデックス:**
+- `date` (DESC)
+
+---
+
 #### `users/{userId}/characters/{characterId}/monthlyComments`
 
 **用途**: 月次コメント
@@ -270,20 +312,7 @@
 
 ### `users/{userId}/diary`
 
-**用途**: 日記機能
-**ドキュメントID**: 日付（例: `2024-01-15`）
-
-**フィールド:**
-
-- **id**: `string` - 日記ID（日付）
-- **title**: `string` - タイトル
-- **date**: `timestamp` - 日付
-- **content**: `string` - 本文
-- **created_date**: `date` - 作成日
-- **created_at**: `timestamp` - 作成日時
-
-**インデックス:**
-- `created_date` (ASC) + `created_at` (DESC)
+> **⚠️ 注意**: このコレクションは旧設計のパスです。実際の日記データはキャラクターごとに管理されており、`users/{userId}/characters/{characterId}/diary` に保存されています。詳細は上記の characters サブコレクションを参照してください。
 
 ---
 
@@ -522,7 +551,11 @@ users/{userId}
 │   ├── posts/{docId}
 │   ├── meeting_history/{docId}
 │   │   └── sharedMeetingId → shared_meetings/{id} 参照
-│   └── monthlyComments/{YYYY-MM}
+│   ├── monthlyComments/{YYYY-MM}
+│   ├── memos/{docId}
+│   └── diary/{docId}
+│       ├── [従来型] content
+│       └── [アクティビティ型] diary_type / facts[] / ai_comment
 ├── subscription/current
 ├── schedules/{docId}
 ├── todos/{docId}
@@ -566,5 +599,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-02-11
+**最終更新**: 2026-03-07
 **作成者**: Claude Code

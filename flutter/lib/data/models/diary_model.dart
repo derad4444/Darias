@@ -7,12 +7,22 @@ class DiaryModel {
   final DateTime date;
   final String userComment;
 
+  // アクティビティ型日記の追加フィールド
+  final String? diaryType;
+  final List<Map<String, String>>? facts;
+  final String? aiComment;
+
   const DiaryModel({
     required this.id,
     required this.content,
     required this.date,
     this.userComment = '',
+    this.diaryType,
+    this.facts,
+    this.aiComment,
   });
+
+  bool get isActivityType => diaryType == 'activity';
 
   factory DiaryModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>?;
@@ -20,11 +30,23 @@ class DiaryModel {
       throw Exception('Document data is null');
     }
 
+    List<Map<String, String>>? facts;
+    final rawFacts = data['facts'];
+    if (rawFacts is List) {
+      facts = rawFacts
+          .whereType<Map>()
+          .map((f) => f.map((k, v) => MapEntry(k.toString(), v.toString())))
+          .toList();
+    }
+
     return DiaryModel(
       id: doc.id,
       content: data['content'] as String? ?? '',
       date: (data['date'] as Timestamp?)?.toDate() ?? DateTime.now(),
       userComment: data['user_comment'] as String? ?? '',
+      diaryType: data['diary_type'] as String?,
+      facts: facts,
+      aiComment: data['ai_comment'] as String?,
     );
   }
 
@@ -33,6 +55,9 @@ class DiaryModel {
       'content': content,
       'date': Timestamp.fromDate(date),
       'user_comment': userComment,
+      if (diaryType != null) 'diary_type': diaryType,
+      if (facts != null) 'facts': facts,
+      if (aiComment != null) 'ai_comment': aiComment,
     };
   }
 
@@ -41,12 +66,18 @@ class DiaryModel {
     String? content,
     DateTime? date,
     String? userComment,
+    String? diaryType,
+    List<Map<String, String>>? facts,
+    String? aiComment,
   }) {
     return DiaryModel(
       id: id ?? this.id,
       content: content ?? this.content,
       date: date ?? this.date,
       userComment: userComment ?? this.userComment,
+      diaryType: diaryType ?? this.diaryType,
+      facts: facts ?? this.facts,
+      aiComment: aiComment ?? this.aiComment,
     );
   }
 

@@ -115,7 +115,9 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.all(16),
                   children: [
-                    _buildDiaryCard(),
+                    widget.diary.isActivityType
+                        ? _buildActivityCard()
+                        : _buildLegacyDiaryCard(),
                     _buildCommentSection(),
                     const SizedBox(height: 32),
                   ],
@@ -128,7 +130,170 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
     );
   }
 
-  Widget _buildDiaryCard() {
+  /// アクティビティ型日記の表示（新方式）
+  Widget _buildActivityCard() {
+    final facts = widget.diary.facts ?? [];
+    final aiComment = widget.diary.aiComment ?? '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 日付ヘッダー
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+            child: Row(
+              children: [
+                Text(
+                  widget.diary.dateString,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w500,
+                    fontFamily: 'serif',
+                    color: Colors.brown,
+                  ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.menu_book,
+                  color: Colors.brown.withValues(alpha: 0.6),
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, indent: 20, endIndent: 20),
+
+          // 今日やったこと
+          if (facts.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                '今日やったこと',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+            ...facts.map((fact) => _buildFactItem(fact)),
+            const SizedBox(height: 8),
+          ],
+
+          // AIコメント吹き出し
+          if (aiComment.isNotEmpty)
+            _buildAiCommentBubble(aiComment),
+
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFactItem(Map<String, String> fact) {
+    final text = fact['text'] ?? fact.values.firstOrNull ?? '';
+    final type = fact['type'] ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            _factIcon(type),
+            size: 16,
+            color: widget.accentColor.withValues(alpha: 0.8),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAiCommentBubble(String comment) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: widget.accentColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: widget.accentColor.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: 16,
+              color: widget.accentColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                comment,
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.6,
+                  color: Colors.black.withValues(alpha: 0.75),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _factIcon(String type) {
+    switch (type) {
+      case 'todo_completed':
+        return Icons.check_circle_outline;
+      case 'todo_created':
+        return Icons.add_task;
+      case 'memo_created':
+        return Icons.notes;
+      case 'schedule':
+        return Icons.calendar_today;
+      case 'chat':
+        return Icons.chat_bubble_outline;
+      case 'big5_progress':
+        return Icons.psychology_outlined;
+      case 'meeting':
+        return Icons.groups_outlined;
+      default:
+        return Icons.radio_button_unchecked;
+    }
+  }
+
+  /// 従来型日記の表示（後方互換）
+  Widget _buildLegacyDiaryCard() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -322,13 +487,30 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   }
 
   void _shareDiary() {
-    final text = '''
-${widget.diary.dateString}の日記
+    final buffer = StringBuffer();
+    buffer.writeln('${widget.diary.dateString}の日記\n');
 
-${widget.diary.content}
+    if (widget.diary.isActivityType) {
+      final facts = widget.diary.facts ?? [];
+      if (facts.isNotEmpty) {
+        buffer.writeln('今日やったこと:');
+        for (final fact in facts) {
+          final text = fact['text'] ?? fact.values.firstOrNull ?? '';
+          buffer.writeln('・$text');
+        }
+        buffer.writeln();
+      }
+      if (widget.diary.aiComment?.isNotEmpty == true) {
+        buffer.writeln(widget.diary.aiComment);
+      }
+    } else {
+      buffer.writeln(widget.diary.content);
+    }
 
-${widget.diary.userComment.isNotEmpty ? '---\nひとこと: ${widget.diary.userComment}' : ''}
-''';
-    Share.share(text.trim(), subject: '${widget.diary.dateString}の日記');
+    if (widget.diary.userComment.isNotEmpty) {
+      buffer.writeln('\n---\nひとこと: ${widget.diary.userComment}');
+    }
+
+    Share.share(buffer.toString().trim(), subject: '${widget.diary.dateString}の日記');
   }
 }
