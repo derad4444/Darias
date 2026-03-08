@@ -1577,7 +1577,10 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
             if (!widget.isWaitingForReply) {
               widget.onSend();
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) _focusNode.requestFocus();
+                if (mounted) {
+                  FocusScope.of(context).requestFocus(_focusNode);
+                  widget.controller.clear();
+                }
               });
             }
             return KeyEventResult.handled;
@@ -1662,7 +1665,10 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                     onTap: widget.isWaitingForReply ? null : () {
                       widget.onSend();
                       WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (mounted) _focusNode.requestFocus();
+                        if (mounted) {
+                          FocusScope.of(context).requestFocus(_focusNode);
+                          widget.controller.clear();
+                        }
                       });
                     },
                     child: Container(
