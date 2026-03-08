@@ -1574,7 +1574,10 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
             return KeyEventResult.ignored;
           } else {
             // Enter: 送信
-            if (!widget.isWaitingForReply) widget.onSend();
+            if (!widget.isWaitingForReply) {
+              widget.onSend();
+              _focusNode.requestFocus();
+            }
             return KeyEventResult.handled;
           }
         }
@@ -1654,7 +1657,10 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                   const SizedBox(width: 8),
                   // 送信ボタン
                   GestureDetector(
-                    onTap: widget.isWaitingForReply ? null : widget.onSend,
+                    onTap: widget.isWaitingForReply ? null : () {
+                      widget.onSend();
+                      _focusNode.requestFocus();
+                    },
                     child: Container(
                       width: 44,
                       height: 44,
