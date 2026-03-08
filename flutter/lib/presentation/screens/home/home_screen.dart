@@ -90,48 +90,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // 吹き出し（上部）
-              if (_displayedMessage.isNotEmpty)
-                Positioned(
-                  left: 20,
-                  right: 20,
-                  top: size.height * 0.08,
-                  child: Column(
-                    children: [
-                      _SpeechBubble(
-                        message: _displayedMessage,
-                        maxWidth: size.width * 0.8,
-                      ),
-                      if (_isCharacterReply) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: _isPlayingVoice ? null : () {
-                            if (isPremium) {
-                              _playVoice();
-                            } else {
-                              context.push('/premium');
-                            }
-                          },
-                          child: _isPlayingVoice
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white70,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.volume_up_outlined,
-                                  size: 22,
-                                  color: Colors.white70,
-                                ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
               // 下部UI（キャラクター画像 + 操作エリア）
               Positioned(
                 left: 0,
@@ -251,6 +209,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
+
+              // 吹き出し（キャラクター画像の前面に表示）
+              if (_displayedMessage.isNotEmpty)
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  top: size.height * 0.08,
+                  child: Column(
+                    children: [
+                      _SpeechBubble(
+                        message: _displayedMessage,
+                        maxWidth: size.width * 0.8,
+                      ),
+                      if (_isCharacterReply) ...[
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: _isPlayingVoice ? null : () {
+                            if (isPremium) {
+                              _playVoice();
+                            } else {
+                              context.push('/premium');
+                            }
+                          },
+                          child: _isPlayingVoice
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white70,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.volume_up_outlined,
+                                  size: 22,
+                                  color: Colors.white70,
+                                ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
             ],
           ),
         ),
