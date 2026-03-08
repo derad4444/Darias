@@ -17,6 +17,9 @@ import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 import 'repeat_settings_screen.dart';
 
+/// 繰り返し予定の編集モード
+enum RecurringEditMode { single, all }
+
 /// スケジュール詳細・編集画面（iOS版と同じデザイン）
 class ScheduleDetailScreen extends ConsumerStatefulWidget {
   /// 編集対象のスケジュール（nullの場合は新規作成）
@@ -25,10 +28,14 @@ class ScheduleDetailScreen extends ConsumerStatefulWidget {
   /// 新規作成時の初期日付
   final DateTime? initialDate;
 
+  /// 繰り返し予定の編集モード
+  final RecurringEditMode recurringEditMode;
+
   const ScheduleDetailScreen({
     super.key,
     this.schedule,
     this.initialDate,
+    this.recurringEditMode = RecurringEditMode.single,
   });
 
   @override
@@ -1086,13 +1093,26 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           remindValue: _remindValue,
           remindUnit: _remindUnit,
         );
-        await ref
-            .read(calendarControllerProvider.notifier)
-            .updateSchedule(updatedSchedule);
-        // 通知を更新（古い通知を削除して再スケジュール）
-        await NotificationService().cancelScheduleNotification(updatedSchedule.id);
-        if (ref.read(notificationSettingsProvider).scheduleNotifications) {
-          await NotificationService().scheduleForSchedule(updatedSchedule);
+
+        if (widget.recurringEditMode == RecurringEditMode.all &&
+            widget.schedule!.recurringGroupId != null) {
+          // 繰り返し全件更新
+          await ref
+              .read(calendarControllerProvider.notifier)
+              .updateAllRecurringSchedules(
+                recurringGroupId: widget.schedule!.recurringGroupId!,
+                template: updatedSchedule,
+              );
+        } else {
+          // この予定のみ更新
+          await ref
+              .read(calendarControllerProvider.notifier)
+              .updateSchedule(updatedSchedule);
+          // 通知を更新
+          await NotificationService().cancelScheduleNotification(updatedSchedule.id);
+          if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+            await NotificationService().scheduleForSchedule(updatedSchedule);
+          }
         }
       }
 

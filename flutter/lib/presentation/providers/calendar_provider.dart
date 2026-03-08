@@ -107,6 +107,28 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// 繰り返しグループの全スケジュールを更新
+  Future<void> updateAllRecurringSchedules({
+    required String recurringGroupId,
+    required ScheduleModel template,
+  }) async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    state = const AsyncValue.loading();
+    try {
+      await _datasource.updateRecurringSchedules(
+        userId: userId,
+        recurringGroupId: recurringGroupId,
+        template: template,
+      );
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      rethrow;
+    }
+  }
+
   /// スケジュールを削除
   Future<void> deleteSchedule(String scheduleId) async {
     final userId = _ref.read(currentUserIdProvider);

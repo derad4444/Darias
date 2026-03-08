@@ -145,9 +145,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           final extra = state.extra as Map<String, dynamic>?;
           final schedule = extra?['schedule'] as ScheduleModel?;
           final initialDate = extra?['initialDate'] as DateTime?;
+          final recurringEditMode = extra?['recurringEditMode'] as RecurringEditMode? ?? RecurringEditMode.single;
           return ScheduleDetailScreen(
             schedule: schedule,
             initialDate: initialDate,
+            recurringEditMode: recurringEditMode,
           );
         },
       ),

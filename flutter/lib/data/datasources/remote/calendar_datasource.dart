@@ -85,6 +85,48 @@ class CalendarDatasource {
         .delete();
   }
 
+  /// 繰り返しグループの全スケジュールをバッチ更新
+  Future<void> updateRecurringSchedules({
+    required String userId,
+    required String recurringGroupId,
+    required ScheduleModel template,
+  }) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('schedules')
+        .where('recurringGroupId', isEqualTo: recurringGroupId)
+        .get();
+
+    final duration = template.endDate.difference(template.startDate);
+    final newHour = template.startDate.hour;
+    final newMinute = template.startDate.minute;
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      final existing = ScheduleModel.fromFirestore(doc);
+      final newStart = template.isAllDay
+          ? DateTime(existing.startDate.year, existing.startDate.month, existing.startDate.day)
+          : DateTime(existing.startDate.year, existing.startDate.month, existing.startDate.day, newHour, newMinute);
+      final newEnd = newStart.add(duration);
+
+      final updated = existing.copyWith(
+        title: template.title,
+        location: template.location,
+        memo: template.memo,
+        tag: template.tag,
+        isAllDay: template.isAllDay,
+        remindValue: template.remindValue,
+        remindUnit: template.remindUnit,
+        repeatOption: template.repeatOption,
+        startDate: newStart,
+        endDate: newEnd,
+      );
+      batch.update(doc.reference, updated.toMap());
+    }
+    await batch.commit();
+  }
+
   /// 特定の日のスケジュールを取得
   Future<List<ScheduleModel>> getSchedulesForDay({
     required String userId,

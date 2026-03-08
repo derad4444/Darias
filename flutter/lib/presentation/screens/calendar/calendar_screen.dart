@@ -10,10 +10,37 @@ import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../widgets/draggable_fab.dart';
+import 'schedule_detail_screen.dart' show RecurringEditMode;
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../diary/diary_detail_screen.dart';
+
+/// 繰り返し予定の編集モード選択ダイアログ
+Future<RecurringEditMode?> _showRecurringEditChoiceDialog(BuildContext context) {
+  return showDialog<RecurringEditMode>(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text('繰り返し予定の編集'),
+      content: const Text('どの予定を編集しますか？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(RecurringEditMode.single),
+          child: const Text('この予定のみ'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(RecurringEditMode.all),
+          child: const Text('すべての繰り返し予定'),
+        ),
+      ],
+    ),
+  );
+}
 
 /// iOS版CalendarViewと同じデザインのカレンダー画面
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -51,11 +78,12 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         accentColor: accentColor,
         textColor: textColor,
         backgroundGradient: backgroundGradient,
-        onNavigateToDetail: (schedule, initialDate) {
+        onNavigateToDetail: (schedule, initialDate, [editMode = RecurringEditMode.single]) {
           Navigator.of(sheetContext).pop();
           context.push('/calendar/detail', extra: {
             'schedule': schedule,
             'initialDate': initialDate,
+            'recurringEditMode': editMode,
           });
         },
         onNavigateToDiary: (date, diary) {
@@ -1754,11 +1782,20 @@ class _ScheduleItem extends ConsumerWidget {
     );
   }
 
-  void _showEditDialog(BuildContext context) {
-    context.push('/calendar/detail', extra: {
-      'schedule': schedule,
-      'initialDate': null,
-    });
+  Future<void> _showEditDialog(BuildContext context) async {
+    var editMode = RecurringEditMode.single;
+    if (schedule.recurringGroupId != null) {
+      final choice = await _showRecurringEditChoiceDialog(context);
+      if (choice == null) return;
+      editMode = choice;
+    }
+    if (context.mounted) {
+      context.push('/calendar/detail', extra: {
+        'schedule': schedule,
+        'initialDate': null,
+        'recurringEditMode': editMode,
+      });
+    }
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
@@ -1803,7 +1840,7 @@ class _ScheduleBottomSheet extends ConsumerStatefulWidget {
   final Color accentColor;
   final Color textColor;
   final Gradient backgroundGradient;
-  final void Function(ScheduleModel? schedule, DateTime? initialDate) onNavigateToDetail;
+  final void Function(ScheduleModel? schedule, DateTime? initialDate, [RecurringEditMode editMode]) onNavigateToDetail;
   final void Function(DateTime date, DiaryModel? diary) onNavigateToDiary;
 
   const _ScheduleBottomSheet({
@@ -2014,8 +2051,14 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                                         schedule: schedule,
                                         accentColor: widget.accentColor,
                                         textColor: widget.textColor,
-                                        onTap: () {
-                                          widget.onNavigateToDetail(schedule, null);
+                                        onTap: () async {
+                                          var editMode = RecurringEditMode.single;
+                                          if (schedule.recurringGroupId != null) {
+                                            final choice = await _showRecurringEditChoiceDialog(context);
+                                            if (choice == null) return;
+                                            editMode = choice;
+                                          }
+                                          widget.onNavigateToDetail(schedule, null, editMode);
                                         },
                                       );
                                     },
@@ -2054,6 +2097,7 @@ class _BottomSheetScheduleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
