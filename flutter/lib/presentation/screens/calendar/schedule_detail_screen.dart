@@ -103,6 +103,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       );
       _endDate = _startDate.add(const Duration(hours: 1));
       _repeatSettings = RepeatSettings();
+      // 最後に使用したタグを引き継ぐ
+      _tag = ref.read(lastUsedScheduleTagProvider);
     }
   }
 
@@ -1075,6 +1077,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           remindUnit: _remindUnit,
         );
         await ref.read(calendarControllerProvider.notifier).addSchedule(newSchedule);
+        // 最後に使用したタグを記録
+        ref.read(lastUsedScheduleTagProvider.notifier).state = _tag;
         // 通知スケジュール（予定通知が有効な場合）
         if (ref.read(notificationSettingsProvider).scheduleNotifications) {
           await NotificationService().scheduleForSchedule(newSchedule);
@@ -1173,6 +1177,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         }
       }
 
+      // 最後に使用したタグを記録
+      ref.read(lastUsedScheduleTagProvider.notifier).state = _tag;
       if (mounted) {
         context.pop();
       }
@@ -1192,39 +1198,57 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     }
   }
 
-  void _showDeleteConfirmation() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('予定を削除'),
-        content: const Text('この予定を削除してもよろしいですか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _deleteSchedule();
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('削除'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _showDeleteConfirmation() async {
+    if (widget.schedule == null) return;
+
+    final recurringGroupId = widget.schedule!.recurringGroupId;
+
+    // 繰り返し予定は「すべて / この予定のみ / キャンセル」を選択して即削除
+    // 通常予定は確認なしで即削除
+    bool deleteAll = false;
+    if (recurringGroupId != null) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('繰り返し予定の削除'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('すべての繰り返し予定', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('この予定のみ', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      deleteAll = choice;
+    }
+
+    await _deleteSchedule(deleteAll: deleteAll);
   }
 
-  Future<void> _deleteSchedule() async {
+  Future<void> _deleteSchedule({bool deleteAll = false}) async {
     if (widget.schedule == null) return;
 
     try {
-      // 通知をキャンセル
       await NotificationService().cancelScheduleNotification(widget.schedule!.id);
-      await ref
-          .read(calendarControllerProvider.notifier)
-          .deleteSchedule(widget.schedule!.id);
+      if (deleteAll && widget.schedule!.recurringGroupId != null) {
+        await ref
+            .read(calendarControllerProvider.notifier)
+            .deleteAllRecurringSchedules(widget.schedule!.recurringGroupId!);
+      } else {
+        await ref
+            .read(calendarControllerProvider.notifier)
+            .deleteSchedule(widget.schedule!.id);
+      }
       if (mounted) {
         context.pop();
       }
@@ -1363,6 +1387,7 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
             ),
           ),
 
+          if (_isEnabled) ...[
           const SizedBox(height: 16),
 
           // -/値/+ コントロール
@@ -1470,6 +1495,7 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
           ),
 
           const SizedBox(height: 30),
+          ], // if (_isEnabled)
         ],
       ),
     );

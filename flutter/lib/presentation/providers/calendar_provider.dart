@@ -144,6 +144,21 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// 繰り返しグループの全スケジュールを削除
+  Future<void> deleteAllRecurringSchedules(String recurringGroupId) async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    try {
+      await _datasource.deleteRecurringSchedules(
+        userId: userId,
+        recurringGroupId: recurringGroupId,
+      );
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   /// 月を変更
   void changeMonth(DateTime month) {
     _ref.read(selectedMonthProvider.notifier).state = DateTime(month.year, month.month, 1);
@@ -244,6 +259,9 @@ final monthlyCommentProvider = FutureProvider.family<String, DateTime>((ref, mon
     return MonthlyCommentModel.defaultComment;
   }
 });
+
+/// 最後に使用したタグ（新規予定作成時の初期値として使用）
+final lastUsedScheduleTagProvider = StateProvider<String>((ref) => '');
 
 /// 検索テキストの状態
 final calendarSearchTextProvider = StateProvider<String>((ref) => '');

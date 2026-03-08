@@ -127,6 +127,25 @@ class CalendarDatasource {
     await batch.commit();
   }
 
+  /// 繰り返しグループの全スケジュールを削除
+  Future<void> deleteRecurringSchedules({
+    required String userId,
+    required String recurringGroupId,
+  }) async {
+    final snapshot = await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('schedules')
+        .where('recurringGroupId', isEqualTo: recurringGroupId)
+        .get();
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   /// 特定の日のスケジュールを取得
   Future<List<ScheduleModel>> getSchedulesForDay({
     required String userId,

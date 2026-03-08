@@ -11,6 +11,7 @@ import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../widgets/draggable_fab.dart';
 import 'schedule_detail_screen.dart' show RecurringEditMode;
+import '../settings/tag_management_screen.dart' show tagsProvider, TagItem;
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
@@ -20,26 +21,40 @@ import '../diary/diary_detail_screen.dart';
 Future<RecurringEditMode?> _showRecurringEditChoiceDialog(BuildContext context) {
   return showDialog<RecurringEditMode>(
     context: context,
-    builder: (context) => AlertDialog(
+    builder: (context) => SimpleDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('繰り返し予定の編集'),
-      content: const Text('どの予定を編集しますか？'),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('キャンセル'),
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: Text('どの予定を編集しますか？'),
         ),
-        TextButton(
+        const SizedBox(height: 8),
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(context).pop(RecurringEditMode.all),
+          child: const Text('すべての繰り返し予定'),
+        ),
+        SimpleDialogOption(
           onPressed: () => Navigator.of(context).pop(RecurringEditMode.single),
           child: const Text('この予定のみ'),
         ),
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(RecurringEditMode.all),
-          child: const Text('すべての繰り返し予定'),
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('キャンセル'),
         ),
       ],
     ),
   );
+}
+
+/// タグ名からタグ色を取得（見つからない場合はfallbackを返す）
+Color _resolveTagColor(String tagName, List<TagItem> tags, Color fallback) {
+  if (tagName.isEmpty) return fallback;
+  try {
+    return tags.firstWhere((t) => t.name == tagName).color;
+  } catch (_) {
+    return fallback;
+  }
 }
 
 /// iOS版CalendarViewと同じデザインのカレンダー画面
@@ -182,6 +197,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           ref.read(calendarSearchModeProvider.notifier).state = false;
                           ref.read(calendarSearchTextProvider.notifier).state = '';
                           _searchController.clear();
+                          ref.read(calendarControllerProvider.notifier).changeMonth(schedule.startDate);
                           ref.read(selectedDayProvider.notifier).state = schedule.startDate;
                         },
                       ),
@@ -429,7 +445,7 @@ class _SearchResults extends StatelessWidget {
 }
 
 /// 検索結果カード
-class _SearchResultCard extends StatelessWidget {
+class _SearchResultCard extends ConsumerWidget {
   final ScheduleModel schedule;
   final Color accentColor;
   final VoidCallback onTap;
@@ -441,7 +457,9 @@ class _SearchResultCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(tagsProvider);
+    final scheduleColor = _resolveTagColor(schedule.tag, tags, accentColor);
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -468,7 +486,7 @@ class _SearchResultCard extends StatelessWidget {
                   width: 4,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: accentColor,
+                    color: scheduleColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -498,14 +516,14 @@ class _SearchResultCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.1),
+                            color: scheduleColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             schedule.tag,
                             style: TextStyle(
-                              fontSize: 10,
-                              color: accentColor,
+                              fontSize: 11,
+                              color: scheduleColor,
                             ),
                           ),
                         ),
@@ -1078,7 +1096,7 @@ class _CalendarYearMonthSelectorState extends State<_CalendarYearMonthSelector> 
 }
 
 /// カレンダーグリッド（iOS版と同様のデザイン）
-class _CalendarGrid extends StatelessWidget {
+class _CalendarGrid extends ConsumerWidget {
   final DateTime month;
   final DateTime? selectedDay;
   final List<ScheduleModel> schedules;
@@ -1098,7 +1116,8 @@ class _CalendarGrid extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(tagsProvider);
     return Column(
       children: [
         // 曜日ヘッダー（固定）
@@ -1106,7 +1125,7 @@ class _CalendarGrid extends StatelessWidget {
         const SizedBox(height: 4),
         // 日付グリッド
         Expanded(
-          child: _buildDaysGrid(),
+          child: _buildDaysGrid(tags),
         ),
       ],
     );
@@ -1139,7 +1158,7 @@ class _CalendarGrid extends StatelessWidget {
     );
   }
 
-  Widget _buildDaysGrid() {
+  Widget _buildDaysGrid(List<TagItem> tags) {
     final firstDay = DateTime(month.year, month.month, 1);
     final lastDay = DateTime(month.year, month.month + 1, 0);
     final daysInMonth = lastDay.day;
@@ -1206,6 +1225,7 @@ class _CalendarGrid extends StatelessWidget {
                     multiDaySlotCount: multiDaySlotCount,
                     accentColor: accentColor,
                     textColor: textColor,
+                    tags: tags,
                     onTap: () => onDaySelected(date),
                   ),
                 ));
@@ -1240,7 +1260,7 @@ class _CalendarGrid extends StatelessWidget {
                   onTap: () => onDaySelected(sd.isBefore(weekStart) ? weekStart : sd),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.8),
+                      color: _resolveTagColor(schedule.tag, tags, accentColor).withValues(alpha: 0.8),
                       borderRadius: BorderRadius.only(
                         topLeft: isVisualStart ? r : Radius.zero,
                         bottomLeft: isVisualStart ? r : Radius.zero,
@@ -1249,12 +1269,12 @@ class _CalendarGrid extends StatelessWidget {
                       ),
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 3),
-                    alignment: Alignment.centerLeft,
+                    alignment: Alignment.center,
                     child: isVisualStart
                         ? Text(
                             schedule.title,
                             style: const TextStyle(
-                              fontSize: 9,
+                              fontSize: 11,
                               color: Colors.white,
                               fontWeight: FontWeight.w500,
                             ),
@@ -1295,6 +1315,7 @@ class _CalendarDayCell extends StatelessWidget {
   final int multiDaySlotCount; // 複数日予定のプレースホルダー数
   final Color accentColor;
   final Color textColor;
+  final List<TagItem> tags;
   final VoidCallback onTap;
 
   const _CalendarDayCell({
@@ -1306,6 +1327,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.multiDaySlotCount,
     required this.accentColor,
     required this.textColor,
+    required this.tags,
     required this.onTap,
   });
 
@@ -1378,7 +1400,7 @@ class _CalendarDayCell extends StatelessWidget {
     }
 
     int displayedCount = 0;
-    const maxDisplay = 2;
+    const maxDisplay = 3;
 
     // 祝日
     if (holiday != null && displayedCount < maxDisplay) {
@@ -1386,10 +1408,21 @@ class _CalendarDayCell extends StatelessWidget {
       displayedCount++;
     }
 
-    // 1日のみの予定
-    for (final schedule in schedules) {
+    // 1日のみの予定（終日→時間指定の順）
+    final timedSorted = schedules.where((s) => !s.isAllDay).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    final allDayFirst = [
+      ...schedules.where((s) => s.isAllDay),
+      ...timedSorted,
+    ];
+    for (final schedule in allDayFirst) {
       if (displayedCount >= maxDisplay) break;
-      items.add(_ScheduleBar(title: schedule.title, color: accentColor, isHoliday: false));
+      items.add(_ScheduleBar(
+        title: schedule.title,
+        color: _resolveTagColor(schedule.tag, tags, accentColor),
+        isHoliday: false,
+        isAllDay: schedule.isAllDay,
+      ));
       displayedCount++;
     }
 
@@ -1407,7 +1440,7 @@ class _CalendarDayCell extends StatelessWidget {
           child: Text(
             '+${totalCount - maxDisplay}',
             style: TextStyle(
-              fontSize: 8,
+              fontSize: 11,
               color: Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
@@ -1428,30 +1461,38 @@ class _ScheduleBar extends StatelessWidget {
   final String title;
   final Color color;
   final bool isHoliday;
+  final bool isAllDay;
 
   const _ScheduleBar({
     required this.title,
     required this.color,
     required this.isHoliday,
+    this.isAllDay = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    // 祝日・終日予定：背景あり（塗りつぶし）＋白テキスト
+    // 時間指定予定：背景なし、タグ色テキストのみ
+    final filled = isHoliday || isAllDay;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 1, left: 1, right: 1),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: isHoliday ? 0.2 : 0.8),
-        borderRadius: BorderRadius.circular(2),
-      ),
+      decoration: filled
+          ? BoxDecoration(
+              color: isHoliday ? color.withValues(alpha: 0.2) : color.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(2),
+            )
+          : null,
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 8,
-          color: isHoliday ? color : Colors.white,
+          fontSize: 11,
+          color: filled ? (isHoliday ? color : Colors.white) : color,
           fontWeight: FontWeight.w500,
         ),
+        textAlign: TextAlign.center,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -1589,6 +1630,11 @@ class _ScheduleList extends ConsumerWidget {
     final holiday = ref.watch(holidayForDateProvider(day));
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
+    final allDaySchedules = schedules.where((s) => s.isAllDay).toList();
+    final timedSchedules = schedules.where((s) => !s.isAllDay).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    final showHeaders = allDaySchedules.isNotEmpty && timedSchedules.isNotEmpty;
+
     return Column(
       children: [
         // 祝日表示
@@ -1639,24 +1685,57 @@ class _ScheduleList extends ConsumerWidget {
                     ],
                   ),
                 )
-              : ListView.builder(
+              : ListView(
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.all(16),
-                  itemCount: schedules.length,
-                  itemBuilder: (context, index) {
-                    final schedule = schedules[index];
-                    return _ScheduleItem(
-                      schedule: schedule,
-                      accentColor: accentColor,
-                      textColor: textColor,
-                    );
-                  },
+                  children: [
+                    if (allDaySchedules.isNotEmpty) ...[
+                      if (showHeaders) _SectionHeader(label: '終日', textColor: textColor),
+                      ...allDaySchedules.map((s) => _ScheduleItem(
+                        schedule: s,
+                        accentColor: accentColor,
+                        textColor: textColor,
+                      )),
+                    ],
+                    if (timedSchedules.isNotEmpty) ...[
+                      if (showHeaders) _SectionHeader(label: '時間指定', textColor: textColor),
+                      ...timedSchedules.map((s) => _ScheduleItem(
+                        schedule: s,
+                        accentColor: accentColor,
+                        textColor: textColor,
+                      )),
+                    ],
+                  ],
                 ),
         ),
 
         // バナー広告（無料ユーザーのみ）
         if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.calendarScreenBannerAdUnitId),
       ],
+    );
+  }
+}
+
+/// セクションヘッダー（終日 / 時間指定）
+class _SectionHeader extends StatelessWidget {
+  final String label;
+  final Color textColor;
+
+  const _SectionHeader({required this.label, required this.textColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 4),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: textColor.withValues(alpha: 0.5),
+          letterSpacing: 0.5,
+        ),
+      ),
     );
   }
 }
@@ -1675,6 +1754,8 @@ class _ScheduleItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(tagsProvider);
+    final scheduleColor = _resolveTagColor(schedule.tag, tags, accentColor);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -1705,7 +1786,7 @@ class _ScheduleItem extends ConsumerWidget {
                   width: 4,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: accentColor,
+                    color: scheduleColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -1799,36 +1880,47 @@ class _ScheduleItem extends ConsumerWidget {
   }
 
   Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('削除確認'),
-        content: const Text('この予定を削除しますか？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('削除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    // 繰り返し予定は「すべて / この予定のみ / キャンセル」を選択して即削除
+    // 通常予定は確認なしで即削除
+    bool deleteAll = false;
+    if (schedule.recurringGroupId != null) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('繰り返し予定の削除'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('すべての繰り返し予定', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('この予定のみ', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      deleteAll = choice;
+    }
 
-    if (confirmed == true) {
-      try {
-        await ref.read(calendarControllerProvider.notifier).deleteSchedule(
-          schedule.id,
+    try {
+      if (deleteAll) {
+        await ref.read(calendarControllerProvider.notifier)
+            .deleteAllRecurringSchedules(schedule.recurringGroupId!);
+      } else {
+        await ref.read(calendarControllerProvider.notifier).deleteSchedule(schedule.id);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('エラー: $e')),
         );
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('エラー: $e')),
-          );
-        }
       }
     }
   }
@@ -2029,7 +2121,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                               ),
                             ),
 
-                          // 予定リスト
+                          // 予定リスト（終日 / 時間指定で分けて表示）
                           Expanded(
                             child: schedules.isEmpty
                                 ? Padding(
@@ -2042,27 +2134,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                                       ),
                                     ),
                                   )
-                                : ListView.builder(
-                                    padding: EdgeInsets.zero,
-                                    itemCount: schedules.length > 5 ? 5 : schedules.length,
-                                    itemBuilder: (context, index) {
-                                      final schedule = schedules[index];
-                                      return _BottomSheetScheduleRow(
-                                        schedule: schedule,
-                                        accentColor: widget.accentColor,
-                                        textColor: widget.textColor,
-                                        onTap: () async {
-                                          var editMode = RecurringEditMode.single;
-                                          if (schedule.recurringGroupId != null) {
-                                            final choice = await _showRecurringEditChoiceDialog(context);
-                                            if (choice == null) return;
-                                            editMode = choice;
-                                          }
-                                          widget.onNavigateToDetail(schedule, null, editMode);
-                                        },
-                                      );
-                                    },
-                                  ),
+                                : _buildBottomSheetScheduleList(context, schedules),
                           ),
                         ],
                       ),
@@ -2077,10 +2149,46 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
       ),
     );
   }
+
+  Widget _buildBottomSheetScheduleList(BuildContext context, List<ScheduleModel> schedules) {
+    final allDaySchedules = schedules.where((s) => s.isAllDay).toList();
+    final timedSchedules = schedules.where((s) => !s.isAllDay).toList()
+      ..sort((a, b) => a.startDate.compareTo(b.startDate));
+    final showHeaders = allDaySchedules.isNotEmpty && timedSchedules.isNotEmpty;
+
+    Widget buildRow(ScheduleModel schedule) => _BottomSheetScheduleRow(
+      schedule: schedule,
+      accentColor: widget.accentColor,
+      textColor: widget.textColor,
+      onTap: () async {
+        var editMode = RecurringEditMode.single;
+        if (schedule.recurringGroupId != null) {
+          final choice = await _showRecurringEditChoiceDialog(context);
+          if (choice == null) return;
+          editMode = choice;
+        }
+        widget.onNavigateToDetail(schedule, null, editMode);
+      },
+    );
+
+    return ListView(
+      padding: EdgeInsets.zero,
+      children: [
+        if (allDaySchedules.isNotEmpty) ...[
+          if (showHeaders) _SectionHeader(label: '終日', textColor: widget.textColor),
+          ...allDaySchedules.map(buildRow),
+        ],
+        if (timedSchedules.isNotEmpty) ...[
+          if (showHeaders) _SectionHeader(label: '時間指定', textColor: widget.textColor),
+          ...timedSchedules.map(buildRow),
+        ],
+      ],
+    );
+  }
 }
 
 /// ボトムシート内の予定行
-class _BottomSheetScheduleRow extends StatelessWidget {
+class _BottomSheetScheduleRow extends ConsumerWidget {
   final ScheduleModel schedule;
   final Color accentColor;
   final Color textColor;
@@ -2094,7 +2202,9 @@ class _BottomSheetScheduleRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tags = ref.watch(tagsProvider);
+    final scheduleColor = _resolveTagColor(schedule.tag, tags, accentColor);
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -2107,7 +2217,7 @@ class _BottomSheetScheduleRow extends StatelessWidget {
               width: 3,
               height: 36,
               decoration: BoxDecoration(
-                color: accentColor,
+                color: scheduleColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
