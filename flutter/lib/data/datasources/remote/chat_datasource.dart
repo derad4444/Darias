@@ -6,23 +6,29 @@ import '../../models/post_model.dart';
 import '../../models/schedule_model.dart';
 import '../../models/todo_model.dart';
 
-/// 質問パターン（最優先で検出 → アプリQ&A）
+/// 質問パターン（アプリ操作に関する質問のみ → アプリQ&A）
 const _questionKeywords = [
-  '？',
-  '?',
   'どうやって',
-  'どうする',
   'どうすれば',
-  '教えて',
   '使い方',
-  '方法',
-  'できる',
   'やり方',
+  '方法',
   'わからない',
   'わかんない',
-  'どこ',
-  'なに',
-  'なんで',
+];
+
+/// アプリ関連ワード（質問キーワードと組み合わせてQ&Aルートを判定）
+const _appKeywords = [
+  'アプリ',
+  '機能',
+  '設定',
+  '予定',
+  'タスク',
+  'メモ',
+  'カレンダー',
+  '日記',
+  '診断',
+  'キャラクター',
 ];
 
 /// ユーザーデータ参照キーワード（質問と組み合わせてFirestoreから取得）
@@ -96,9 +102,11 @@ class ChatDatasource {
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _functions = functions ?? FirebaseFunctions.instanceFor(region: 'asia-northeast1');
 
-  /// 質問パターンが含まれているかチェック（最優先）
+  /// 質問パターンが含まれているかチェック（アプリ操作ワードとの組み合わせ必須）
   bool _containsQuestionPattern(String message) {
-    return _questionKeywords.any((keyword) => message.contains(keyword));
+    final hasQuestion = _questionKeywords.any((k) => message.contains(k));
+    final hasAppWord = _appKeywords.any((k) => message.contains(k));
+    return hasQuestion && hasAppWord;
   }
 
   /// ユーザーデータ参照が必要なキーワードを検出（質問時のみ使用）
