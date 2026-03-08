@@ -89,9 +89,8 @@
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
 | `reply` | `string` | AI返答テキスト |
-| `emotion` | `string` | 感情表現（`""` = normal, `"_smile"`, `"_angry"`, `"_cry"`, `"_sleep"`) |
 | `isBig5Question` | `boolean` | BIG5回答モード中かどうか |
-| `voiceUrl` | `string` | 音声URL（現在は常に `""`。音声生成は一時無効化中） |
+| `voiceUrl` | `string` | 常に `""`（音声はユーザーがスピーカーボタンを押した際に `generateVoice` で別途生成） |
 | `questionId` / `questionText` / `progress` | `string` | BIG5質問モード時のみ |
 | `big5Completed` / `newScores` | - | 100問完了時のみ |
 
@@ -102,6 +101,11 @@
 3. **BIG5診断トリガー** (`性格診断して` / `性格解析して`) → 次の質問を返し `big5Progress` を更新
 4. **BIG5回答** (1-5の数字 かつ `currentQuestion` が存在) → 回答を記録し段階完了処理、次の質問を返す
 5. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
+
+> **Flutter側の振り分け（Cloud Function呼び出し前）:**
+> - アプリ操作ワード（予定・タスク・メモ等）を含む「使い方」系の質問 → `answerAppQuestion` へ
+> - メモ/タスク/スケジュールキーワードを含む → ローカル抽出してFirestoreに保存
+> - それ以外 → `generateCharacterReply` の通常チャット（5）へ
 
 **モデル選択:**
 - Premium ユーザー: `gpt-4o-2024-11-20`
