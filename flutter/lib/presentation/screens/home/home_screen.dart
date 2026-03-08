@@ -101,10 +101,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         message: _displayedMessage,
                         maxWidth: size.width * 0.8,
                       ),
-                      if (isPremium && _isCharacterReply) ...[
+                      if (_isCharacterReply) ...[
                         const SizedBox(height: 6),
                         GestureDetector(
-                          onTap: _isPlayingVoice ? null : _playVoice,
+                          onTap: _isPlayingVoice ? null : () {
+                            if (isPremium) {
+                              _playVoice();
+                            } else {
+                              context.push('/premium');
+                            }
+                          },
                           child: _isPlayingVoice
                               ? const SizedBox(
                                   width: 18,
