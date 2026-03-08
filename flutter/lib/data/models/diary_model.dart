@@ -9,7 +9,7 @@ class DiaryModel {
 
   // アクティビティ型日記の追加フィールド
   final String? diaryType;
-  final List<Map<String, String>>? facts;
+  final List<String>? facts;
   final String? aiComment;
 
   const DiaryModel({
@@ -30,13 +30,10 @@ class DiaryModel {
       throw Exception('Document data is null');
     }
 
-    List<Map<String, String>>? facts;
+    List<String>? facts;
     final rawFacts = data['facts'];
     if (rawFacts is List) {
-      facts = rawFacts
-          .whereType<Map>()
-          .map((f) => f.map((k, v) => MapEntry(k.toString(), v.toString())))
-          .toList();
+      facts = rawFacts.map((f) => f.toString()).toList();
     }
 
     return DiaryModel(
@@ -67,7 +64,7 @@ class DiaryModel {
     DateTime? date,
     String? userComment,
     String? diaryType,
-    List<Map<String, String>>? facts,
+    List<String>? facts,
     String? aiComment,
   }) {
     return DiaryModel(

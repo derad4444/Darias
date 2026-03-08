@@ -220,24 +220,21 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
     );
   }
 
-  Widget _buildFactItem(Map<String, String> fact) {
-    final text = fact['text'] ?? fact.values.firstOrNull ?? '';
-    final type = fact['type'] ?? '';
-
+  Widget _buildFactItem(String fact) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(
-            _factIcon(type),
+            Icons.check_circle_outline,
             size: 16,
             color: widget.accentColor.withValues(alpha: 0.8),
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              text,
+              fact,
               style: const TextStyle(
                 fontSize: 14,
                 height: 1.5,
@@ -285,27 +282,6 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
         ),
       ),
     );
-  }
-
-  IconData _factIcon(String type) {
-    switch (type) {
-      case 'todo_completed':
-        return Icons.check_circle_outline;
-      case 'todo_created':
-        return Icons.add_task;
-      case 'memo_created':
-        return Icons.notes;
-      case 'schedule':
-        return Icons.calendar_today;
-      case 'chat':
-        return Icons.chat_bubble_outline;
-      case 'big5_progress':
-        return Icons.psychology_outlined;
-      case 'meeting':
-        return Icons.groups_outlined;
-      default:
-        return Icons.radio_button_unchecked;
-    }
   }
 
   /// 従来型日記の表示（後方互換）
@@ -511,8 +487,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
       if (facts.isNotEmpty) {
         buffer.writeln('今日やったこと:');
         for (final fact in facts) {
-          final text = fact['text'] ?? fact.values.firstOrNull ?? '';
-          buffer.writeln('・$text');
+          buffer.writeln('・$fact');
         }
         buffer.writeln();
       }
