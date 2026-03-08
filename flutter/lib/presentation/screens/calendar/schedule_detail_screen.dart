@@ -49,6 +49,9 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   int _remindValue = 0;
   String _remindUnit = '';
   bool _isSaving = false;
+  bool _isCreatingRecurring = false;
+  int _recurringProgress = 0;
+  int _recurringTotal = 0;
 
   /// どのピッカーが展開中か（null=全て閉じ）
   String? _expandedPicker; // 'start' or 'end'
@@ -80,7 +83,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       _remindValue = schedule.remindValue;
       _remindUnit = schedule.remindUnit;
     } else {
-      // 新規作成時の初期値：現在時刻
+      // 新規作成時の初期値：iOS版と同じ「次の時間の0分」
       final now = DateTime.now();
       final initialDate = widget.initialDate ?? now;
 
@@ -88,8 +91,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         initialDate.year,
         initialDate.month,
         initialDate.day,
-        now.hour,
-        now.minute,
+        now.hour + 1,
+        0,
       );
       _endDate = _startDate.add(const Duration(hours: 1));
       _repeatSettings = RepeatSettings();
@@ -131,7 +134,9 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     final textColor = colorSettings.textColor;
 
     return Scaffold(
-      body: Container(
+      body: Stack(
+        children: [
+          Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
           child: Column(
@@ -392,6 +397,50 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
             ],
           ),
         ),
+      ),
+          // 繰り返し予定作成中のオーバーレイ（iOS版と同じ）
+          if (_isCreatingRecurring)
+            Container(
+              color: Colors.black.withOpacity(0.4),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.all(30),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                      const SizedBox(height: 20),
+                      const Text(
+                        '繰り返し予定を作成中...',
+                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '$_recurringProgress / $_recurringTotal',
+                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: 200,
+                        child: LinearProgressIndicator(
+                          value: _recurringTotal > 0 ? _recurringProgress / _recurringTotal : 0,
+                          color: Colors.white,
+                          backgroundColor: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -999,7 +1048,12 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
 
     try {
       if (_isNewSchedule) {
-        // 新規作成
+        if (_repeatSettings.type != RepeatType.none) {
+          // 繰り返し予定：iOSと同様に複数ドキュメントを生成して保存
+          await _saveRecurringSchedules();
+          return;
+        }
+        // 単発予定の新規作成
         final newSchedule = ScheduleModel(
           id: const Uuid().v4(),
           title: _titleController.text,
@@ -1009,7 +1063,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           location: _locationController.text,
           memo: _memoController.text,
           tag: _tag,
-          repeatOption: _repeatSettings.type.name == 'none' ? '' : _repeatSettings.type.name,
+          repeatOption: '',
           remindValue: _remindValue,
           remindUnit: _remindUnit,
         );
@@ -1054,6 +1108,66 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  /// 繰り返し予定を複数ドキュメントとして保存（iOS版の createRecurringSchedules と同等）
+  Future<void> _saveRecurringSchedules() async {
+    final duration = _endDate.difference(_startDate);
+    final recurringDates = _repeatSettings.generateDates(_startDate);
+    final groupId = const Uuid().v4();
+    final repeatOptionName = _repeatSettings.type.name;
+
+    setState(() {
+      _isCreatingRecurring = true;
+      _recurringTotal = recurringDates.length;
+      _recurringProgress = 0;
+    });
+
+    try {
+      for (final date in recurringDates) {
+        final schedule = ScheduleModel(
+          id: const Uuid().v4(),
+          title: _titleController.text,
+          startDate: date,
+          endDate: date.add(duration),
+          isAllDay: _isAllDay,
+          location: _locationController.text,
+          memo: _memoController.text,
+          tag: _tag,
+          repeatOption: repeatOptionName,
+          remindValue: _remindValue,
+          remindUnit: _remindUnit,
+          recurringGroupId: groupId,
+        );
+
+        await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
+
+        if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+          await NotificationService().scheduleForSchedule(schedule);
+        }
+
+        if (mounted) {
+          setState(() => _recurringProgress++);
+        }
+      }
+
+      if (mounted) {
+        context.pop();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('保存に失敗しました: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreatingRecurring = false;
+          _isSaving = false;
+        });
       }
     }
   }
@@ -1131,6 +1245,9 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
   late int _value;
   late String _unit;
   late bool _isEnabled;
+  late TextEditingController _valueController;
+
+  static const int _maxValue = 999;
 
   @override
   void initState() {
@@ -1138,19 +1255,13 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
     _value = widget.remindValue > 0 ? widget.remindValue : 10;
     _unit = widget.remindUnit.isNotEmpty ? widget.remindUnit : 'minutes';
     _isEnabled = widget.remindValue > 0 && widget.remindUnit.isNotEmpty;
+    _valueController = TextEditingController(text: '$_value');
   }
 
-  int get _maxValue {
-    switch (_unit) {
-      case 'minutes':
-        return 59;
-      case 'hours':
-        return 23;
-      case 'days':
-        return 30;
-      default:
-        return 59;
-    }
+  @override
+  void dispose() {
+    _valueController.dispose();
+    super.dispose();
   }
 
   @override
@@ -1244,35 +1355,77 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
                 _buildStepperButton(
                   icon: Icons.remove,
                   onTap: _value > 1
-                      ? () => setState(() => _value--)
+                      ? () => setState(() {
+                          _value--;
+                          _valueController.text = '$_value';
+                        })
                       : null,
                   accentColor: widget.accentColor,
                 ),
-                // 値表示
+                // 値入力（自由入力 + +/-ボタン）
                 Container(
                   width: 80,
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 12),
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    '$_value',
+                  child: TextField(
+                    controller: _valueController,
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: widget.textColor,
                     ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                      counterText: '',
+                    ),
+                    maxLength: 3,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    onChanged: (text) {
+                      final parsed = int.tryParse(text);
+                      if (parsed != null && parsed >= 1 && parsed <= _maxValue) {
+                        setState(() => _value = parsed);
+                      } else if (text.isEmpty) {
+                        // 空の場合はそのまま（フォーカスアウト時に補正）
+                      } else if (parsed != null && parsed > _maxValue) {
+                        setState(() {
+                          _value = _maxValue;
+                          _valueController.text = '$_maxValue';
+                          _valueController.selection = TextSelection.collapsed(offset: '$_maxValue'.length);
+                        });
+                      }
+                    },
+                    onSubmitted: (_) {
+                      if (_valueController.text.isEmpty || int.tryParse(_valueController.text) == null) {
+                        setState(() {
+                          _valueController.text = '$_value';
+                        });
+                      }
+                    },
+                    onTapOutside: (_) {
+                      if (_valueController.text.isEmpty || int.tryParse(_valueController.text) == null) {
+                        setState(() {
+                          _valueController.text = '$_value';
+                        });
+                      }
+                    },
                   ),
                 ),
                 // プラスボタン
                 _buildStepperButton(
                   icon: Icons.add,
                   onTap: _value < _maxValue
-                      ? () => setState(() => _value++)
+                      ? () => setState(() {
+                          _value++;
+                          _valueController.text = '$_value';
+                        })
                       : null,
                   accentColor: widget.accentColor,
                 ),
@@ -1333,13 +1486,6 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
         onTap: () {
           setState(() {
             _unit = unitValue;
-            // 単位変更時に値が上限を超えていたら調整
-            final newMax = unitValue == 'minutes'
-                ? 59
-                : unitValue == 'hours'
-                    ? 23
-                    : 30;
-            if (_value > newMax) _value = newMax;
           });
         },
         child: Container(

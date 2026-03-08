@@ -390,7 +390,8 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
     final backgroundGradient = ref.watch(backgroundGradientProvider);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
+      height: MediaQuery.of(context).size.height,
+      padding: EdgeInsets.only(top: MediaQuery.of(context).viewPadding.top),
       decoration: BoxDecoration(
         gradient: backgroundGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
