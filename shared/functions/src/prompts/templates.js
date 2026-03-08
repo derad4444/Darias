@@ -25,6 +25,26 @@ function formatBig5Detailed(scores) {
 }
 
 /**
+ * BIG5スコアから性格特性テキストを生成
+ * @param {Object} big5 - Big5 scores object
+ * @return {string} - 特性を説明した自然な文字列
+ */
+function buildPersonalityTraits(big5) {
+  const traits = [];
+  if (big5.openness >= 4) traits.push("新しい体験や創造を好む");
+  else if (big5.openness <= 2) traits.push("安定した慣れた環境を好む");
+  if (big5.conscientiousness >= 4) traits.push("計画的でルーティンや目標達成を大切にする");
+  else if (big5.conscientiousness <= 2) traits.push("柔軟でゆるやかなペースを好む");
+  if (big5.extraversion >= 4) traits.push("人との交流が活力源の社交的な性格");
+  else if (big5.extraversion <= 2) traits.push("一人の静かな時間を大切にする");
+  if (big5.agreeableness >= 4) traits.push("思いやりがあり仲間との協力を重んじる");
+  else if (big5.agreeableness <= 2) traits.push("自分軸を大切にする");
+  if (big5.neuroticism <= 2) traits.push("感情が安定していてストレスに強い");
+  else if (big5.neuroticism >= 4) traits.push("感受性が豊かでセルフケアを大切にする");
+  return traits.length > 0 ? traits.join("、") : "バランスの取れた性格";
+}
+
+/**
  * Get gender short code
  * @param {string} gender - full gender string
  * @return {string} - M/F/N
@@ -55,27 +75,17 @@ const OPTIMIZED_PROMPTS = {
    * Enhanced for better Japanese conversation flow with detailed Big5
    */
   characterReply: (type, gender, big5, dreamText, userMessage, style, question) => {
-    const big5Detailed = formatBig5Detailed(big5);
+    const traits = buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
 
-    return `${big5Detailed}
-
+    return `性格特性: ${traits}
 性別: ${genderText}
 ${dream}
 
 ユーザー発言:"${userMessage}"
 
-上記のBIG5スコアを根拠に、キャラクターとして100文字以内で自然に返答してください。
-
-生活・ライフスタイル・趣味・おすすめ・アドバイスを求められた場合は、必ず以下のスコアを具体的な根拠として使うこと:
-- 開放性が高い(4以上)→新体験・創作・多様な刺激を好む、低い(2以下)→安定・慣れた環境を好む
-- 誠実性が高い(4以上)→計画的・ルーティン・目標達成重視、低い(2以下)→柔軟でゆるやかなペース
-- 外向性が高い(4以上)→人との交流・社交的な活動が活力源、低い(2以下)→一人の時間・静かな環境が大切
-- 協調性が高い(4以上)→仲間との協力・思いやりある関わりが向く、低い(2以下)→自分軸・競争環境が向く
-- 神経症傾向が低い(2以下)→安定・ストレス耐性あり・落ち着いた生活、高い(4以上)→リラックス・セルフケア重視
-
-スコアの数値は返答に出さず、特性を自然な会話に織り込む。`;
+上記の性格特性を自然に反映し、キャラクターとして100文字以内で返答してください。`;
   },
 
   /**
