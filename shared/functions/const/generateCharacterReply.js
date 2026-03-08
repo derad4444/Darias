@@ -889,20 +889,9 @@ exports.generateCharacterReply = onCall(
 
         const reply = completion.choices[0].message.content.trim();
 
-        // 感情判定を実行（エラー時はnormalにフォールバック）
-        let emotion = "";
-        try {
-          emotion = await detectEmotion(openai, reply);
-        } catch (emotionError) {
-          console.warn("Emotion detection failed, using normal:", emotionError);
-          emotion = ""; // normal表情
-        }
-
-        // リリース対応：音声生成を一時的に無効化してテキストのみで返却
         return {
           reply,
           voiceUrl: "",
-          emotion: emotion
         };
       } catch (e) {
         console.error("🔥 Error in generateCharacterReply:", e);

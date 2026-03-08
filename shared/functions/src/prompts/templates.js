@@ -82,9 +82,6 @@ const OPTIMIZED_PROMPTS = {
     return `性格特性: ${traits}
 性別: ${genderText}
 ${dream}
-
-ユーザー発言:"${userMessage}"
-
 上記の性格特性を自然に反映し、キャラクターとして100文字以内で返答してください。`;
   },
 
