@@ -21,6 +21,7 @@ import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
+import '../../providers/subscription_provider.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -37,6 +38,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   // ダイアログ表示中フラグ（多重表示防止）
   bool _isShowingDialog = false;
   bool _isPlayingVoice = false;
+  bool _isCharacterReply = false;
 
 
   /// iOS版と同じ初期メッセージリスト
@@ -73,6 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final big5ProgressAsync = ref.watch(big5ProgressProvider(characterId));
     final characterDetailsAsync = ref.watch(characterDetailsProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
+    final isPremium = ref.watch(effectiveIsPremiumProvider);
     final size = MediaQuery.of(context).size;
 
     // デバッグ用: characterIdと進捗状況を確認
@@ -98,24 +101,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         message: _displayedMessage,
                         maxWidth: size.width * 0.8,
                       ),
-                      const SizedBox(height: 6),
-                      GestureDetector(
-                        onTap: _isPlayingVoice ? null : _playVoice,
-                        child: _isPlayingVoice
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
+                      if (isPremium && _isCharacterReply) ...[
+                        const SizedBox(height: 6),
+                        GestureDetector(
+                          onTap: _isPlayingVoice ? null : _playVoice,
+                          child: _isPlayingVoice
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white70,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.volume_up_outlined,
+                                  size: 22,
                                   color: Colors.white70,
                                 ),
-                              )
-                            : const Icon(
-                                Icons.volume_up_outlined,
-                                size: 22,
-                                color: Colors.white70,
-                              ),
-                      ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -285,6 +290,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       setState(() {
         _displayedMessage = result?.reply ?? 'お返事がありませんでした';
         _isWaitingForReply = false;
+        _isCharacterReply = true;
       });
       if (mounted && result != null && !_isShowingDialog) {
         if (result.scheduleDetected || result.memoDetected || result.todoDetected) {
