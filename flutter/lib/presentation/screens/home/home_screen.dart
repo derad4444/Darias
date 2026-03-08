@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
@@ -1541,7 +1542,7 @@ class _ActionButton extends StatelessWidget {
 }
 
 /// チャット入力エリア
-class _ChatInputArea extends StatelessWidget {
+class _ChatInputArea extends StatefulWidget {
   final TextEditingController controller;
   final bool isWaitingForReply;
   final Color accentColor;
@@ -1555,9 +1556,43 @@ class _ChatInputArea extends StatelessWidget {
   });
 
   @override
+  State<_ChatInputArea> createState() => _ChatInputAreaState();
+}
+
+class _ChatInputAreaState extends State<_ChatInputArea> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          if (HardwareKeyboard.instance.isShiftPressed) {
+            // Shift+Enter: 改行を挿入
+            return KeyEventResult.ignored;
+          } else {
+            // Enter: 送信
+            if (!widget.isWaitingForReply) widget.onSend();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<TextEditingValue>(
-      valueListenable: controller,
+      valueListenable: widget.controller,
       builder: (context, textValue, _) {
         final hasText = textValue.text.isNotEmpty;
         final length = textValue.text.length;
@@ -1572,7 +1607,7 @@ class _ChatInputArea extends StatelessWidget {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: isWaitingForReply ? 0.1 : 0.2),
+                        color: Colors.white.withValues(alpha: widget.isWaitingForReply ? 0.1 : 0.2),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.4),
@@ -1582,14 +1617,15 @@ class _ChatInputArea extends StatelessWidget {
                         children: [
                           Expanded(
                             child: TextField(
-                              controller: controller,
-                              enabled: !isWaitingForReply,
+                              controller: widget.controller,
+                              focusNode: _focusNode,
+                              enabled: !widget.isWaitingForReply,
                               maxLines: 3,
                               minLines: 1,
                               maxLength: 100,
                               decoration: InputDecoration(
-                                hintText: isWaitingForReply ? '返答を待っています...' : '性格診断して',
-                                hintStyle: TextStyle(color: Colors.grey),
+                                hintText: widget.isWaitingForReply ? '返答を待っています...' : '性格診断して',
+                                hintStyle: const TextStyle(color: Colors.grey),
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -1597,12 +1633,11 @@ class _ChatInputArea extends StatelessWidget {
                                 ),
                                 counterText: '',
                               ),
-                              onSubmitted: (_) => onSend(),
                             ),
                           ),
                           if (hasText)
                             GestureDetector(
-                              onTap: () => controller.clear(),
+                              onTap: () => widget.controller.clear(),
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(horizontal: 8),
                                 child: Icon(
@@ -1619,19 +1654,19 @@ class _ChatInputArea extends StatelessWidget {
                   const SizedBox(width: 8),
                   // 送信ボタン
                   GestureDetector(
-                    onTap: isWaitingForReply ? null : onSend,
+                    onTap: widget.isWaitingForReply ? null : widget.onSend,
                     child: Container(
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: !isWaitingForReply && hasText
-                            ? accentColor.withValues(alpha: 0.85)
+                        color: !widget.isWaitingForReply && hasText
+                            ? widget.accentColor.withValues(alpha: 0.85)
                             : Colors.grey.withValues(alpha: 0.5),
                         shape: BoxShape.circle,
-                        boxShadow: !isWaitingForReply && hasText
+                        boxShadow: !widget.isWaitingForReply && hasText
                             ? [
                                 BoxShadow(
-                                  color: accentColor.withValues(alpha: 0.3),
+                                  color: widget.accentColor.withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 2),
                                 ),
@@ -1639,7 +1674,7 @@ class _ChatInputArea extends StatelessWidget {
                             : null,
                       ),
                       child: Icon(
-                        isWaitingForReply ? Icons.hourglass_empty : Icons.send,
+                        widget.isWaitingForReply ? Icons.hourglass_empty : Icons.send,
                         color: Colors.white,
                         size: 20,
                       ),
@@ -1648,18 +1683,28 @@ class _ChatInputArea extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              // 文字数カウント
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  '$length/100文字',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: length >= 100
-                        ? Colors.red
-                        : AppColors.textLight.withValues(alpha: 0.7),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Shift+Enter/Enter ヒント
+                  Text(
+                    'Enterで送信 / Shift+Enterで改行',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textLight.withValues(alpha: 0.5),
+                    ),
                   ),
-                ),
+                  // 文字数カウント
+                  Text(
+                    '$length/100文字',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: length >= 100
+                          ? Colors.red
+                          : AppColors.textLight.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
