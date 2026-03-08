@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -364,17 +365,28 @@ class _ChatBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isUser ? const Color(0xFFA084CA) : Colors.white.withValues(alpha: 0.9),
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                  child: Text(
-                    content,
-                    style: TextStyle(
-                      color: isUser ? Colors.white : Colors.black,
-                      fontSize: 14,
+                GestureDetector(
+                  onLongPress: () {
+                    Clipboard.setData(ClipboardData(text: content));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('コピーしました'),
+                        duration: Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isUser ? const Color(0xFFA084CA) : Colors.white.withValues(alpha: 0.9),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(
+                      content,
+                      style: TextStyle(
+                        color: isUser ? Colors.white : Colors.black,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
                 ),
