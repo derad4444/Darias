@@ -70,6 +70,11 @@ Object.defineProperty(exports, "validateGooglePlayReceipt", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "appleServerNotification", {
+  get: () => require("./validateReceipt").appleServerNotification,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "generateOrReuseMeeting", {
   get: () => require("./src/functions/generateSixPersonMeeting").generateOrReuseMeeting,
   enumerable: true,

@@ -415,173 +415,16 @@ func generateOrReuseMeeting(
 
 ---
 
-## 📦 6. Swift モデル定義
+## 📦 6. Flutter データモデル
 
-### Big5Scores（既存モデルを再利用）
+✅ **実装済み**: `flutter/lib/data/datasources/remote/meeting_datasource.dart`
 
-```swift
-struct Big5Scores: Codable {
-    let openness: Double
-    let conscientiousness: Double
-    let extraversion: Double
-    let agreeableness: Double
-    let neuroticism: Double
-
-    func toDictionary() -> [String: Double] {
-        return [
-            "openness": openness,
-            "conscientiousness": conscientiousness,
-            "extraversion": extraversion,
-            "agreeableness": agreeableness,
-            "neuroticism": neuroticism
-        ]
-    }
-
-    static func fromScoreMap(_ map: [String: Any]) -> Big5Scores? {
-        guard let o = (map["openness"] as? Double) ?? (map["openness"] as? Int).map(Double.init),
-              let c = (map["conscientiousness"] as? Double) ?? (map["conscientiousness"] as? Int).map(Double.init),
-              let e = (map["extraversion"] as? Double) ?? (map["extraversion"] as? Int).map(Double.init),
-              let a = (map["agreeableness"] as? Double) ?? (map["agreeableness"] as? Int).map(Double.init),
-              let n = (map["neuroticism"] as? Double) ?? (map["neuroticism"] as? Int).map(Double.init) else {
-            return nil
-        }
-        return Big5Scores(openness: o, conscientiousness: c,
-                         extraversion: e, agreeableness: a, neuroticism: n)
-    }
-
-    func similarity(to other: Big5Scores) -> Double {
-        let diff = abs(openness - other.openness) +
-                   abs(conscientiousness - other.conscientiousness) +
-                   abs(extraversion - other.extraversion) +
-                   abs(agreeableness - other.agreeableness) +
-                   abs(neuroticism - other.neuroticism)
-        return 1.0 - (diff / 25.0)
-    }
-}
-```
-
-### SharedMeeting（新規）
-
-```swift
-struct SharedMeeting: Identifiable, Codable {
-    let id: String
-    let personalityKey: String
-    let concernCategory: String
-    let concernSubcategory: String?
-    let concernKeywords: [String]
-    let conversation: Conversation
-    let statsData: StatsData
-    let usageCount: Int
-    let ratings: Ratings
-    let createdAt: Date
-    let lastUsedAt: Date
-    let templateId: String?
-
-    struct Conversation: Codable {
-        let generationType: GenerationType
-        let rounds: [Round]
-        let conclusion: Conclusion
-
-        enum GenerationType: String, Codable {
-            case template
-            case aiGenerated = "ai_generated"
-        }
-    }
-
-    struct Round: Codable {
-        let roundNumber: Int
-        let messages: [Message]
-    }
-
-    struct Message: Identifiable, Codable {
-        let id: String
-        let speaker: String
-        let text: String
-        let emotion: String
-
-        enum CodingKeys: String, CodingKey {
-            case id, speaker, text, emotion
-        }
-
-        init(id: String = UUID().uuidString, speaker: String, text: String, emotion: String) {
-            self.id = id
-            self.speaker = speaker
-            self.text = text
-            self.emotion = emotion
-        }
-
-        var variant: PersonalityVariant? {
-            PersonalityVariant(rawValue: speaker)
-        }
-    }
-
-    struct Conclusion: Codable {
-        let summary: String
-        let recommendations: [String]
-        let votes: [String: [String]]
-    }
-
-    struct StatsData: Codable {
-        let sampleSize: Int
-        let similarityThreshold: Double
-        let referencedPersonalityKeys: [String]
-        let results: [String: Result]
-        let successPatterns: [SuccessPattern]
-
-        struct Result: Codable {
-            let count: Int
-            let avgSatisfaction: Double
-            let percentage: Double
-        }
-
-        struct SuccessPattern: Codable {
-            let pattern: String
-            let frequency: Double
-        }
-
-        func toDictionary() -> [String: Any] {
-            // Firestore保存用の変換
-            // 実装省略
-            return [:]
-        }
-    }
-
-    struct Ratings: Codable {
-        let avgRating: Double
-        let totalRatings: Int
-        let distribution: [String: Int]
-    }
-}
-```
-
-### MeetingHistory（新規）
-
-```swift
-struct MeetingHistory: Identifiable, Codable {
-    let id: String
-    let sharedMeetingId: String  // 参照
-    let userConcern: String
-    let userBIG5: Big5Scores
-    var userFeedback: UserFeedback?
-    let createdAt: Date
-    var viewedAt: Date?
-    let cacheHit: Bool
-
-    struct UserFeedback: Codable {
-        var votedFor: String?
-        var helpful: Bool?
-        var rating: Int?  // 1-5
-    }
-
-    // 会話内容を取得する関数
-    func fetchSharedMeeting() async throws -> SharedMeeting {
-        let db = Firestore.firestore()
-        let doc = try await db.collection("shared_meetings")
-            .document(sharedMeetingId)
-            .getDocument()
-
-        return try doc.data(as: SharedMeeting.self)
-    }
+主要フィールド（Firestoreスキーマに対応）：
+- `MeetingConversation`: rounds, conclusion
+- `MeetingRound`: roundNumber, messages
+- `MeetingMessage`: speaker, text, emotion
+- `MeetingConclusion`: summary, recommendations, nextSteps
+- `MeetingHistory`: sharedMeetingId, userConcern, cacheHit, createdAt
 }
 ```
 
@@ -705,43 +548,12 @@ service cloud.firestore {
 
 ---
 
-## 🔄 10. Phase 2: 実データ収集
-
-### daily_choices サブコレクション（将来追加）
-
-```
-/users/{userId}/characters/{characterId}/daily_choices/{choiceId}
-{
-  choiceId: "choice_20251222",
-  date: "2025-12-22",
-
-  choices: [
-    {
-      category: "career",
-      question: "転職の面接を受けますか？",
-      decision: "accepted",
-      feeling: "nervous",
-      mood: 7
-    }
-  ],
-
-  overallMood: 7.5,
-  note: "緊張したけど良い経験だった",
-
-  createdAt: Timestamp
-}
-```
-
----
-
-## 📝 11. まとめ
+## 📝 10. まとめ
 
 ### 新規追加するコレクション
 
 1. **shared_meetings/{sharedMeetingId}** - 共有会議キャッシュ（最重要）
-2. **meeting_templates/{templateId}** - 会話テンプレート
-3. **users/{userId}/characters/{characterId}/meeting_history/{historyId}** - 個人履歴
-4. **users/{userId}/characters/{characterId}/daily_choices/{choiceId}** - Phase 2で追加
+2. **users/{userId}/characters/{characterId}/meeting_history/{historyId}** - 個人履歴
 
 ### 既存コレクションの活用
 

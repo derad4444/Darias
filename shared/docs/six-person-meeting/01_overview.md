@@ -177,7 +177,6 @@
 - 投票機能（どの意見が良かった？）
   - shared_meetings の評価に反映
   - 高評価の会議が優先的に表示される
-- 質問機能（会話中に質問できる - Phase 2）
 
 ---
 
@@ -242,16 +241,10 @@ AND concernCategory == user.concernCategory
 - プロンプトの継続改善
   - ユーザーフィードバックに基づく調整
   - 禁止表現リストの拡充
-- キャッシュヒット率分析
-- 人気会議ランキング機能
-- 高評価会議のレコメンド
 - 運用コスト: 約12.5円/月（キャッシュ50%）
 
 ### Phase 3: 完全版（3ヶ月目以降）
-- 質問機能（会話中にユーザーが質問）
-- 詳細な個別ストーリー閲覧
 - キャッシュ最適化（80%ヒット率達成）
-- 低評価会議の自動再生成
 - 運用コスト: 約5円/月（キャッシュ80%）
 
 ---
@@ -270,8 +263,7 @@ AND concernCategory == user.concernCategory
 ### キャッシュの品質管理
 ```
 ✅ usageCount で人気度を追跡
-✅ ratings で品質を追跡（評価平均4.0以下は改善）
-✅ 低評価のキャッシュは自動的にAI再生成
+✅ ratings で品質を追跡（avgRating / totalRatings / ratingSum を保存）
 ✅ 定期的にテンプレートをアップデート
 ```
 
@@ -330,7 +322,7 @@ AND concernCategory == user.concernCategory
 1. ~~デザインモックアップ作成~~ ✅
 2. ~~Firestoreスキーマ設計~~ ✅（既存DB活用 + shared_meetings）
 3. Cloud Functions実装（キャッシュ優先ロジック）
-4. SwiftUIで画面実装
+4. FlutterのMeetingScreenで画面実装
 5. テンプレート作成（30パターン）
 6. **Firestore Index作成（personalityKey + concernCategory）**
 7. ベータテスト（キャッシュヒット率測定）
@@ -360,8 +352,6 @@ AND concernCategory == user.concernCategory
 ・キャッシュヒット率が上がるほど効率化
 
 【付加価値】
-・人気会議ランキング機能
-・高評価会議のレコメンド
 ・ユーザー間での知見共有（間接的）
 
 【品質】

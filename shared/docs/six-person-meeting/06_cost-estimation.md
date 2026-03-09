@@ -477,7 +477,7 @@ Cloud Functions:   0.0001円
 ### 品質管理（Phase 2）
 
 ```
-✅ ratings.avgRating が4.0以下 → 自動再生成
+✅ ratings.avgRating で品質を追跡
 ✅ 低usageCountのキャッシュ → 定期削除
 ✅ テンプレートの定期アップデート
 ```

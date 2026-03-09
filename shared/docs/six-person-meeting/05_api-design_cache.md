@@ -471,10 +471,8 @@ async function generateConversation(params: {
   statsData: StatsData;
 }): Promise<any> {
 
-  // テンプレート選択（80%）vs AI生成（20%）
-  const useTemplate = Math.random() < 0.8;
-
-  if (useTemplate) {
+  // 100% AI生成（GPT-4o-mini）
+  if (false) {  // テンプレート分岐は廃止済み
     // テンプレート使用
     const template = await selectTemplate(params.concernCategory, params.userBIG5);
 
@@ -723,7 +721,7 @@ function validateInput(data: GenerateMeetingRequest): void {
 ✅ 1. コスト削減: 80%削減（3ヶ月後）
 ✅ 2. 高速化: 3-5秒 → 0.5秒
 ✅ 3. スケーラビリティ: ユーザー増加でヒット率向上
-✅ 4. 品質管理: ratings で低評価を自動改善
+✅ 4. 品質管理: ratings で評価を追跡（avgRating / totalRatings / ratingSum）
 ✅ 5. 運用効率: キャッシュ数は最大890件程度
 ```
 

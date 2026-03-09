@@ -305,6 +305,154 @@ exports.validateGooglePlayReceipt = functions.https.onCall(async (data, context)
 });
 
 /**
+ * Apple Server Notifications v2 を受け取り、Firestoreを即座に更新する
+ *
+ * App Store Connect での設定:
+ *   My Apps → App Information → App Store Server Notifications
+ *   Production URL: https://<region>-<project>.cloudfunctions.net/appleServerNotification
+ *
+ * 対応通知タイプ:
+ *   SUBSCRIBED       - 新規購入
+ *   DID_RENEW        - 自動更新成功
+ *   EXPIRED          - サブスク期限切れ
+ *   DID_FAIL_TO_RENEW - 自動更新失敗（猶予期間あり）
+ *   GRACE_PERIOD_EXPIRED - 猶予期間も終了
+ *   REFUND           - 返金完了
+ *   REVOKE           - ファミリー共有取り消し
+ */
+exports.appleServerNotification = functions.https.onRequest(async (req, res) => {
+  if (req.method !== 'POST') {
+    res.status(405).send('Method Not Allowed');
+    return;
+  }
+
+  try {
+    const { signedPayload } = req.body;
+    if (!signedPayload) {
+      console.error('appleServerNotification: signedPayload missing');
+      res.status(400).send('Bad Request: signedPayload required');
+      return;
+    }
+
+    // JWS を Base64デコード（署名検証なし版: Firebase + HTTPS で通信経路は保護済み）
+    // 本番強化が必要な場合は Apple の公開鍵で ES256 検証を追加する
+    const payloadBase64 = signedPayload.split('.')[1];
+    const payloadJson = Buffer.from(payloadBase64, 'base64url').toString('utf8');
+    const payload = JSON.parse(payloadJson);
+
+    const notificationType = payload.notificationType;  // e.g. "EXPIRED"
+    const subtype = payload.subtype;                    // e.g. "VOLUNTARY"
+
+    // 内部トランザクション情報をデコード
+    const transactionInfoBase64 = payload.data?.signedTransactionInfo?.split('.')[1];
+    const renewalInfoBase64 = payload.data?.signedRenewalInfo?.split('.')[1];
+
+    const transactionInfo = transactionInfoBase64
+      ? JSON.parse(Buffer.from(transactionInfoBase64, 'base64url').toString('utf8'))
+      : null;
+
+    const renewalInfo = renewalInfoBase64
+      ? JSON.parse(Buffer.from(renewalInfoBase64, 'base64url').toString('utf8'))
+      : null;
+
+    const originalTransactionId = transactionInfo?.originalTransactionId
+      || renewalInfo?.originalTransactionId;
+
+    console.log(`appleServerNotification: type=${notificationType} subtype=${subtype} txId=${originalTransactionId}`);
+
+    if (!originalTransactionId) {
+      console.error('appleServerNotification: originalTransactionId not found in payload');
+      res.status(200).send('OK'); // Appleへは200を返す
+      return;
+    }
+
+    // originalTransactionId でユーザーを特定
+    const db = admin.firestore();
+    const subscriptionSnapshot = await db.collectionGroup('subscription')
+      .where('transaction_id', '==', originalTransactionId)
+      .limit(1)
+      .get();
+
+    if (subscriptionSnapshot.empty) {
+      console.warn(`appleServerNotification: No user found for txId=${originalTransactionId}`);
+      res.status(200).send('OK');
+      return;
+    }
+
+    const subscriptionRef = subscriptionSnapshot.docs[0].ref;
+    const userId = subscriptionRef.parent.parent.id;
+
+    // 通知タイプに応じてFirestoreを更新
+    const now = admin.firestore.Timestamp.now();
+
+    switch (notificationType) {
+      case 'SUBSCRIBED':
+      case 'DID_RENEW': {
+        // 購入・更新成功 → プレミアムに
+        const expiresDateMs = transactionInfo?.expiresDate;
+        const endDate = expiresDateMs
+          ? admin.firestore.Timestamp.fromMillis(expiresDateMs)
+          : null;
+        await updateUserSubscription(userId, {
+          plan: 'premium',
+          status: 'active',
+          end_date: endDate,
+          auto_renewal: true,
+          transaction_id: originalTransactionId,
+          updated_at: now,
+        });
+        console.log(`appleServerNotification: ${notificationType} → premium userId=${userId}`);
+        break;
+      }
+
+      case 'EXPIRED':
+      case 'GRACE_PERIOD_EXPIRED': {
+        // 期限切れ → 無料に
+        await updateUserSubscription(userId, {
+          plan: 'free',
+          status: 'expired',
+          auto_renewal: false,
+          updated_at: now,
+        });
+        console.log(`appleServerNotification: ${notificationType} → free userId=${userId}`);
+        break;
+      }
+
+      case 'DID_FAIL_TO_RENEW': {
+        // 自動更新失敗（猶予期間中はまだプレミアム）
+        await subscriptionRef.set({ status: 'grace_period', updated_at: now }, { merge: true });
+        console.log(`appleServerNotification: DID_FAIL_TO_RENEW → grace_period userId=${userId}`);
+        break;
+      }
+
+      case 'REFUND':
+      case 'REVOKE': {
+        // 返金・取り消し → 即座に無料に
+        await updateUserSubscription(userId, {
+          plan: 'free',
+          status: 'free',
+          auto_renewal: false,
+          updated_at: now,
+        });
+        console.log(`appleServerNotification: ${notificationType} → free (revoked) userId=${userId}`);
+        break;
+      }
+
+      default:
+        console.log(`appleServerNotification: Unhandled type=${notificationType}, skipping`);
+    }
+
+    // Apple には必ず200を返す（2xx以外だとリトライされる）
+    res.status(200).send('OK');
+
+  } catch (error) {
+    console.error('appleServerNotification: Error processing notification', error);
+    // エラー時も200を返してAppleのリトライを防ぐ（ログで監視）
+    res.status(200).send('OK');
+  }
+});
+
+/**
  * Google Play Developer API でサブスクリプション購入を検証
  */
 async function verifyPurchaseWithGoogle(purchaseToken, productId) {

@@ -1,8 +1,8 @@
-# Character アプリ クロスプラットフォーム設計書
+# DARIASアプリ アーキテクチャ設計書
 
 ## 概要
 
-本ドキュメントは、既存のiOS版Characterアプリを Flutter で再構築し、iOS/Android/Web の3プラットフォームに展開するための設計書です。
+Flutter で iOS/Android/Web の3プラットフォームに対応したアーキテクチャ設計書です。
 
 ---
 
@@ -80,7 +80,6 @@
 | | firebase_storage | 画像ストレージ |
 | | cloud_functions | Cloud Functions呼び出し |
 | **課金** | in_app_purchase | iOS/Android課金 |
-| | purchases_flutter (RevenueCat) | 課金管理の簡素化 |
 | **広告** | google_mobile_ads | AdMob広告 |
 | **ローカルDB** | drift (SQLite) | オフラインキャッシュ |
 | **UI** | flutter_hooks | Reactライクなフック |
@@ -282,119 +281,24 @@ character_flutter/
 
 ---
 
-## 4. データモデル移行マッピング
+## 4. 主要機能
 
-### Swift → Dart 変換例
+### 実装済み機能一覧
 
-#### Character Model
-
-**Swift (既存)**
-```swift
-struct CharacterModels {
-    struct Character: Codable, Identifiable {
-        let id: String
-        var name: String
-        var gender: String
-        var big5Scores: Big5Scores?
-        var personalityKey: String?
-        var createdAt: Date
-        var updatedAt: Date
-    }
-
-    struct Big5Scores: Codable {
-        var openness: Double
-        var conscientiousness: Double
-        var extraversion: Double
-        var agreeableness: Double
-        var neuroticism: Double
-    }
-}
-```
-
-**Dart (新規)**
-```dart
-// lib/data/models/character_model.dart
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
-
-part 'character_model.freezed.dart';
-part 'character_model.g.dart';
-
-@freezed
-class CharacterModel with _$CharacterModel {
-  const factory CharacterModel({
-    required String id,
-    required String name,
-    required String gender,
-    Big5ScoresModel? big5Scores,
-    String? personalityKey,
-    required DateTime createdAt,
-    required DateTime updatedAt,
-  }) = _CharacterModel;
-
-  factory CharacterModel.fromJson(Map<String, dynamic> json) =>
-      _$CharacterModelFromJson(json);
-
-  factory CharacterModel.fromFirestore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
-    return CharacterModel(
-      id: doc.id,
-      name: data['name'] ?? '',
-      gender: data['gender'] ?? '',
-      big5Scores: data['big5Scores'] != null
-          ? Big5ScoresModel.fromJson(data['big5Scores'])
-          : null,
-      personalityKey: data['personalityKey'],
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
-    );
-  }
-}
-
-@freezed
-class Big5ScoresModel with _$Big5ScoresModel {
-  const factory Big5ScoresModel({
-    required double openness,
-    required double conscientiousness,
-    required double extraversion,
-    required double agreeableness,
-    required double neuroticism,
-  }) = _Big5ScoresModel;
-
-  factory Big5ScoresModel.fromJson(Map<String, dynamic> json) =>
-      _$Big5ScoresModelFromJson(json);
-}
-```
-
----
-
-## 5. 主要機能の移行計画
-
-### Phase 1: 基盤構築 (必須)
-
-| 機能 | 内容 | 優先度 |
-|-----|------|-------|
-| Firebase初期化 | core, auth, firestore, storage 接続 | 🔴 最高 |
-| 認証 | ログイン/サインアップ/ログアウト | 🔴 最高 |
-| キャラクター選択 | 性別選択、キャラクター表示 | 🔴 最高 |
-| ホーム画面 | メインナビゲーション | 🔴 最高 |
-
-### Phase 2: コア機能
-
-| 機能 | 内容 | 優先度 |
-|-----|------|-------|
-| チャット | キャラクターとの会話、履歴表示 | 🟠 高 |
-| BIG5診断 | 質問表示、回答保存、結果表示 | 🟠 高 |
-| 6人会議 | Cloud Functions呼び出し、結果表示 | 🟠 高 |
-
-### Phase 3: サブ機能
-
-| 機能 | 内容 | 優先度 |
-|-----|------|-------|
-| カレンダー | スケジュール CRUD | 🟡 中 |
-| 日記 | 日記 CRUD | 🟡 中 |
-| Todo | タスク管理 | 🟡 中 |
-| メモ | メモ CRUD | 🟡 中 |
+| 機能 | 内容 |
+|-----|------|
+| 認証 | ログイン/サインアップ/ログアウト |
+| キャラクター選択 | 性別選択、キャラクター表示 |
+| ホーム画面 | メインナビゲーション |
+| チャット | キャラクターとの会話、履歴表示 |
+| BIG5診断 | 質問表示、回答保存、結果表示 |
+| 6人会議 | Cloud Functions呼び出し、結果表示 |
+| カレンダー | スケジュール CRUD |
+| 日記 | 日記 CRUD |
+| Todo | タスク管理 |
+| メモ | メモ CRUD |
+| 課金 | サブスクリプション管理 |
+| 広告 | バナー広告、リワード広告 |
 
 ### カレンダー・タグ UI詳細
 
@@ -415,16 +319,6 @@ class Big5ScoresModel with _$Big5ScoresModel {
 - **タグ一覧**: カラーバー付きカード、タグ名+メモ表示（最大2行省略）
 - **タグ編集シート**: タグ名入力、カラーピッカー（プリセット30色）、メモ入力（複数行、任意）
 - **Firestoreスキーマ**: `users/{userId}/tags/{tagId}` - name, colorHex, memo
-
-### Phase 4: 収益化・その他
-
-| 機能 | 内容 | 優先度 |
-|-----|------|-------|
-| 課金 | サブスクリプション管理 | 🟢 高 |
-| 広告 | バナー広告、リワード広告 | 🟢 高 |
-| 設定 | フォント、テーマ、アカウント | 🟢 中 |
-| 通知 | プッシュ通知、ローカル通知 | 🟢 中 |
-| ウィジェット | iOS/Androidホーム画面ウィジェット | 🔵 低 |
 
 ---
 
@@ -489,20 +383,6 @@ class Big5ScoresModel with _$Big5ScoresModel {
 
 ---
 
-## 8. 移行スケジュール (目安)
-
-```
-Week 1-2:   プロジェクトセットアップ、Firebase接続、認証
-Week 3-4:   キャラクター選択、ホーム画面
-Week 5-6:   チャット機能
-Week 7-8:   BIG5診断
-Week 9-10:  6人会議
-Week 11-12: カレンダー、日記、Todo、メモ
-Week 13-14: 課金、広告
-Week 15-16: 設定、通知、テスト
-Week 17-18: バグ修正、審査対応
-```
-
 ---
 
 ## 9. テスト戦略
@@ -566,40 +446,9 @@ jobs:
 
 ---
 
-## 11. 既存iOSアプリからの段階的移行
-
-### オプションA: 完全置き換え (推奨)
-1. Flutter版を新規開発
-2. 同じFirebaseプロジェクトに接続
-3. 既存ユーザーはそのままログイン可能
-4. App Store で既存アプリを更新
-
-### オプションB: 並行運用
-1. Flutter版を別アプリとしてリリース
-2. 既存iOSアプリは保守モード
-3. 新規ユーザーはFlutter版へ誘導
-
-**推奨**: オプションA (1コードベースのメリットを最大化)
-
----
-
-## 12. まとめ
-
-### この設計の利点
+## 11. アーキテクチャの利点
 
 1. **単一コードベース**: 1回の改修で iOS/Android/Web に反映
-2. **DB共通**: 既存Firestoreをそのまま使用
-3. **バックエンド変更不要**: Cloud Functionsは完全流用
+2. **DB共通**: FirestoreをiOS/Android/Web共通で使用
+3. **バックエンド共通**: Cloud Functionsを全プラットフォームで流用
 4. **保守性向上**: 今後の機能追加が1箇所で完結
-5. **コスト削減**: 3つ別々に開発するより大幅に低コスト
-
-### 次のアクション
-
-1. Flutter 開発環境のセットアップ
-2. プロジェクト作成 (`flutter create character_flutter`)
-3. Firebase 接続設定
-4. Phase 1 の実装開始
-
----
-
-*最終更新: 2026-01-16*

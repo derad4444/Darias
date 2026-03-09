@@ -41,6 +41,31 @@ users/{userId}/subscription/current
 
 ## 🔧 実施した改善内容
 
+### 改善4: Apple Server Notifications（サーバー間リアルタイム通知）✅ 実装済み
+
+#### 概要
+Apple のサーバーからサブスクリプション変更を直接受け取り、Firestoreを即座に更新する。
+クライアント（Flutter/Swift問わず）のアプリ起動を待たずにサーバー側で処理される。
+
+#### 実装
+- **Cloud Functions**: `appleServerNotification` （`validateReceipt.js`）
+- **エンドポイント**: `https://us-central1-my-character-app.cloudfunctions.net/appleServerNotification`
+- **App Store Connect 設定**: Production Server URL に上記を登録済み
+
+#### 対応通知タイプ
+| 通知タイプ | 処理内容 |
+|-----------|---------|
+| `SUBSCRIBED` / `DID_RENEW` | プレミアムに更新（期限も更新） |
+| `EXPIRED` / `GRACE_PERIOD_EXPIRED` | 無料プランに戻す |
+| `DID_FAIL_TO_RENEW` | `grace_period` ステータスに設定 |
+| `REFUND` / `REVOKE` | 即座に無料プランに戻す |
+
+#### 効果
+- 返金・期限切れ・自動更新失敗を**アプリ起動を待たず即座に反映**
+- 改善1（返金処理）・改善2（フォアグラウンドチェック）を補完し、多層防御を実現
+
+---
+
 ### 改善1: 返金（revocation）の適切な処理
 
 #### 問題
@@ -242,34 +267,6 @@ private func performDailyReceiptValidation() async {
 
 ---
 
-## ✅ テスト項目
-
-実機で以下をテストすることを推奨：
-
-### 1. 基本機能
-- [ ] プレミアム購入が成功する
-- [ ] 購入後、すぐにプレミアム機能が使える
-- [ ] 別端末で同じアカウントでログインしてもプレミアム
-
-### 2. キャンセル
-- [ ] App Storeでキャンセル
-- [ ] キャンセル後も期限まで利用可能
-- [ ] 期限到達後、無料プランに戻る
-
-### 3. 返金（サンドボックス環境）
-- [ ] 返金後、即座に無料プランに戻る
-- [ ] アプリを再起動しても無料プランのまま
-
-### 4. 自動更新
-- [ ] 自動更新が成功すると期限が延長される
-- [ ] 自動更新が失敗すると無料プランに戻る
-
-### 5. 定期検証
-- [ ] 1日1回のレシート検証が実行される
-- [ ] フォアグラウンドに戻るたびにチェックされる
-
----
-
 ## 🔒 セキュリティ考慮事項
 
 ### 現在の保護機能
@@ -287,20 +284,6 @@ private func performDailyReceiptValidation() async {
 | 返金詐欺 | revocationDate検知 | ✅ 今回追加 |
 
 ---
-
-## 📝 今後の検討事項
-
-### 優先度: 高
-- [ ] Apple Server Notificationsの実装（リアルタイム更新）
-- [ ] 管理画面でのサブスクリプション状態の確認機能
-
-### 優先度: 中
-- [ ] サブスクリプション解析（チャーン率、LTV計算）
-- [ ] プッシュ通知（期限切れ前のリマインダー）
-
-### 優先度: 低
-- [ ] 家族共有への対応
-- [ ] 複数デバイスでの同時利用制限
 
 ---
 

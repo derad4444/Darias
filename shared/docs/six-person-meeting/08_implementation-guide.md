@@ -56,62 +56,11 @@ Object.defineProperty(exports, "generateOrReuseMeeting", {
 }
 ```
 
-### フロントエンド（SwiftUI）
+### フロントエンド（Flutter）
 
-#### 1. モデル
-**ファイル**: `Character/Models/SixPersonMeeting.swift`
-
-実装内容：
-- `SixPersonMeeting` - 会議全体のデータ
-- `MeetingConversation` - 会話データ
-- `ConversationRound` / `ConversationMessage` - ラウンドとメッセージ
-- `MeetingConclusion` - 結論データ
-- `MeetingStatsData` - 統計データ
-- `MeetingHistory` - 会議履歴
-- `ConcernCategory` - カテゴリ定義
-
-#### 2. サービス
-**ファイル**: `Character/Services/SixPersonMeetingService.swift`
-
-実装内容：
-- `generateOrReuseMeeting()` - 会議生成API呼び出し
-- `fetchMeetingHistory()` - 履歴取得
-- `fetchMeetingById()` - 特定会議取得
-- `rateMeeting()` - 会議評価
-- `getMeetingUsageCount()` - 利用回数取得
-
-#### 3. 画面実装
-
-**a. 悩み入力画面**
-**ファイル**: `Character/Views/Meeting/MeetingInputView.swift`
-
-機能：
-- カテゴリ選択（10カテゴリ）
-- 悩みテキスト入力（500文字まで）
-- 会議生成ボタン
-- プレミアムチェック
-
-**b. 会議表示画面**
-**ファイル**: `Character/Views/Meeting/SixPersonMeetingView.swift`
-
-機能：
-- チャット風UI（1.5秒間隔でアニメーション）
-- 左右配置（慎重派 vs 行動派）
-- キャラクターアイコン・色分け
-- スキップ機能（結論へジャンプ）
-- 結論・レコメンデーション・次のステップ表示
-- 評価機能（1-5段階）
-- キャッシュヒット表示
-
-**c. 会議履歴画面**
-**ファイル**: `Character/Views/Meeting/MeetingHistoryView.swift`
-
-機能：
-- 過去の会議一覧表示
-- カテゴリバッジ表示
-- キャッシュヒット表示
-- 会議詳細閲覧
-- 引っ張って更新
+✅ Flutter版に移行済み。以下のファイルで実装：
+- `flutter/lib/presentation/screens/meeting/meeting_screen.dart` - 会議表示・会話アニメーション・評価
+- `flutter/lib/data/datasources/remote/meeting_datasource.dart` - API呼び出し・評価更新
 
 ---
 
@@ -120,7 +69,7 @@ Object.defineProperty(exports, "generateOrReuseMeeting", {
 ### 1. Cloud Functionsのデプロイ
 
 ```bash
-cd /Users/onoderaryousuke/Desktop/development-D/Character/functions
+cd /Users/onoderaryousuke/Desktop/development-D/DARIAS/shared/functions
 
 # 依存関係のインストール（初回のみ）
 npm install
@@ -130,69 +79,6 @@ firebase deploy --only functions:generateOrReuseMeeting
 
 # インデックスもデプロイ
 firebase deploy --only firestore:indexes
-```
-
-### 2. Xcodeでビルド
-
-1. Xcodeで`Character.xcodeproj`を開く
-2. 新しく追加したファイルがプロジェクトに含まれているか確認
-3. ビルド（⌘+B）してエラーがないか確認
-
-必要に応じて、以下のファイルをXcodeプロジェクトに追加：
-- `Character/Models/SixPersonMeeting.swift`
-- `Character/Services/SixPersonMeetingService.swift`
-- `Character/Views/Meeting/MeetingInputView.swift`
-- `Character/Views/Meeting/SixPersonMeetingView.swift`
-- `Character/Views/Meeting/MeetingHistoryView.swift`
-
----
-
-## 🔌 既存画面への統合方法
-
-### HomeViewに会議ボタンを追加
-
-```swift
-// HomeViewのどこかに追加
-Button(action: {
-    showMeetingInput = true
-}) {
-    HStack {
-        Image(systemName: "person.3.fill")
-        Text("6人の自分に相談")
-    }
-}
-.sheet(isPresented: $showMeetingInput) {
-    if let user = authManager.currentUser,
-       let characterId = characterService.currentCharacterId {
-        MeetingInputView(
-            userId: user.uid,
-            characterId: characterId
-        )
-    }
-}
-```
-
-### ナビゲーションバーに履歴ボタンを追加
-
-```swift
-.toolbar {
-    ToolbarItem(placement: .navigationBarTrailing) {
-        Button(action: {
-            showMeetingHistory = true
-        }) {
-            Image(systemName: "clock.arrow.circlepath")
-        }
-    }
-}
-.sheet(isPresented: $showMeetingHistory) {
-    if let user = authManager.currentUser,
-       let characterId = characterService.currentCharacterId {
-        MeetingHistoryView(
-            userId: user.uid,
-            characterId: characterId
-        )
-    }
-}
 ```
 
 ---
@@ -218,12 +104,12 @@ curl -X POST http://localhost:5001/my-character-app/asia-northeast1/generateOrRe
   }'
 ```
 
-### 2. iOS シミュレータでのテスト
+### 2. Flutterシミュレータでのテスト
 
-1. Xcodeでシミュレータを起動
+1. `flutter run` でシミュレータを起動
 2. ログイン
 3. ホーム画面から「6人の自分に相談」ボタンをタップ
-4. カテゴリ選択と悩み入力
+4. 悩みを入力
 5. 「会議を開始」ボタンをタップ
 6. 会話アニメーションを確認
 7. 結論表示を確認
@@ -387,22 +273,6 @@ do {
 
 ### Phase 2の追加機能（オプション）
 
-1. **テンプレート拡充**
-   - 30パターン → 100パターンに増やす
-   - `sixPersonMeetingTemplates.js`にカテゴリを追加
-
-2. **人気会議ランキング**
-   - usageCountでソートして表示
-   - 新しい画面を作成
-
-3. **質問機能**
-   - 会議中にユーザーが質問できる
-   - リアルタイムでAIが回答
-
-4. **キャッシュ分析ダッシュボード**
-   - BigQueryでログ分析
-   - ヒット率のグラフ化
-
 ---
 
 ## 📝 まとめ
@@ -411,17 +281,16 @@ do {
 - Cloud Functions（generateOrReuseMeeting）
 - キャッシュ優先アーキテクチャ
 - Firestoreインデックス
-- SwiftUIの全画面（入力・表示・履歴）
+- Flutter全画面（meeting_screen.dart）
 - プレミアム制限
 - 評価機能
 
 ✅ **デプロイ準備完了**
 - すぐにfirebase deployできる状態
-- Xcodeビルドも可能
 
 ✅ **コスト最適化済み**
 - キャッシュにより80%コスト削減
-- テンプレート使用で20%のみAI生成
+- 100% AI生成（GPT-4o-mini）
 
 ✅ **スケーラブル**
 - ユーザーが増えるほどキャッシュヒット率向上
