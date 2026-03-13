@@ -29,17 +29,22 @@ import '../screens/auth/forgot_password_screen.dart';
 import '../screens/settings/tag_management_screen.dart';
 import '../screens/history/unified_history_screen.dart';
 import '../screens/settings/volume_settings_screen.dart';
+import '../screens/splash/splash_screen.dart';
 
 /// ルーター設定
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
 
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     redirect: (context, state) {
       final isLoggedIn = authState.valueOrNull != null;
+      final isSplash = state.matchedLocation == '/splash';
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
+
+      // スプラッシュ画面は常に通す
+      if (isSplash) return null;
 
       if (!isLoggedIn && !isAuthRoute) {
         return '/login';
@@ -52,6 +57,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      // スプラッシュ
+      GoRoute(
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
+
       // メイン（5タブ構成）
       GoRoute(
         path: '/',
