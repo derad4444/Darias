@@ -1205,41 +1205,39 @@ class _CalendarGrid extends ConsumerWidget {
             final List<Widget> cells = [];
             for (int wd = 0; wd < 7; wd++) {
               final date = gridDate(week, wd);
-              if (!isInMonth(date)) {
-                cells.add(Expanded(child: Container()));
-              } else {
-                final dateOnly = DateTime(date.year, date.month, date.day);
-                final singleDaySchedules = schedules.where((s) {
-                  final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
-                  final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
-                  return sd == ed && sd == dateOnly;
-                }).toList()
-                  ..sort((a, b) => a.startDate.compareTo(b.startDate));
-                final holiday = holidays.where((h) => h.isOnDate(date)).firstOrNull;
+              final outsideMonth = !isInMonth(date);
+              final dateOnly = DateTime(date.year, date.month, date.day);
+              final singleDaySchedules = schedules.where((s) {
+                final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
+                final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
+                return sd == ed && sd == dateOnly;
+              }).toList()
+                ..sort((a, b) => a.startDate.compareTo(b.startDate));
+              final holiday = holidays.where((h) => h.isOnDate(date)).firstOrNull;
 
-                cells.add(Expanded(
-                  child: _CalendarDayCell(
-                    date: date,
-                    isToday: date.year == today.year &&
-                        date.month == today.month &&
-                        date.day == today.day,
-                    isSelected: selectedDay != null &&
-                        date.year == selectedDay!.year &&
-                        date.month == selectedDay!.month &&
-                        date.day == selectedDay!.day,
-                    schedules: singleDaySchedules,
-                    holiday: holiday,
-                    multiDaySlotCount: multiDaySlotCount,
-                    accentColor: accentColor,
-                    textColor: textColor,
-                    tags: tags,
-                    dateCircleSize: dateCircleSize,
-                    itemFontSize: itemFontSize,
-                    scheduleAreaHeight: scheduleAreaHeight,
-                    onTap: () => onDaySelected(date),
-                  ),
-                ));
-              }
+              cells.add(Expanded(
+                child: _CalendarDayCell(
+                  date: date,
+                  isToday: date.year == today.year &&
+                      date.month == today.month &&
+                      date.day == today.day,
+                  isSelected: selectedDay != null &&
+                      date.year == selectedDay!.year &&
+                      date.month == selectedDay!.month &&
+                      date.day == selectedDay!.day,
+                  isOutsideMonth: outsideMonth,
+                  schedules: singleDaySchedules,
+                  holiday: holiday,
+                  multiDaySlotCount: multiDaySlotCount,
+                  accentColor: accentColor,
+                  textColor: textColor,
+                  tags: tags,
+                  dateCircleSize: dateCircleSize,
+                  itemFontSize: itemFontSize,
+                  scheduleAreaHeight: scheduleAreaHeight,
+                  onTap: () => onDaySelected(date),
+                ),
+              ));
             }
 
             // 複数日予定のオーバーレイバー
@@ -1324,6 +1322,7 @@ class _CalendarDayCell extends StatelessWidget {
   final DateTime date;
   final bool isToday;
   final bool isSelected;
+  final bool isOutsideMonth;
   final List<ScheduleModel> schedules; // 1日のみの予定
   final HolidayModel? holiday;
   final int multiDaySlotCount; // 複数日予定のプレースホルダー数
@@ -1339,6 +1338,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.date,
     required this.isToday,
     required this.isSelected,
+    this.isOutsideMonth = false,
     required this.schedules,
     this.holiday,
     required this.multiDaySlotCount,
@@ -1358,9 +1358,11 @@ class _CalendarDayCell extends StatelessWidget {
     final isSaturday = weekday == 6;
     final isHoliday = holiday != null;
 
-    // 日付の色
+    // 日付の色（月外はグレーアウト）
     Color dateColor;
-    if (isSelected) {
+    if (isOutsideMonth) {
+      dateColor = textColor.withValues(alpha: 0.3);
+    } else if (isSelected) {
       dateColor = Colors.white;
     } else if (isSunday || isHoliday) {
       dateColor = Colors.red.withValues(alpha: 0.8);
@@ -1422,22 +1424,32 @@ class _CalendarDayCell extends StatelessWidget {
   Widget _buildScheduleItems(double fontSize) {
     final List<Widget> items = [];
 
-    // 複数日予定オーバーレイ用のプレースホルダー（高さを確保）
-    for (int i = 0; i < multiDaySlotCount; i++) {
-      items.add(const SizedBox(height: 16)); // barH(14) + barGap(2)
-    }
+    // マルチデイバーが占める高さ（バーの下にセル予定が来るよう確保）
+    const barH = 14.0;
+    const barGap = 2.0;
+    final barSpace = multiDaySlotCount * (barH + barGap);
+    final effectiveHeight = scheduleAreaHeight - barSpace;
 
     int displayedCount = 0;
-    // 1アイテムの高さ（fontSize + margin + padding + 行高）
-    const itemH = 20.0;
-    // マルチデイプレースホルダーを差し引いた残り高さから表示可能件数を計算
-    final availableH = scheduleAreaHeight - multiDaySlotCount * 16.0;
-    // +N表示用に1枠確保するため -1 してから計算（最低1件は表示）
-    final maxDisplay = (availableH / itemH - 1).floor().clamp(1, 3);
+    // 実際のアイテム高さ（フォントサイズ × 行高 + margin + padding）
+    final itemH = fontSize * 1.2 + 3;
+    // +N表示用に1枠確保して表示可能件数を計算（最低0件）
+    final maxDisplay = effectiveHeight <= 0
+        ? 0
+        : (effectiveHeight / itemH - 1).floor().clamp(0, 3);
 
+    // マルチデイバー分のスペーサー
+    if (barSpace > 0) {
+      items.add(SizedBox(height: barSpace));
+    }
+
+    // 表示順: 祝日 → 終日予定（バー） → 時間指定予定
     // 祝日
     if (holiday != null && displayedCount < maxDisplay) {
-      items.add(_ScheduleBar(title: holiday!.name, color: Colors.red, isHoliday: true, fontSize: fontSize));
+      items.add(SizedBox(
+        height: itemH,
+        child: _ScheduleBar(title: holiday!.name, color: Colors.red, isHoliday: true, fontSize: fontSize),
+      ));
       displayedCount++;
     }
 
@@ -1450,12 +1462,15 @@ class _CalendarDayCell extends StatelessWidget {
     ];
     for (final schedule in allDayFirst) {
       if (displayedCount >= maxDisplay) break;
-      items.add(_ScheduleBar(
-        title: schedule.title,
-        color: _resolveTagColor(schedule.tag, tags, accentColor),
-        isHoliday: false,
-        isAllDay: schedule.isAllDay,
-        fontSize: fontSize,
+      items.add(SizedBox(
+        height: itemH,
+        child: _ScheduleBar(
+          title: schedule.title,
+          color: _resolveTagColor(schedule.tag, tags, accentColor),
+          isHoliday: false,
+          isAllDay: schedule.isAllDay,
+          fontSize: fontSize,
+        ),
       ));
       displayedCount++;
     }
@@ -1463,8 +1478,9 @@ class _CalendarDayCell extends StatelessWidget {
     // 残り件数
     final totalCount = (holiday != null ? 1 : 0) + schedules.length;
     if (totalCount > maxDisplay) {
-      items.add(
-        Container(
+      items.add(SizedBox(
+        height: itemH,
+        child: Container(
           margin: const EdgeInsets.only(top: 1),
           padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
           decoration: BoxDecoration(
@@ -1475,12 +1491,13 @@ class _CalendarDayCell extends StatelessWidget {
             '+${totalCount - maxDisplay}',
             style: TextStyle(
               fontSize: fontSize,
+              height: 1.2,
               color: Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
-      );
+      ));
     }
 
     return Column(
@@ -1526,6 +1543,7 @@ class _ScheduleBar extends StatelessWidget {
         title,
         style: TextStyle(
           fontSize: fontSize,
+          height: 1.2,
           color: filled ? (isHoliday ? color : Colors.white) : color,
           fontWeight: FontWeight.w500,
         ),
