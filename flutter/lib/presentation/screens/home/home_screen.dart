@@ -67,8 +67,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  /// 会議後フォローアップ: 固定メッセージを吹き出しに表示
+  void _triggerMeetingFollowup(String conclusion) {
+    if (mounted) {
+      setState(() {
+        _displayedMessage = '会議お疲れ様！続きがあれば話しかけてね';
+        _isCharacterReply = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 会議後フォローアップの監視
+    ref.listen<String?>(meetingFollowupConclusionProvider, (prev, next) {
+      if (next != null) {
+        ref.read(meetingFollowupConclusionProvider.notifier).state = null;
+        _triggerMeetingFollowup(next);
+      }
+    });
+
     final backgroundGradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);

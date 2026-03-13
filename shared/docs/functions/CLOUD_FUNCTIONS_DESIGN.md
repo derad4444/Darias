@@ -83,6 +83,7 @@
 | `userId` | `string` | Firebase Auth UID |
 | `isPremium` | `boolean` | プレミアムユーザーフラグ |
 | `chatHistory` | `array<{userMessage, aiResponse}>` | 直近2件の会話履歴 |
+| `meetingContext` | `string` (optional) | 直近30日以内の会議結論（`"相談:xxx / 結論:yyy"` 形式）。チャットの文脈として使用 [Case 4] |
 
 **返却値:**
 
@@ -201,6 +202,9 @@
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
+- **利用制限**: 無料ユーザー生涯1回 / プレミアムユーザー月30回（`usage_tracking` で管理）
+- **モデル**: 会議生成 `gpt-4o-2024-11-20`、カテゴリ判定 `gpt-4o-mini`
+- **キャッシュ**: `personalityKey` のみでマッチング（カテゴリ非依存）、閲覧済み除外
 
 ---
 
@@ -428,4 +432,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-03-07*
+*最終更新: 2026-03-13*

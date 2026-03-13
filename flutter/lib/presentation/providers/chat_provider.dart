@@ -6,6 +6,9 @@ import '../../data/models/post_model.dart';
 import 'auth_provider.dart';
 import 'subscription_provider.dart';
 
+/// 会議後フォローアップの結論を一時保持するプロバイダー（案1）
+final meetingFollowupConclusionProvider = StateProvider<String?>((ref) => null);
+
 /// ChatDatasourceのプロバイダー
 final chatDatasourceProvider = Provider<ChatDatasource>((ref) {
   return ChatDatasource(

@@ -95,13 +95,19 @@ class MeetingDatasource {
     } catch (e) {
       debugPrint('❌ generateOrReuseMeeting error: $e');
 
-      // プレミアム制限エラーをチェック
+      // 利用制限エラーをチェック
       final errorMessage = e.toString();
       if (errorMessage.contains('無料ユーザーは1回のみ') ||
           errorMessage.contains('プレミアムにアップグレード') ||
           errorMessage.contains('プレミアムに')) {
         throw MeetingError(
           '無料プランでは自分会議は1回のみ利用可能です。プレミアムにアップグレードしてください。',
+          MeetingErrorType.premiumRequired,
+        );
+      }
+      if (errorMessage.contains('今月の会議利用上限')) {
+        throw MeetingError(
+          '今月の会議利用上限（30回）に達しました。来月またご利用ください。',
           MeetingErrorType.premiumRequired,
         );
       }

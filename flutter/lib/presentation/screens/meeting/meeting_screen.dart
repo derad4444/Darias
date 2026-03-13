@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../data/models/six_person_meeting_model.dart';
+import '../../../data/models/todo_model.dart';
 import '../../../data/datasources/remote/meeting_datasource.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/todo_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// 6人会議画面（iOS版SixPersonMeetingViewと同じフロー）
@@ -584,6 +588,31 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                         ),
                         const SizedBox(width: 8),
                         Expanded(child: Text(entry.value)),
+                        // 案3: タスクに追加ボタン
+                        GestureDetector(
+                          onTap: () => _addNextStepAsTodo(entry.value),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.blue.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: const Text(
+                              '+タスク',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.blue,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -593,6 +622,30 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           ),
 
         const SizedBox(height: 16),
+
+        // 案1: チャットで深掘りボタン
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: () {
+              ref.read(meetingFollowupConclusionProvider.notifier).state =
+                  _meetingResponse!.conversation.conclusion.summary;
+              ref.read(selectedTabProvider.notifier).state = 0;
+              context.go('/');
+            },
+            icon: const Icon(Icons.chat_bubble_outline),
+            label: const Text('チャットで深掘りする'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.blue.withValues(alpha: 0.85),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
 
         // 共有ボタン
         SizedBox(
@@ -846,6 +899,40 @@ $nextSteps
 DARIASアプリで自分会議を体験しよう！
 ''';
     Share.share(shareText.trim());
+  }
+
+  /// 案3: ネクストステップをタスクに追加
+  Future<void> _addNextStepAsTodo(String stepText) async {
+    final now = DateTime.now();
+    final todo = TodoModel(
+      id: '',
+      title: stepText,
+      description: '自分会議のネクストステップ',
+      isCompleted: false,
+      dueDate: null,
+      priority: TodoPriority.medium,
+      tag: '',
+      createdAt: now,
+      updatedAt: now,
+    );
+
+    try {
+      await ref.read(todoControllerProvider.notifier).addTodo(todo);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('タスクに追加しました'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('タスクの追加に失敗しました: $e')),
+        );
+      }
+    }
   }
 
   /// 評価ダイアログ（API連携）

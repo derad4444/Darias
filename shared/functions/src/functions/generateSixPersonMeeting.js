@@ -9,7 +9,6 @@ const {Logger} = require("../utils/logger");
 const {
   generateSixPersonalities,
   calculateSimilarity,
-  detectConcernCategory,
   generatePersonalityKey,
 } = require("../utils/sixPersonMeeting");
 const {
@@ -18,6 +17,52 @@ const {
 
 const db = getFirestore();
 const logger = new Logger("SixPersonMeeting");
+
+const VALID_CATEGORIES = [
+  "career", "romance", "money", "health",
+  "family", "future", "hobby", "study", "moving", "other",
+];
+
+/**
+ * AIで悩みのカテゴリを判定（gpt-4o-mini使用）
+ * @param {string} concern - ユーザーの悩み
+ * @param {Object} openai - OpenAIクライアント
+ * @return {Promise<string>} - カテゴリID
+ */
+async function detectConcernCategoryWithAI(concern, openai) {
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [{
+        role: "user",
+        content: `次の悩みを最も適切なカテゴリ1つに分類してください。
+悩み: "${concern}"
+
+カテゴリ:
+- career (キャリア・仕事)
+- romance (恋愛・人間関係)
+- money (お金・経済)
+- health (健康・ライフスタイル)
+- family (家族・子育て)
+- future (将来・人生設計)
+- hobby (趣味・自己実現)
+- study (学習・スキル)
+- moving (引っ越し・住居)
+- other (その他)
+
+カテゴリID（英語）のみ出力してください。`,
+      }],
+      max_tokens: 20,
+      temperature: 0,
+    });
+
+    const result = completion.choices[0].message.content.trim().toLowerCase();
+    return VALID_CATEGORIES.includes(result) ? result : "other";
+  } catch (e) {
+    logger.error("AI category detection failed, falling back to other", {error: e.message});
+    return "other";
+  }
+}
 
 /**
  * 6人会議を生成またはキャッシュから取得する
@@ -51,15 +96,27 @@ exports.generateOrReuseMeeting = onCall(
 
         logger.info("Meeting generation started", {userId, characterId});
 
-        // 2. プレミアムチェック
+        // 2. 利用制限チェック
         const isPremium = await checkPremiumStatus(userId);
-        const usageCount = await getMeetingUsageCount(userId, characterId);
 
-        if (!isPremium && usageCount >= 1) {
-          throw new HttpsError(
-              "resource-exhausted",
-              "無料ユーザーは1回のみ利用可能です。プレミアムにアップグレードしてください。",
-          );
+        if (!isPremium) {
+          // 無料ユーザー: 生涯1回制限
+          const usageCount = await getMeetingUsageCount(userId, characterId);
+          if (usageCount >= 1) {
+            throw new HttpsError(
+                "resource-exhausted",
+                "無料ユーザーは1回のみ利用可能です。プレミアムにアップグレードしてください。",
+            );
+          }
+        } else {
+          // プレミアムユーザー: 月30回制限
+          const {count} = await checkMonthlyMeetingCount(userId);
+          if (count >= 30) {
+            throw new HttpsError(
+                "resource-exhausted",
+                "今月の会議利用上限（30回）に達しました。来月またご利用ください。",
+            );
+          }
         }
 
         // 3. キャラクターのBIG5とpersonalityKeyを取得
@@ -70,8 +127,11 @@ exports.generateOrReuseMeeting = onCall(
 
         const {big5, gender, personalityKey, sixPersonalities} = characterData;
 
-        // 4. カテゴリの自動検出（指定がない場合）
-        const category = concernCategory || detectConcernCategory(concern);
+        // 4. カテゴリの自動検出（AIで判定）
+        const apiKey = OPENAI_API_KEY.value().trim();
+        const openai = getOpenAIClient(apiKey);
+        const category = concernCategory || await detectConcernCategoryWithAI(concern, openai);
+        logger.info("Category detected", {concern: concern.substring(0, 50), category});
 
         // 5. 過去の閲覧履歴を取得（同じ会議を見せないため）
         const viewedMeetings = await getViewedMeetings(userId, characterId);
@@ -93,6 +153,7 @@ exports.generateOrReuseMeeting = onCall(
         let conversation;
         let statsData;
         let cacheHit = false;
+        let usageCount = 0;
 
         if (cacheResult) {
           // ✅ キャッシュヒット - 既存データを再利用
@@ -105,6 +166,7 @@ exports.generateOrReuseMeeting = onCall(
           conversation = cacheResult.conversation;
           statsData = cacheResult.statsData;
           cacheHit = true;
+          usageCount = cacheResult.usageCount;
 
           // usageCountをインクリメント
           await db.collection("shared_meetings").doc(sharedMeetingId).update({
@@ -155,6 +217,7 @@ exports.generateOrReuseMeeting = onCall(
 
           sharedMeetingId = sharedMeetingRef.id;
           cacheHit = false;
+          usageCount = 1;
 
           logger.info("New meeting created and cached", {sharedMeetingId});
         }
@@ -174,6 +237,11 @@ exports.generateOrReuseMeeting = onCall(
               cacheHit,
               createdAt: new Date(),
             });
+
+        // プレミアムユーザーの月間カウントをインクリメント
+        if (isPremium) {
+          await incrementMonthlyMeetingCount(userId);
+        }
 
         const duration = Date.now() - startTime;
         logger.info("Meeting generation completed", {
@@ -271,6 +339,44 @@ async function checkPremiumStatus(userId) {
   } catch (error) {
     logger.error("Premium check failed", {error: error.message});
     return false;
+  }
+}
+
+/**
+ * プレミアムユーザーの今月の会議利用回数を取得
+ * @param {string} userId - ユーザーID
+ * @return {Promise<{count: number, currentMonth: string}>}
+ */
+async function checkMonthlyMeetingCount(userId) {
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  try {
+    const userDoc = await db.collection("users").doc(userId).get();
+    const usageTracking = userDoc.data()?.usage_tracking || {};
+    const lastMonth = usageTracking.last_meeting_month || "";
+    const count = lastMonth === currentMonth ?
+      (usageTracking.meeting_count_this_month || 0) : 0;
+    return {count, currentMonth};
+  } catch (error) {
+    logger.error("Monthly meeting count check failed", {error: error.message});
+    return {count: 0, currentMonth};
+  }
+}
+
+/**
+ * プレミアムユーザーの今月の会議利用回数をインクリメント
+ * @param {string} userId - ユーザーID
+ */
+async function incrementMonthlyMeetingCount(userId) {
+  try {
+    const {count, currentMonth} = await checkMonthlyMeetingCount(userId);
+    await db.collection("users").doc(userId).update({
+      "usage_tracking.meeting_count_this_month": count + 1,
+      "usage_tracking.last_meeting_month": currentMonth,
+    });
+  } catch (error) {
+    logger.error("Monthly meeting count increment failed", {error: error.message});
   }
 }
 
@@ -523,10 +629,14 @@ async function generateConversationWithAI(
   const completion = await safeOpenAICall(
       openai.chat.completions.create.bind(openai.chat.completions),
       {
-        model: "gpt-4o-mini",
-        messages: [{role: "user", content: prompt}],
+        model: "gpt-4o-2024-11-20",
+        messages: [
+          {role: "system", content: "You are a JSON generator. Always respond with valid JSON only, no explanations or markdown."},
+          {role: "user", content: prompt},
+        ],
         temperature: 0.8,
-        max_tokens: 2000,
+        max_tokens: 3000,
+        response_format: {type: "json_object"},
       },
   );
 

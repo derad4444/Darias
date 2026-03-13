@@ -1,0 +1,457 @@
+# チャット機能 設計書
+
+> DARIASのチャット機能の全体設計。Flutter クライアントと Cloud Functions の連携を含む。
+
+**最終更新日**: 2026-03-13
+**関連ファイル**:
+- Flutter: `lib/data/datasources/remote/chat_datasource.dart`
+- Flutter: `lib/presentation/providers/chat_provider.dart`
+- Flutter: `lib/presentation/screens/home/home_screen.dart`
+- Functions: `const/generateCharacterReply.js`
+- Functions: `const/answerAppQuestion.js`
+- Functions: `const/extractSchedule.js`
+
+---
+
+## 目次
+
+1. [アーキテクチャ概要](#アーキテクチャ概要)
+2. [メッセージ振り分けロジック](#メッセージ振り分けロジック)
+3. [通常チャット（generateCharacterReply）](#通常チャット)
+4. [アプリQ&A（answerAppQuestion）](#アプリqa)
+5. [予定抽出（extractSchedule）](#予定抽出)
+6. [メモ・タスクのローカル抽出](#メモタスクのローカル抽出)
+7. [会議連携（Cases 1〜4）](#会議連携)
+8. [BIG5性格診断との連携](#big5性格診断との連携)
+9. [Firestoreへの保存](#firestoreへの保存)
+10. [コスト見積もり](#コスト見積もり)
+
+---
+
+## アーキテクチャ概要
+
+```
+ユーザー入力（ホーム画面）
+    │
+    ▼
+ChatDatasource.sendMessageWithScheduleDetection()
+    │
+    ├─① 質問パターン検出（アプリQ&A ワード組み合わせ）
+    │       └→ answerAppQuestion（Cloud Function）
+    │
+    ├─② メモキーワード検出
+    │       └→ ローカル抽出 → Firestoreに保存
+    │
+    ├─③ タスクキーワード検出
+    │       └→ ローカル抽出 → Firestoreに保存
+    │
+    ├─④ 予定キーワード検出
+    │       └→ extractSchedule（Cloud Function）→ Firestoreに保存
+    │
+    └─⑤ 通常チャット（上記に該当しない場合）
+            ├─ 直近2件のチャット履歴（posts）
+            ├─ 直近30日の会議結論（meeting_history → shared_meetings）[Case 4]
+            ├─ 悩み系キーワード検出 → meetingSuggested フラグ [Case 2]
+            └→ generateCharacterReply（Cloud Function）
+                    └→ posts コレクションに保存
+```
+
+---
+
+## メッセージ振り分けロジック
+
+振り分けは `ChatDatasource`（Flutter側）で行う。優先順位は ①〜⑤ の順。
+
+### ① 質問パターン（アプリQ&A）
+
+**条件**: 質問キーワード AND アプリキーワードの両方を含む
+
+```dart
+// 質問キーワード（どちらか1つ含む）
+'どうやって', 'どうすれば', '使い方', 'やり方', '方法', 'わからない', 'わかんない'
+
+// アプリキーワード（どちらか1つ含む）
+'アプリ', '機能', '設定', '予定', 'タスク', 'メモ', 'カレンダー', '日記', '診断', 'キャラクター'
+```
+
+→ `answerAppQuestion` Cloud Function へ。postsには保存しない。
+
+### ② メモキーワード
+
+```dart
+'メモ', 'メモして', 'メモしといて', 'メモしておいて', 'メモしておく'
+```
+
+→ ローカル抽出（キーワード除去）して `memos` コレクションへ保存。返答: 固定文「メモしておくね！」
+
+### ③ タスクキーワード
+
+```dart
+'タスク', 'タスクに追加', 'タスク追加', 'やること', 'TODO', 'todo'
+```
+
+→ ローカル抽出して `todos` コレクションへ保存。返答: 固定文「タスクに追加しておくね！」
+
+### ④ 予定キーワード
+
+```dart
+'予定', 'スケジュール', '日', '時', 'から', 'まで', '明日', '今日', '週', '月', '年'
+```
+
+→ `extractSchedule` Cloud Function で予定抽出。保存成功なら固定文「予定楽しんでね！」。postsには保存しない。
+
+### ⑤ 通常チャット
+
+上記に該当しない場合、または予定抽出に失敗した場合。
+
+---
+
+## 通常チャット
+
+### Cloud Function: `generateCharacterReply`
+
+**Cloud Function 側の処理の振り分け（優先順）:**
+
+1. **無意味な入力検出**（3文字未満・記号のみ・繰り返し文字等）→ フォールバック固定返答
+2. **予定問い合わせ**（「今日の予定」「明日の予定」等のパターン）→ Firestore `schedules` を照会して返答
+3. **BIG5トリガー**（「性格診断して」「性格解析して」）→ 次の質問を返す
+4. **BIG5回答**（1-5の数字 かつ `currentQuestion` が存在）→ 回答を記録して次の質問
+5. **通常チャット** → OpenAI でキャラクター返答を生成
+
+### 入力パラメータ
+
+```javascript
+{
+  characterId: string,
+  userMessage: string,      // 100文字まで処理
+  userId: string,
+  isPremium: boolean,
+  chatHistory: [            // 直近2件の会話履歴
+    { userMessage: string, aiResponse: string }
+  ],
+  meetingContext?: string,  // 直近30日の会議結論（後述 Case 4）
+}
+```
+
+### 返却値
+
+```javascript
+{
+  reply: string,
+  isBig5Question: boolean,
+  voiceUrl: "",              // 常に空文字（音声は別途生成）
+  // BIG5回答時のみ:
+  questionId?: string,
+  questionText?: string,
+  progress?: string,         // 例: "15/100"
+  // BIG5完了時のみ:
+  big5Completed?: boolean,
+  newScores?: Big5Scores,
+  // 感情表現:
+  emotion?: string,          // "" (normal) / "_smile" / "_angry" / "_cry" / "_sleep"
+}
+```
+
+### モデル選択
+
+| ユーザータイプ | モデル |
+|-------------|--------|
+| プレミアム | `gpt-4o-2024-11-20` |
+| 無料 | `gpt-4o-mini` |
+
+### キャラクタープロンプトの構成
+
+`OPTIMIZED_PROMPTS.characterReply()` を使用。入力は以下:
+
+- **type**: BIG5に基づく性格タイプ（AI / Learning / Human）
+- **gender**: male / female / neutral
+- **big5**: 5つのスコア（openness, conscientiousness, extraversion, agreeableness, neuroticism）
+- **dreamText**: キャラクターの夢
+- **userMessage**: ユーザーのメッセージ
+- **meetingContext**: 直近30日の会議結論（Case 4）
+
+性格タイプは `androidScore` で決定:
+```
+androidScore = (6 - agreeableness) + (6 - extraversion) + (6 - neuroticism)
+
+>= 9 → AI型    (論理的・システマティック)
+<= 6 → 人間型  (共感・感情重視)
+それ以外 → 学習型 (論理+感情のミックス)
+```
+
+---
+
+## アプリQ&A
+
+### Cloud Function: `answerAppQuestion`
+
+アプリの使い方に関する質問、またはユーザーデータ参照が必要な質問に回答。
+
+**入力:**
+
+```javascript
+{
+  userId: string,
+  userMessage: string,
+  dataTypes: string[],  // ["schedules", "todos", "memos"] から必要なもの
+}
+```
+
+**処理:**
+1. `dataTypes` に基づき Firestore からデータ取得（読み取り専用）
+   - `schedules`: 前後30日以内（最大20件）
+   - `todos`: 未完了タスク（最大20件）
+   - `memos`: 最新メモ（最大10件）
+2. アプリガイド + データをシステムプロンプトに組み込み
+3. `gpt-4o-mini` で回答生成
+
+**返却:** `{ reply: string }` （postsに保存しない）
+
+---
+
+## 予定抽出
+
+### Cloud Function: `extractSchedule`
+
+メッセージから予定情報を抽出してFirestoreに保存。
+
+**入力:**
+```javascript
+{
+  userId: string,
+  userMessage: string,
+}
+```
+
+**返却:**
+```javascript
+{
+  hasSchedule: boolean,
+  scheduleData?: {
+    title: string,
+    startDate: string | Timestamp,
+    endDate: string | Timestamp,
+    isAllDay: boolean,
+    location: string,
+    memo: string,
+  }
+}
+```
+
+Flutter側で `ScheduleModel` に変換し、`schedules` コレクションへ保存。
+
+---
+
+## メモ・タスクのローカル抽出
+
+Cloud Function を使わずローカルで処理（コスト削減・応答速度向上）。
+
+### メモ抽出ロジック
+
+```dart
+// キーワードを除去して残った部分をタイトルとする
+MemoModel _extractMemoFromMessage(String message) {
+  var content = message;
+  // キーワードを長いものから順に除去
+  for (final kw in sortedKeywords) {
+    content = content.replaceAll(kw, '').trim();
+  }
+  // MemoModel(title: content, content: '', ...) を返す
+}
+```
+
+→ `memos` コレクションに保存（`users/{userId}/memos/{id}`）
+
+### タスク抽出ロジック
+
+```dart
+TodoModel _extractTodoFromMessage(String message) {
+  // 同様にキーワード除去してタイトルを取得
+  // TodoModel(title: ..., priority: medium) を返す
+}
+```
+
+→ `todos` コレクションに保存（`users/{userId}/todos/{id}`）
+
+---
+
+## 会議連携
+
+### Case 1: 会議後フォローアップ（ホーム画面への固定メッセージ）
+
+会議画面で「チャットで深掘りする」ボタンを押すと:
+
+1. `meetingFollowupConclusionProvider`（`StateProvider<String?>`）に会議結論を書き込む
+2. ホームタブ（index 0）に遷移
+3. ホーム画面の `ref.listen<String?>` がプロバイダーの変化を検知
+4. 固定メッセージ「会議お疲れ様！続きがあれば話しかけてね」を表示
+
+**特徴:**
+- Cloud Function の呼び出しなし（固定文）
+- `IndexedStack` でホーム画面は常にマウント済みのため `ref.listen` が機能する
+
+```dart
+// meeting_screen.dart
+ref.read(meetingFollowupConclusionProvider.notifier).state =
+    _meetingResponse!.conversation.conclusion.summary;
+ref.read(selectedTabProvider.notifier).state = 0;
+context.go('/');
+
+// home_screen.dart（build内）
+ref.listen<String?>(meetingFollowupConclusionProvider, (prev, next) {
+  if (next != null) {
+    ref.read(meetingFollowupConclusionProvider.notifier).state = null;
+    _triggerMeetingFollowup(next);
+  }
+});
+```
+
+### Case 2: 悩み系キーワードへの会議提案
+
+通常チャット時に悩み系キーワードを検出すると `meetingSuggested: true` を返す。
+
+**トリガーワード:**
+```dart
+'どうしよう', '迷ってる', '迷っている', '決められない', '悩んでいる',
+'悩んでる', 'どうすればいい', 'どうしたらいい', '困ってる', '困っている',
+'迷い', '悩み', 'どうしたら', '相談したい', '判断できない', 'わからなくなってきた'
+```
+
+Flutter側で `meetingSuggested == true` の場合に「6人会議を試す？」等のUIを表示（呼び出し元の実装依存）。
+
+### Case 4: 会議結論をチャットのコンテキストに注入
+
+通常チャット時、直近30日以内の会議結論を `generateCharacterReply` に `meetingContext` として渡す。
+
+```dart
+Future<String?> _fetchRecentMeetingConclusion(userId, characterId) async {
+  // meeting_history から最新1件取得
+  // 30日以内かチェック
+  // shared_meetings から conclusion.summary を取得
+  // "相談:{concern} / 結論:{summary(80文字)}" 形式で返す
+}
+```
+
+Cloud Function 側ではこれをシステムプロンプトに組み込み、文脈を踏まえた返答を生成。
+
+---
+
+## BIG5性格診断との連携
+
+### 診断の流れ
+
+```
+ユーザー: 「性格診断して」
+    ↓
+generateCharacterReply（Cloud Function）
+    ├─ isTopicRequest: true を検出
+    ├─ big5Progress/current から次の質問を取得
+    └─ 質問文を返却（isBig5Question: true）
+
+ユーザー: 「3」（1-5の数字）
+    ↓
+generateCharacterReply
+    ├─ isNumericAnswer: true かつ currentQuestion が存在
+    ├─ 回答を answeredQuestions に追加
+    ├─ 段階完了チェック（20問、50問、100問）
+    │   └─ 段階完了時: generateStagedCharacterDetails を非同期実行
+    └─ 次の質問または完了メッセージを返却
+```
+
+### BIG5 回答時のキャラクタートーン
+
+質問回数（段階）によってコメントのトーンが変わる:
+
+| 段階 | 質問数 | トーン |
+|------|--------|--------|
+| AI段階 | 1-20問 | システマティック（「データを記録しました」） |
+| 学習中段階 | 21-50問 | 共感的（「なるほど、少しずつ分かってきた」） |
+| 人間段階 | 51-100問 | 親しみやすい（「分かる！」「素敵だね」） |
+
+---
+
+## Firestoreへの保存
+
+### postsに保存されるケース
+
+**保存される**: 通常チャット（`generateCharacterReply` の5番ルート）
+
+**保存されない**: 以下のケース
+- 質問パターン（answerAppQuestion）
+- メモキーワード検出
+- タスクキーワード検出
+- 予定キーワード検出（scheduleが検出されなかった場合も保存なし）
+- BIG5回答・トリガー
+
+### 保存データ
+
+```
+users/{userId}/characters/{characterId}/posts/{docId}
+├── content: string        // ユーザーメッセージ（最大100文字）
+├── analysis_result: string // AI返答
+└── timestamp: Timestamp
+```
+
+**書き込み場所**: Cloud Function ではなく Flutter クライアント（`ChatDatasource._savePost()`）が保存する。
+
+---
+
+## コスト見積もり
+
+### generateCharacterReply の費用（通常チャット時）
+
+```
+プレミアムユーザー（gpt-4o-2024-11-20）:
+- 入力: システムプロンプト(~400t) + 履歴(~200t) + メッセージ(~50t) = ~650 tokens
+- 出力: 最大150 tokens
+- コスト: 650 × $2.50/1M + 150 × $10.00/1M = $1.625 + $1.50 / 1000回
+        = $0.003125/回 ≈ 0.47円/回
+
+無料ユーザー（gpt-4o-mini）:
+- 入力: ~650 tokens、出力: ~150 tokens
+- コスト: 650 × $0.15/1M + 150 × $0.60/1M = $0.097 + $0.09 / 1000回
+        = $0.000187/回 ≈ 0.028円/回
+```
+
+### answerAppQuestion の費用
+
+```
+gpt-4o-mini 固定:
+- 入力: アプリガイド(~500t) + ユーザーデータ(~300t) + メッセージ(~50t) = ~850 tokens
+- 出力: 最大150 tokens
+- コスト: 約0.04円/回
+```
+
+### extractSchedule の費用
+
+```
+gpt-4o-mini 固定:
+- 入力: ~300 tokens、出力: ~200 tokens
+- コスト: 約0.02円/回
+```
+
+---
+
+## 関連する Riverpod プロバイダー
+
+| プロバイダー | 型 | 用途 |
+|------------|-----|------|
+| `chatDatasourceProvider` | `Provider<ChatDatasource>` | ChatDatasource のシングルトン |
+| `chatHistoryProvider` | `StreamProvider.family<List<PostModel>, String>` | チャット履歴のリアルタイム購読 |
+| `chatControllerProvider` | `StateNotifierProvider<ChatController, AsyncValue<void>>` | メッセージ送信の状態管理 |
+| `meetingFollowupConclusionProvider` | `StateProvider<String?>` | 会議結論の一時保持（Case 1） |
+
+---
+
+## 画面構成
+
+チャット機能はホーム画面（`home_screen.dart`）に内包されている。独立した `/chat` 画面は削除済み。
+
+```
+MainShellScreen（IndexedStack）
+└── HomeScreen（タブ0、常にマウント）
+    ├── キャラクター吹き出し表示エリア
+    ├── チャット入力フィールド
+    └── 送信ボタン
+        └─ onSend → ChatController.sendMessage() → ChatDatasource
+```

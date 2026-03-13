@@ -70,6 +70,26 @@ const _todoKeywords = [
   'todo',
 ];
 
+/// 悩み系キーワード（会議への誘導トリガー）
+const _concernKeywords = [
+  'どうしよう',
+  '迷ってる',
+  '迷っている',
+  '決められない',
+  '悩んでいる',
+  '悩んでる',
+  'どうすればいい',
+  'どうしたらいい',
+  '困ってる',
+  '困っている',
+  '迷い',
+  '悩み',
+  'どうしたら',
+  '相談したい',
+  '判断できない',
+  'わからなくなってきた',
+];
+
 /// メッセージ送信結果
 class SendMessageResult {
   final String reply;
@@ -79,6 +99,7 @@ class SendMessageResult {
   final bool memoDetected;
   final TodoModel? detectedTodo;
   final bool todoDetected;
+  final bool meetingSuggested;
 
   SendMessageResult({
     required this.reply,
@@ -88,6 +109,7 @@ class SendMessageResult {
     this.memoDetected = false,
     this.detectedTodo,
     this.todoDetected = false,
+    this.meetingSuggested = false,
   });
 }
 
@@ -131,6 +153,63 @@ class ChatDatasource {
   /// タスクキーワードが含まれているかチェック
   bool _containsTodoKeyword(String message) {
     return _todoKeywords.any((keyword) => message.contains(keyword));
+  }
+
+  /// 悩み系キーワードが含まれているかチェック（会議への誘導トリガー）
+  bool _containsConcernKeyword(String message) {
+    return _concernKeywords.any((keyword) => message.contains(keyword));
+  }
+
+  /// 直近30日以内の会議結論を取得（案4: チャットのコンテキストに使用）
+  Future<String?> _fetchRecentMeetingConclusion(
+    String userId,
+    String characterId,
+  ) async {
+    try {
+      final thirtyDaysAgo = DateTime.now().subtract(const Duration(days: 30));
+
+      final historySnapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('characters')
+          .doc(characterId)
+          .collection('meeting_history')
+          .orderBy('createdAt', descending: true)
+          .limit(1)
+          .get();
+
+      if (historySnapshot.docs.isEmpty) return null;
+
+      final historyData = historySnapshot.docs.first.data();
+      final createdAt = (historyData['createdAt'] as Timestamp?)?.toDate();
+      if (createdAt == null || createdAt.isBefore(thirtyDaysAgo)) return null;
+
+      final sharedMeetingId = historyData['sharedMeetingId'] as String?;
+      if (sharedMeetingId == null) return null;
+
+      final meetingDoc = await _firestore
+          .collection('shared_meetings')
+          .doc(sharedMeetingId)
+          .get();
+
+      if (!meetingDoc.exists) return null;
+
+      final data = meetingDoc.data()!;
+      final conversation = data['conversation'] as Map<String, dynamic>?;
+      final conclusion = conversation?['conclusion'] as Map<String, dynamic>?;
+      if (conclusion == null) return null;
+
+      final summary = conclusion['summary'] as String? ?? '';
+      final concern = historyData['userConcern'] as String? ?? '';
+      if (summary.isEmpty) return null;
+
+      final shortSummary =
+          summary.length > 80 ? summary.substring(0, 80) : summary;
+      return '相談:$concern / 結論:$shortSummary';
+    } catch (e) {
+      debugPrint('⚠️ fetchRecentMeetingConclusion error: $e');
+      return null;
+    }
   }
 
   /// メッセージからメモ内容をローカル抽出
@@ -260,14 +339,25 @@ class ChatDatasource {
     // ⑤ 通常のキャラクター返答
     final chatHistory = await _fetchRecentChatHistory(userId, characterId);
 
+    // 案4: 直近の会議結論をコンテキストとして取得（30日以内）
+    final meetingContext =
+        await _fetchRecentMeetingConclusion(userId, characterId);
+
+    // 案2: 悩み系キーワードを検出して会議への誘導フラグを立てる
+    final meetingSuggested = _containsConcernKeyword(trimmed);
+
     final callable = _functions.httpsCallable('generateCharacterReply');
-    final result = await callable.call<Map<String, dynamic>>({
+    final params = <String, dynamic>{
       'characterId': characterId,
       'userMessage': trimmed,
       'userId': userId,
       'isPremium': isPremium,
       'chatHistory': chatHistory,
-    });
+    };
+    if (meetingContext != null) {
+      params['meetingContext'] = meetingContext;
+    }
+    final result = await callable.call<Map<String, dynamic>>(params);
 
     final data = result.data;
     final reply = data['reply'] as String? ?? '';
@@ -279,7 +369,10 @@ class ChatDatasource {
       reply: reply,
     );
 
-    return SendMessageResult(reply: reply);
+    return SendMessageResult(
+      reply: reply,
+      meetingSuggested: meetingSuggested,
+    );
   }
 
   /// アプリQ&A / ユーザーデータ参照（Cloud Function呼び出し）

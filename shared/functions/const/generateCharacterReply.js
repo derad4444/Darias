@@ -5,6 +5,7 @@ const {getNextQuestion, calculateBIG5Scores, BIG5_QUESTIONS} =
   require("./big5Questions");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
+const firestoreCache = require("../src/utils/firestoreCache");
 
 // 感情判定関数
 async function detectEmotion(openai, messageText) {
@@ -321,7 +322,7 @@ function generateEngagingComment(questionId, answerValue, currentStage) {
 }
 
 // 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
-function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
+function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext) {
   // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -347,7 +348,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage) {
   }
 
   // BIG5詳細形式を使用した新しいプロンプト
-  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question);
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext);
 }
 
 // 段階判定ロジック
@@ -431,7 +432,7 @@ exports.generateCharacterReply = onCall(
     async (request) => {
       const {data} = request;
       try {
-        const {characterId, userMessage, userId, isPremium, chatHistory} = data;
+        const {characterId, userMessage, userId, isPremium, chatHistory, meetingContext} = data;
         if (!characterId || !userMessage || !userId) {
           return {error: "Missing characterId or userMessage"};
         }
@@ -443,13 +444,18 @@ exports.generateCharacterReply = onCall(
         if (!isNumericAnswer && isMeaninglessInput(userMessage)) {
           console.log(`🚫 Meaningless input detected: "${userMessage}"`);
 
-          // キャラクター情報を取得（genderのみ必要）
-          const charDetailSnap = await db.collection("users").doc(userId)
-              .collection("characters").doc(characterId)
-              .collection("details").doc("current").get();
+          // キャラクター情報を取得（genderのみ必要・キャッシュ利用）
+          const _charDetailKey = `charDetail_${userId}_${characterId}`;
+          let _charDetailData = firestoreCache.get(_charDetailKey);
+          if (_charDetailData === undefined) {
+            const snap = await db.collection("users").doc(userId)
+                .collection("characters").doc(characterId)
+                .collection("details").doc("current").get();
+            _charDetailData = snap.exists ? snap.data() : null;
+            firestoreCache.set(_charDetailKey, _charDetailData);
+          }
 
-          const gender = charDetailSnap.exists ?
-            charDetailSnap.data().gender || "neutral" : "neutral";
+          const gender = _charDetailData ? _charDetailData.gender || "neutral" : "neutral";
 
           const fallbackReply = getRandomFallbackReply(gender);
 
@@ -484,21 +490,26 @@ exports.generateCharacterReply = onCall(
           pattern.test(userMessage.replace(/\s/g, "")),
         );
 
-        const [charDetailSnap, big5ProgressSnap] =
-          await Promise.all([
-            db.collection("users").doc(userId)
-                .collection("characters").doc(characterId)
-                .collection("details").doc("current").get(),
-            db.collection("users").doc(userId)
-                .collection("characters").doc(characterId)
-                .collection("big5Progress").doc("current").get(),
-          ]);
-
-        if (!charDetailSnap.exists) {
+        // キャラクター詳細はキャッシュ利用（5分TTL）
+        const charDetailKey = `charDetail_${userId}_${characterId}`;
+        let charData = firestoreCache.get(charDetailKey);
+        if (charData === undefined) {
+          const snap = await db.collection("users").doc(userId)
+              .collection("characters").doc(characterId)
+              .collection("details").doc("current").get();
+          if (!snap.exists) {
+            return {error: "Character details not found"};
+          }
+          charData = snap.data();
+          firestoreCache.set(charDetailKey, charData);
+        } else if (charData === null) {
           return {error: "Character details not found"};
         }
 
-        const charData = charDetailSnap.data();
+        // big5Progressはキャッシュなし（BIG5回答ごとに更新されるため）
+        const big5ProgressSnap = await db.collection("users").doc(userId)
+            .collection("characters").doc(characterId)
+            .collection("big5Progress").doc("current").get();
         let big5ProgressData = big5ProgressSnap.exists ?
           big5ProgressSnap.data() : null;
 
@@ -732,6 +743,8 @@ exports.generateCharacterReply = onCall(
                   analysis_level: 100,
                   updated_at: admin.firestore.FieldValue.serverTimestamp(),
                 });
+            // 書き込み後にキャッシュを無効化
+            firestoreCache.invalidate(`charDetail_${userId}_${characterId}`);
 
             // 進行状況を完了状態に更新
             await db.collection("users").doc(userId)
@@ -847,7 +860,7 @@ exports.generateCharacterReply = onCall(
 
         // Android度を計算し、プロンプトを生成
         const prompt = buildCharacterPrompt(
-            currentBig5, gender, dreamText, userMessage);
+            currentBig5, gender, dreamText, userMessage, meetingContext);
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 

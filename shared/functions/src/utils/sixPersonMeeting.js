@@ -50,7 +50,7 @@ function generateSixPersonalities(userBig5, gender) {
     position: "right", // 行動派グループ
   });
 
-  // 3. 理想の自分 (全特性を高水準に)
+  // 3. 理想の自分 (開放性・誠実性・協調性を高く、神経症傾向を低く)
   personalities.push({
     id: "ideal",
     name: "理想の自分",
@@ -62,7 +62,7 @@ function generateSixPersonalities(userBig5, gender) {
       conscientiousness: Math.max(userBig5.conscientiousness, 4),
       extraversion: optimizeToMiddle(userBig5.extraversion, 3.5),
       agreeableness: Math.max(userBig5.agreeableness, 4),
-      neuroticism: Math.max(userBig5.neuroticism, 4), // 高い = 安定
+      neuroticism: Math.min(userBig5.neuroticism, 2), // 低い = 情緒安定（BIG5標準: 高N=不安定）
     },
     gender,
     position: "left", // 慎重派グループ
@@ -182,29 +182,63 @@ function getCategoryDisplayName(category) {
 
 /**
  * 悩みテキストからカテゴリを推定
+ * スコア制: 全カテゴリのマッチ数を数えて最多のものを返す
  * @param {string} concern - ユーザーの悩み
  * @return {string} - 推定されたカテゴリ
  */
 function detectConcernCategory(concern) {
   const keywords = {
-    career: ["仕事", "転職", "キャリア", "就職", "職場", "上司", "同僚", "残業", "給料"],
-    romance: ["恋愛", "恋人", "彼氏", "彼女", "結婚", "パートナー", "出会い", "片思い", "別れ"],
-    money: ["お金", "貯金", "投資", "ローン", "借金", "収入", "支出", "節約"],
-    health: ["健康", "病気", "ダイエット", "運動", "睡眠", "疲れ", "ストレス"],
-    family: ["家族", "親", "子供", "子育て", "育児", "夫婦", "兄弟", "姉妹"],
-    future: ["将来", "人生", "目標", "夢", "計画", "不安"],
-    hobby: ["趣味", "やりたいこと", "好きなこと", "興味"],
-    study: ["勉強", "学習", "資格", "スキル", "語学"],
-    moving: ["引っ越し", "住居", "家", "マンション", "一人暮らし"],
+    career: [
+      "仕事", "転職", "キャリア", "就職", "職場", "上司", "同僚", "残業", "給料",
+      "副業", "フリーランス", "起業", "独立", "昇進", "退職", "パワハラ", "会社",
+      "業務", "労働", "雇用",
+    ],
+    romance: [
+      "恋愛", "恋人", "彼氏", "彼女", "結婚", "パートナー", "出会い", "片思い", "別れ",
+      "好きな人", "ふられ", "浮気", "離婚", "不倫", "デート", "告白", "振る",
+    ],
+    money: [
+      "お金", "貯金", "投資", "ローン", "借金", "収入", "支出", "節約",
+      "副収入", "資産", "年収", "生活費", "クレカ", "奨学金", "財布", "家計",
+    ],
+    health: [
+      "健康", "病気", "ダイエット", "運動", "睡眠", "疲れ", "ストレス",
+      "メンタル", "うつ", "不眠", "太", "痩せ", "医者", "体重", "体調", "疲労",
+    ],
+    family: [
+      "家族", "親", "子供", "子育て", "育児", "夫婦", "兄弟", "姉妹",
+      "介護", "相続", "嫁", "姑", "義両親", "DV", "父", "母", "祖父", "祖母",
+    ],
+    future: [
+      "将来", "人生", "目標", "夢", "計画", "不安",
+      "生きがい", "このまま", "これから", "先が見えない", "方向性",
+    ],
+    hobby: [
+      "趣味", "やりたいこと", "好きなこと", "興味",
+      "ゲーム", "スポーツ", "音楽", "絵", "料理", "旅行", "創作",
+    ],
+    study: [
+      "勉強", "学習", "資格", "スキル", "語学",
+      "受験", "試験", "英語", "プログラミング", "読書", "大学",
+    ],
+    moving: [
+      "引っ越し", "住居", "家", "マンション", "一人暮らし",
+      "賃貸", "物件", "上京", "地元", "実家", "同棲",
+    ],
   };
 
+  let bestCategory = "other";
+  let bestScore = 0;
+
   for (const [category, words] of Object.entries(keywords)) {
-    if (words.some((word) => concern.includes(word))) {
-      return category;
+    const score = words.filter((word) => concern.includes(word)).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestCategory = category;
     }
   }
 
-  return "other";
+  return bestCategory;
 }
 
 /**

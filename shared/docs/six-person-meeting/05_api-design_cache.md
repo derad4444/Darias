@@ -1,19 +1,16 @@
 # API設計（Cloud Functions - キャッシュ優先版）
 
-## 🔧 Cloud Functions一覧
+> **最終更新**: 2026-03-13（TypeScript擬似コードから実装済みJSコードに全面更新）
+
+---
+
+## 🔧 実際のファイル構成
 
 ```
-functions/src/
-├── sixPersonMeeting/
-│   ├── generateOrReuseMeeting.ts    ← メイン関数（キャッシュ優先）
-│   ├── searchCache.ts               ← キャッシュ検索
-│   ├── searchDatabase.ts            ← 類似性格検索
-│   ├── calculateStats.ts            ← 統計計算
-│   ├── generateConversation.ts      ← 会話生成
-│   └── templates/
-│       ├── careerChange.ts          ← カテゴリ別テンプレート
-│       ├── romance.ts
-│       └── ...
+shared/functions/
+├── src/functions/generateSixPersonMeeting.js  ← メイン関数・全ロジック
+├── src/utils/sixPersonMeeting.js              ← 6人性格生成ユーティリティ
+└── src/prompts/sixPersonMeetingTemplates.js   ← 会議プロンプトテンプレート
 ```
 
 ---
@@ -21,694 +18,247 @@ functions/src/
 ## 📡 1. generateOrReuseMeeting（メイン関数 - キャッシュ優先）
 
 ### エンドポイント
-```typescript
-exports.generateOrReuseMeeting = functions
-  .region('asia-northeast1')
-  .https.onCall(async (data, context) => {
-    // キャッシュを最初に検索、ヒットしなければ新規生成
-  });
+
+```javascript
+exports.generateOrReuseMeeting = onCall(
+  {
+    region: "asia-northeast1",
+    memory: "1GiB",
+    timeoutSeconds: 300,
+  },
+  async (request) => { ... }
+);
 ```
 
 ### リクエスト
-```typescript
-interface GenerateMeetingRequest {
-  userId: string;
-  characterId: string;
-  concern: string;
-  concernCategory: string;  // 'career', 'romance', etc（必須）
+
+```javascript
+// request.data の型
+{
+  userId: string;         // Firebase Auth UID
+  characterId: string;    // キャラクターID
+  concern: string;        // ユーザーの悩み
+  concernCategory?: string; // 省略時はAIで自動判定
 }
 ```
 
 ### レスポンス
-```typescript
-interface GenerateMeetingResponse {
-  historyId: string;  // meeting_history のID
-  sharedMeetingId: string;  // shared_meetings のID
-  cacheHit: boolean;  // キャッシュヒットしたか
-  conversation: Conversation;
-  statsData: StatsData;
-  createdAt: Timestamp;
-}
-```
-
-### 実装（キャッシュ優先ロジック）
-
-```typescript
-import { OpenAI } from 'openai';
-import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
-
-const openai = new OpenAI({
-  apiKey: functions.config().openai.key
-});
-
-const db = admin.firestore();
-
-export const generateOrReuseMeeting = functions
-  .region('asia-northeast1')
-  .https.onCall(async (data: GenerateMeetingRequest, context) => {
-
-    // 1. 認証チェック
-    if (!context.auth) {
-      throw new functions.https.HttpsError(
-        'unauthenticated',
-        'ユーザー認証が必要です'
-      );
-    }
-
-    const userId = context.auth.uid;
-
-    // 2. プレミアムチェック
-    const isPremium = await checkPremiumStatus(userId);
-    if (!isPremium) {
-      const usageCount = await getMeetingUsageCount(userId, data.characterId);
-      if (usageCount >= 1) {
-        throw new functions.https.HttpsError(
-          'permission-denied',
-          '無料プランは1回のみです。プレミアムにアップグレードしてください。'
-        );
-      }
-    }
-
-    // 3. ユーザーのpersonalityKey取得
-    const characterDoc = await db
-      .collection('users').doc(userId)
-      .collection('characters').doc(data.characterId)
-      .collection('details').doc('current')
-      .get();
-
-    if (!characterDoc.exists) {
-      throw new functions.https.HttpsError(
-        'not-found',
-        'キャラクターデータが見つかりません'
-      );
-    }
-
-    const personalityKey = characterDoc.data()?.personalityKey as string;
-    const userBIG5 = characterDoc.data()?.confirmedBig5Scores;
-
-    if (!personalityKey || !userBIG5) {
-      throw new functions.https.HttpsError(
-        'failed-precondition',
-        'BIG5診断が完了していません'
-      );
-    }
-
-    // 4. 【最重要】キャッシュ検索
-    console.log(`🔍 Searching cache: ${personalityKey} + ${data.concernCategory}`);
-
-    const cacheQuery = await db.collection('shared_meetings')
-      .where('personalityKey', '==', personalityKey)
-      .where('concernCategory', '==', data.concernCategory)
-      .orderBy('usageCount', 'desc')
-      .limit(1)
-      .get();
-
-    let sharedMeetingId: string;
-    let cacheHit = false;
-    let conversation: any;
-    let statsData: any;
-
-    if (!cacheQuery.empty) {
-      // 5a. ✅ キャッシュヒット！
-      const cacheDoc = cacheQuery.docs[0];
-      sharedMeetingId = cacheDoc.id;
-      cacheHit = true;
-
-      const cacheData = cacheDoc.data();
-      conversation = cacheData.conversation;
-      statsData = cacheData.statsData;
-
-      // usageCount をインクリメント
-      await db.collection('shared_meetings').doc(sharedMeetingId).update({
-        usageCount: admin.firestore.FieldValue.increment(1),
-        lastUsedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      console.log(`✅ Cache HIT! (ID: ${sharedMeetingId}, usageCount: ${cacheData.usageCount + 1})`);
-
-    } else {
-      // 5b. ❌ キャッシュミス → 新規生成
-      console.log('⚠️ Cache MISS. Generating new meeting...');
-
-      // 類似性格検索
-      const similarKeys = await findSimilarPersonalityKeys(
-        userBIG5,
-        extractGender(personalityKey),
-        0.85
-      );
-
-      console.log(`Found ${similarKeys.length} similar personality keys`);
-
-      // 統計データ算出
-      statsData = await calculateStatsFromAnalysis(
-        similarKeys,
-        data.concernCategory
-      );
-
-      // 会話生成（テンプレート or AI）
-      conversation = await generateConversation({
-        concern: data.concern,
-        concernCategory: data.concernCategory,
-        userBIG5,
-        statsData
-      });
-
-      // shared_meetings に保存（キャッシュ化）
-      const sharedRef = await db.collection('shared_meetings').add({
-        personalityKey,
-        concernCategory: data.concernCategory,
-        concernSubcategory: extractSubcategory(data.concern),
-        concernKeywords: extractKeywords(data.concern),
-        conversation,
-        statsData,
-        usageCount: 1,
-        ratings: {
-          avgRating: 0.0,
-          totalRatings: 0,
-          distribution: { '5': 0, '4': 0, '3': 0, '2': 0, '1': 0 }
-        },
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUsedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      sharedMeetingId = sharedRef.id;
-
-      console.log(`✅ New meeting created and cached (ID: ${sharedMeetingId})`);
-    }
-
-    // 6. ユーザーの履歴に参照を保存
-    const historyRef = await db
-      .collection('users').doc(userId)
-      .collection('characters').doc(data.characterId)
-      .collection('meeting_history')
-      .add({
-        sharedMeetingId,
-        userConcern: data.concern,
-        userBIG5,
-        cacheHit,
-        createdAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-    // 7. 使用回数カウント（オプション）
-    await db.collection('users').doc(userId).update({
-      'usage_tracking.six_person_meeting_count': admin.firestore.FieldValue.increment(1),
-      'usage_tracking.last_meeting_date': new Date().toISOString().split('T')[0]
-    });
-
-    return {
-      historyId: historyRef.id,
-      sharedMeetingId,
-      cacheHit,
-      conversation,
-      statsData,
-      createdAt: new Date().toISOString()
-    };
-  });
-
-// ヘルパー関数
-async function checkPremiumStatus(userId: string): Promise<boolean> {
-  const userDoc = await db.collection('users').doc(userId).get();
-  return userDoc.data()?.subscription?.status === 'premium';
-}
-
-async function getMeetingUsageCount(userId: string, characterId: string): Promise<number> {
-  const snapshot = await db
-    .collection('users').doc(userId)
-    .collection('characters').doc(characterId)
-    .collection('meeting_history')
-    .count()
-    .get();
-  return snapshot.data().count;
-}
-
-function extractGender(personalityKey: string): string {
-  // "O4_C4_E2_A4_N3_female" → "female"
-  return personalityKey.split('_').pop() || '';
-}
-
-function extractSubcategory(concern: string): string {
-  // 簡易実装（実際はもっと高度な分類）
-  if (concern.includes('転職')) return 'career_change';
-  if (concern.includes('結婚')) return 'marriage';
-  if (concern.includes('お金')) return 'money';
-  return 'general';
-}
-
-function extractKeywords(concern: string): string[] {
-  // 簡易実装（実際は形態素解析など）
-  const keywords = concern.split(/[\s、。！？]+/)
-    .filter(word => word.length >= 2)
-    .slice(0, 5);
-  return keywords;
-}
-```
-
----
-
-## 🔍 2. findSimilarPersonalityKeys（類似性格検索）
-
-```typescript
-interface Big5Scores {
-  openness: number;
-  conscientiousness: number;
-  extraversion: number;
-  agreeableness: number;
-  neuroticism: number;
-}
-
-async function findSimilarPersonalityKeys(
-  userBIG5: Big5Scores,
-  userGender: string,
-  threshold: number = 0.85
-): Promise<string[]> {
-
-  // Big5Analysis コレクション全体をスキャン
-  const snapshot = await db.collection('Big5Analysis').get();
-
-  const similarKeys: string[] = [];
-
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
-    const big5Scores = data.big5_scores;
-
-    if (!big5Scores) continue;
-
-    // 類似度計算
-    const similarity = calculateSimilarity(userBIG5, big5Scores);
-
-    if (similarity >= threshold) {
-      const key = data.personality_key as string;
-
-      // 性別が一致する場合のみ（オプション）
-      if (key.endsWith(`_${userGender}`)) {
-        similarKeys.push(key);
-      }
-    }
-  }
-
-  console.log(`Found ${similarKeys.length} similar personalities (threshold: ${threshold})`);
-
-  return similarKeys;
-}
-
-function calculateSimilarity(a: Big5Scores, b: Big5Scores): number {
-  const diff =
-    Math.abs(a.openness - b.openness) +
-    Math.abs(a.conscientiousness - b.conscientiousness) +
-    Math.abs(a.extraversion - b.extraversion) +
-    Math.abs(a.agreeableness - b.agreeableness) +
-    Math.abs(a.neuroticism - b.neuroticism);
-
-  return 1.0 - (diff / 25.0);  // 0-1に正規化（5特性 × 5段階 = 最大差分25）
-}
-```
-
----
-
-## 📊 3. calculateStatsFromAnalysis（統計計算）
-
-```typescript
-interface StatsData {
-  sampleSize: number;
-  similarityThreshold: number;
-  referencedPersonalityKeys: string[];
-  results: Record<string, {
-    count: number;
-    avgSatisfaction: number;
-    percentage: number;
-  }>;
-  successPatterns: Array<{
-    pattern: string;
-    frequency: number;
-  }>;
-}
-
-async function calculateStatsFromAnalysis(
-  personalityKeys: string[],
-  concernCategory: string
-): Promise<StatsData> {
-
-  // 各personalityKeyの分析テキストを取得
-  const analyses: string[] = [];
-
-  for (const key of personalityKeys) {
-    const doc = await db.collection('Big5Analysis').doc(key).get();
-
-    if (doc.exists) {
-      const data = doc.data();
-
-      // concernCategory に応じた分析テキストを取得
-      let analysisText: string | undefined;
-      switch (concernCategory) {
-        case 'career':
-          analysisText = data?.career_analysis;
-          break;
-        case 'romance':
-          analysisText = data?.romance_analysis;
-          break;
-        case 'stress':
-          analysisText = data?.stress_analysis;
-          break;
-        case 'learning':
-          analysisText = data?.learning_analysis;
-          break;
-        case 'decision':
-          analysisText = data?.decision_analysis;
-          break;
-      }
-
-      if (analysisText) {
-        analyses.push(analysisText);
-      }
-    }
-  }
-
-  // テキスト分析でパターン抽出
-  const patterns = extractPatternsFromTexts(analyses, concernCategory);
-
-  // PersonalityStatsMetadata から各パターンの人数を取得
-  const metadataDoc = await db
-    .collection('PersonalityStatsMetadata')
-    .doc('summary')
-    .get();
-
-  const personalityCounts = metadataDoc.data()?.personality_counts as Record<string, number> || {};
-
-  const sampleSize = personalityKeys
-    .map(key => personalityCounts[key] || 0)
-    .reduce((sum, count) => sum + count, 0);
-
-  return {
-    sampleSize,
-    similarityThreshold: 0.85,
-    referencedPersonalityKeys: personalityKeys,
-    results: patterns.results,
-    successPatterns: patterns.successPatterns
-  };
-}
-
-function extractPatternsFromTexts(
-  texts: string[],
-  concernCategory: string
-): {
-  results: Record<string, any>;
-  successPatterns: Array<{ pattern: string; frequency: number }>;
-} {
-
-  // キーワード頻度分析
-  const keywords = concernCategory === 'career'
-    ? ['転職', 'スキルアップ', '準備', '慎重', '即決']
-    : concernCategory === 'romance'
-    ? ['結婚', '恋愛', 'パートナー', '自由', '安定']
-    : ['挑戦', '安定', '変化', '継続', 'バランス'];
-
-  const keywordCounts: Record<string, number> = {};
-
-  for (const text of texts) {
-    for (const keyword of keywords) {
-      if (text.includes(keyword)) {
-        keywordCounts[keyword] = (keywordCounts[keyword] || 0) + 1;
-      }
-    }
-  }
-
-  // 仮の結果データ（実際はもっと高度な分析が必要）
-  const results = {
-    positive_action: {
-      count: Math.floor(texts.length * 0.6),
-      avgSatisfaction: 7.5,
-      percentage: 0.6
-    },
-    stayed: {
-      count: Math.floor(texts.length * 0.4),
-      avgSatisfaction: 6.8,
-      percentage: 0.4
-    }
-  };
-
-  const successPatterns = Object.entries(keywordCounts)
-    .map(([keyword, count]) => ({
-      pattern: keyword,
-      frequency: count / texts.length
-    }))
-    .sort((a, b) => b.frequency - a.frequency)
-    .slice(0, 5);
-
-  return { results, successPatterns };
-}
-```
-
----
-
-## 💬 4. generateConversation（会話生成）
-
-```typescript
-async function generateConversation(params: {
-  concern: string;
-  concernCategory: string;
-  userBIG5: Big5Scores;
-  statsData: StatsData;
-}): Promise<any> {
-
-  // 100% AI生成（GPT-4o-mini）
-  if (false) {  // テンプレート分岐は廃止済み
-    // テンプレート使用
-    const template = await selectTemplate(params.concernCategory, params.userBIG5);
-
-    // 変数を置換
-    const rounds = template.rounds.map(round => ({
-      roundNumber: round.roundNumber,
-      messages: round.messages.map(msg => ({
-        speaker: msg.speaker,
-        text: replaceVariables(msg.template, {
-          sampleSize: params.statsData.sampleSize.toString(),
-          satisfactionRate: (params.statsData.results.positive_action?.percentage * 100).toFixed(0)
-        }),
-        emotion: msg.emotion
-      }))
-    }));
-
-    // 結論のみAI生成
-    const conclusion = await generateConclusionWithAI(params);
-
-    return {
-      generationType: 'template',
-      rounds,
-      conclusion
-    };
-
-  } else {
-    // 完全AI生成
-    return await generateFullConversationWithAI(params);
-  }
-}
-
-function replaceVariables(template: string, variables: Record<string, string>): string {
-  let result = template;
-  for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(`{${key}}`, value);
-  }
-  return result;
-}
-
-async function generateConclusionWithAI(params: {
-  concern: string;
-  statsData: StatsData;
-}): Promise<any> {
-
-  const prompt = `
-ユーザーの悩み: ${params.concern}
-
-統計データ:
-- サンプル数: ${params.statsData.sampleSize}人
-- 結果: ${JSON.stringify(params.statsData.results)}
-- 成功パターン: ${params.statsData.successPatterns.map(p => p.pattern).join(', ')}
-
-6人の会話を踏まえて、以下の形式で結論を生成してください:
-
-1. 要約（50文字以内）
-2. 具体的な推奨アクション（3つ）
-3. 投票結果（6人のうち誰がどの立場か）
-`;
-
-  const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: '6人会議の結論を生成するアシスタントです。データに基づいた具体的なアドバイスを提供します。'
-      },
-      { role: 'user', content: prompt }
-    ],
-    max_tokens: 500,
-    temperature: 0.7
-  });
-
-  const conclusionText = response.choices[0].message.content || '';
-
-  // 簡易的にパース（実際はもっと構造化された生成が必要）
-  return {
-    summary: conclusionText.substring(0, 100),
-    recommendations: [
-      '3ヶ月の準備期間を設ける',
-      '最低5社は面接を受ける',
-      '転職前にスキルアップ'
-    ],
-    votes: {
-      should_change: ['opposite', 'child'],
-      should_consider: ['original', 'ideal', 'wise'],
-      should_not_change: ['shadow']
-    }
-  };
-}
-
-async function selectTemplate(
-  concernCategory: string,
-  userBIG5: Big5Scores
-): Promise<any> {
-
-  // テンプレートコレクションから検索
-  const templates = await db
-    .collection('meeting_templates')
-    .where('category', '==', concernCategory)
-    .orderBy('priority', 'desc')
-    .limit(10)
-    .get();
-
-  // BIG5条件に合致するテンプレートを選択
-  for (const doc of templates.docs) {
-    const template = doc.data();
-    const conditions = template.conditions;
-
-    // BIG5範囲チェック
-    if (conditions.big5Range) {
-      let match = true;
-      for (const [trait, range] of Object.entries(conditions.big5Range)) {
-        const userValue = userBIG5[trait as keyof Big5Scores];
-        if (userValue < range.min || userValue > range.max) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
-        return template;
-      }
-    }
-  }
-
-  // デフォルトテンプレート
-  return templates.docs[0]?.data() || getDefaultTemplate(concernCategory);
-}
-
-function getDefaultTemplate(category: string): any {
-  // デフォルトテンプレートを返す
-  return {
-    rounds: [
-      {
-        roundNumber: 1,
-        messages: [
-          { speaker: 'original', template: 'データを見ると、{sampleSize}人の類似ケースがあります', emotion: '😟' },
-          { speaker: 'opposite', template: '考えすぎ！今すぐ行動しよう！', emotion: '😄' },
-          { speaker: 'wise', template: '長期的に考えましょう', emotion: '😌' }
-        ]
-      }
-    ]
-  };
-}
-```
-
----
-
-## 📈 5. キャッシュ効果の測定
-
-### ログ収集
-
-```typescript
-// Cloud Functionsで自動的にログ
-console.log({
-  event: 'meeting_generation',
-  cacheHit,
-  personalityKey,
-  concernCategory,
-  sharedMeetingId,
-  usageCount: cacheHit ? cacheData.usageCount + 1 : 1,
-  responseTime: Date.now() - startTime
-});
-```
-
-### BigQuery エクスポート（オプション）
 
 ```javascript
-// Firebase Console → Logs → BigQuery連携
-// 自動でログがBigQueryに送られる
+{
+  success: true,
+  meetingId: string,    // shared_meetings のID
+  conversation: Conversation,
+  statsData: StatsData,
+  cacheHit: boolean,
+  usageCount: number,   // 会議の総利用回数（+1済み）
+  duration: number,     // 処理時間(ms)
+}
+```
 
-SELECT
-  DATE(timestamp) as date,
-  COUNTIF(jsonPayload.cacheHit = true) / COUNT(*) as cache_hit_rate,
-  AVG(jsonPayload.responseTime) as avg_response_time_ms,
-  SUM(CASE WHEN jsonPayload.cacheHit = false THEN 0.12 ELSE 0 END) as total_cost_jpy
-FROM
-  `project.dataset.cloud_functions_logs`
-WHERE
-  jsonPayload.event = 'meeting_generation'
-GROUP BY
-  date
-ORDER BY
-  date DESC
+### 処理フロー
+
+```
+1. 認証チェック (request.auth)
+2. プレミアムステータス確認（subscription/current ドキュメント）
+3. 利用制限チェック
+   - 無料ユーザー: meeting_history の件数 >= 1 → エラー
+   - プレミアムユーザー: usage_tracking.meeting_count_this_month >= 30 → エラー
+4. キャラクターデータ取得（details/current: big5, gender, personalityKey, sixPersonalities）
+5. カテゴリ判定（concernCategory が未指定の場合 gpt-4o-mini で AI判定）
+6. 閲覧履歴取得（meeting_history から sharedMeetingId のリスト）
+7. キャッシュ検索（personalityKey のみで検索、閲覧済みを除外）
+8a. キャッシュヒット → 既存会議データを取得、usageCount をインクリメント
+8b. キャッシュミス → AI生成（gpt-4o-2024-11-20）、shared_meetings に保存
+9. meeting_history にユーザー別履歴を保存
+10. プレミアムユーザーの月間カウントをインクリメント
+11. レスポンス返却
 ```
 
 ---
 
-## 🔐 6. セキュリティ考慮事項
+## 🤖 2. detectConcernCategoryWithAI（カテゴリ自動判定）
 
-```typescript
-// レート制限
-const MAX_REQUESTS_PER_HOUR = 50;
+キャッシュミス時に `concernCategory` が未指定の場合のみ呼ばれる。
 
-async function checkRateLimit(userId: string): Promise<void> {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+```javascript
+const VALID_CATEGORIES = [
+  "career", "romance", "money", "health",
+  "family", "future", "hobby", "study", "moving", "other",
+];
 
-  const recentRequests = await db
-    .collection('users').doc(userId)
-    .collection('characters').doc('default')
-    .collection('meeting_history')
-    .where('createdAt', '>', oneHourAgo)
-    .count()
+async function detectConcernCategoryWithAI(concern, openai) {
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    messages: [{
+      role: "user",
+      content: `次の悩みを最も適切なカテゴリ1つに分類してください。\n悩み: "${concern}"\n...`
+    }],
+    max_tokens: 20,
+    temperature: 0,
+  });
+  const result = completion.choices[0].message.content.trim().toLowerCase();
+  return VALID_CATEGORIES.includes(result) ? result : "other";
+}
+```
+
+**特徴:**
+- temperature=0 で安定した判定
+- max_tokens=20 でコスト最小化（カテゴリIDのみ出力）
+- エラー時は "other" にフォールバック
+- カテゴリはキャッシュには影響しない（記録用のみ）
+
+---
+
+## 🗄️ 3. キャッシュ検索ロジック
+
+```javascript
+async function searchMeetingCache(personalityKey, excludeIds = []) {
+  const cacheQuery = await db
+    .collection("shared_meetings")
+    .where("personalityKey", "==", personalityKey)
+    .orderBy("usageCount", "desc")
     .get();
 
-  if (recentRequests.data().count >= MAX_REQUESTS_PER_HOUR) {
-    throw new functions.https.HttpsError(
-      'resource-exhausted',
-      'リクエスト制限に達しました。1時間後に再度お試しください。'
-    );
+  // 除外リスト（閲覧済み）に含まれていない最初のドキュメントを返す
+  for (const doc of cacheQuery.docs) {
+    if (!excludeIds.includes(doc.id)) {
+      return { id: doc.id, ...doc.data() };
+    }
   }
+  return null; // 全部除外済みならnull（新規生成）
+}
+```
+
+**重要な設計:**
+- `personalityKey` **のみ**でキャッシュ検索（カテゴリ非依存）
+- 同じ性格タイプなら悩みのカテゴリが異なっても再利用
+- 利用回数（`usageCount`）が多い会議を優先
+- 閲覧済みIDは除外して毎回新鮮なコンテンツを提供
+
+---
+
+## 💬 4. 会議生成（AI 100%生成）
+
+```javascript
+async function generateConversationWithAI(concern, category, personalities, statsData) {
+  const openai = getOpenAIClient(apiKey);
+  const prompt = createMeetingPrompt(concern, category, personalities, statsData);
+
+  const completion = await safeOpenAICall(
+    openai.chat.completions.create.bind(openai.chat.completions),
+    {
+      model: "gpt-4o-2024-11-20",
+      messages: [
+        {
+          role: "system",
+          content: "You are a JSON generator. Always respond with valid JSON only, no explanations or markdown."
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.8,
+      max_tokens: 3000,
+      response_format: { type: "json_object" },  // JSON強制
+    },
+  );
+
+  const content = completion.choices[0].message.content.trim();
+  return JSON.parse(content);
+}
+```
+
+**特徴:**
+- `response_format: { type: "json_object" }` でJSON出力を強制（AI がテキストで返すバグ防止）
+- systemプロンプトでJSON専用アシスタントとして定義
+- マークダウン記法（```json）除去ロジックも実装済み
+
+---
+
+## 🔒 5. 利用制限
+
+### 無料ユーザー（生涯1回）
+
+```javascript
+// meeting_history の件数で判定
+const usageCount = await getMeetingUsageCount(userId, characterId);
+if (usageCount >= 1) {
+  throw new HttpsError("resource-exhausted", "無料ユーザーは1回のみ...");
+}
+```
+
+### プレミアムユーザー（月30回）
+
+```javascript
+// users/{userId}.usage_tracking で月間カウント管理
+async function checkMonthlyMeetingCount(userId) {
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const userDoc = await db.collection("users").doc(userId).get();
+  const usageTracking = userDoc.data()?.usage_tracking || {};
+  const lastMonth = usageTracking.last_meeting_month || "";
+  // 月が変わったらカウントリセット
+  const count = lastMonth === currentMonth ? (usageTracking.meeting_count_this_month || 0) : 0;
+  return { count, currentMonth };
 }
 
-// 入力検証
-function validateInput(data: GenerateMeetingRequest): void {
-  if (!data.concern || data.concern.length < 5) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      '悩みは5文字以上で入力してください'
-    );
-  }
-
-  if (data.concern.length > 500) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      '悩みは500文字以内で入力してください'
-    );
-  }
-
-  const validCategories = ['career', 'romance', 'stress', 'learning', 'decision'];
-  if (!validCategories.includes(data.concernCategory)) {
-    throw new functions.https.HttpsError(
-      'invalid-argument',
-      '無効なカテゴリです'
-    );
-  }
+// 利用後にインクリメント
+async function incrementMonthlyMeetingCount(userId) {
+  const { count, currentMonth } = await checkMonthlyMeetingCount(userId);
+  await db.collection("users").doc(userId).update({
+    "usage_tracking.meeting_count_this_month": count + 1,
+    "usage_tracking.last_meeting_month": currentMonth,
+  });
 }
+```
+
+---
+
+## 📊 6. Firestore 書き込みパターン
+
+### キャッシュミス時（新規生成）
+
+```
+shared_meetings/{id}
+├── personalityKey: "O3_C3_E3_A4_N3_男性"
+├── concernCategory: "career"  // 記録用（キャッシュマッチには使わない）
+├── conversation: { rounds, conclusion }
+├── statsData: { similarCount, totalUsers, ... }
+├── usageCount: 1
+├── ratings: { avgRating: 0, totalRatings: 0, ratingSum: 0 }
+├── createdAt: Timestamp
+└── lastUsedAt: Timestamp
+
+users/{userId}/characters/{characterId}/meeting_history/{id}
+├── sharedMeetingId: "..."
+├── userConcern: "転職どうしよう"
+├── concernCategory: "career"
+├── userBIG5: { openness: 3, ... }
+├── cacheHit: false
+└── createdAt: Timestamp
+```
+
+### キャッシュヒット時
+
+```
+shared_meetings/{id}（update）
+├── usageCount: +1
+└── lastUsedAt: Timestamp（更新）
+
+users/{userId}/characters/{characterId}/meeting_history/{id}（add）
+└── （上記と同じ、cacheHit: true）
+```
+
+---
+
+## 📈 7. キャッシュ効果の測定
+
+Cloud Functions ログから確認可能:
+
+```javascript
+logger.info("Meeting generation completed", {
+  duration,
+  cacheHit,       // true/false
+  sharedMeetingId,
+});
 ```
 
 ---
@@ -718,33 +268,22 @@ function validateInput(data: GenerateMeetingRequest): void {
 ### キャッシュ優先ロジックの利点
 
 ```
-✅ 1. コスト削減: 80%削減（3ヶ月後）
-✅ 2. 高速化: 3-5秒 → 0.5秒
-✅ 3. スケーラビリティ: ユーザー増加でヒット率向上
-✅ 4. 品質管理: ratings で評価を追跡（avgRating / totalRatings / ratingSum）
-✅ 5. 運用効率: キャッシュ数は最大890件程度
+✅ 1. コスト削減: キャッシュヒットで1.63円→0円
+✅ 2. 高速化: AI生成(30-60秒) → キャッシュ返却(数秒)
+✅ 3. カテゴリ非依存: 同性格タイプなら悩みに関わらず再利用
+✅ 4. 閲覧除外: 同じユーザーに同じ会議を見せない
+✅ 5. 品質管理: ratings で評価を追跡
 ```
 
-### 実装の優先順位
+### 実装済み機能
 
 ```
-Phase 1（MVP）
-✅ キャッシュ検索ロジック
-✅ shared_meetings への保存
-✅ meeting_history への参照保存
-✅ 基本的なテンプレート（30パターン）
-
-Phase 2
-✅ キャッシュヒット率の測定
-✅ ratings機能
-✅ テンプレート拡充（100パターン）
-
-Phase 3
-✅ 高度な分析
-✅ 自動最適化
-✅ プリウォーミング
+✅ personalityKey のみでキャッシュ（カテゴリ非依存）
+✅ 閲覧済み会議の除外（meeting_history で管理）
+✅ gpt-4o-2024-11-20 で会議生成
+✅ gpt-4o-mini でカテゴリ自動判定
+✅ response_format: json_object でJSON強制出力
+✅ 無料ユーザー: 生涯1回制限
+✅ プレミアムユーザー: 月30回制限（usage_tracking で管理）
+✅ 毎日3時のバックフィルスケジューラ（sixPersonalities補完）
 ```
-
----
-
-次のステップ: 実装ロードマップ (`07_implementation.md`)

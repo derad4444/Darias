@@ -8,9 +8,7 @@ import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/main/main_shell_screen.dart';
-import '../screens/home/home_screen.dart';
 import '../screens/character/character_select_screen.dart';
-import '../screens/chat/chat_screen.dart';
 import '../screens/big5/big5_diagnosis_screen.dart';
 import '../screens/todo/todo_list_screen.dart';
 import '../screens/todo/todo_detail_screen.dart';
@@ -22,27 +20,15 @@ import '../screens/memo/memo_detail_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
 import '../screens/settings/settings_screen.dart';
-import '../screens/settings/profile_edit_screen.dart';
 import '../screens/settings/notification_settings_screen.dart';
 import '../screens/settings/theme_settings_screen.dart';
-import '../screens/settings/help_screen.dart';
 import '../screens/settings/data_export_screen.dart';
-import '../screens/onboarding/onboarding_screen.dart';
-import '../screens/statistics/statistics_screen.dart';
-import '../screens/search/search_screen.dart';
-import '../screens/big5/big5_results_screen.dart';
-import '../screens/settings/data_import_screen.dart';
 import '../screens/character/character_detail_screen.dart';
 import '../screens/settings/feedback_screen.dart';
-import '../screens/settings/privacy_settings_screen.dart';
-import '../screens/settings/about_screen.dart';
-import '../screens/auth/change_password_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/settings/tag_management_screen.dart';
 import '../screens/history/unified_history_screen.dart';
-import '../screens/meeting/character_explanation_screen.dart';
 import '../screens/settings/volume_settings_screen.dart';
-import '../screens/settings/font_settings_screen.dart';
 
 /// ルーター設定
 final routerProvider = Provider<GoRouter>((ref) {
@@ -90,13 +76,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/character-select',
         name: 'character-select',
         builder: (context, state) => const CharacterSelectScreen(),
-      ),
-
-      // チャット
-      GoRoute(
-        path: '/chat',
-        name: 'chat',
-        builder: (context, state) => const ChatScreen(),
       ),
 
       // BIG5診断
@@ -199,13 +178,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsScreen(),
       ),
 
-      // プロフィール編集
-      GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const ProfileEditScreen(),
-      ),
-
       // 通知設定
       GoRoute(
         path: '/notification-settings',
@@ -220,13 +192,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ThemeSettingsScreen(),
       ),
 
-      // ヘルプ
-      GoRoute(
-        path: '/help',
-        name: 'help',
-        builder: (context, state) => const HelpScreen(),
-      ),
-
       // プレミアムアップグレード
       GoRoute(
         path: '/premium',
@@ -234,46 +199,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PremiumUpgradeScreen(),
       ),
 
-      // オンボーディング
-      GoRoute(
-        path: '/onboarding',
-        name: 'onboarding',
-        builder: (context, state) => const OnboardingScreen(),
-      ),
-
-      // 統計
-      GoRoute(
-        path: '/statistics',
-        name: 'statistics',
-        builder: (context, state) => const StatisticsScreen(),
-      ),
-
-      // 検索
-      GoRoute(
-        path: '/search',
-        name: 'search',
-        builder: (context, state) => const SearchScreen(),
-      ),
-
       // データエクスポート
       GoRoute(
         path: '/data-export',
         name: 'data-export',
         builder: (context, state) => const DataExportScreen(),
-      ),
-
-      // BIG5診断結果
-      GoRoute(
-        path: '/big5/results',
-        name: 'big5-results',
-        builder: (context, state) => const Big5ResultsScreen(),
-      ),
-
-      // データインポート
-      GoRoute(
-        path: '/data-import',
-        name: 'data-import',
-        builder: (context, state) => const DataImportScreen(),
       ),
 
       // キャラクター詳細
@@ -291,27 +221,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/feedback',
         name: 'feedback',
         builder: (context, state) => const FeedbackScreen(),
-      ),
-
-      // プライバシー設定
-      GoRoute(
-        path: '/privacy-settings',
-        name: 'privacy-settings',
-        builder: (context, state) => const PrivacySettingsScreen(),
-      ),
-
-      // アバウト
-      GoRoute(
-        path: '/about',
-        name: 'about',
-        builder: (context, state) => const AboutScreen(),
-      ),
-
-      // パスワード変更
-      GoRoute(
-        path: '/change-password',
-        name: 'change-password',
-        builder: (context, state) => const ChangePasswordScreen(),
       ),
 
       // パスワードリセット
@@ -339,13 +248,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // キャラクター説明
-      GoRoute(
-        path: '/character-explanation',
-        name: 'character-explanation',
-        builder: (context, state) => const CharacterExplanationScreen(),
-      ),
-
       // 音量設定
       GoRoute(
         path: '/volume-settings',
@@ -353,12 +255,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const VolumeSettingsScreen(),
       ),
 
-      // フォント設定
-      GoRoute(
-        path: '/font-settings',
-        name: 'font-settings',
-        builder: (context, state) => const FontSettingsScreen(),
-      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       body: Center(

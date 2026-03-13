@@ -38,7 +38,9 @@
 - **subscriptionStatus**: `string` - サブスクリプション状態 (`"premium"` / `"free"`)。`subscription/current` と同期。Cloud Functions・iOS PurchaseManager が書き込み
 - **hasCompletedOnboarding**: `boolean` - オンボーディング完了フラグ
 - **characterGender**: `string` - キャラクター性別
-- ~~**usage_tracking**~~: *(未使用 / 廃止予定)* かつて日次チャット回数追跡に利用する想定だったが、現在の Cloud Function・クライアントどちらも更新していない。実質的に空 or 存在しないドキュメントがほとんど。
+- **usage_tracking**: `map` - 会議機能の利用回数追跡（プレミアムユーザーのみ書き込み）
+  - **meeting_count_this_month**: `number` - 今月の会議利用回数
+  - **last_meeting_month**: `string` - 最後に会議を利用した月（YYYY-MM形式）。現在月と異なる場合はカウントをリセット
 
 **アクセス権限**: ユーザー自身のデータのみ読み書き可
 
@@ -145,7 +147,8 @@
 
 **備考:**
 - メモ・タスク・予定の検出メッセージは `posts` に保存されない（各コレクションに直接保存）
-- 書き込みは `generateCharacterReply` Cloud Function が通常チャット返答時のみ行う
+- 書き込みは Dart クライアント（ChatDatasource）が通常チャット返答後に行う
+- メモ/タスク/スケジュールキーワード検出時は `posts` に保存されず、それぞれのコレクション（memos/todos/schedules）に直接保存される
 
 #### `users/{userId}/characters/{characterId}/meeting_history`
 
@@ -601,5 +604,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-03-07（usage_tracking 廃止予定に更新・posts フィールド詳細追加）
+**最終更新**: 2026-03-13（usage_tracking を会議月間追跡フィールドとして復活・posts 保存ロジック詳細化）
 **作成者**: Claude Code
