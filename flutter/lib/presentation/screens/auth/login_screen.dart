@@ -42,6 +42,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/');
       }
     } catch (e) {
+      debugPrint('Login error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = _getErrorMessage(e);

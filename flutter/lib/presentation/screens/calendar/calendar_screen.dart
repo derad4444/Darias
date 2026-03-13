@@ -147,144 +147,140 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         child: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: Stack(
+          child: Column(
             children: [
-              Column(
-                children: [
-                  // ヘッダー（検索モードと通常モードで切り替え）
-                  if (isSearchMode)
-                    _SearchHeader(
-                      controller: _searchController,
-                      accentColor: accentColor,
-                      textColor: textColor,
-                      onClose: () {
-                        ref.read(calendarSearchModeProvider.notifier).state = false;
-                        ref.read(calendarSearchTextProvider.notifier).state = '';
-                        _searchController.clear();
-                      },
-                      onChanged: (value) {
-                        ref.read(calendarSearchTextProvider.notifier).state = value;
-                      },
-                    )
-                  else
-                    _CalendarHeader(
-                      month: selectedMonth,
-                      accentColor: accentColor,
-                      textColor: textColor,
-                      backgroundGradient: backgroundGradient,
-                      onPreviousMonth: () =>
-                          ref.read(calendarControllerProvider.notifier).previousMonth(),
-                      onNextMonth: () =>
-                          ref.read(calendarControllerProvider.notifier).nextMonth(),
-                      onTodayTap: () =>
-                          ref.read(calendarControllerProvider.notifier).goToToday(),
-                      onSearchTap: () {
-                        ref.read(calendarSearchModeProvider.notifier).state = true;
-                      },
-                      onYearMonthSelected: (year, month) {
-                        ref.read(calendarControllerProvider.notifier).goToMonth(year, month);
-                      },
-                    ),
+              // ヘッダー（検索モードと通常モードで切り替え）
+              if (isSearchMode)
+                _SearchHeader(
+                  controller: _searchController,
+                  accentColor: accentColor,
+                  textColor: textColor,
+                  onClose: () {
+                    ref.read(calendarSearchModeProvider.notifier).state = false;
+                    ref.read(calendarSearchTextProvider.notifier).state = '';
+                    _searchController.clear();
+                  },
+                  onChanged: (value) {
+                    ref.read(calendarSearchTextProvider.notifier).state = value;
+                  },
+                )
+              else
+                _CalendarHeader(
+                  month: selectedMonth,
+                  accentColor: accentColor,
+                  textColor: textColor,
+                  backgroundGradient: backgroundGradient,
+                  onPreviousMonth: () =>
+                      ref.read(calendarControllerProvider.notifier).previousMonth(),
+                  onNextMonth: () =>
+                      ref.read(calendarControllerProvider.notifier).nextMonth(),
+                  onTodayTap: () =>
+                      ref.read(calendarControllerProvider.notifier).goToToday(),
+                  onSearchTap: () {
+                    ref.read(calendarSearchModeProvider.notifier).state = true;
+                  },
+                  onYearMonthSelected: (year, month) {
+                    ref.read(calendarControllerProvider.notifier).goToMonth(year, month);
+                  },
+                ),
 
-                  // 検索モードの場合は検索結果を表示
-                  if (isSearchMode)
-                    Expanded(
-                      child: _SearchResults(
-                        schedules: filteredSchedules,
-                        searchText: searchText,
+              // 検索モードの場合は検索結果を表示
+              if (isSearchMode)
+                Expanded(
+                  child: _SearchResults(
+                    schedules: filteredSchedules,
+                    searchText: searchText,
+                    accentColor: accentColor,
+                    onScheduleTap: (schedule) {
+                      ref.read(calendarSearchModeProvider.notifier).state = false;
+                      ref.read(calendarSearchTextProvider.notifier).state = '';
+                      _searchController.clear();
+                      ref.read(calendarControllerProvider.notifier).changeMonth(schedule.startDate);
+                      ref.read(selectedDayProvider.notifier).state = schedule.startDate;
+                    },
+                  ),
+                )
+              else ...[
+                // カレンダーグリッド
+                Expanded(
+                  child: schedulesAsync.when(
+                    data: (schedules) => holidaysAsync.when(
+                      data: (holidays) => _CalendarGrid(
+                        month: selectedMonth,
+                        selectedDay: selectedDay,
+                        schedules: schedules,
+                        holidays: holidays,
                         accentColor: accentColor,
-                        onScheduleTap: (schedule) {
-                          ref.read(calendarSearchModeProvider.notifier).state = false;
-                          ref.read(calendarSearchTextProvider.notifier).state = '';
-                          _searchController.clear();
-                          ref.read(calendarControllerProvider.notifier).changeMonth(schedule.startDate);
-                          ref.read(selectedDayProvider.notifier).state = schedule.startDate;
+                        textColor: textColor,
+                        onDaySelected: (day) {
+                          ref.read(calendarControllerProvider.notifier).selectDay(day);
+                          _showScheduleBottomSheet(
+                            context,
+                            ref,
+                            day,
+                            accentColor,
+                            textColor,
+                          );
                         },
                       ),
-                    )
-                  else ...[
-                    // カレンダーグリッド（iOS版と同様に大きく表示）
-                    Expanded(
-                      child: schedulesAsync.when(
-                        data: (schedules) => holidaysAsync.when(
-                          data: (holidays) => _CalendarGrid(
-                            month: selectedMonth,
-                            selectedDay: selectedDay,
-                            schedules: schedules,
-                            holidays: holidays,
-                            accentColor: accentColor,
-                            textColor: textColor,
-                            onDaySelected: (day) {
-                              ref.read(calendarControllerProvider.notifier).selectDay(day);
-                              // iOS版と同様にボトムシートを表示
-                              _showScheduleBottomSheet(
-                                context,
-                                ref,
-                                day,
-                                accentColor,
-                                textColor,
-                              );
-                            },
-                          ),
-                          loading: () => _CalendarGrid(
-                            month: selectedMonth,
-                            selectedDay: selectedDay,
-                            schedules: schedules,
-                            holidays: const [],
-                            accentColor: accentColor,
-                            textColor: textColor,
-                            onDaySelected: (day) {
-                              ref.read(calendarControllerProvider.notifier).selectDay(day);
-                              _showScheduleBottomSheet(
-                                context,
-                                ref,
-                                day,
-                                accentColor,
-                                textColor,
-                              );
-                            },
-                          ),
-                          error: (e, st) => _CalendarGrid(
-                            month: selectedMonth,
-                            selectedDay: selectedDay,
-                            schedules: schedules,
-                            holidays: const [],
-                            accentColor: accentColor,
-                            textColor: textColor,
-                            onDaySelected: (day) {
-                              ref.read(calendarControllerProvider.notifier).selectDay(day);
-                              _showScheduleBottomSheet(
-                                context,
-                                ref,
-                                day,
-                                accentColor,
-                                textColor,
-                              );
-                            },
-                          ),
-                        ),
-                        loading: () => const Center(child: CircularProgressIndicator()),
-                        error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
+                      loading: () => _CalendarGrid(
+                        month: selectedMonth,
+                        selectedDay: selectedDay,
+                        schedules: schedules,
+                        holidays: const [],
+                        accentColor: accentColor,
+                        textColor: textColor,
+                        onDaySelected: (day) {
+                          ref.read(calendarControllerProvider.notifier).selectDay(day);
+                          _showScheduleBottomSheet(
+                            context,
+                            ref,
+                            day,
+                            accentColor,
+                            textColor,
+                          );
+                        },
+                      ),
+                      error: (e, st) => _CalendarGrid(
+                        month: selectedMonth,
+                        selectedDay: selectedDay,
+                        schedules: schedules,
+                        holidays: const [],
+                        accentColor: accentColor,
+                        textColor: textColor,
+                        onDaySelected: (day) {
+                          ref.read(calendarControllerProvider.notifier).selectDay(day);
+                          _showScheduleBottomSheet(
+                            context,
+                            ref,
+                            day,
+                            accentColor,
+                            textColor,
+                          );
+                        },
                       ),
                     ),
-                  ],
-                ],
-              ),
-
-              // キャラクターと月次コメント（iOS版と同様に下部に配置）
-              if (!isSearchMode)
-                Positioned(
-                  left: -20,
-                  bottom: 10,
-                  child: _CharacterWithComment(
-                    monthlyComment: monthlyCommentAsync.when(
-                      data: (comment) => comment,
-                      loading: () => '今月のひとことを読み込み中...',
-                      error: (e, st) => '今月もあなたらしく過ごしてください',
-                    ),
-                    isLoading: monthlyCommentAsync.isLoading,
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
                   ),
                 ),
+
+                // キャラクターと月次コメント（カレンダー下に専用エリアを確保）
+                SizedBox(
+                  height: 160,
+                  child: Transform.translate(
+                    offset: const Offset(-20, 0),
+                    child: _CharacterWithComment(
+                      monthlyComment: monthlyCommentAsync.when(
+                        data: (comment) => comment,
+                        loading: () => '今月のひとことを読み込み中...',
+                        error: (e, st) => '今月もあなたらしく過ごしてください',
+                      ),
+                      isLoading: monthlyCommentAsync.isLoading,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -1178,6 +1174,17 @@ class _CalendarGrid extends ConsumerWidget {
           bool isInMonth(DateTime d) =>
               d.year == month.year && d.month == month.month;
 
+          // 表示週数を計算して行の高さを動的に算出
+          // 常に6行固定でサイズ計算（5週・6週で表示サイズを統一）
+          const weekCount = 6;
+          final rowHeight = constraints.maxHeight / weekCount;
+          // 日付円のサイズ: 行の高さの35%（18〜28px）
+          final dateCircleSize = (rowHeight * 0.35).clamp(18.0, 28.0);
+          // セルのmargin(1px*2)を引いた予定エリアの高さ
+          final scheduleAreaHeight = rowHeight - 2 - dateCircleSize;
+          // 予定バーのフォントサイズ: 予定エリア÷4（8〜11px）
+          final itemFontSize = (scheduleAreaHeight / 4 - 2).clamp(8.0, 11.0);
+
           final List<Widget> rows = [];
 
           for (int week = 0; week < 6; week++) {
@@ -1226,6 +1233,9 @@ class _CalendarGrid extends ConsumerWidget {
                     accentColor: accentColor,
                     textColor: textColor,
                     tags: tags,
+                    dateCircleSize: dateCircleSize,
+                    itemFontSize: itemFontSize,
+                    scheduleAreaHeight: scheduleAreaHeight,
                     onTap: () => onDaySelected(date),
                   ),
                 ));
@@ -1235,7 +1245,7 @@ class _CalendarGrid extends ConsumerWidget {
             // 複数日予定のオーバーレイバー
             const barH = 14.0;
             const barGap = 2.0;
-            const dateAreaH = 32.0; // SizedBox(2) + Container(28) + 2
+            final dateAreaH = dateCircleSize + 1; // dateCircle + margin
 
             final List<Widget> bars = [];
             for (int slot = 0; slot < multiDaySchedules.length; slot++) {
@@ -1287,11 +1297,15 @@ class _CalendarGrid extends ConsumerWidget {
               ));
             }
 
-            rows.add(Expanded(
+            rows.add(SizedBox(
+              height: rowHeight,
               child: Stack(
-                clipBehavior: Clip.none,
+                clipBehavior: Clip.hardEdge,
                 children: [
-                  Row(children: cells),
+                  SizedBox(
+                    height: rowHeight,
+                    child: Row(children: cells),
+                  ),
                   ...bars,
                 ],
               ),
@@ -1316,6 +1330,9 @@ class _CalendarDayCell extends StatelessWidget {
   final Color accentColor;
   final Color textColor;
   final List<TagItem> tags;
+  final double dateCircleSize;
+  final double itemFontSize;
+  final double scheduleAreaHeight;
   final VoidCallback onTap;
 
   const _CalendarDayCell({
@@ -1328,6 +1345,9 @@ class _CalendarDayCell extends StatelessWidget {
     required this.accentColor,
     required this.textColor,
     required this.tags,
+    required this.dateCircleSize,
+    required this.itemFontSize,
+    required this.scheduleAreaHeight,
     required this.onTap,
   });
 
@@ -1355,13 +1375,14 @@ class _CalendarDayCell extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         margin: const EdgeInsets.all(1),
+        clipBehavior: Clip.hardEdge,
+        decoration: const BoxDecoration(),
         child: Column(
           children: [
-            // 日付（iOS版と同様に円形）
-            const SizedBox(height: 2),
+            // 日付（円形）
             Container(
-              width: 28,
-              height: 28,
+              width: dateCircleSize,
+              height: dateCircleSize,
               decoration: BoxDecoration(
                 color: isSelected ? accentColor : Colors.transparent,
                 shape: BoxShape.circle,
@@ -1373,7 +1394,7 @@ class _CalendarDayCell extends StatelessWidget {
                 child: Text(
                   '${date.day}',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: dateCircleSize * 0.5,
                     fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                     color: dateColor,
                   ),
@@ -1381,9 +1402,16 @@ class _CalendarDayCell extends StatelessWidget {
               ),
             ),
 
-            // 予定・祝日表示エリア
-            Expanded(
-              child: _buildScheduleItems(),
+            // 予定・祝日表示エリア（高さを明示的に固定してoverflow防止）
+            SizedBox(
+              height: scheduleAreaHeight,
+              child: ClipRect(
+                child: OverflowBox(
+                  maxHeight: double.infinity,
+                  alignment: Alignment.topLeft,
+                  child: _buildScheduleItems(itemFontSize),
+                ),
+              ),
             ),
           ],
         ),
@@ -1391,7 +1419,7 @@ class _CalendarDayCell extends StatelessWidget {
     );
   }
 
-  Widget _buildScheduleItems() {
+  Widget _buildScheduleItems(double fontSize) {
     final List<Widget> items = [];
 
     // 複数日予定オーバーレイ用のプレースホルダー（高さを確保）
@@ -1400,11 +1428,16 @@ class _CalendarDayCell extends StatelessWidget {
     }
 
     int displayedCount = 0;
-    const maxDisplay = 3;
+    // 1アイテムの高さ（fontSize + margin + padding + 行高）
+    const itemH = 20.0;
+    // マルチデイプレースホルダーを差し引いた残り高さから表示可能件数を計算
+    final availableH = scheduleAreaHeight - multiDaySlotCount * 16.0;
+    // +N表示用に1枠確保するため -1 してから計算（最低1件は表示）
+    final maxDisplay = (availableH / itemH - 1).floor().clamp(1, 3);
 
     // 祝日
     if (holiday != null && displayedCount < maxDisplay) {
-      items.add(_ScheduleBar(title: holiday!.name, color: Colors.red, isHoliday: true));
+      items.add(_ScheduleBar(title: holiday!.name, color: Colors.red, isHoliday: true, fontSize: fontSize));
       displayedCount++;
     }
 
@@ -1422,6 +1455,7 @@ class _CalendarDayCell extends StatelessWidget {
         color: _resolveTagColor(schedule.tag, tags, accentColor),
         isHoliday: false,
         isAllDay: schedule.isAllDay,
+        fontSize: fontSize,
       ));
       displayedCount++;
     }
@@ -1440,7 +1474,7 @@ class _CalendarDayCell extends StatelessWidget {
           child: Text(
             '+${totalCount - maxDisplay}',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: fontSize,
               color: Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
@@ -1450,6 +1484,7 @@ class _CalendarDayCell extends StatelessWidget {
     }
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: items,
     );
@@ -1462,12 +1497,14 @@ class _ScheduleBar extends StatelessWidget {
   final Color color;
   final bool isHoliday;
   final bool isAllDay;
+  final double fontSize;
 
   const _ScheduleBar({
     required this.title,
     required this.color,
     required this.isHoliday,
     this.isAllDay = false,
+    required this.fontSize,
   });
 
   @override
@@ -1488,7 +1525,7 @@ class _ScheduleBar extends StatelessWidget {
       child: Text(
         title,
         style: TextStyle(
-          fontSize: 11,
+          fontSize: fontSize,
           color: filled ? (isHoliday ? color : Colors.white) : color,
           fontWeight: FontWeight.w500,
         ),
@@ -1563,7 +1600,7 @@ class _CharacterWithComment extends ConsumerWidget {
         Container(
           constraints: BoxConstraints(maxWidth: 220),
           padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.only(bottom: 20),
+          margin: EdgeInsets.zero,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.9),
             borderRadius: BorderRadius.circular(16),
