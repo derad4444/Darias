@@ -1376,9 +1376,13 @@ class _CalendarDayCell extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.all(1),
         clipBehavior: Clip.hardEdge,
-        decoration: const BoxDecoration(),
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: Colors.grey.withValues(alpha: 0.15),
+            width: 0.5,
+          ),
+        ),
         child: Column(
           children: [
             // 日付（円形）

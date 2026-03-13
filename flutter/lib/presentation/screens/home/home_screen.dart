@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:ui';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,23 +43,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isCharacterReply = false;
 
 
-  /// iOS版と同じ初期メッセージリスト
+  /// 初期メッセージリスト
   static const List<String> _initialMessages = [
+    // 機能案内
     '性格解析は全部で100問あるよ。好きなタイミングで「性格診断して」と話しかけてくれれば質問するから答えてね！',
-    '「何日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！',
-    'アプリでわからないことや欲しい機能があれば設定画面の問い合わせから開発者に連絡してね！',
     '性格解析が終わったらキャラクター詳細画面でどんな性格か確認してみてね',
+    '「〇月〇日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！',
+    '「〇〇をメモしておいて」って話しかけるとノートにメモを残しておくよ！',
+    '「〇〇をタスクに追加して」って言ってくれればタスクとして登録しておくね！',
+    'アプリの使い方がわからないことがあったら何でも話しかけてみて！できる限り答えるよ',
+    '日記は毎日自動で書かれるよ。履歴ボタンから確認してみてね！',
+    '自分会議では6人の私があなたの悩みを多角的に議論するよ。悩みがあったら試してみてね！',
+    'アプリでわからないことや欲しい機能があれば設定画面の問い合わせから開発者に連絡してね！',
     '画面の背景の色は自由に変えられるから設定画面から好みの色に変えてね！',
     'BGMの大きさは設定画面で変えられるよ',
+    // キャラクターの感情・雑談
     'あなたに興味があるからあなたの性格が写っちゃいそうだよ。もう1人の自分だと思って接してね！',
     '私の夢はあなたの夢にもなるのかな？',
+    'あなたのこと、もっと知りたいな',
+    '毎日ここに来てくれると嬉しいな',
+    '悩みがあったらいつでも話しかけてね',
   ];
 
   @override
   void initState() {
     super.initState();
-    // ランダムな初期メッセージを選択
-    _displayedMessage = _initialMessages[Random().nextInt(_initialMessages.length)];
+    // 時間帯挨拶 or ランダムメッセージを選択（1/3の確率で挨拶）
+    final hour = DateTime.now().hour;
+    final useGreeting = Random().nextInt(3) == 0;
+    if (useGreeting) {
+      if (hour >= 5 && hour < 12) {
+        _displayedMessage = 'おはよう！今日も一緒に頑張ろうね';
+      } else if (hour >= 12 && hour < 18) {
+        _displayedMessage = 'お昼ごはんちゃんと食べた？';
+      } else {
+        _displayedMessage = '今日もお疲れさま！ゆっくり休んでね';
+      }
+    } else {
+      _displayedMessage = _initialMessages[Random().nextInt(_initialMessages.length)];
+    }
   }
 
   @override
@@ -623,23 +646,15 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
   }
 
   Widget _buildImage() {
-    // URLが取得できた場合はImage.networkで表示
+    // URLが取得できた場合はCachedNetworkImageで表示（2回目以降はキャッシュから即時表示）
     if (_imageUrl != null && !_hasError) {
-      return Image.network(
-        _imageUrl!,
+      return CachedNetworkImage(
+        imageUrl: _imageUrl!,
         fit: BoxFit.contain,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          // 性格画像のロード中はローディングインジケーターを表示
-          return const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          // CORSエラーなどでFirebase Storageから取得できない場合はフォールバック
-          // Web版ではCORS設定が必要
-          return _buildFallbackImage();
-        },
+        placeholder: (context, url) => const Center(
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        errorWidget: (context, url, error) => _buildFallbackImage(),
       );
     }
 
@@ -1597,11 +1612,8 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
         if (event is KeyDownEvent &&
             event.logicalKey == LogicalKeyboardKey.enter) {
           if (HardwareKeyboard.instance.isShiftPressed) {
-            // Shift+Enter: 改行を挿入
-            return KeyEventResult.ignored;
-          } else {
-            // Enter: 送信
-            if (!widget.isWaitingForReply) {
+            // Shift+Enter: 送信
+            if (!widget.isWaitingForReply && widget.controller.text.trim().isNotEmpty) {
               widget.onSend();
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
@@ -1611,6 +1623,9 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
               });
             }
             return KeyEventResult.handled;
+          } else {
+            // Enter: 改行（デフォルト動作）
+            return KeyEventResult.ignored;
           }
         }
         return KeyEventResult.ignored;
@@ -1731,7 +1746,7 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                 children: [
                   // Shift+Enter/Enter ヒント
                   Text(
-                    'Enterで送信 / Shift+Enterで改行',
+                    'Shift+Enterで送信 / Enterで改行',
                     style: TextStyle(
                       fontSize: 10,
                       color: AppColors.textLight.withValues(alpha: 0.5),

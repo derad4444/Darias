@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
@@ -26,6 +27,7 @@ class MeetingScreen extends ConsumerStatefulWidget {
 class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   final _topicController = TextEditingController();
   final _scrollController = ScrollController();
+  late final FocusNode _topicFocusNode;
 
   // API レスポンス
   GenerateMeetingResponse? _meetingResponse;
@@ -48,6 +50,24 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     super.initState();
     _topicController.addListener(_onTextChanged);
     _loadUsageCount();
+    _topicFocusNode = FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent &&
+            event.logicalKey == LogicalKeyboardKey.enter) {
+          if (HardwareKeyboard.instance.isShiftPressed) {
+            // Shift+Enter: 会議を開始
+            if (_topicController.text.trim().isNotEmpty) {
+              _startMeeting();
+            }
+            return KeyEventResult.handled;
+          } else {
+            // Enter: 改行（デフォルト動作）
+            return KeyEventResult.ignored;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    );
   }
 
   void _onTextChanged() {
@@ -73,6 +93,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     _topicController.removeListener(_onTextChanged);
     _topicController.dispose();
     _scrollController.dispose();
+    _topicFocusNode.dispose();
     super.dispose();
   }
 
@@ -159,6 +180,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                 const SizedBox(height: 12),
                 TextField(
                     controller: _topicController,
+                    focusNode: _topicFocusNode,
                     decoration: InputDecoration(
                       hintText: '例: 転職すべきか迷っている...',
                       hintStyle: TextStyle(color: AppColors.textLight),
@@ -177,11 +199,23 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                         {required currentLength,
                         required isFocused,
                         maxLength}) {
-                      return Text(
-                        '$currentLength / ${maxLength ?? 500}文字',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
+                      return Row(
+                        children: [
+                          Text(
+                            'Shift+Enterで開始 / Enterで改行',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textLight.withValues(alpha: 0.5),
                             ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '$currentLength / ${maxLength ?? 500}文字',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                          ),
+                        ],
                       );
                     },
                   ),

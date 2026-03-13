@@ -33,6 +33,9 @@ class FirebaseImageService {
   // メモリキャッシュ（Web用）
   final Map<String, Uint8List> _memoryCache = {};
 
+  // URLキャッシュ（Firebase Storage APIへのリクエストを削減）
+  final Map<String, String> _urlCache = {};
+
   FirebaseImageService._();
 
   /// 初期化
@@ -135,14 +138,20 @@ class FirebaseImageService {
     }
   }
 
-  /// 画像URLを取得
+  /// 画像URLを取得（URLキャッシュ付き）
   Future<String> getImageUrl({
     required String fileName,
     required CharacterGender gender,
   }) async {
+    final cacheKey = '${gender.value}_$fileName';
+    if (_urlCache.containsKey(cacheKey)) {
+      return _urlCache[cacheKey]!;
+    }
     final storagePath = 'character-images/${gender.value}/$fileName.png';
     final ref = _storage.ref().child(storagePath);
-    return await ref.getDownloadURL();
+    final url = await ref.getDownloadURL();
+    _urlCache[cacheKey] = url;
+    return url;
   }
 
   /// キャッシュをクリア
