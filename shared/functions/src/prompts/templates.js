@@ -78,7 +78,9 @@ const OPTIMIZED_PROMPTS = {
     const traits = buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
-    const meeting = meetingContext ? `最近の会議: ${meetingContext}` : "";
+    const meeting = meetingContext
+      ? `【会議コンテキスト】${meetingContext}\n（ユーザーが会議について話している場合はこの内容を踏まえて返答してください）`
+      : "";
 
     return `性格特性: ${traits}
 性別: ${genderText}
