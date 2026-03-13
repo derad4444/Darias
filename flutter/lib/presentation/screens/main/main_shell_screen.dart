@@ -45,106 +45,74 @@ class MainShellScreen extends ConsumerWidget {
           const SettingsScreen(),
         ],
       ),
-      // iOS風の半透明タブバー（ホームを中央に強調表示）
-      bottomNavigationBar: Stack(
-        clipBehavior: Clip.none,
-        alignment: Alignment.topCenter,
-        children: [
-          ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? Colors.black.withValues(alpha: 0.8)
-                      : Colors.white.withValues(alpha: 0.8),
-                  border: Border(
-                    top: BorderSide(
-                      color: Colors.grey.withValues(alpha: 0.2),
-                      width: 0.5,
-                    ),
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _TabItem(
-                          icon: Icons.calendar_today_outlined,
-                          selectedIcon: Icons.calendar_today,
-                          label: '予定',
-                          isSelected: selectedTab == 1,
-                          accentColor: accentColor,
-                          onTap: () => ref.read(selectedTabProvider.notifier).state = 1,
-                        ),
-                        _TabItem(
-                          icon: Icons.note_outlined,
-                          selectedIcon: Icons.note,
-                          label: 'ノート',
-                          isSelected: selectedTab == 2,
-                          accentColor: accentColor,
-                          onTap: () => ref.read(selectedTabProvider.notifier).state = 2,
-                        ),
-                        // ホームボタンのスペース
-                        const SizedBox(width: 64),
-                        _TabItem(
-                          icon: Icons.person_outline,
-                          selectedIcon: Icons.person,
-                          label: '詳細',
-                          isSelected: selectedTab == 3,
-                          accentColor: accentColor,
-                          onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
-                        ),
-                        _TabItem(
-                          icon: Icons.settings_outlined,
-                          selectedIcon: Icons.settings,
-                          label: '設定',
-                          isSelected: selectedTab == 4,
-                          accentColor: accentColor,
-                          onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
-                        ),
-                      ],
-                    ),
-                  ),
+      // iOS風の半透明タブバー
+      bottomNavigationBar: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.black.withValues(alpha: 0.8)
+                  : Colors.white.withValues(alpha: 0.8),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.grey.withValues(alpha: 0.2),
+                  width: 0.5,
                 ),
               ),
             ),
-          ),
-          // 中央に浮き出るホームボタン
-          Positioned(
-            top: -24,
-            child: GestureDetector(
-              onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
-              child: Container(
-                width: 64,
-                height: 64,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accentColor, accentColor.withValues(alpha: 0.8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: accentColor.withValues(alpha: 0.4),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _TabItem(
+                      icon: Icons.home_outlined,
+                      selectedIcon: Icons.home,
+                      label: 'ホーム',
+                      isSelected: selectedTab == 0,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
+                    ),
+                    _TabItem(
+                      icon: Icons.calendar_today_outlined,
+                      selectedIcon: Icons.calendar_today,
+                      label: '予定',
+                      isSelected: selectedTab == 1,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 1,
+                    ),
+                    _TabItem(
+                      icon: Icons.note_outlined,
+                      selectedIcon: Icons.note,
+                      label: 'ノート',
+                      isSelected: selectedTab == 2,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 2,
+                    ),
+                    _TabItem(
+                      icon: Icons.person_outline,
+                      selectedIcon: Icons.person,
+                      label: '詳細',
+                      isSelected: selectedTab == 3,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
+                    ),
+                    _TabItem(
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: '設定',
+                      isSelected: selectedTab == 4,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
                     ),
                   ],
                 ),
-                child: Icon(
-                  selectedTab == 0 ? Icons.home : Icons.home_outlined,
-                  color: Colors.white,
-                  size: 30,
-                ),
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
   }

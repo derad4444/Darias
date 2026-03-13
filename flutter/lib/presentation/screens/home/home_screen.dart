@@ -106,9 +106,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: Stack(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final availH = constraints.maxHeight;
+              final availW = constraints.maxWidth;
+              final charW = availW * 1.3;
+              final charH = availH * 0.8;
+              // iOS版に合わせてキャラクター中心をY=60%に配置
+              final charTop = availH * 0.6 - charH / 2;
+
+              return Stack(
+            clipBehavior: Clip.none,
             children: [
-              // 下部UI（キャラクター画像 + 操作エリア）
+              // キャラクター画像（背景レイヤー、iOSと同じ位置・サイズ）
+              Positioned(
+                left: -(charW - availW) / 2,
+                top: charTop,
+                child: characterDetailsAsync.when(
+                  data: (details) => _CharacterDisplay(
+                    key: ValueKey(details?.personalityImageFileName),
+                    width: charW,
+                    height: charH,
+                    characterGender: details?.gender ?? userAsync.valueOrNull?.characterGender,
+                    personalityImageFileName: details?.personalityImageFileName,
+                  ),
+                  loading: () => SizedBox(width: charW, height: charH,
+                    child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                  error: (_, __) => _CharacterDisplay(
+                    width: charW,
+                    height: charH,
+                    characterGender: userAsync.valueOrNull?.characterGender,
+                  ),
+                ),
+              ),
+
+              // 下部UI（操作エリア）
               Positioned(
                 left: 0,
                 right: 0,
@@ -116,48 +148,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // キャラクター画像（性格解析バーのすぐ上）
-                    SizedBox(
-                      width: size.width * 1.0,
-                      height: size.height * 0.55,
-                      child: characterDetailsAsync.when(
-                        data: (details) {
-                          if (details?.personalityImageFileName != null) {
-                            return _CharacterDisplay(
-                              key: ValueKey(details!.personalityImageFileName),
-                              width: size.width * 1.0,
-                              height: size.height * 0.55,
-                              characterGender: details.gender ?? userAsync.valueOrNull?.characterGender,
-                              personalityImageFileName: details.personalityImageFileName,
-                            );
-                          }
-                          return const Center(
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          );
-                        },
-                        loading: () => const Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        error: (_, __) => _CharacterDisplay(
-                          width: size.width * 1.0,
-                          height: size.height * 0.55,
-                          characterGender: userAsync.valueOrNull?.characterGender,
-                        ),
-                      ),
-                    ),
-
-                    // BIG5進捗バー
-                    big5ProgressAsync.when(
-                      data: (progress) => _BIG5ProgressBar(
-                        answeredCount: progress?.answeredCount ?? 0,
-                        accentColor: accentColor,
-                      ),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    ),
-
-                    const SizedBox(height: 8),
-
                     // 自分会議ボタンと履歴ボタン
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -202,6 +192,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                         ],
                       ),
+                    ),
+
+                    const SizedBox(height: 8),
+
+                    // BIG5進捗バー
+                    big5ProgressAsync.when(
+                      data: (progress) => _BIG5ProgressBar(
+                        answeredCount: progress?.answeredCount ?? 0,
+                        accentColor: accentColor,
+                      ),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
                     ),
 
                     const SizedBox(height: 8),
@@ -270,7 +272,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
             ],
-          ),
+          );
+        },
+      ),
         ),
       ),
     );
@@ -929,8 +933,13 @@ class _BIG5ProgressBar extends StatelessWidget {
 
     return GestureDetector(
       onTap: () => _showPersonalityRoadmap(context),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Row(
           children: [
             // レベル表示
@@ -1633,7 +1642,7 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                   Expanded(
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: widget.isWaitingForReply ? 0.1 : 0.2),
+                        color: Colors.white.withValues(alpha: widget.isWaitingForReply ? 0.5 : 0.85),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.4),

@@ -75,7 +75,9 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
             gradient: backgroundGradient,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
+          child: SafeArea(
+            minimum: const EdgeInsets.only(top: 24),
+            child: Column(
             children: [
               // ハンドル
               Container(
@@ -140,6 +142,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                 ),
               ),
             ],
+          ),
           ),
         );
       },

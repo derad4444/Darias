@@ -2055,6 +2055,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
           gradient: widget.backgroundGradient,
         ),
         child: SafeArea(
+          minimum: const EdgeInsets.only(top: 24),
           child: Column(
           children: [
             // 日付ヘッダー

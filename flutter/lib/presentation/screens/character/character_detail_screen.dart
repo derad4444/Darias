@@ -295,7 +295,7 @@ class _CharacterDetailBody extends ConsumerWidget {
       physics: const BouncingScrollPhysics(),
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.of(context).padding.top + kToolbarHeight),
+          SizedBox(height: MediaQuery.of(context).padding.top),
 
           // 1つ目のバナー広告（キャラクター画像の上）
           if (shouldShowBannerAd)
@@ -724,6 +724,7 @@ class _AnalysisDetailSheet extends ConsumerWidget {
           gradient: backgroundGradient,
         ),
         child: SafeArea(
+          minimum: const EdgeInsets.only(top: 24),
           child: Column(
           children: [
             // ヘッダー
