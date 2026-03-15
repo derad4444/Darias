@@ -15,6 +15,6 @@ struct CalendarWidget: Widget {
         }
         .configurationDisplayName("カレンダー")
         .description("今日と明日の予定を確認できます")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

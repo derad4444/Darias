@@ -11,7 +11,7 @@ struct TodoWidgetProvider: TimelineProvider {
         TodoWidgetEntry(
             date: Date(),
             todos: [
-                WidgetTodo(id: "1", title: "サンプルタスク", priority: "high", dueDate: Date()),
+                WidgetTodo(id: "1", title: "サンプルタスク", priority: "high", dueDate: "2026-03-15T13:00:00.000"),
                 WidgetTodo(id: "2", title: "もう一つのタスク", priority: "medium", dueDate: nil)
             ]
         )

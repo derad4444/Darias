@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/memo_datasource.dart';
 import '../../data/models/memo_model.dart';
+import '../../data/services/widget_data_service.dart';
 import 'auth_provider.dart';
 
 /// MemoDatasourceのプロバイダー
@@ -24,7 +25,11 @@ class MemoController extends StateNotifier<AsyncValue<void>> {
   final MemoDatasource _datasource;
   final Ref _ref;
 
-  MemoController(this._datasource, this._ref) : super(const AsyncValue.data(null));
+  MemoController(this._datasource, this._ref) : super(const AsyncValue.data(null)) {
+    _ref.listen<AsyncValue<List<MemoModel>>>(memosProvider, (_, next) {
+      next.whenData((memos) => WidgetDataService.shared.cacheMemos(memos));
+    });
+  }
 
   /// メモを追加（作成されたドキュメントIDを返す）
   Future<String?> addMemo(MemoModel memo) async {

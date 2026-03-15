@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -146,13 +147,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 left: -(charW - availW) / 2,
                 top: charTop,
                 child: characterDetailsAsync.when(
-                  data: (details) => _CharacterDisplay(
-                    key: ValueKey(details?.personalityImageFileName),
-                    width: charW,
-                    height: charH,
-                    characterGender: details?.gender ?? userAsync.valueOrNull?.characterGender,
-                    personalityImageFileName: details?.personalityImageFileName,
-                  ),
+                  data: (details) {
+                    if (details == null) {
+                      return SizedBox(
+                        width: charW,
+                        height: charH,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      );
+                    }
+                    return _CharacterDisplay(
+                      key: ValueKey(details.personalityImageFileName),
+                      width: charW,
+                      height: charH,
+                      characterGender: details.gender,
+                      personalityImageFileName: details.personalityImageFileName,
+                    );
+                  },
                   loading: () => SizedBox(width: charW, height: charH,
                     child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
                   error: (_, __) => _CharacterDisplay(
@@ -224,6 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       data: (progress) => _BIG5ProgressBar(
                         answeredCount: progress?.answeredCount ?? 0,
                         accentColor: accentColor,
+                        backgroundGradient: backgroundGradient,
                       ),
                       loading: () => const SizedBox.shrink(),
                       error: (_, __) => const SizedBox.shrink(),
@@ -317,9 +328,37 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (mounted) setState(() => _isPlayingVoice = false);
   }
 
+  void _showWebPremiumDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('プレミアム機能'),
+        content: const Text('チャット機能はアプリ版またはプレミアムプランでご利用いただけます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('閉じる'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push('/premium');
+            },
+            child: const Text('プレミアムへ'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _sendMessage() async {
     final message = _chatController.text.trim();
     if (message.isEmpty || _isWaitingForReply) return;
+
+    if (kIsWeb && !ref.read(effectiveIsPremiumProvider)) {
+      _showWebPremiumDialog();
+      return;
+    }
 
     setState(() {
       _isWaitingForReply = true;
@@ -929,10 +968,12 @@ class _SpeechBubble extends StatelessWidget {
 class _BIG5ProgressBar extends StatelessWidget {
   final int answeredCount;
   final Color accentColor;
+  final Gradient? backgroundGradient;
 
   const _BIG5ProgressBar({
     required this.answeredCount,
     required this.accentColor,
+    this.backgroundGradient,
   });
 
   @override
@@ -1024,8 +1065,54 @@ class _BIG5ProgressBar extends StatelessWidget {
     );
   }
 
-  /// 性格解析ロードマップを表示（iOS版PersonalityRoadmapViewと同じ）
+  /// 性格解析ロードマップを表示
   void _showPersonalityRoadmap(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _PersonalityRoadmapPage(
+          answeredCount: answeredCount,
+          accentColor: accentColor,
+          backgroundGradient: backgroundGradient,
+        ),
+      ),
+    );
+  }
+}
+
+/// 性格解析ロードマップ ページ
+class _PersonalityRoadmapPage extends StatefulWidget {
+  final int answeredCount;
+  final Color accentColor;
+  final Gradient? backgroundGradient;
+
+  const _PersonalityRoadmapPage({
+    required this.answeredCount,
+    required this.accentColor,
+    this.backgroundGradient,
+  });
+
+  @override
+  State<_PersonalityRoadmapPage> createState() => _PersonalityRoadmapPageState();
+}
+
+class _PersonalityRoadmapPageState extends State<_PersonalityRoadmapPage> {
+  final _scrollController = ScrollController();
+  double _dragAccum = 0;
+  bool _dismissing = false;
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final answeredCount = widget.answeredCount;
+    final accentColor = widget.accentColor;
+    final backgroundGradient = widget.backgroundGradient;
     final stages = [
       _StageInfo(
         number: 1,
@@ -1053,46 +1140,49 @@ class _BIG5ProgressBar extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
+    return Scaffold(
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 1.0,
-        minChildSize: 0.5,
-        maxChildSize: 1.0,
-        expand: false,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-          ),
-          child: SafeArea(
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: Listener(
+            onPointerMove: (event) {
+              if (_scrollController.hasClients &&
+                  _scrollController.offset <= 0 &&
+                  event.delta.dy > 0) {
+                _dragAccum += event.delta.dy;
+                if (_dragAccum > 80 && !_dismissing) {
+                  _dismissing = true;
+                  Navigator.pop(context);
+                }
+              } else {
+                _dragAccum = 0;
+              }
+            },
+            onPointerUp: (_) => _dragAccum = 0,
+            onPointerCancel: (_) => _dragAccum = 0,
             child: SingleChildScrollView(
-              controller: scrollController,
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // 閉じるボタン
-                Align(
-                  alignment: Alignment.topRight,
-                  child: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-
-                // ヘッダー
-                Icon(
-                  Icons.psychology,
-                  size: 48,
-                  color: accentColor,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '性格解析ロードマップ',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                // タイトル行（スクロールと一体）
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 48),
+                    Text(
+                      '性格解析ロードマップ',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -1226,7 +1316,6 @@ class _BIG5ProgressBar extends StatelessWidget {
                     child: const Text('閉じる'),
                   ),
                 ),
-
                 const SizedBox(height: 16),
               ],
             ),

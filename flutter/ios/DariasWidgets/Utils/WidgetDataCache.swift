@@ -10,16 +10,19 @@ import Foundation
 class WidgetDataCache {
     static let shared = WidgetDataCache()
 
-    private let sharedDefaults: UserDefaults?
-
-    private init() {
-        sharedDefaults = UserDefaults(suiteName: AppGroupConstants.suiteName)
+    private var sharedDefaults: UserDefaults? {
+        let defaults = UserDefaults(suiteName: AppGroupConstants.suiteName)
+        defaults?.synchronize()
+        return defaults
     }
+
+    private init() {}
 
     // MARK: - Schedule
 
     func loadSchedules() -> [WidgetSchedule] {
-        guard let data = sharedDefaults?.data(forKey: AppGroupConstants.schedulesCacheKey),
+        guard let jsonString = sharedDefaults?.string(forKey: AppGroupConstants.schedulesCacheKey),
+              let data = jsonString.data(using: .utf8),
               let schedules = try? JSONDecoder().decode([WidgetSchedule].self, from: data) else {
             return []
         }
@@ -29,7 +32,8 @@ class WidgetDataCache {
     // MARK: - Memo
 
     func loadMemos() -> [WidgetMemo] {
-        guard let data = sharedDefaults?.data(forKey: AppGroupConstants.memosCacheKey),
+        guard let jsonString = sharedDefaults?.string(forKey: AppGroupConstants.memosCacheKey),
+              let data = jsonString.data(using: .utf8),
               let memos = try? JSONDecoder().decode([WidgetMemo].self, from: data) else {
             return []
         }
@@ -43,7 +47,8 @@ class WidgetDataCache {
     // MARK: - Todo
 
     func loadTodos() -> [WidgetTodo] {
-        guard let data = sharedDefaults?.data(forKey: AppGroupConstants.todosCacheKey),
+        guard let jsonString = sharedDefaults?.string(forKey: AppGroupConstants.todosCacheKey),
+              let data = jsonString.data(using: .utf8),
               let todos = try? JSONDecoder().decode([WidgetTodo].self, from: data) else {
             return []
         }
@@ -53,7 +58,8 @@ class WidgetDataCache {
     // MARK: - Big5 Progress
 
     func loadBig5Progress() -> WidgetBig5Progress {
-        guard let data = sharedDefaults?.data(forKey: AppGroupConstants.big5ProgressKey),
+        guard let jsonString = sharedDefaults?.string(forKey: AppGroupConstants.big5ProgressKey),
+              let data = jsonString.data(using: .utf8),
               let progress = try? JSONDecoder().decode(WidgetBig5Progress.self, from: data) else {
             return WidgetBig5Progress(answered: 0, total: 100)
         }

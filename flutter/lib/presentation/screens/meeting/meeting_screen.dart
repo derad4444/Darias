@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -778,10 +779,38 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   // アクション
   // ============================================================
 
+  void _showWebPremiumDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('プレミアム機能'),
+        content: const Text('会議機能はアプリ版またはプレミアムプランでご利用いただけます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('閉じる'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.push('/premium');
+            },
+            child: const Text('プレミアムへ'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 会議を開始（generateOrReuseMeeting APIを呼ぶ）
   Future<void> _startMeeting() async {
     final topic = _topicController.text.trim();
     if (topic.isEmpty) return;
+
+    if (kIsWeb && !ref.read(effectiveIsPremiumProvider)) {
+      _showWebPremiumDialog();
+      return;
+    }
 
     setState(() {
       _isLoading = true;

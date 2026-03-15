@@ -1409,9 +1409,11 @@ class _DiaryCardNew extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // 日記の内容プレビュー（セリフ体）
+              // 日記本文 or AIコメント（本文が空の場合）
               Text(
-                diary.content,
+                diary.content.isNotEmpty
+                    ? diary.content
+                    : (diary.aiComment ?? ''),
                 style: TextStyle(
                   fontSize: 14,
                   fontFamily: 'serif',
@@ -1420,28 +1422,6 @@ class _DiaryCardNew extends StatelessWidget {
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
-
-              // コメントがある場合
-              if (diary.userComment.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.message,
-                      size: 10,
-                      color: accentColor.withValues(alpha: 0.7),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'コメントあり',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: accentColor.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),

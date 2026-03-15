@@ -15,6 +15,6 @@ struct MemoWidget: Widget {
         }
         .configurationDisplayName("メモ")
         .description("最新のメモを確認できます")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

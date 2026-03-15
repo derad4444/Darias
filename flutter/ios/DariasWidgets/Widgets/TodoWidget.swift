@@ -15,6 +15,6 @@ struct TodoWidget: Widget {
         }
         .configurationDisplayName("Todo")
         .description("今日のタスクを確認できます")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }

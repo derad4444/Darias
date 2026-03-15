@@ -11,6 +11,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_colors.dart';
 import 'data/services/ad_service.dart';
 import 'data/services/notification_service.dart';
+import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/router/app_router.dart';
@@ -38,6 +39,9 @@ void main() async {
 
   // 通知サービス初期化
   await NotificationService().initialize();
+
+  // ウィジェットデータサービス初期化（ネイティブのみ）
+  await WidgetDataService.shared.initialize();
 
   // 日本語ロケールの日付フォーマット初期化
   await initializeDateFormatting('ja');

@@ -2,7 +2,7 @@
 //  WidgetData.swift
 //  DariasWidgets
 //
-//  Widget用の軽量データモデル
+//  Widget用の軽量データモデル（日付はStringで保持してデコードエラーを回避）
 //
 
 import Foundation
@@ -14,34 +14,25 @@ import WidgetKit
 struct WidgetSchedule: Codable, Identifiable {
     let id: String
     let title: String
-    let startDate: Date
-    let endDate: Date
+    let startDate: String  // ISO8601 String
+    let endDate: String    // ISO8601 String
     let location: String?
     let isAllDay: Bool
 
     var timeText: String {
-        if isAllDay {
-            return "終日"
-        }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: startDate)
+        if isAllDay { return "終日" }
+        // "2026-03-20T13:00:00.000" → "13:00"
+        let parts = startDate.split(separator: "T")
+        guard parts.count == 2 else { return "" }
+        let timePart = String(parts[1].prefix(5))
+        return timePart
     }
 
-    var timeUntilStart: String {
-        let interval = startDate.timeIntervalSince(Date())
-        if interval < 0 {
-            return "開催中"
-        }
-
-        let hours = Int(interval / 3600)
-        let minutes = Int((interval.truncatingRemainder(dividingBy: 3600)) / 60)
-
-        if hours > 0 {
-            return "\(hours)時間\(minutes)分後"
-        } else {
-            return "\(minutes)分後"
-        }
+    var startDateParsed: Date? {
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: startDate) { return d }
+        return iso.date(from: String(startDate.prefix(23)) + "Z")
     }
 }
 
@@ -52,24 +43,19 @@ struct WidgetMemo: Codable, Identifiable {
     let id: String
     let title: String
     let content: String
-    let updatedAt: Date
+    let updatedAt: String  // ISO8601 String
     let tag: String
     let isPinned: Bool
 
     var updatedText: String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.dateFormat = "M/d更新"
-        return formatter.string(from: updatedAt)
-    }
-
-    var contentPreview: String {
-        let lines = content.components(separatedBy: .newlines)
-        let preview = lines.prefix(5).joined(separator: "\n")
-        if preview.count > 50 {
-            return String(preview.prefix(50)) + "..."
-        }
-        return preview
+        // "2026-03-08T00:26:37.745" → "3/8更新"
+        let parts = updatedAt.split(separator: "T")
+        guard parts.count >= 1 else { return "" }
+        let datePart = parts[0].split(separator: "-")
+        guard datePart.count == 3 else { return "" }
+        let month = Int(datePart[1]) ?? 0
+        let day = Int(datePart[2]) ?? 0
+        return "\(month)/\(day)更新"
     }
 
     var contentOneLine: String {
@@ -89,14 +75,6 @@ enum TodoPriority: String, Codable {
     case medium = "medium"
     case high = "high"
 
-    var displayText: String {
-        switch self {
-        case .low: return "低"
-        case .medium: return "中"
-        case .high: return "高"
-        }
-    }
-
     var icon: String {
         switch self {
         case .high: return "🔴"
@@ -111,7 +89,7 @@ struct WidgetTodo: Codable, Identifiable {
     let id: String
     let title: String
     let priority: String
-    let dueDate: Date?
+    let dueDate: String?   // ISO8601 String or null
 
     var priorityEnum: TodoPriority {
         return TodoPriority(rawValue: priority) ?? .medium
@@ -123,9 +101,14 @@ struct WidgetTodo: Codable, Identifiable {
 
     var dueDateText: String {
         guard let dueDate = dueDate else { return "期限なし" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d"
-        return formatter.string(from: dueDate) + "まで"
+        // "2025-11-22T22:00:00.000" → "11/22まで"
+        let parts = dueDate.split(separator: "T")
+        guard parts.count >= 1 else { return "期限なし" }
+        let datePart = parts[0].split(separator: "-")
+        guard datePart.count == 3 else { return "期限なし" }
+        let month = Int(datePart[1]) ?? 0
+        let day = Int(datePart[2]) ?? 0
+        return "\(month)/\(day)まで"
     }
 }
 
@@ -138,31 +121,6 @@ struct WidgetBig5Progress: Codable {
 
     var percentage: Double {
         return Double(answered) / Double(total)
-    }
-
-    var currentLevelText: String {
-        switch answered {
-        case 0..<20:
-            return "未開始"
-        case 20..<50:
-            return "基本解析完了"
-        case 50..<100:
-            return "学習進化解析完了"
-        case 100:
-            return "完全人格解析完了"
-        default:
-            return ""
-        }
-    }
-
-    var currentIcon: String {
-        switch answered {
-        case 0..<20: return "🤖"
-        case 20..<50: return "🤖"
-        case 50..<100: return "🧠"
-        case 100: return "👤"
-        default: return "🤖"
-        }
     }
 }
 

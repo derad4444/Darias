@@ -3,6 +3,7 @@ import '../../data/datasources/remote/calendar_datasource.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/models/holiday_model.dart';
 import '../../data/models/monthly_comment_model.dart';
+import '../../data/services/widget_data_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
 
@@ -67,7 +68,11 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
   final CalendarDatasource _datasource;
   final Ref _ref;
 
-  CalendarController(this._datasource, this._ref) : super(const AsyncValue.data(null));
+  CalendarController(this._datasource, this._ref) : super(const AsyncValue.data(null)) {
+    _ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
+      next.whenData((schedules) => WidgetDataService.shared.cacheSchedules(schedules));
+    });
+  }
 
   /// スケジュールを追加
   Future<void> addSchedule(ScheduleModel schedule) async {

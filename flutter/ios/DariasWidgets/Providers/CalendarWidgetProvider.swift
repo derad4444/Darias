@@ -14,8 +14,8 @@ struct CalendarWidgetProvider: TimelineProvider {
                 WidgetSchedule(
                     id: "1",
                     title: "サンプル予定",
-                    startDate: Date(),
-                    endDate: Date().addingTimeInterval(3600),
+                    startDate: "2026-03-15T13:00:00.000",
+                    endDate: "2026-03-15T14:00:00.000",
                     location: nil,
                     isAllDay: false
                 )

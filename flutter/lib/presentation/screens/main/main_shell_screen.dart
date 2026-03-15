@@ -1,9 +1,18 @@
+import 'dart:async';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/widget_data_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../../data/models/memo_model.dart';
+import '../../../data/models/schedule_model.dart';
+import '../../../data/models/todo_model.dart';
+import '../../providers/memo_provider.dart';
+import '../../providers/todo_provider.dart';
+import '../../providers/calendar_provider.dart';
 import '../home/home_screen.dart';
 import '../calendar/calendar_screen.dart';
 import '../note/note_screen.dart';
@@ -14,14 +23,62 @@ import '../settings/settings_screen.dart';
 final selectedTabProvider = StateProvider<int>((ref) => 0);
 
 /// iOS版と同じ5タブ構成のメイン画面
-class MainShellScreen extends ConsumerWidget {
+class MainShellScreen extends ConsumerStatefulWidget {
   const MainShellScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainShellScreen> createState() => _MainShellScreenState();
+}
+
+class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+  StreamSubscription<Uri?>? _widgetClickSub;
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb) {
+      _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
+    }
+  }
+
+  void _handleWidgetUri(Uri? uri) {
+    if (uri == null) return;
+    // darias://open/?page=todo  → queryParameters['page'] = 'todo'
+    final page = uri.queryParameters['page'];
+    if (page == 'calendar') {
+      ref.read(selectedTabProvider.notifier).state = 1;
+    } else if (page == 'todo') {
+      ref.read(selectedTabProvider.notifier).state = 2;
+      ref.read(noteSegmentProvider.notifier).state = NoteSegment.todo;
+    } else if (page == 'memo') {
+      ref.read(selectedTabProvider.notifier).state = 2;
+      ref.read(noteSegmentProvider.notifier).state = NoteSegment.memo;
+    }
+  }
+
+  @override
+  void dispose() {
+    _widgetClickSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final selectedTab = ref.watch(selectedTabProvider);
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
+
+    if (!kIsWeb) {
+      ref.listen<AsyncValue<List<MemoModel>>>(memosProvider, (_, next) {
+        next.whenData((memos) => WidgetDataService.shared.cacheMemos(memos));
+      });
+      ref.listen<AsyncValue<List<TodoModel>>>(todosProvider, (_, next) {
+        next.whenData((todos) => WidgetDataService.shared.cacheTodos(todos));
+      });
+      ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
+        next.whenData((schedules) => WidgetDataService.shared.cacheSchedules(schedules));
+      });
+    }
 
     return Scaffold(
       body: IndexedStack(

@@ -236,6 +236,7 @@ class TagManagementScreen extends ConsumerWidget {
   }
 
   void _showAddTagSheet(BuildContext context, WidgetRef ref, Color accentColor, Color textColor) {
+    final topPadding = MediaQuery.of(context).viewPadding.top;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -243,6 +244,7 @@ class TagManagementScreen extends ConsumerWidget {
       builder: (context) => _TagEditSheet(
         accentColor: accentColor,
         textColor: textColor,
+        topPadding: topPadding,
         onSave: (tag) {
           ref.read(tagsProvider.notifier).addTag(tag);
         },
@@ -251,6 +253,7 @@ class TagManagementScreen extends ConsumerWidget {
   }
 
   void _showEditTagSheet(BuildContext context, WidgetRef ref, TagItem tag, Color accentColor, Color textColor) {
+    final topPadding = MediaQuery.of(context).viewPadding.top;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -259,6 +262,7 @@ class TagManagementScreen extends ConsumerWidget {
         tag: tag,
         accentColor: accentColor,
         textColor: textColor,
+        topPadding: topPadding,
         onSave: (updatedTag) {
           ref.read(tagsProvider.notifier).updateTag(updatedTag);
         },
@@ -351,12 +355,14 @@ class _TagEditSheet extends ConsumerStatefulWidget {
   final Color accentColor;
   final Color textColor;
   final Function(TagItem) onSave;
+  final double topPadding;
 
   const _TagEditSheet({
     this.tag,
     required this.accentColor,
     required this.textColor,
     required this.onSave,
+    this.topPadding = 0,
   });
 
   @override
@@ -391,7 +397,7 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
 
     return Container(
       height: MediaQuery.of(context).size.height,
-      padding: EdgeInsets.only(top: MediaQuery.of(context).viewPadding.top),
+      padding: EdgeInsets.only(top: widget.topPadding),
       decoration: BoxDecoration(
         gradient: backgroundGradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),

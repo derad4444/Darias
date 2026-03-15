@@ -127,6 +127,7 @@ class WidgetDataService {
 
   /// 初期化
   Future<void> initialize() async {
+    if (kIsWeb) return;
     await HomeWidget.setAppGroupId(_appGroupId);
   }
 
@@ -134,6 +135,7 @@ class WidgetDataService {
 
   /// スケジュールをウィジェット用にキャッシュ
   Future<void> cacheSchedules(List<ScheduleModel> schedules) async {
+    if (kIsWeb) return;
     debugPrint('📅 [WidgetDataService] cacheSchedules called with ${schedules.length} schedules');
 
     // 過去30日〜未来のスケジュールのみキャッシュ
@@ -178,6 +180,7 @@ class WidgetDataService {
 
   /// メモをウィジェット用にキャッシュ
   Future<void> cacheMemos(List<MemoModel> memos) async {
+    if (kIsWeb) return;
     debugPrint('📝 [WidgetDataService] cacheMemos called with ${memos.length} memos');
 
     // ピン留め優先、次に更新日時順
@@ -218,6 +221,7 @@ class WidgetDataService {
 
   /// ToDoをウィジェット用にキャッシュ
   Future<void> cacheTodos(List<TodoModel> todos) async {
+    if (kIsWeb) return;
     debugPrint('✅ [WidgetDataService] cacheTodos called with ${todos.length} todos');
 
     // 未完了のみ、優先度順→期日順
@@ -273,6 +277,7 @@ class WidgetDataService {
     required int answeredCount,
     int totalCount = 100,
   }) async {
+    if (kIsWeb) return;
     final progress = WidgetBig5Progress(
       answered: answeredCount,
       total: totalCount,

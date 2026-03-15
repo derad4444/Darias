@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@android:color/white">
+
+    <!-- 今日 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="今日"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#E53935" />
+
+    <LinearLayout android:id="@+id/today_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/today_time_1" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/today_title_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/today_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/today_time_2" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/today_title_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/today_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/today_time_3" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/today_title_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/today_row_4" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/today_time_4" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/today_title_4" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <TextView android:id="@+id/today_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="予定なし" android:textSize="12sp" android:textColor="#999999" android:paddingVertical="4dp" android:visibility="gone" />
+
+    <TextView android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginVertical="8dp" />
+
+    <!-- 明日 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="明日"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#1E88E5" />
+
+    <LinearLayout android:id="@+id/tomorrow_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/tomorrow_time_1" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/tomorrow_title_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/tomorrow_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/tomorrow_time_2" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/tomorrow_title_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/tomorrow_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/tomorrow_time_3" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/tomorrow_title_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <TextView android:id="@+id/tomorrow_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="予定なし" android:textSize="12sp" android:textColor="#999999" android:paddingVertical="4dp" android:visibility="gone" />
+
+    <TextView android:layout_width="match_parent" android:layout_height="1dp" android:background="#E0E0E0" android:layout_marginVertical="8dp" />
+
+    <!-- 明後日 -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="明後日"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:textColor="#8E24AA" />
+
+    <LinearLayout android:id="@+id/dayafter_row_1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/dayafter_time_1" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/dayafter_title_1" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/dayafter_row_2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/dayafter_time_2" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/dayafter_title_2" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/dayafter_row_3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingVertical="4dp" android:visibility="gone">
+        <TextView android:id="@+id/dayafter_time_3" android:layout_width="44dp" android:layout_height="wrap_content" android:textSize="12sp" android:textColor="#999999" />
+        <TextView android:id="@+id/dayafter_title_3" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:textSize="13sp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <TextView android:id="@+id/dayafter_empty" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="予定なし" android:textSize="12sp" android:textColor="#999999" android:paddingVertical="4dp" android:visibility="gone" />
+
+</LinearLayout>

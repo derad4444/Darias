@@ -1,21 +1,19 @@
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/models/memo_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/models/todo_model.dart';
-import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/big5/big5_diagnosis_screen.dart';
-import '../screens/todo/todo_list_screen.dart';
 import '../screens/todo/todo_detail_screen.dart';
-import '../screens/calendar/calendar_screen.dart';
 import '../screens/calendar/schedule_detail_screen.dart';
 import '../screens/diary/diary_list_screen.dart';
-import '../screens/memo/memo_list_screen.dart';
 import '../screens/memo/memo_detail_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
@@ -31,14 +29,39 @@ import '../screens/history/unified_history_screen.dart';
 import '../screens/settings/volume_settings_screen.dart';
 import '../screens/splash/splash_screen.dart';
 
+/// Auth状態変化をGoRouterに通知するChangeNotifier
+/// ルーターを再生成せずにredirectだけ再評価させるために使用
+class _AuthChangeNotifier extends ChangeNotifier {
+  _AuthChangeNotifier() {
+    _subscription = FirebaseAuth.instance.authStateChanges().listen((_) {
+      notifyListeners();
+    });
+  }
+
+  late final StreamSubscription<User?> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
+}
+
+final _authChangeNotifierProvider = Provider<_AuthChangeNotifier>((ref) {
+  final notifier = _AuthChangeNotifier();
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
 /// ルーター設定
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  final notifier = ref.watch(_authChangeNotifierProvider);
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: notifier,
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final isSplash = state.matchedLocation == '/splash';
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
@@ -97,13 +120,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const Big5DiagnosisScreen(),
       ),
 
-      // Todo
-      GoRoute(
-        path: '/todo',
-        name: 'todo',
-        builder: (context, state) => const TodoListScreen(),
-      ),
-
       // Todo詳細
       GoRoute(
         path: '/todo/detail',
@@ -119,13 +135,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             initialTag: map?['initialTag'] as String? ?? '',
           );
         },
-      ),
-
-      // カレンダー
-      GoRoute(
-        path: '/calendar',
-        name: 'calendar',
-        builder: (context, state) => const CalendarScreen(),
       ),
 
       // スケジュール詳細
@@ -150,13 +159,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/diary',
         name: 'diary',
         builder: (context, state) => const DiaryListScreen(),
-      ),
-
-      // メモ
-      GoRoute(
-        path: '/memo',
-        name: 'memo',
-        builder: (context, state) => const MemoListScreen(),
       ),
 
       // メモ詳細

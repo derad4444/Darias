@@ -7,15 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		001908CE1D901C88EC2E3661 /* AppGroupConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 313721BB19ACCEF7E0ADC8F6 /* AppGroupConstants.swift */; };
+		0A3D0A1E061645FDD724B383 /* DariasWidgetsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60C69555A373F3AEAB4695BE /* DariasWidgetsBundle.swift */; };
+		0F66B7EE993662EDB84255ED /* TodoWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E802CBF6DDC85999DFB8A009 /* TodoWidgetView.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		172A325DFA56A40897FD7386 /* WidgetData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95FA79260445938CCFCC3C9D /* WidgetData.swift */; };
+		1F4E439F9A05AF218577F551 /* CalendarWidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118CDE5D22FC16CADCF307DC /* CalendarWidgetProvider.swift */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		3C2D7F0F52135D024BF0A366 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5A705C33C4C004BD96C3CC19 /* WidgetKit.framework */; };
+		3F11D0817F7C09C0553F7CE4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 478DC04EB7A2235577B8F5D2 /* Assets.xcassets */; };
+		44C3EF24D58C490CB3E65AF0 /* TodoWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8658EE84C4D362C52C7857A /* TodoWidget.swift */; };
 		4D6AA04E40B31B3A71962D66 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CB2F55F975E886BF21B2FDAA /* Pods_Runner.framework */; };
+		6D24656220621183F855BC09 /* WidgetColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB7CB1B9182C2CD7F07A2FEE /* WidgetColors.swift */; };
+		70B7F3EE84364DF17B79BB3E /* CalendarWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F209B487AB5D7E2FF5EE48C9 /* CalendarWidget.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
+		75046BC0E4F92CC410393609 /* DariasIcon.png in Resources */ = {isa = PBXBuildFile; fileRef = F245998F79A8D34C03C12850 /* DariasIcon.png */; };
+		869159F6AF5CFC8EF565EC92 /* MemoWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EEA8954F407B7295E8CEC71 /* MemoWidget.swift */; };
+		95222E75928A41F55C6A4706 /* DariasWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = AE2BD931AA603D144A03835D /* DariasWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		A1F5B8DFEFC1E3BC6A4E1B2D /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ECF9843E1EC5A592A5BDCC3C /* Pods_RunnerTests.framework */; };
+		AB6A5721B82BE27B2306BE67 /* CalendarWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 912E4DC970720B3DF96E790F /* CalendarWidgetView.swift */; };
+		B2FB224F609D3BA6D261317F /* MemoWidgetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 823285968506A5F6A6535372 /* MemoWidgetView.swift */; };
+		BD0A82F296B03B250BEBDBDE /* WidgetDataCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FBC4C612FEA6B6624B82D68 /* WidgetDataCache.swift */; };
+		CC29939DAB6E7B9F159F94FE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E2B900DB413DCF4F8E3DF440 /* SwiftUI.framework */; };
+		CD0BF9B1341524313B862561 /* TodoWidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78215C5BC529A6E85DF5DFD5 /* TodoWidgetProvider.swift */; };
+		D87B44198621E083B2BF2AFC /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9446A02F91224DDB4F4C7543 /* Foundation.framework */; };
+		FA3CB409973AD09EF8FD514A /* MemoWidgetProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 77B198DAABAD8699917BA0B3 /* MemoWidgetProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -25,6 +45,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		D78A7087AB6C74C6321239E3 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 83E3D2C59D5799C8CB02FA9E;
+			remoteInfo = DariasWidgets;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -39,18 +66,42 @@
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A263AD1A755762D843004ABE /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				95222E75928A41F55C6A4706 /* DariasWidgets.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		118CDE5D22FC16CADCF307DC /* CalendarWidgetProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarWidgetProvider.swift; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		2EEA8954F407B7295E8CEC71 /* MemoWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoWidget.swift; sourceTree = "<group>"; };
+		313721BB19ACCEF7E0ADC8F6 /* AppGroupConstants.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupConstants.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		478DC04EB7A2235577B8F5D2 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		5686EA9AB7FF6557125A2278 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		5A705C33C4C004BD96C3CC19 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = WidgetKit.framework; sourceTree = SDKROOT; };
+		5FBC4C612FEA6B6624B82D68 /* WidgetDataCache.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetDataCache.swift; sourceTree = "<group>"; };
+		60C69555A373F3AEAB4695BE /* DariasWidgetsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DariasWidgetsBundle.swift; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		77B198DAABAD8699917BA0B3 /* MemoWidgetProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoWidgetProvider.swift; sourceTree = "<group>"; };
+		78215C5BC529A6E85DF5DFD5 /* TodoWidgetProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodoWidgetProvider.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		823285968506A5F6A6535372 /* MemoWidgetView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoWidgetView.swift; sourceTree = "<group>"; };
+		912E4DC970720B3DF96E790F /* CalendarWidgetView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarWidgetView.swift; sourceTree = "<group>"; };
+		9446A02F91224DDB4F4C7543 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		95FA79260445938CCFCC3C9D /* WidgetData.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetData.swift; sourceTree = "<group>"; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
 		97C146EE1CF9000F007C117D /* Runner.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Runner.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -58,16 +109,33 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A8658EE84C4D362C52C7857A /* TodoWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodoWidget.swift; sourceTree = "<group>"; };
+		AE2BD931AA603D144A03835D /* DariasWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = DariasWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB7CB1B9182C2CD7F07A2FEE /* WidgetColors.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WidgetColors.swift; sourceTree = "<group>"; };
 		C6AB29C08595BFBD339E5F57 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		CB2F55F975E886BF21B2FDAA /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		CDE77F668137024971995650 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		DCFD0ABF23F0527ADABAB659 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		E2B900DB413DCF4F8E3DF440 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; path = SwiftUI.framework; sourceTree = SDKROOT; };
+		E802CBF6DDC85999DFB8A009 /* TodoWidgetView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TodoWidgetView.swift; sourceTree = "<group>"; };
 		ECF9843E1EC5A592A5BDCC3C /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		F18451CF66A76B5DF68550D4 /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
+		F209B487AB5D7E2FF5EE48C9 /* CalendarWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarWidget.swift; sourceTree = "<group>"; };
+		F245998F79A8D34C03C12850 /* DariasIcon.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = DariasIcon.png; sourceTree = "<group>"; };
 		FE282B8E873D2DCA521B0DFB /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		6C87898711E10945A341D77C /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D87B44198621E083B2BF2AFC /* Foundation.framework in Frameworks */,
+				3C2D7F0F52135D024BF0A366 /* WidgetKit.framework in Frameworks */,
+				CC29939DAB6E7B9F159F94FE /* SwiftUI.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EB1CF9000F007C117D /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -87,12 +155,51 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		07FBCD010A4E11E3306618B1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				912E4DC970720B3DF96E790F /* CalendarWidgetView.swift */,
+				823285968506A5F6A6535372 /* MemoWidgetView.swift */,
+				E802CBF6DDC85999DFB8A009 /* TodoWidgetView.swift */,
+			);
+			name = Views;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		153A74392893D92334CD2B8B /* Utils */ = {
+			isa = PBXGroup;
+			children = (
+				5FBC4C612FEA6B6624B82D68 /* WidgetDataCache.swift */,
+			);
+			name = Utils;
+			path = Utils;
+			sourceTree = "<group>";
+		};
 		331C8082294A63A400263BE5 /* RunnerTests */ = {
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
 			);
 			path = RunnerTests;
+			sourceTree = "<group>";
+		};
+		3B086261D20B69C43D765DFE /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				9446A02F91224DDB4F4C7543 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		3CA8EBB1B600A3FB7E00D258 /* Providers */ = {
+			isa = PBXGroup;
+			children = (
+				118CDE5D22FC16CADCF307DC /* CalendarWidgetProvider.swift */,
+				77B198DAABAD8699917BA0B3 /* MemoWidgetProvider.swift */,
+				78215C5BC529A6E85DF5DFD5 /* TodoWidgetProvider.swift */,
+			);
+			name = Providers;
+			path = Providers;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
@@ -115,6 +222,8 @@
 				331C8082294A63A400263BE5 /* RunnerTests */,
 				CC29D708F6A449B7CC9ECB69 /* Pods */,
 				C467EF7C7A03711D4456E49D /* Frameworks */,
+				CCAC5B38760220229033ECC4 /* DariasWidgets */,
+				C4117D96F27EE00C001C94ED /* Shared */,
 			);
 			sourceTree = "<group>";
 		};
@@ -123,6 +232,7 @@
 			children = (
 				97C146EE1CF9000F007C117D /* Runner.app */,
 				331C8081294A63A400263BE5 /* RunnerTests.xctest */,
+				AE2BD931AA603D144A03835D /* DariasWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -142,11 +252,43 @@
 			path = Runner;
 			sourceTree = "<group>";
 		};
+		A7DB9B668485DD82768724F5 /* Widgets */ = {
+			isa = PBXGroup;
+			children = (
+				F209B487AB5D7E2FF5EE48C9 /* CalendarWidget.swift */,
+				2EEA8954F407B7295E8CEC71 /* MemoWidget.swift */,
+				A8658EE84C4D362C52C7857A /* TodoWidget.swift */,
+			);
+			name = Widgets;
+			path = Widgets;
+			sourceTree = "<group>";
+		};
+		BAD6DE60E8E4718C8E89A9FB /* Constants */ = {
+			isa = PBXGroup;
+			children = (
+				313721BB19ACCEF7E0ADC8F6 /* AppGroupConstants.swift */,
+			);
+			name = Constants;
+			path = Constants;
+			sourceTree = "<group>";
+		};
+		C4117D96F27EE00C001C94ED /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				BAD6DE60E8E4718C8E89A9FB /* Constants */,
+			);
+			name = Shared;
+			path = Shared;
+			sourceTree = "<group>";
+		};
 		C467EF7C7A03711D4456E49D /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
 				CB2F55F975E886BF21B2FDAA /* Pods_Runner.framework */,
 				ECF9843E1EC5A592A5BDCC3C /* Pods_RunnerTests.framework */,
+				3B086261D20B69C43D765DFE /* iOS */,
+				5A705C33C4C004BD96C3CC19 /* WidgetKit.framework */,
+				E2B900DB413DCF4F8E3DF440 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -163,6 +305,32 @@
 			);
 			name = Pods;
 			path = Pods;
+			sourceTree = "<group>";
+		};
+		CCAC5B38760220229033ECC4 /* DariasWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				60C69555A373F3AEAB4695BE /* DariasWidgetsBundle.swift */,
+				E8471230B00F84D6C9F3CE3F /* Models */,
+				3CA8EBB1B600A3FB7E00D258 /* Providers */,
+				153A74392893D92334CD2B8B /* Utils */,
+				07FBCD010A4E11E3306618B1 /* Views */,
+				A7DB9B668485DD82768724F5 /* Widgets */,
+				478DC04EB7A2235577B8F5D2 /* Assets.xcassets */,
+				F245998F79A8D34C03C12850 /* DariasIcon.png */,
+				BB7CB1B9182C2CD7F07A2FEE /* WidgetColors.swift */,
+			);
+			name = DariasWidgets;
+			path = DariasWidgets;
+			sourceTree = "<group>";
+		};
+		E8471230B00F84D6C9F3CE3F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				95FA79260445938CCFCC3C9D /* WidgetData.swift */,
+			);
+			name = Models;
+			path = Models;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -187,6 +355,23 @@
 			productReference = 331C8081294A63A400263BE5 /* RunnerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		83E3D2C59D5799C8CB02FA9E /* DariasWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4E184DCBF0D118501CD756E0 /* Build configuration list for PBXNativeTarget "DariasWidgets" */;
+			buildPhases = (
+				7DAFFFB2E22535AC903D93C6 /* Sources */,
+				6C87898711E10945A341D77C /* Frameworks */,
+				B5ADB601FC3932369A59F60A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = DariasWidgets;
+			productName = DariasWidgets;
+			productReference = AE2BD931AA603D144A03835D /* DariasWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		97C146ED1CF9000F007C117D /* Runner */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 97C147051CF9000F007C117D /* Build configuration list for PBXNativeTarget "Runner" */;
@@ -197,6 +382,7 @@
 				97C146EB1CF9000F007C117D /* Frameworks */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
+				A263AD1A755762D843004ABE /* Embed App Extensions */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				4F5EB8E92FA2BE47C2D97442 /* [CP] Embed Pods Frameworks */,
 				49795C2200E657C3462F0D9F /* [CP] Copy Pods Resources */,
@@ -204,6 +390,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				1415DF7EA381E720D9189BC8 /* PBXTargetDependency */,
 			);
 			name = Runner;
 			productName = Runner;
@@ -245,6 +432,7 @@
 			targets = (
 				97C146ED1CF9000F007C117D /* Runner */,
 				331C8080294A63A400263BE5 /* RunnerTests */,
+				83E3D2C59D5799C8CB02FA9E /* DariasWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -265,6 +453,15 @@
 				3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */,
 				97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */,
 				97C146FC1CF9000F007C117D /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B5ADB601FC3932369A59F60A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3F11D0817F7C09C0553F7CE4 /* Assets.xcassets in Resources */,
+				75046BC0E4F92CC410393609 /* DariasIcon.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -391,6 +588,27 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7DAFFFB2E22535AC903D93C6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0A3D0A1E061645FDD724B383 /* DariasWidgetsBundle.swift in Sources */,
+				172A325DFA56A40897FD7386 /* WidgetData.swift in Sources */,
+				1F4E439F9A05AF218577F551 /* CalendarWidgetProvider.swift in Sources */,
+				FA3CB409973AD09EF8FD514A /* MemoWidgetProvider.swift in Sources */,
+				CD0BF9B1341524313B862561 /* TodoWidgetProvider.swift in Sources */,
+				BD0A82F296B03B250BEBDBDE /* WidgetDataCache.swift in Sources */,
+				AB6A5721B82BE27B2306BE67 /* CalendarWidgetView.swift in Sources */,
+				B2FB224F609D3BA6D261317F /* MemoWidgetView.swift in Sources */,
+				0F66B7EE993662EDB84255ED /* TodoWidgetView.swift in Sources */,
+				70B7F3EE84364DF17B79BB3E /* CalendarWidget.swift in Sources */,
+				869159F6AF5CFC8EF565EC92 /* MemoWidget.swift in Sources */,
+				44C3EF24D58C490CB3E65AF0 /* TodoWidget.swift in Sources */,
+				001908CE1D901C88EC2E3661 /* AppGroupConstants.swift in Sources */,
+				6D24656220621183F855BC09 /* WidgetColors.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		97C146EA1CF9000F007C117D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -403,6 +621,12 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		1415DF7EA381E720D9189BC8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = DariasWidgets;
+			target = 83E3D2C59D5799C8CB02FA9E /* DariasWidgets */;
+			targetProxy = D78A7087AB6C74C6321239E3 /* PBXContainerItemProxy */;
+		};
 		331C8086294A63A400263BE5 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
@@ -430,6 +654,60 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		027B16CB115A6AA9E5B7CEA6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = DariasWidgets/DariasWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UYP6X4YKVM;
+				INFOPLIST_FILE = DariasWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character.DariasWidgets;
+				PRODUCT_NAME = DariasWidgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		20724272C1F410874BA1F670 /* Profile */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = DariasWidgets/DariasWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UYP6X4YKVM;
+				INFOPLIST_FILE = DariasWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character.DariasWidgets;
+				PRODUCT_NAME = DariasWidgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Profile;
+		};
 		249021D3217E4FDB00AE95B9 /* Profile */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -488,6 +766,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
@@ -671,6 +950,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
@@ -694,6 +974,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
@@ -710,6 +991,32 @@
 			};
 			name = Release;
 		};
+		E7EBE0968DADD687B5B9998E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = DariasWidgets/DariasWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = UYP6X4YKVM;
+				INFOPLIST_FILE = DariasWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character.DariasWidgets;
+				PRODUCT_NAME = DariasWidgets;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -719,6 +1026,16 @@
 				331C8088294A63A400263BE5 /* Debug */,
 				331C8089294A63A400263BE5 /* Release */,
 				331C808A294A63A400263BE5 /* Profile */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4E184DCBF0D118501CD756E0 /* Build configuration list for PBXNativeTarget "DariasWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				027B16CB115A6AA9E5B7CEA6 /* Release */,
+				E7EBE0968DADD687B5B9998E /* Debug */,
+				20724272C1F410874BA1F670 /* Profile */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
