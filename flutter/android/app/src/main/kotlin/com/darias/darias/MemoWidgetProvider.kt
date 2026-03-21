@@ -51,7 +51,7 @@ class MemoWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0))
             val pendingIntent = launchPendingIntent(context, appWidgetId)
             val isLarge = minHeight >= 200
 

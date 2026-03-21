@@ -56,7 +56,7 @@ class TodoWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0))
             val isLarge = minHeight >= 200
             val pendingIntent = launchPendingIntent(context, appWidgetId)
 

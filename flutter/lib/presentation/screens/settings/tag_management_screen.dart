@@ -74,6 +74,8 @@ class TagItem {
     );
   }
 
+  String get colorHex => _colorToHex(color);
+
   Map<String, dynamic> toMap() {
     return {
       'name': name,

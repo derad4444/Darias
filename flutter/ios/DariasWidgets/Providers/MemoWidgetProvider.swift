@@ -25,6 +25,10 @@ struct MemoWidgetProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (MemoWidgetEntry) -> Void) {
+        if context.isPreview {
+            completion(placeholder(in: context))
+            return
+        }
         let memos = WidgetDataCache.shared.loadMemos()
         let totalCount = WidgetDataCache.shared.loadMemosTotalCount()
         let entry = MemoWidgetEntry(date: Date(), memos: memos, totalCount: totalCount)

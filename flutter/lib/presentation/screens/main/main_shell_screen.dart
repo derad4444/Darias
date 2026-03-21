@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:home_widget/home_widget.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/widget_data_service.dart';
 import '../../providers/auth_provider.dart';
@@ -13,6 +14,7 @@ import '../../../data/models/todo_model.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/calendar_provider.dart';
+import '../settings/tag_management_screen.dart';
 import '../home/home_screen.dart';
 import '../calendar/calendar_screen.dart';
 import '../note/note_screen.dart';
@@ -38,6 +40,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.initState();
     if (!kIsWeb) {
       _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
+      // コールドスタート（ウィジェットタップによるアプリ起動）の処理
+      HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
+        if (uri != null) _handleWidgetUri(uri);
+      });
     }
   }
 
@@ -76,7 +82,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         next.whenData((todos) => WidgetDataService.shared.cacheTodos(todos));
       });
       ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
-        next.whenData((schedules) => WidgetDataService.shared.cacheSchedules(schedules));
+        next.whenData((schedules) {
+          final tags = ref.read(tagsProvider);
+          final tagColors = {for (final t in tags) t.name: t.colorHex};
+          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
+        });
       });
     }
 

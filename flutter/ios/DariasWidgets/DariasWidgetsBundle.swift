@@ -11,8 +11,9 @@ import WidgetKit
 @main
 struct DariasWidgetsBundle: WidgetBundle {
     var body: some Widget {
-        TodoWidget()
-        MemoWidget()
+        CalendarGridWidget()
         CalendarWidget()
+        MemoWidget()
+        TodoWidget()
     }
 }

@@ -15,6 +15,7 @@ class WidgetSchedule {
   final DateTime endDate;
   final String? location;
   final bool isAllDay;
+  final String? colorHex;
 
   WidgetSchedule({
     required this.id,
@@ -23,6 +24,7 @@ class WidgetSchedule {
     required this.endDate,
     this.location,
     required this.isAllDay,
+    this.colorHex,
   });
 
   Map<String, dynamic> toJson() => {
@@ -32,6 +34,7 @@ class WidgetSchedule {
         'endDate': endDate.toIso8601String(),
         'location': location,
         'isAllDay': isAllDay,
+        'colorHex': colorHex,
       };
 }
 
@@ -109,10 +112,11 @@ class WidgetDataService {
   // App Group ID (iOS) / SharedPreferences (Android)
   static const String _appGroupId = 'group.com.derad.Character';
 
-  // Widget名
-  static const String _calendarWidgetName = 'CalendarWidget';
-  static const String _memoWidgetName = 'MemoWidget';
-  static const String _todoWidgetName = 'TodoWidget';
+  // Widget名（androidNameはAndroidManifestのreceiver android:nameと一致させる）
+  static const String _calendarWidgetName = 'CalendarWidgetProvider';
+  static const String _calendarGridWidgetName = 'CalendarGridWidgetProvider';
+  static const String _memoWidgetName = 'MemoWidgetProvider';
+  static const String _todoWidgetName = 'TodoWidgetProvider';
   static const String _big5WidgetName = 'Big5ProgressWidget';
 
   // キャッシュキー
@@ -134,7 +138,7 @@ class WidgetDataService {
   // MARK: - Schedule Caching
 
   /// スケジュールをウィジェット用にキャッシュ
-  Future<void> cacheSchedules(List<ScheduleModel> schedules) async {
+  Future<void> cacheSchedules(List<ScheduleModel> schedules, {Map<String, String> tagColors = const {}}) async {
     if (kIsWeb) return;
     debugPrint('📅 [WidgetDataService] cacheSchedules called with ${schedules.length} schedules');
 
@@ -147,6 +151,7 @@ class WidgetDataService {
       ..sort((a, b) => a.startDate.compareTo(b.startDate));
 
     final limitedSchedules = widgetSchedules.take(50).map((schedule) {
+      final colorHex = schedule.tag.isNotEmpty ? tagColors[schedule.tag] : null;
       return WidgetSchedule(
         id: schedule.id,
         title: schedule.title,
@@ -154,6 +159,7 @@ class WidgetDataService {
         endDate: schedule.endDate,
         location: schedule.location.isEmpty ? null : schedule.location,
         isAllDay: schedule.isAllDay,
+        colorHex: colorHex,
       );
     }).toList();
 
@@ -171,6 +177,11 @@ class WidgetDataService {
       name: _calendarWidgetName,
       iOSName: _calendarWidgetName,
       androidName: _calendarWidgetName,
+    );
+    await HomeWidget.updateWidget(
+      name: _calendarGridWidgetName,
+      iOSName: _calendarGridWidgetName,
+      androidName: _calendarGridWidgetName,
     );
 
     debugPrint('📅 [WidgetDataService] Successfully cached schedules');
@@ -319,6 +330,11 @@ class WidgetDataService {
       name: _big5WidgetName,
       iOSName: _big5WidgetName,
       androidName: _big5WidgetName,
+    );
+    await HomeWidget.updateWidget(
+      name: _calendarGridWidgetName,
+      iOSName: _calendarGridWidgetName,
+      androidName: _calendarGridWidgetName,
     );
 
     debugPrint('🔄 [WidgetDataService] Reloaded all widgets');

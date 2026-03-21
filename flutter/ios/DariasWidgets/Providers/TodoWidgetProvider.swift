@@ -18,6 +18,10 @@ struct TodoWidgetProvider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (TodoWidgetEntry) -> Void) {
+        if context.isPreview {
+            completion(placeholder(in: context))
+            return
+        }
         let todos = WidgetDataCache.shared.loadTodos()
         let entry = TodoWidgetEntry(date: Date(), todos: todos)
         completion(entry)

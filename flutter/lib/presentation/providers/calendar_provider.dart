@@ -4,8 +4,10 @@ import '../../data/models/schedule_model.dart';
 import '../../data/models/holiday_model.dart';
 import '../../data/models/monthly_comment_model.dart';
 import '../../data/services/widget_data_service.dart';
+import '../../data/services/japanese_holiday_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
+import '../screens/settings/tag_management_screen.dart';
 
 /// CalendarDatasourceのプロバイダー
 final calendarDatasourceProvider = Provider<CalendarDatasource>((ref) {
@@ -69,9 +71,21 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
 
   CalendarController(this._datasource, this._ref) : super(const AsyncValue.data(null)) {
+    // スケジュール更新時にキャッシュ
     _ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
-      next.whenData((schedules) => WidgetDataService.shared.cacheSchedules(schedules));
+      next.whenData((schedules) => _cacheSchedules(schedules));
     });
+    // タグ更新時にも再キャッシュ（タグロード前にスケジュールが先に届くレースコンディション対策）
+    _ref.listen<List<TagItem>>(tagsProvider, (_, __) {
+      final schedules = _ref.read(allSchedulesProvider);
+      schedules.whenData((s) => _cacheSchedules(s));
+    });
+  }
+
+  void _cacheSchedules(List<ScheduleModel> schedules) {
+    final tags = _ref.read(tagsProvider);
+    final tagColors = {for (final t in tags) t.name: t.colorHex};
+    WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
   }
 
   /// スケジュールを追加
@@ -208,28 +222,20 @@ final calendarControllerProvider =
   );
 });
 
-/// 祝日一覧のストリームプロバイダー
-final holidaysProvider = StreamProvider<List<HolidayModel>>((ref) {
-  final firestore = ref.watch(firestoreProvider);
-  return firestore
-      .collection('holidays')
-      .snapshots()
-      .map((snapshot) => snapshot.docs.map((doc) => HolidayModel.fromFirestore(doc)).toList());
+/// 祝日一覧のプロバイダー（ローカルデータを使用）
+final holidaysProvider = Provider<List<HolidayModel>>((ref) {
+  return JapaneseHolidayService.allHolidays();
 });
 
 /// 特定の日付の祝日を取得
 final holidayForDateProvider = Provider.family<HolidayModel?, DateTime>((ref, date) {
-  final holidaysAsync = ref.watch(holidaysProvider);
-  return holidaysAsync.when(
-    data: (holidays) {
-      try {
-        return holidays.firstWhere((h) => h.isOnDate(date));
-      } catch (e) {
-        return null;
-      }
-    },
-    loading: () => null,
-    error: (e, st) => null,
+  final name = JapaneseHolidayService.getHolidayName(date);
+  if (name == null) return null;
+  return HolidayModel(
+    id: JapaneseHolidayService.key(date),
+    name: name,
+    dateString: JapaneseHolidayService.key(date),
+    date: DateTime(date.year, date.month, date.day),
   );
 });
 

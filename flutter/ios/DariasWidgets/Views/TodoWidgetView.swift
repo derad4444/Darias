@@ -34,7 +34,7 @@ struct SmallTodoView: View {
         VStack(alignment: .leading, spacing: 6) {
             // Header
             HStack(spacing: 6) {
-                Image(uiImage: UIImage(contentsOfFile: Bundle.main.path(forResource: "DariasIcon", ofType: "png") ?? "") ?? UIImage())
+                Image("DariasIcon")
                     .resizable()
                     .frame(width: 20, height: 20)
                     .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -89,7 +89,7 @@ struct MediumTodoView: View {
         VStack(alignment: .leading, spacing: 8) {
             // Header
             HStack(spacing: 6) {
-                Image(uiImage: UIImage(contentsOfFile: Bundle.main.path(forResource: "DariasIcon", ofType: "png") ?? "") ?? UIImage())
+                Image("DariasIcon")
                     .resizable()
                     .frame(width: 20, height: 20)
                     .clipShape(RoundedRectangle(cornerRadius: 5))
@@ -157,7 +157,7 @@ struct LargeTodoView: View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
             HStack(spacing: 6) {
-                Image(uiImage: UIImage(contentsOfFile: Bundle.main.path(forResource: "DariasIcon", ofType: "png") ?? "") ?? UIImage())
+                Image("DariasIcon")
                     .resizable()
                     .frame(width: 22, height: 22)
                     .clipShape(RoundedRectangle(cornerRadius: 6))

@@ -10,11 +10,7 @@ import Foundation
 class WidgetDataCache {
     static let shared = WidgetDataCache()
 
-    private var sharedDefaults: UserDefaults? {
-        let defaults = UserDefaults(suiteName: AppGroupConstants.suiteName)
-        defaults?.synchronize()
-        return defaults
-    }
+    private let sharedDefaults: UserDefaults? = UserDefaults(suiteName: AppGroupConstants.suiteName)
 
     private init() {}
 

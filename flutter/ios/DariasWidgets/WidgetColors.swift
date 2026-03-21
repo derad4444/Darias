@@ -5,6 +5,20 @@
 
 import SwiftUI
 
+extension Color {
+    init?(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard hex.count == 6 else { return nil }
+        var rgb: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&rgb)
+        self.init(
+            red: Double((rgb >> 16) & 0xFF) / 255,
+            green: Double((rgb >> 8) & 0xFF) / 255,
+            blue: Double(rgb & 0xFF) / 255
+        )
+    }
+}
+
 struct WidgetColors {
     static let primaryPink = Color(red: 1.0, green: 0.42, blue: 0.616)       // #FF6B9D
     static let lavender    = Color(red: 0.769, green: 0.29, blue: 0.753)      // #C44AC0

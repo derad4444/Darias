@@ -18,6 +18,7 @@ struct WidgetSchedule: Codable, Identifiable {
     let endDate: String    // ISO8601 String
     let location: String?
     let isAllDay: Bool
+    let colorHex: String?
 
     var timeText: String {
         if isAllDay { return "終日" }
@@ -32,7 +33,12 @@ struct WidgetSchedule: Codable, Identifiable {
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let d = iso.date(from: startDate) { return d }
-        return iso.date(from: String(startDate.prefix(23)) + "Z")
+        // タイムゾーン情報なし → ローカルタイム（JST）として解釈
+        // 誤って"Z"を付けるとUTCになり+9時間ずれて日付が変わるため使わない
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+        return fmt.date(from: String(startDate.prefix(23)))
     }
 }
 

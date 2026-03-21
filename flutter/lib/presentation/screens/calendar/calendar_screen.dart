@@ -134,7 +134,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final searchText = ref.watch(calendarSearchTextProvider);
     final filteredSchedules = ref.watch(filteredSchedulesProvider);
     final monthlyCommentAsync = ref.watch(monthlyCommentProvider(selectedMonth));
-    final holidaysAsync = ref.watch(holidaysProvider);
+    final holidays = ref.watch(holidaysProvider);
 
     return Scaffold(
       body: DraggableFabStack(
@@ -204,8 +204,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                 // カレンダーグリッド
                 Expanded(
                   child: schedulesAsync.when(
-                    data: (schedules) => holidaysAsync.when(
-                      data: (holidays) => _CalendarGrid(
+                    data: (schedules) => _CalendarGrid(
                         month: selectedMonth,
                         selectedDay: selectedDay,
                         schedules: schedules,
@@ -223,43 +222,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           );
                         },
                       ),
-                      loading: () => _CalendarGrid(
-                        month: selectedMonth,
-                        selectedDay: selectedDay,
-                        schedules: schedules,
-                        holidays: const [],
-                        accentColor: accentColor,
-                        textColor: textColor,
-                        onDaySelected: (day) {
-                          ref.read(calendarControllerProvider.notifier).selectDay(day);
-                          _showScheduleBottomSheet(
-                            context,
-                            ref,
-                            day,
-                            accentColor,
-                            textColor,
-                          );
-                        },
-                      ),
-                      error: (e, st) => _CalendarGrid(
-                        month: selectedMonth,
-                        selectedDay: selectedDay,
-                        schedules: schedules,
-                        holidays: const [],
-                        accentColor: accentColor,
-                        textColor: textColor,
-                        onDaySelected: (day) {
-                          ref.read(calendarControllerProvider.notifier).selectDay(day);
-                          _showScheduleBottomSheet(
-                            context,
-                            ref,
-                            day,
-                            accentColor,
-                            textColor,
-                          );
-                        },
-                      ),
-                    ),
                     loading: () => const Center(child: CircularProgressIndicator()),
                     error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
                   ),

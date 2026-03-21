@@ -62,7 +62,7 @@ class CalendarWidgetProvider : AppWidgetProvider() {
             appWidgetId: Int
         ) {
             val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
-            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+            val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0))
             val isLarge = minHeight >= 200
             val pendingIntent = launchPendingIntent(context, appWidgetId)
 
@@ -133,33 +133,67 @@ class CalendarWidgetProvider : AppWidgetProvider() {
                 appWidgetManager.updateAppWidget(appWidgetId, views)
             } else {
                 val views = RemoteViews(context.packageName, R.layout.calendar_widget)
+                val upcomingRowIds = listOf(
+                    Triple(R.id.upcoming_row_1, R.id.upcoming_date_1, Pair(R.id.upcoming_time_1, R.id.upcoming_title_1)),
+                    Triple(R.id.upcoming_row_2, R.id.upcoming_date_2, Pair(R.id.upcoming_time_2, R.id.upcoming_title_2)),
+                    Triple(R.id.upcoming_row_3, R.id.upcoming_date_3, Pair(R.id.upcoming_time_3, R.id.upcoming_title_3)),
+                )
                 try {
                     val schedules = JSONArray(schedulesJson)
-                    var todayTitle = "予定なし"
-                    var todayTime = ""
+                    val mdFormat = SimpleDateFormat("M/d", Locale.JAPAN)
+                    val todayStart = today.clone() as Calendar
+                    todayStart.set(Calendar.HOUR_OF_DAY, 0)
+                    todayStart.set(Calendar.MINUTE, 0)
+                    todayStart.set(Calendar.SECOND, 0)
+                    todayStart.set(Calendar.MILLISECOND, 0)
+                    val tomorrow = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 1) }
 
+                    val upcomingList = mutableListOf<Triple<String, String, String>>() // date, time, title
                     for (i in 0 until schedules.length()) {
                         val s = schedules.getJSONObject(i)
                         val startStr = s.optString("startDate", "")
                         if (startStr.isEmpty()) continue
                         val cleanStr = if (startStr.length > 19) startStr.substring(0, 19) else startStr
                         val startDate = try { dateFormat.parse(cleanStr) } catch (e: Exception) { null } ?: continue
+                        if (startDate.before(todayStart.time)) continue
                         val cal = Calendar.getInstance().apply { time = startDate }
-                        if (cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
-                            cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR)) {
-                            val isAllDay = s.optBoolean("isAllDay", false)
-                            todayTitle = s.optString("title", "")
-                            todayTime = if (isAllDay) "終日" else timeFormat.format(startDate)
-                            break
+                        val isAllDay = s.optBoolean("isAllDay", false)
+                        val title = s.optString("title", "")
+                        val timeStr = if (isAllDay) "終日" else timeFormat.format(startDate)
+                        val dateLabel = when {
+                            cal.get(Calendar.YEAR) == today.get(Calendar.YEAR) &&
+                            cal.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR) -> "今日"
+                            cal.get(Calendar.YEAR) == tomorrow.get(Calendar.YEAR) &&
+                            cal.get(Calendar.DAY_OF_YEAR) == tomorrow.get(Calendar.DAY_OF_YEAR) -> "明日"
+                            else -> mdFormat.format(startDate)
                         }
+                        upcomingList.add(Triple(dateLabel, timeStr, title))
+                        if (upcomingList.size >= 3) break
                     }
-                    views.setTextViewText(R.id.schedule_title, todayTitle)
-                    views.setTextViewText(R.id.schedule_time, todayTime)
+
                     val todayFormat = SimpleDateFormat("M月d日(E)", Locale.JAPAN)
                     views.setTextViewText(R.id.today_date, todayFormat.format(today.time))
+
+                    if (upcomingList.isEmpty()) {
+                        views.setViewVisibility(R.id.upcoming_empty, View.VISIBLE)
+                        upcomingRowIds.forEach { views.setViewVisibility(it.first, View.GONE) }
+                    } else {
+                        views.setViewVisibility(R.id.upcoming_empty, View.GONE)
+                        upcomingRowIds.forEachIndexed { idx, (rowId, dateId, timeTitlePair) ->
+                            if (idx < upcomingList.size) {
+                                val (dateLabel, timeStr, title) = upcomingList[idx]
+                                views.setViewVisibility(rowId, View.VISIBLE)
+                                views.setTextViewText(dateId, dateLabel)
+                                views.setTextViewText(timeTitlePair.first, timeStr)
+                                views.setTextViewText(timeTitlePair.second, title)
+                            } else {
+                                views.setViewVisibility(rowId, View.GONE)
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
-                    views.setTextViewText(R.id.schedule_title, "予定なし")
-                    views.setTextViewText(R.id.schedule_time, "")
+                    views.setViewVisibility(R.id.upcoming_empty, View.VISIBLE)
+                    upcomingRowIds.forEach { views.setViewVisibility(it.first, View.GONE) }
                 }
                 views.setOnClickPendingIntent(R.id.widget_root, pendingIntent)
                 appWidgetManager.updateAppWidget(appWidgetId, views)
