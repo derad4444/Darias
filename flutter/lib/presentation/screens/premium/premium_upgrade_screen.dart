@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:url_launcher/url_launcher.dart';
-
-import '../../../core/constants/app_constants.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -494,7 +492,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             TextButton(
-              onPressed: _openTermsOfService,
+              onPressed: () => context.push('/terms'),
               child: Text(
                 '利用規約',
                 style: TextStyle(
@@ -505,7 +503,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
             ),
             const SizedBox(width: 16),
             TextButton(
-              onPressed: _openPrivacyPolicy,
+              onPressed: () => context.push('/privacy'),
               child: Text(
                 'プライバシーポリシー',
                 style: TextStyle(
@@ -520,19 +518,4 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
     );
   }
 
-  /// 利用規約を開く
-  Future<void> _openTermsOfService() async {
-    final uri = Uri.parse(AppConstants.termsOfServiceUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  /// プライバシーポリシーを開く
-  Future<void> _openPrivacyPolicy() async {
-    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
 }

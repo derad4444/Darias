@@ -113,12 +113,12 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: '利用規約',
                       subtitle: 'サービス利用規約を確認',
-                      onTap: () => _openTermsOfService(),
+                      onTap: () => _openTermsOfService(context),
                     ),
                     _SettingsCard(
                       title: 'プライバシーポリシー',
                       subtitle: '個人情報の取り扱いについて',
-                      onTap: () => _openPrivacyPolicy(),
+                      onTap: () => _openPrivacyPolicy(context),
                     ),
 
                     const SizedBox(height: 16),
@@ -161,18 +161,12 @@ class SettingsScreen extends ConsumerWidget {
     }
   }
 
-  Future<void> _openTermsOfService() async {
-    final uri = Uri.parse(AppConstants.termsOfServiceUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  void _openTermsOfService(BuildContext context) {
+    context.push('/terms');
   }
 
-  Future<void> _openPrivacyPolicy() async {
-    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
+  void _openPrivacyPolicy(BuildContext context) {
+    context.push('/privacy');
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {

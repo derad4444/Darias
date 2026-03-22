@@ -27,6 +27,8 @@ import '../screens/auth/forgot_password_screen.dart';
 import '../screens/settings/tag_management_screen.dart';
 import '../screens/history/unified_history_screen.dart';
 import '../screens/settings/volume_settings_screen.dart';
+import '../screens/settings/terms_of_service_screen.dart';
+import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/splash/splash_screen.dart';
 
 /// Auth状態変化をGoRouterに通知するChangeNotifier
@@ -267,6 +269,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/volume-settings',
         name: 'volume-settings',
         builder: (context, state) => const VolumeSettingsScreen(),
+      ),
+
+      // 利用規約
+      GoRoute(
+        path: '/terms',
+        name: 'terms',
+        builder: (context, state) => const TermsOfServiceScreen(),
+      ),
+
+      // プライバシーポリシー
+      GoRoute(
+        path: '/privacy',
+        name: 'privacy',
+        builder: (context, state) => const PrivacyPolicyScreen(),
       ),
 
     ],
