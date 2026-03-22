@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../datasources/remote/subscription_datasource.dart';
 import '../models/subscription_model.dart';
 
@@ -13,8 +14,8 @@ class PurchaseService {
   final SubscriptionDatasource _datasource;
   final FirebaseFunctions _functions;
 
-  // 商品ID
-  static const String monthlyProductId = 'com.character.premium.monthly';
+  // 商品ID（AppConstantsと一致させること）
+  static const String monthlyProductId = PurchaseConstants.monthlySubscriptionId;
   static const Set<String> productIds = {monthlyProductId};
 
   // 状態

@@ -82,9 +82,9 @@ class AdConstants {
 class PurchaseConstants {
   PurchaseConstants._();
 
-  // 商品ID
-  static const String monthlySubscriptionId = 'darias_premium_monthly';
-  static const String yearlySubscriptionId = 'darias_premium_yearly';
+  // 商品ID（既存iOSアプリ・App Store Connectと一致させること）
+  static const String monthlySubscriptionId = 'com.character.premium.monthly';
+  static const String yearlySubscriptionId = 'com.character.premium.yearly';
 
   // 価格表示用
   static const String monthlyPriceDefault = '¥480/月';

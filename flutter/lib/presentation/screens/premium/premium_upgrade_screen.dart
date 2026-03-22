@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -371,12 +372,9 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
             child: ElevatedButton(
               onPressed: monthlyProduct != null
                   ? () async {
-                      final success = await ref
+                      await ref
                           .read(subscriptionControllerProvider.notifier)
                           .purchaseMonthly();
-                      if (success && mounted) {
-                        // 購入成功後の処理はコールバックで行われる
-                      }
                     }
                   : null,
               style: ElevatedButton.styleFrom(
@@ -403,7 +401,34 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 12),
+
+          // 商品が読み込めなかった場合のメッセージ
+          if (monthlyProduct == null && !state.isLoading)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Column(
+                children: [
+                  Text(
+                    '商品情報を読み込めませんでした',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textLight,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  TextButton(
+                    onPressed: () => ref
+                        .read(subscriptionControllerProvider.notifier)
+                        .reloadProducts(),
+                    child: Text(
+                      '再読み込み',
+                      style: TextStyle(color: accentColor, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 4),
 
           // 復元ボタン
           TextButton(
@@ -497,17 +522,17 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
 
   /// 利用規約を開く
   Future<void> _openTermsOfService() async {
-    final uri = Uri.parse('https://example.com/terms');
+    final uri = Uri.parse(AppConstants.termsOfServiceUrl);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 
   /// プライバシーポリシーを開く
   Future<void> _openPrivacyPolicy() async {
-    final uri = Uri.parse('https://example.com/privacy');
+    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
   }
 }

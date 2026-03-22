@@ -44,6 +44,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
         if (uri != null) _handleWidgetUri(uri);
       });
+      // 初回表示時にすでにデータが揃っている場合も確実にキャッシュ
+      // （ref.listenは初期値では発火しないため、ポストフレームで補完）
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        ref.read(allSchedulesProvider).whenData((schedules) {
+          final tags = ref.read(tagsProvider);
+          final tagColors = {for (final t in tags) t.name: t.colorHex};
+          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
+        });
+        ref.read(memosProvider).whenData(WidgetDataService.shared.cacheMemos);
+        ref.read(todosProvider).whenData(WidgetDataService.shared.cacheTodos);
+      });
     }
   }
 

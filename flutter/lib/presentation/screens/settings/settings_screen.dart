@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
@@ -108,6 +109,20 @@ class SettingsScreen extends ConsumerWidget {
 
                     const SizedBox(height: 16),
 
+                    // 利用規約・プライバシーポリシー
+                    _SettingsCard(
+                      title: '利用規約',
+                      subtitle: 'サービス利用規約を確認',
+                      onTap: () => _openTermsOfService(),
+                    ),
+                    _SettingsCard(
+                      title: 'プライバシーポリシー',
+                      subtitle: '個人情報の取り扱いについて',
+                      onTap: () => _openPrivacyPolicy(),
+                    ),
+
+                    const SizedBox(height: 16),
+
                     // 下部バナー広告（無料ユーザーのみ）
                     if (shouldShowBannerAd)
                       Padding(
@@ -141,6 +156,20 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _openInstagram() async {
     const instagramUrl = 'https://www.instagram.com/darias_1024/';
     final uri = Uri.parse(instagramUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openTermsOfService() async {
+    final uri = Uri.parse(AppConstants.termsOfServiceUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(AppConstants.privacyPolicyUrl);
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }

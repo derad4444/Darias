@@ -112,11 +112,15 @@ class WidgetDataService {
   // App Group ID (iOS) / SharedPreferences (Android)
   static const String _appGroupId = 'group.com.derad.Character';
 
-  // Widget名（androidNameはAndroidManifestのreceiver android:nameと一致させる）
-  static const String _calendarWidgetName = 'CalendarWidgetProvider';
-  static const String _calendarGridWidgetName = 'CalendarGridWidgetProvider';
-  static const String _memoWidgetName = 'MemoWidgetProvider';
-  static const String _todoWidgetName = 'TodoWidgetProvider';
+  // Widget名（Android: AndroidManifestのreceiver android:nameと一致、iOS: Widgetのkind文字列と一致）
+  static const String _calendarWidgetAndroidName = 'CalendarWidgetProvider';
+  static const String _calendarWidgetIosName = 'CalendarWidget';
+  static const String _calendarGridWidgetAndroidName = 'CalendarGridWidgetProvider';
+  static const String _calendarGridWidgetIosName = 'CalendarGridWidget';
+  static const String _memoWidgetAndroidName = 'MemoWidgetProvider';
+  static const String _memoWidgetIosName = 'MemoWidget';
+  static const String _todoWidgetAndroidName = 'TodoWidgetProvider';
+  static const String _todoWidgetIosName = 'TodoWidget';
   static const String _big5WidgetName = 'Big5ProgressWidget';
 
   // キャッシュキー
@@ -174,14 +178,12 @@ class WidgetDataService {
 
     // カレンダーウィジェットを更新
     await HomeWidget.updateWidget(
-      name: _calendarWidgetName,
-      iOSName: _calendarWidgetName,
-      androidName: _calendarWidgetName,
+      iOSName: _calendarWidgetIosName,
+      androidName: _calendarWidgetAndroidName,
     );
     await HomeWidget.updateWidget(
-      name: _calendarGridWidgetName,
-      iOSName: _calendarGridWidgetName,
-      androidName: _calendarGridWidgetName,
+      iOSName: _calendarGridWidgetIosName,
+      androidName: _calendarGridWidgetAndroidName,
     );
 
     debugPrint('📅 [WidgetDataService] Successfully cached schedules');
@@ -220,9 +222,8 @@ class WidgetDataService {
 
     // メモウィジェットを更新
     await HomeWidget.updateWidget(
-      name: _memoWidgetName,
-      iOSName: _memoWidgetName,
-      androidName: _memoWidgetName,
+      iOSName: _memoWidgetIosName,
+      androidName: _memoWidgetAndroidName,
     );
 
     debugPrint('✅ [WidgetDataService] Successfully cached ${widgetMemos.length} memos');
@@ -262,9 +263,8 @@ class WidgetDataService {
 
     // ToDoウィジェットを更新
     await HomeWidget.updateWidget(
-      name: _todoWidgetName,
-      iOSName: _todoWidgetName,
-      androidName: _todoWidgetName,
+      iOSName: _todoWidgetIosName,
+      androidName: _todoWidgetAndroidName,
     );
 
     debugPrint('✅ [WidgetDataService] Successfully cached ${widgetTodos.length} todos');
@@ -312,29 +312,24 @@ class WidgetDataService {
   /// 全てのウィジェットをリロード
   Future<void> reloadAllWidgets() async {
     await HomeWidget.updateWidget(
-      name: _calendarWidgetName,
-      iOSName: _calendarWidgetName,
-      androidName: _calendarWidgetName,
+      iOSName: _calendarWidgetIosName,
+      androidName: _calendarWidgetAndroidName,
     );
     await HomeWidget.updateWidget(
-      name: _memoWidgetName,
-      iOSName: _memoWidgetName,
-      androidName: _memoWidgetName,
+      iOSName: _memoWidgetIosName,
+      androidName: _memoWidgetAndroidName,
     );
     await HomeWidget.updateWidget(
-      name: _todoWidgetName,
-      iOSName: _todoWidgetName,
-      androidName: _todoWidgetName,
+      iOSName: _todoWidgetIosName,
+      androidName: _todoWidgetAndroidName,
     );
     await HomeWidget.updateWidget(
-      name: _big5WidgetName,
       iOSName: _big5WidgetName,
       androidName: _big5WidgetName,
     );
     await HomeWidget.updateWidget(
-      name: _calendarGridWidgetName,
-      iOSName: _calendarGridWidgetName,
-      androidName: _calendarGridWidgetName,
+      iOSName: _calendarGridWidgetIosName,
+      androidName: _calendarGridWidgetAndroidName,
     );
 
     debugPrint('🔄 [WidgetDataService] Reloaded all widgets');
