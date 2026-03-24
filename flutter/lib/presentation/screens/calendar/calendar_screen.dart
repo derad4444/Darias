@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1547,12 +1548,12 @@ class _CharacterWithComment extends ConsumerWidget {
         // キャラクター画像
         characterImageAsync.when(
           data: (imageUrl) => imageUrl != null
-              ? Image.network(
-                  imageUrl,
+              ? CachedNetworkImage(
+                  imageUrl: imageUrl,
                   width: 150,
                   height: 150,
                   fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
+                  errorWidget: (context, url, error) =>
                       Image.asset(
                         defaultImage,
                         width: 150,
