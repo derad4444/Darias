@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -10,12 +11,24 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  String _version = '';
+
   @override
   void initState() {
     super.initState();
+    _loadVersion();
     if (kIsWeb) {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) context.go('/');
+      });
+    }
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _version = info.version;
       });
     }
   }
@@ -30,12 +43,12 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Stack(
             children: [
               // バージョン表記（左上）
-              const Positioned(
+              Positioned(
                 top: 16,
                 left: 16,
                 child: Text(
-                  'Ver2.0.0',
-                  style: TextStyle(
+                  _version.isEmpty ? '' : 'Ver$_version',
+                  style: const TextStyle(
                     fontSize: 12,
                     color: Colors.grey,
                   ),

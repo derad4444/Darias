@@ -135,10 +135,9 @@ class CharacterDetailData {
   }
 
   /// 性格に基づいた画像ファイル名を生成
-  String get personalityImageFileName {
-    if (confirmedBig5Scores == null) {
-      return gender == '男性' ? 'Male_MMMMM' : 'Female_MMMMM';
-    }
+  /// 未診断（analysisLevel == 0）の場合はnullを返す（iOS版と同じ挙動）
+  String? get personalityImageFileName {
+    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
 
     final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
     final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
@@ -309,6 +308,7 @@ class _CharacterDetailBody extends ConsumerWidget {
           // キャラクター画像
           _CharacterImage(
             imageFileName: detail.personalityImageFileName,
+            gender: detail.gender,
           ),
 
           const SizedBox(height: 16),
@@ -374,10 +374,12 @@ class _CharacterDetailBody extends ConsumerWidget {
 
 /// キャラクター画像ウィジェット
 class _CharacterImage extends StatefulWidget {
-  final String imageFileName;
+  final String? imageFileName;
+  final String? gender;
 
   const _CharacterImage({
     required this.imageFileName,
+    required this.gender,
   });
 
   @override
@@ -402,18 +404,30 @@ class _CharacterImageState extends State<_CharacterImage> {
     }
   }
 
+  String get _defaultImagePath {
+    return widget.gender == '男性'
+        ? 'assets/images/android_male.png'
+        : 'assets/images/android_female.png';  // genderがnullの場合も女性画像をデフォルト
+  }
+
   Future<void> _loadImage() async {
+    // 未診断（imageFileName == null）の場合はローカルのデフォルト画像を表示（iOS版と同じ挙動）
+    if (widget.imageFileName == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
       // ファイル名から性別を抽出
-      final isMale = widget.imageFileName.startsWith('Male');
+      final isMale = widget.imageFileName!.startsWith('Male');
       final gender = isMale
           ? CharacterGender.male
           : CharacterGender.female;
 
       final imageData = await FirebaseImageService.shared.fetchImage(
-        fileName: widget.imageFileName,
+        fileName: widget.imageFileName!,
         gender: gender,
       );
 
@@ -445,10 +459,16 @@ class _CharacterImageState extends State<_CharacterImage> {
     }
 
     if (_imageProvider == null) {
-      return const SizedBox(
+      // 未診断またはFirebase取得失敗時はデフォルト画像を表示（iOS版と同じ挙動）
+      return SizedBox(
         width: 200,
         height: 200,
-        child: Center(child: Icon(Icons.person, size: 80)),
+        child: Image.asset(
+          _defaultImagePath,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) =>
+              const Center(child: Icon(Icons.person, size: 80)),
+        ),
       );
     }
 

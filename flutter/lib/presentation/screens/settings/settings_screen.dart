@@ -262,12 +262,15 @@ class SettingsScreen extends ConsumerWidget {
           );
           await user.reauthenticateWithCredential(credential);
 
+          // Auth削除を先に実行（Firestoreより先にしないと不整合が発生する）
+          final userId = user.uid;
+          await user.delete();
+
+          // Auth削除成功後にFirestoreデータを削除
           await ref.read(firestoreProvider)
               .collection('users')
-              .doc(user.uid)
+              .doc(userId)
               .delete();
-
-          await user.delete();
 
           if (context.mounted) {
             Navigator.of(context).pop();
@@ -279,13 +282,15 @@ class SettingsScreen extends ConsumerWidget {
             );
           }
         } on FirebaseAuthException catch (e) {
+          debugPrint('❌ アカウント削除 FirebaseAuthException: code=${e.code}, message=${e.message}');
           if (context.mounted) {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(_getDeleteErrorMessage(e.code))),
             );
           }
-        } catch (e) {
+        } catch (e, st) {
+          debugPrint('❌ アカウント削除エラー: $e\n$st');
           if (context.mounted) {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
@@ -341,11 +346,16 @@ class SettingsScreen extends ConsumerWidget {
   String _getDeleteErrorMessage(String code) {
     switch (code) {
       case 'wrong-password':
+      case 'invalid-credential': // Firebase Auth SDK 新バージョンでのエラーコード
         return 'パスワードが正しくありません';
       case 'requires-recent-login':
         return 'セキュリティのため、再度ログインしてください';
       case 'too-many-requests':
         return 'リクエストが多すぎます。しばらくしてからお試しください';
+      case 'network-request-failed':
+        return 'ネットワークエラーが発生しました。接続を確認してください';
+      case 'user-not-found':
+        return 'ユーザーが見つかりません';
       default:
         return 'エラーが発生しました ($code)';
     }

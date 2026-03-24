@@ -26,6 +26,26 @@ enum MeetingErrorType {
   timeout,
 }
 
+/// Cloud Functions のレスポンス Map<Object?, Object?> を Map<String, dynamic> に再帰変換
+Map<String, dynamic> _deepConvertMap(Map map) {
+  return map.map((key, value) {
+    final convertedValue = value is Map
+        ? _deepConvertMap(value)
+        : value is List
+            ? _deepConvertList(value)
+            : value;
+    return MapEntry(key.toString(), convertedValue);
+  });
+}
+
+List<dynamic> _deepConvertList(List list) {
+  return list.map((item) {
+    if (item is Map) return _deepConvertMap(item);
+    if (item is List) return _deepConvertList(item);
+    return item;
+  }).toList();
+}
+
 class MeetingDatasource {
   final FirebaseFirestore _firestore;
   final FirebaseFunctions _functions;
@@ -83,8 +103,9 @@ class MeetingDatasource {
         params['concernCategory'] = concernCategory;
       }
 
-      final result = await callable.call<Map<String, dynamic>>(params);
-      final data = result.data;
+      final result = await callable.call(params);
+      // Cloud Functions SDKはネイティブで Map<Object?, Object?> を返すため深い変換が必要
+      final data = _deepConvertMap(result.data as Map);
 
       debugPrint('✅ generateOrReuseMeeting success');
       debugPrint('   meetingId: ${data['meetingId']}');

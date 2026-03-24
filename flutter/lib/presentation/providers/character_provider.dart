@@ -124,10 +124,9 @@ class CharacterDetails {
   }
 
   /// 性格に基づいた画像ファイル名を生成（性別プレフィックス付き）
-  String get personalityImageFileName {
-    if (confirmedBig5Scores == null) {
-      return gender == '男性' ? 'Male_MMMMM' : 'Female_MMMMM';
-    }
+  /// 未診断（analysisLevel == 0）の場合はnullを返す（iOS版と同じ挙動）
+  String? get personalityImageFileName {
+    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
 
     final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
     final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
@@ -140,10 +139,9 @@ class CharacterDetails {
   }
 
   /// FirebaseImageService用のファイル名を取得（OCAENパターンのみ）
-  String getPersonalityImageFileName() {
-    if (confirmedBig5Scores == null) {
-      return 'MMMMM';
-    }
+  /// 未診断の場合はnullを返す
+  String? getPersonalityImageFileName() {
+    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
 
     final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
     final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
@@ -190,18 +188,14 @@ final characterImageProvider = FutureProvider<String?>((ref) async {
       ? firebase_image.CharacterGender.male
       : firebase_image.CharacterGender.female;
 
-  // iOS版と同じ形式でファイル名を生成（性別プレフィックス付き）
-  // 例: "Female_HLMHL" または "Male_MMMMM"
-  String fileName;
-  final genderPrefix = details.gender == '男性' ? 'Male' : 'Female';
+  // 未診断の場合はnullを返す（呼び出し元でローカルアセットを使用）
+  final pattern = details.getPersonalityImageFileName();
+  if (pattern == null) return null;
 
-  if (details.confirmedBig5Scores != null) {
-    final pattern = details.getPersonalityImageFileName();
-    fileName = '${genderPrefix}_$pattern';
-  } else {
-    // デフォルト画像
-    fileName = '${genderPrefix}_MMMMM';
-  }
+  // iOS版と同じ形式でファイル名を生成（性別プレフィックス付き）
+  // 例: "Female_HLMHL"
+  final genderPrefix = details.gender == '男性' ? 'Male' : 'Female';
+  final fileName = '${genderPrefix}_$pattern';
 
   debugPrint('📸 キャラクター画像取得: fileName=$fileName, gender=${gender.value}');
 

@@ -629,12 +629,18 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
   }
 
   Future<void> _loadImageUrl() async {
-    // このウィジェットは personalityImageFileName がある場合のみ作成されるため
-    // null チェックは念のため
-    if (widget.personalityImageFileName == null || widget.characterGender == null) {
+    if (widget.characterGender == null) {
       setState(() {
         _isLoading = false;
         _hasError = true;
+      });
+      return;
+    }
+
+    // 未診断（personalityImageFileName == null）の場合はローカルのデフォルト画像を表示（iOS版と同じ挙動）
+    if (widget.personalityImageFileName == null) {
+      setState(() {
+        _isLoading = false;
       });
       return;
     }
@@ -950,7 +956,7 @@ class _SpeechBubble extends StatelessWidget {
             ),
           ],
         ),
-        child: Text(
+        child: SelectableText(
           message,
           style: const TextStyle(
             fontSize: 15,
