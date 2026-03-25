@@ -878,8 +878,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
         _displayedMessages = List.from(_displayedMessages)..add(message);
       });
 
-      // スクロールを下に
-      _scrollToBottom();
+      // 描画完了後にスクロール（setState直後はまだmaxScrollExtentが更新されていないため）
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
 
       index++;
 
