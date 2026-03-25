@@ -13,8 +13,6 @@ import '../../providers/meeting_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/todo_provider.dart';
-import '../../providers/chat_provider.dart';
-import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// 6人会議画面（iOS版SixPersonMeetingViewと同じフロー）
@@ -657,30 +655,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           ),
 
         const SizedBox(height: 16),
-
-        // 案1: チャットで深掘りボタン
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton.icon(
-            onPressed: () {
-              ref.read(meetingFollowupConclusionProvider.notifier).state =
-                  _meetingResponse!.conversation.conclusion.summary;
-              ref.read(selectedTabProvider.notifier).state = 0;
-              context.go('/');
-            },
-            icon: const Icon(Icons.chat_bubble_outline),
-            label: const Text('チャットで深掘りする'),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.blue.withValues(alpha: 0.85),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 12),
 
         // 共有ボタン
         SizedBox(
