@@ -13,6 +13,8 @@ import '../../providers/meeting_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/todo_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// 6人会議画面（iOS版SixPersonMeetingViewと同じフロー）
@@ -733,7 +735,14 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           const Spacer(),
           // 完了ボタン
           FilledButton(
-            onPressed: () => context.go('/'),
+            onPressed: () {
+              if (_meetingResponse != null) {
+                ref.read(meetingFollowupConclusionProvider.notifier).state =
+                    _meetingResponse!.conversation.conclusion.summary;
+              }
+              ref.read(selectedTabProvider.notifier).state = 0;
+              context.go('/');
+            },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.blue.withValues(alpha: 0.85),
               padding:
