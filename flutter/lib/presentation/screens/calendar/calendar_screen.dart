@@ -202,29 +202,41 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                   ),
                 )
               else ...[
-                // カレンダーグリッド
+                // カレンダーグリッド（横スワイプで月変更）
                 Expanded(
-                  child: schedulesAsync.when(
-                    data: (schedules) => _CalendarGrid(
-                        month: selectedMonth,
-                        selectedDay: selectedDay,
-                        schedules: schedules,
-                        holidays: holidays,
-                        accentColor: accentColor,
-                        textColor: textColor,
-                        onDaySelected: (day) {
-                          ref.read(calendarControllerProvider.notifier).selectDay(day);
-                          _showScheduleBottomSheet(
-                            context,
-                            ref,
-                            day,
-                            accentColor,
-                            textColor,
-                          );
-                        },
-                      ),
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
+                  child: GestureDetector(
+                    onHorizontalDragEnd: (details) {
+                      const threshold = 100.0;
+                      if (details.primaryVelocity != null) {
+                        if (details.primaryVelocity! < -threshold) {
+                          ref.read(calendarControllerProvider.notifier).nextMonth();
+                        } else if (details.primaryVelocity! > threshold) {
+                          ref.read(calendarControllerProvider.notifier).previousMonth();
+                        }
+                      }
+                    },
+                    child: schedulesAsync.when(
+                      data: (schedules) => _CalendarGrid(
+                          month: selectedMonth,
+                          selectedDay: selectedDay,
+                          schedules: schedules,
+                          holidays: holidays,
+                          accentColor: accentColor,
+                          textColor: textColor,
+                          onDaySelected: (day) {
+                            ref.read(calendarControllerProvider.notifier).selectDay(day);
+                            _showScheduleBottomSheet(
+                              context,
+                              ref,
+                              day,
+                              accentColor,
+                              textColor,
+                            );
+                          },
+                        ),
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
+                    ),
                   ),
                 ),
 
