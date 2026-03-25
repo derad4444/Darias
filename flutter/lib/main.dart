@@ -3,6 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_quill/flutter_quill.dart' show FlutterQuillLocalizations;
@@ -13,6 +14,7 @@ import 'data/services/ad_service.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
+import 'presentation/providers/character_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/router/app_router.dart';
 
@@ -43,6 +45,12 @@ void main() async {
   // ウィジェットデータサービス初期化（ネイティブのみ）
   await WidgetDataService.shared.initialize();
 
+  // Web ではブラウザのネイティブ context menu を無効化し
+  // Flutter のローカライズ済みメニュー（日本語）を使用する
+  if (kIsWeb) {
+    BrowserContextMenu.disableContextMenu();
+  }
+
   // 日本語ロケールの日付フォーマット初期化
   await initializeDateFormatting('ja');
 
@@ -62,7 +70,12 @@ class DariasApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final colorSeed = ref.watch(colorSeedProvider);
 
-    return MaterialApp.router(
+    // キャラクター画像URLをアプリ起動直後からプリロード（各画面表示前にキャッシュしておく）
+    ref.listen(characterImageProvider, (_, __) {});
+
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: MaterialApp.router(
       title: 'DARIAS',
       debugShowCheckedModeBanner: false,
       // 日本語ロケール設定
@@ -81,6 +94,7 @@ class DariasApp extends ConsumerWidget {
       routerConfig: router,
       // iOS風のスクロール動作
       scrollBehavior: const CupertinoScrollBehavior(),
+    ),
     );
   }
 

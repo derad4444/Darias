@@ -5,6 +5,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// キャラクター性別
 enum CharacterGender {
@@ -36,6 +37,8 @@ class FirebaseImageService {
   // URLキャッシュ（Firebase Storage APIへのリクエストを削減）
   final Map<String, String> _urlCache = {};
 
+  static const _urlCachePrefix = 'char_img_url_';
+
   FirebaseImageService._();
 
   /// 初期化
@@ -59,7 +62,40 @@ class FirebaseImageService {
       }
     }
 
+    // SharedPreferencesからURLキャッシュを復元
+    await _loadUrlCacheFromPrefs();
+
     _isInitialized = true;
+  }
+
+  /// SharedPreferencesからURLキャッシュを復元
+  Future<void> _loadUrlCacheFromPrefs() async {
+    if (kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final keys = prefs.getKeys().where((k) => k.startsWith(_urlCachePrefix));
+      for (final key in keys) {
+        final url = prefs.getString(key);
+        if (url != null) {
+          final cacheKey = key.substring(_urlCachePrefix.length);
+          _urlCache[cacheKey] = url;
+        }
+      }
+      debugPrint('📦 URLキャッシュ復元: ${_urlCache.length}件');
+    } catch (e) {
+      debugPrint('URLキャッシュ読込失敗: $e');
+    }
+  }
+
+  /// URLキャッシュをSharedPreferencesに保存
+  Future<void> _saveUrlToPrefs(String cacheKey, String url) async {
+    if (kIsWeb) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_urlCachePrefix$cacheKey', url);
+    } catch (e) {
+      debugPrint('URLキャッシュ保存失敗: $e');
+    }
   }
 
   /// 画像を取得（キャッシュ優先）
@@ -138,19 +174,23 @@ class FirebaseImageService {
     }
   }
 
-  /// 画像URLを取得（URLキャッシュ付き）
+  /// 画像URLを取得（URLキャッシュ付き・SharedPreferences永続化）
   Future<String> getImageUrl({
     required String fileName,
     required CharacterGender gender,
   }) async {
+    if (!_isInitialized) await initialize();
+
     final cacheKey = '${gender.value}_$fileName';
     if (_urlCache.containsKey(cacheKey)) {
+      debugPrint('📦 URLキャッシュヒット: $fileName');
       return _urlCache[cacheKey]!;
     }
     final storagePath = 'character-images/${gender.value}/$fileName.png';
     final ref = _storage.ref().child(storagePath);
     final url = await ref.getDownloadURL();
     _urlCache[cacheKey] = url;
+    _saveUrlToPrefs(cacheKey, url); // 非同期で保存（待たない）
     return url;
   }
 
