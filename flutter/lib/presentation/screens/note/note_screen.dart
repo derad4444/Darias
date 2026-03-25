@@ -364,6 +364,11 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                               accentColor: accentColor,
                               tagColor: tagColorMap[memo.tag],
                               onTap: () => context.push('/memo/detail', extra: memo),
+                              onLongPress: () => _confirmDelete(
+                                context,
+                                title: memo.title,
+                                onConfirm: () => ref.read(memoControllerProvider.notifier).deleteMemo(memo.id),
+                              ),
                             ),
                           );
                         }
@@ -378,6 +383,11 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
                             accentColor: accentColor,
                             tagColor: tagColorMap[memo.tag],
                             onTap: () => context.push('/memo/detail', extra: memo),
+                            onLongPress: () => _confirmDelete(
+                              context,
+                              title: memo.title,
+                              onConfirm: () => ref.read(memoControllerProvider.notifier).deleteMemo(memo.id),
+                            ),
                           ),
                         );
                       },
@@ -399,6 +409,7 @@ class _MemoCard extends StatelessWidget {
   final Color accentColor;
   final Color? tagColor;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _MemoCard({
     required this.title,
@@ -408,6 +419,7 @@ class _MemoCard extends StatelessWidget {
     required this.accentColor,
     this.tagColor,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -415,6 +427,7 @@ class _MemoCard extends StatelessWidget {
     final hasTagColor = tagColor != null;
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -714,6 +727,11 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                                       !todo.isCompleted,
                                     );
                               },
+                              onLongPress: () => _confirmDelete(
+                                context,
+                                title: todo.title,
+                                onConfirm: () => ref.read(todoControllerProvider.notifier).deleteTodo(todo.id),
+                              ),
                             ),
                           );
                         }
@@ -735,6 +753,11 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
                                     !todo.isCompleted,
                                   );
                             },
+                            onLongPress: () => _confirmDelete(
+                              context,
+                              title: todo.title,
+                              onConfirm: () => ref.read(todoControllerProvider.notifier).deleteTodo(todo.id),
+                            ),
                           ),
                         );
                       },
@@ -802,6 +825,7 @@ class _TodoRow extends StatelessWidget {
   final Color? tagColor;
   final VoidCallback onTap;
   final VoidCallback onToggle;
+  final VoidCallback? onLongPress;
 
   const _TodoRow({
     required this.title,
@@ -813,6 +837,7 @@ class _TodoRow extends StatelessWidget {
     this.tagColor,
     required this.onTap,
     required this.onToggle,
+    this.onLongPress,
   });
 
   @override
@@ -824,6 +849,7 @@ class _TodoRow extends StatelessWidget {
     final hasTagColor = tagColor != null;
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -960,4 +986,31 @@ class _TodoRow extends StatelessWidget {
       return '${date.month}/${date.day}';
     }
   }
+}
+
+/// 削除確認ダイアログ
+Future<void> _confirmDelete(
+  BuildContext context, {
+  required String title,
+  required VoidCallback onConfirm,
+}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('削除'),
+      content: Text('「$title」を削除しますか？'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('削除'),
+        ),
+      ],
+    ),
+  );
+  if (confirmed == true) onConfirm();
 }
