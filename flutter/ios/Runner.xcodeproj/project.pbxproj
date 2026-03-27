@@ -39,19 +39,19 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		C13B8A50B1BB4A01AA2E497B /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 2F6C4BA41C8D4CFEB04D527B /* Pods.xcodeproj */;
-			proxyType = 1;
-			remoteGlobalIDString = 8B74B458B450D74B75744B87BD747314;
-			remoteInfo = "Pods-Runner";
-		};
 		331C8085294A63A400263BE5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 97C146E61CF9000F007C117D /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 97C146ED1CF9000F007C117D;
 			remoteInfo = Runner;
+		};
+		C13B8A50B1BB4A01AA2E497B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 2F6C4BA41C8D4CFEB04D527B /* Pods.xcodeproj */;
+			proxyType = 1;
+			remoteGlobalIDString = 8B74B458B450D74B75744B87BD747314;
+			remoteInfo = "Pods-Runner";
 		};
 		D78A7087AB6C74C6321239E3 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -87,13 +87,13 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		2F6C4BA41C8D4CFEB04D527B /* Pods.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = Pods.xcodeproj; path = Pods/Pods.xcodeproj; sourceTree = "<group>"; };
 		02389A380134E0E02CF13994 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		118CDE5D22FC16CADCF307DC /* CalendarWidgetProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarWidgetProvider.swift; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		2AFB5DC4380364F838695BFD /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		2EEA8954F407B7295E8CEC71 /* MemoWidget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoWidget.swift; sourceTree = "<group>"; };
+		2F6C4BA41C8D4CFEB04D527B /* Pods.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = Pods.xcodeproj; path = Pods/Pods.xcodeproj; sourceTree = "<group>"; };
 		313721BB19ACCEF7E0ADC8F6 /* AppGroupConstants.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppGroupConstants.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -170,7 +170,6 @@
 				823285968506A5F6A6535372 /* MemoWidgetView.swift */,
 				E802CBF6DDC85999DFB8A009 /* TodoWidgetView.swift */,
 			);
-			name = Views;
 			path = Views;
 			sourceTree = "<group>";
 		};
@@ -179,7 +178,6 @@
 			children = (
 				5FBC4C612FEA6B6624B82D68 /* WidgetDataCache.swift */,
 			);
-			name = Utils;
 			path = Utils;
 			sourceTree = "<group>";
 		};
@@ -206,7 +204,6 @@
 				77B198DAABAD8699917BA0B3 /* MemoWidgetProvider.swift */,
 				78215C5BC529A6E85DF5DFD5 /* TodoWidgetProvider.swift */,
 			);
-			name = Providers;
 			path = Providers;
 			sourceTree = "<group>";
 		};
@@ -221,7 +218,6 @@
 				7381749EEDF1D71C4D94194D /* Pods-RunnerTests.release.xcconfig */,
 				2AFB5DC4380364F838695BFD /* Pods-RunnerTests.profile.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -282,7 +278,6 @@
 				2EEA8954F407B7295E8CEC71 /* MemoWidget.swift */,
 				A8658EE84C4D362C52C7857A /* TodoWidget.swift */,
 			);
-			name = Widgets;
 			path = Widgets;
 			sourceTree = "<group>";
 		};
@@ -291,7 +286,6 @@
 			children = (
 				313721BB19ACCEF7E0ADC8F6 /* AppGroupConstants.swift */,
 			);
-			name = Constants;
 			path = Constants;
 			sourceTree = "<group>";
 		};
@@ -300,7 +294,6 @@
 			children = (
 				BAD6DE60E8E4718C8E89A9FB /* Constants */,
 			);
-			name = Shared;
 			path = Shared;
 			sourceTree = "<group>";
 		};
@@ -329,7 +322,6 @@
 				F245998F79A8D34C03C12850 /* DariasIcon.png */,
 				BB7CB1B9182C2CD7F07A2FEE /* WidgetColors.swift */,
 			);
-			name = DariasWidgets;
 			path = DariasWidgets;
 			sourceTree = "<group>";
 		};
@@ -338,7 +330,6 @@
 			children = (
 				95FA79260445938CCFCC3C9D /* WidgetData.swift */,
 			);
-			name = Models;
 			path = Models;
 			sourceTree = "<group>";
 		};
@@ -394,6 +385,7 @@
 				A263AD1A755762D843004ABE /* Embed App Extensions */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				1BC3F8E5C821133F34DD4A3F /* [CP] Copy Pods Resources */,
+				DA1234567890ABCDEF123456 /* Generate Missing dSYMs */,
 			);
 			buildRules = (
 			);
@@ -428,10 +420,11 @@
 			};
 			buildConfigurationList = 97C146E91CF9000F007C117D /* Build configuration list for PBXProject "Runner" */;
 			compatibilityVersion = "Xcode 9.3";
-			developmentRegion = en;
+			developmentRegion = ja;
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				en,
+				ja,
 				Base,
 			);
 			mainGroup = 97C146E51CF9000F007C117D;
@@ -529,9 +522,13 @@
 			inputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-input-files.xcfilelist",
 			);
+			inputPaths = (
+			);
 			name = "[CP] Copy Pods Resources";
 			outputFileListPaths = (
 				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-resources-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			outputPaths = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -568,6 +565,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		DA1234567890ABCDEF123456 /* Generate Missing dSYMs */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Generate Missing dSYMs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+			shellPath = /bin/sh;
+			shellScript = "find \"${BUILT_PRODUCTS_DIR}/${FRAMEWORKS_FOLDER_PATH}\" -name \"*.framework\" -type d | while read -r framework; do\n    binary=\"${framework}/$(basename \"${framework}\" .framework)\"\n    if ! [ -f \"${binary}\" ]; then\n        continue\n    fi\n    dsym=\"${DWARF_DSYM_FOLDER_PATH}/$(basename \"${framework}\").dSYM\"\n    if ! [ -d \"${dsym}\" ]; then\n        echo \"Generating dSYM for ${framework}\"\n        dsymutil \"${binary}\" -o \"${dsym}\"\n    fi\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -613,11 +628,6 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		5C82540CD2D04158B0CBE73E /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			name = "Pods-Runner";
-			targetProxy = C13B8A50B1BB4A01AA2E497B /* PBXContainerItemProxy */;
-		};
 		1415DF7EA381E720D9189BC8 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = DariasWidgets;
@@ -628,6 +638,11 @@
 			isa = PBXTargetDependency;
 			target = 97C146ED1CF9000F007C117D /* Runner */;
 			targetProxy = 331C8085294A63A400263BE5 /* PBXContainerItemProxy */;
+		};
+		5C82540CD2D04158B0CBE73E /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "Pods-Runner";
+			targetProxy = C13B8A50B1BB4A01AA2E497B /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -764,7 +779,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER);
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -772,6 +787,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = $(FLUTTER_BUILD_NAME);
 				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -948,7 +964,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER);
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -956,6 +972,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = $(FLUTTER_BUILD_NAME);
 				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -972,7 +989,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
-				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
+				CURRENT_PROJECT_VERSION = $(FLUTTER_BUILD_NUMBER);
 				DEVELOPMENT_TEAM = UYP6X4YKVM;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -980,6 +997,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = $(FLUTTER_BUILD_NAME);
 				PRODUCT_BUNDLE_IDENTIFIER = com.Derao.Character;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
