@@ -12,7 +12,7 @@ class AdConfig {
   static const String _testRewardedIos = 'ca-app-pub-3940256099942544/1712485313';
 
   // テストモードかどうか（リリース時は false に変更）
-  static const bool isTestMode = true;
+  static const bool isTestMode = false;
 
   // ─── 内部ヘルパー ─────────────────────────────────────────
   /// iOS本番IDを返す。テストモード時はGoogle提供のテストIDを返す。
@@ -113,9 +113,25 @@ class AdConfig {
   static String get taskAddTopBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/5441477059');
 
-  /// タスク追加画面下部バナー（iOS未設定のため要確認）
+  /// タスク追加画面下部バナー
   static String get taskAddBottomBannerAdUnitId =>
-      _banner(iosId: 'YOUR_IOS_TASK_ADD_BOTTOM_BANNER_AD_UNIT_ID');
+      _banner(iosId: 'ca-app-pub-5851550594315289/7106968080');
+
+  /// 会議画面バナー
+  static String get meetingScreenBannerAdUnitId =>
+      _banner(iosId: 'ca-app-pub-5851550594315289/4592485389');
+
+  /// 予定一覧画面バナー
+  static String get scheduleListBannerAdUnitId =>
+      _banner(iosId: 'ca-app-pub-5851550594315289/9018815555');
+
+  /// 会議履歴画面バナー
+  static String get meetingHistoryBannerAdUnitId =>
+      _banner(iosId: 'ca-app-pub-5851550594315289/1850771972');
+
+  /// 日記履歴画面バナー
+  static String get diaryHistoryBannerAdUnitId =>
+      _banner(iosId: 'ca-app-pub-5851550594315289/6680293379');
 
   // ─── リワード広告ユニットID ───────────────────────────────
   /// リワード動画広告

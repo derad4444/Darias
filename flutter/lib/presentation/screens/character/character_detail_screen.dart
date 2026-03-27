@@ -361,11 +361,11 @@ class _CharacterDetailBody extends ConsumerWidget {
           // 2つ目のバナー広告（性格表示の一番下）
           if (shouldShowBannerAd)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: BannerAdWidget(adUnitId: AdConfig.characterDetailBottomBannerAdUnitId),
             ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 16),
         ],
       ),
     );

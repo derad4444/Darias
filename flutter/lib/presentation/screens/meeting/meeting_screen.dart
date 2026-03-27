@@ -12,6 +12,9 @@ import '../../../data/datasources/remote/meeting_datasource.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/ad_provider.dart';
+import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/ad_service.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../main/main_shell_screen.dart';
@@ -140,6 +143,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
   Widget _buildTopicInput(Color accentColor) {
     final isPremium = ref.watch(effectiveIsPremiumProvider);
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return Center(
       child: SingleChildScrollView(
@@ -245,6 +249,12 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                 ),
               ),
             ),
+
+            // バナー広告（無料ユーザーのみ）
+            if (shouldShowBannerAd) ...[
+              const SizedBox(height: 16),
+              BannerAdContainer(adUnitId: AdConfig.meetingScreenBannerAdUnitId),
+            ],
           ],
         ),
       ),

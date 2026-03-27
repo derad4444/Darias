@@ -96,31 +96,37 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (shouldShowBannerAd) ...[
-                  BannerAdContainer(adUnitId: AdConfig.taskAddTopBannerAdUnitId),
-                  const SizedBox(height: 16),
-                ],
-
-                // タイトル
-                _buildSectionTitle('タイトル'),
-                const SizedBox(height: 8),
-                _buildTextField(
-                  controller: _titleController,
-                  hintText: 'タイトルを入力',
-                  accentColor: accentColor,
-                  onChanged: (_) => setState(() {}),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 上部：バナー・タイトル・説明ラベル
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (shouldShowBannerAd) ...[
+                      BannerAdContainer(adUnitId: AdConfig.taskAddTopBannerAdUnitId),
+                      const SizedBox(height: 16),
+                    ],
+                    _buildSectionTitle('タイトル'),
+                    const SizedBox(height: 8),
+                    _buildTextField(
+                      controller: _titleController,
+                      hintText: 'タイトルを入力',
+                      accentColor: accentColor,
+                      onChanged: (_) => setState(() {}),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildSectionTitle('説明'),
+                    const SizedBox(height: 8),
+                  ],
                 ),
-                const SizedBox(height: 16),
-
-                // 説明（残りスペースを埋める）
-                _buildSectionTitle('説明'),
-                const SizedBox(height: 8),
-                Expanded(
+              ),
+              // 説明テキストフィールド（残りスペースを埋める）
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Container(
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.9),
@@ -151,56 +157,50 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-
-                // 期限設定
-                _buildDueDateSection(accentColor),
-                const SizedBox(height: 16),
-
-                // 優先度
-                _buildPrioritySection(accentColor),
-                const SizedBox(height: 16),
-
-                // タグ
-                _buildTagSection(accentColor),
-                const SizedBox(height: 16),
-
-                // 完了状態（編集時のみ）
-                if (!_isNewTodo) ...[
-                  _buildCompletedSection(accentColor),
-                  const SizedBox(height: 24),
-                ],
-
-                // 削除ボタン（編集時のみ）
-                if (!_isNewTodo) ...[
-                  GestureDetector(
-                    onTap: _showDeleteConfirmation,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+              ),
+              // 下部：期限・優先度・タグ・完了・削除・バナー
+              SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildDueDateSection(accentColor),
+                    const SizedBox(height: 16),
+                    _buildPrioritySection(accentColor),
+                    const SizedBox(height: 16),
+                    _buildTagSection(accentColor),
+                    if (!_isNewTodo) ...[
+                      const SizedBox(height: 16),
+                      _buildCompletedSection(accentColor),
+                      const SizedBox(height: 16),
+                      GestureDetector(
+                        onTap: _showDeleteConfirmation,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.delete, color: Colors.red, size: 20),
+                              SizedBox(width: 8),
+                              Text('TODOを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                        ),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.delete, color: Colors.red, size: 20),
-                          SizedBox(width: 8),
-                          Text('TODOを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                if (shouldShowBannerAd) ...[
-                  const SizedBox(height: 16),
-                  BannerAdContainer(adUnitId: AdConfig.taskAddBottomBannerAdUnitId),
-                ],
-              ],
-            ),
+                    ],
+                    if (shouldShowBannerAd) ...[
+                      const SizedBox(height: 16),
+                      BannerAdContainer(adUnitId: AdConfig.taskAddBottomBannerAdUnitId),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

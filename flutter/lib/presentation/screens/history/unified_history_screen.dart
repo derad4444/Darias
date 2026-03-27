@@ -430,6 +430,7 @@ class _MeetingHistoryTabState extends ConsumerState<_MeetingHistoryTab> {
   Widget build(BuildContext context) {
     print('🗂️ _MeetingHistoryTab - characterId: ${widget.characterId}');
     final meetingsAsync = ref.watch(meetingHistoryProvider(widget.characterId ?? ''));
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return Column(
       children: [
@@ -533,6 +534,9 @@ class _MeetingHistoryTabState extends ConsumerState<_MeetingHistoryTab> {
             error: (e, st) => Center(child: Text('エラー: $e', style: const TextStyle(color: AppColors.textPrimary))),
           ),
         ),
+
+        // バナー広告（無料ユーザーのみ）
+        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.meetingHistoryBannerAdUnitId),
       ],
     );
   }
@@ -1324,7 +1328,7 @@ class _DiaryHistoryTabState extends ConsumerState<_DiaryHistoryTab> {
         ),
 
         // バナー広告（無料ユーザーのみ、日記履歴の最下部）
-        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.chatHistoryBannerAdUnitId),
+        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.diaryHistoryBannerAdUnitId),
       ],
     );
   }

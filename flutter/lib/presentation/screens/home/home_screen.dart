@@ -388,6 +388,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _showActionConfirmDialog(result);
         }
       }
+      // チャット消費 & リワード広告チェック（5回ごと、非プレミアムのみ）
+      await ref.read(adControllerProvider.notifier).consumeChat();
+      if (mounted && ref.read(shouldShowVideoAdProvider) && !_isShowingDialog) {
+        _showRewardedAdDialog();
+      }
     } catch (e) {
       setState(() {
         _displayedMessage = 'エラーが発生しました。もう一度試してください。';
@@ -482,6 +487,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // フォールバック（通常は到達しない）
         return const SizedBox.shrink();
       },
+    ).whenComplete(() => _isShowingDialog = false);
+  }
+
+  /// リワード広告ダイアログを表示（5チャットごと）
+  void _showRewardedAdDialog() {
+    _isShowingDialog = true;
+    final accentColor = ref.read(accentColorProvider);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('📺 動画を見て続けよう', textAlign: TextAlign.center),
+        content: const Text(
+          '動画広告を視聴すると、チャットが続けられます。\nスキップして後で視聴することもできます。',
+          textAlign: TextAlign.center,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('スキップ'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              final success = await ref.read(adControllerProvider.notifier).showRewardedAd();
+              if (success && mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('🎁 ありがとう！チャットを続けられます')),
+                );
+              }
+            },
+            icon: const Icon(Icons.play_circle, color: Colors.white),
+            label: const Text('動画を見る', style: TextStyle(color: Colors.white)),
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+          ),
+        ],
+      ),
     ).whenComplete(() => _isShowingDialog = false);
   }
 

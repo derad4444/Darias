@@ -262,7 +262,7 @@ class _DiaryList extends StatelessWidget {
       itemBuilder: (context, index) {
         if (shouldShowBannerAd && index == diaries.length) {
           return BannerAdContainer(
-            adUnitId: AdConfig.chatHistoryBannerAdUnitId,
+            adUnitId: AdConfig.diaryHistoryBannerAdUnitId,
             padding: const EdgeInsets.only(top: 16, bottom: 20),
           );
         }

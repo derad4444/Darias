@@ -2015,6 +2015,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
     final holiday = ref.watch(holidayForDateProvider(_currentDay));
     final diary = ref.watch(diaryForDateProvider(_currentDay));
     final hasDiary = diary != null;
+    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -2178,6 +2179,10 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                 ),
               ),
             ),
+
+            // バナー広告（無料ユーザーのみ）
+            if (shouldShowBannerAd)
+              BannerAdContainer(adUnitId: AdConfig.scheduleListBannerAdUnitId),
           ],
         ),
         ),
