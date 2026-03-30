@@ -96,15 +96,13 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // 上部：バナー・タイトル・説明ラベル
-              Padding(
+          child: CustomScrollView(
+            slivers: [
+              // タイトル・説明ラベル
+              SliverPadding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
                     if (shouldShowBannerAd) ...[
                       BannerAdContainer(adUnitId: AdConfig.taskAddTopBannerAdUnitId),
                       const SizedBox(height: 16),
@@ -120,84 +118,85 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                     const SizedBox(height: 16),
                     _buildSectionTitle('説明'),
                     const SizedBox(height: 8),
-                  ],
+                  ]),
                 ),
               ),
-              // 説明テキストフィールド（残りスペースを埋める）
-              Expanded(
+              // 説明欄＋下部項目（残り画面を埋める）
+              SliverFillRemaining(
+                hasScrollBody: false,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: TextField(
-                      controller: _descriptionController,
-                      maxLines: null,
-                      expands: true,
-                      textAlignVertical: TextAlignVertical.top,
-                      decoration: InputDecoration(
-                        hintText: '説明を入力（任意）',
-                        hintStyle: TextStyle(color: AppColors.textLight),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Colors.transparent,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // 下部：期限・優先度・タグ・完了・削除・バナー
-              SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildDueDateSection(accentColor),
-                    const SizedBox(height: 16),
-                    _buildPrioritySection(accentColor),
-                    const SizedBox(height: 16),
-                    _buildTagSection(accentColor),
-                    if (!_isNewTodo) ...[
-                      const SizedBox(height: 16),
-                      _buildCompletedSection(accentColor),
-                      const SizedBox(height: 16),
-                      GestureDetector(
-                        onTap: _showDeleteConfirmation,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // 説明テキストフィールド（残りスペースを埋める）
+                      Expanded(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
                           decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: 0.05),
+                            color: Colors.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.delete, color: Colors.red, size: 20),
-                              SizedBox(width: 8),
-                              Text('TODOを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
                             ],
                           ),
+                          child: TextField(
+                            controller: _descriptionController,
+                            maxLines: null,
+                            expands: true,
+                            textAlignVertical: TextAlignVertical.top,
+                            decoration: InputDecoration(
+                              hintText: '説明を入力（任意）',
+                              hintStyle: TextStyle(color: AppColors.textLight),
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              filled: true,
+                              fillColor: Colors.transparent,
+                              contentPadding: const EdgeInsets.all(12),
+                            ),
+                          ),
                         ),
                       ),
-                    ],
-                    if (shouldShowBannerAd) ...[
                       const SizedBox(height: 16),
-                      BannerAdContainer(adUnitId: AdConfig.taskAddBottomBannerAdUnitId),
+                      _buildDueDateSection(accentColor),
+                      const SizedBox(height: 16),
+                      _buildPrioritySection(accentColor),
+                      const SizedBox(height: 16),
+                      _buildTagSection(accentColor),
+                      if (!_isNewTodo) ...[
+                        const SizedBox(height: 16),
+                        _buildCompletedSection(accentColor),
+                        const SizedBox(height: 16),
+                        GestureDetector(
+                          onTap: _showDeleteConfirmation,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.delete, color: Colors.red, size: 20),
+                                SizedBox(width: 8),
+                                Text('TODOを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (shouldShowBannerAd) ...[
+                        const SizedBox(height: 16),
+                        BannerAdContainer(adUnitId: AdConfig.taskAddBottomBannerAdUnitId),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ],
@@ -242,12 +241,12 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(color: AppColors.textLight),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           filled: true,
           fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
         onChanged: onChanged,
       ),

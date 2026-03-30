@@ -514,6 +514,13 @@ class _TodoContentView extends ConsumerStatefulWidget {
 
 class _TodoContentViewState extends ConsumerState<_TodoContentView> {
   String _selectedFilter = 'すべて';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -530,6 +537,14 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
       data: (todos) {
         // フィルター適用
         var filteredTodos = todos;
+        if (_searchController.text.isNotEmpty) {
+          final query = _searchController.text.toLowerCase();
+          filteredTodos = filteredTodos
+              .where((t) =>
+                  t.title.toLowerCase().contains(query) ||
+                  t.description.toLowerCase().contains(query))
+              .toList();
+        }
         if (_selectedFilter == '未完了') {
           filteredTodos = filteredTodos.where((t) => !t.isCompleted).toList();
         } else if (_selectedFilter == '完了済み') {
@@ -557,6 +572,46 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
 
         return Column(
           children: [
+            // 検索バー
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: const InputDecoration(
+                          hintText: 'タスクを検索',
+                          border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ),
+                    if (_searchController.text.isNotEmpty)
+                      IconButton(
+                        icon: Icon(
+                          Icons.clear,
+                          color: Colors.grey.withValues(alpha: 0.6),
+                        ),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() {});
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
             // フィルターセグメント
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

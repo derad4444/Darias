@@ -154,15 +154,13 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
         body: Container(
           decoration: BoxDecoration(gradient: backgroundGradient),
           child: SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 上部：バナー・タイトル・内容ラベル
-                Padding(
+            child: CustomScrollView(
+              slivers: [
+                // タイトル・内容ラベル
+                SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+                  sliver: SliverList(
+                    delegate: SliverChildListDelegate([
                       if (shouldShowBannerAd) ...[
                         BannerAdContainer(adUnitId: AdConfig.memoAddTopBannerAdUnitId),
                         const SizedBox(height: 16),
@@ -173,123 +171,122 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                       const SizedBox(height: 16),
                       _buildSectionTitle('内容'),
                       const SizedBox(height: 8),
-                    ],
+                    ]),
                   ),
                 ),
-                // 内容エディタ（残りスペースを埋める）
-                Expanded(
+                // 内容欄＋下部項目（残り画面を埋める）
+                SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildEditorArea(accentColor),
-                  ),
-                ),
-                // 下部：タグ・ピン留め・削除・バナー
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildSectionTitle('タグ'),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: () => _showTagSelection(accentColor),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // エディタ（残りスペースを埋める）
+                        Expanded(child: _buildEditorArea(accentColor)),
+                        const SizedBox(height: 16),
+                        _buildSectionTitle('タグ'),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () => _showTagSelection(accentColor),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.05),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                if (_selectedTag.isNotEmpty) ...[
+                                  Builder(builder: (context) {
+                                    final tags = ref.watch(tagsProvider);
+                                    final tagItem = tags.where((t) => t.name == _selectedTag).firstOrNull;
+                                    return Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: tagItem?.color ?? accentColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    );
+                                  }),
+                                  const SizedBox(width: 8),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    _selectedTag.isEmpty ? 'タグを選択' : _selectedTag,
+                                    style: TextStyle(
+                                      color: _selectedTag.isEmpty ? AppColors.textLight : AppColors.textPrimary,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                                Icon(Icons.keyboard_arrow_down, color: AppColors.textLight),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
                             color: Colors.white.withValues(alpha: 0.9),
                             borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: Row(
                             children: [
-                              if (_selectedTag.isNotEmpty) ...[
-                                Builder(builder: (context) {
-                                  final tags = ref.watch(tagsProvider);
-                                  final tagItem = tags.where((t) => t.name == _selectedTag).firstOrNull;
-                                  return Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      color: tagItem?.color ?? accentColor,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  );
-                                }),
-                                const SizedBox(width: 8),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  _selectedTag.isEmpty ? 'タグを選択' : _selectedTag,
-                                  style: TextStyle(
-                                    color: _selectedTag.isEmpty ? AppColors.textLight : AppColors.textPrimary,
-                                    fontSize: 15,
-                                  ),
-                                ),
+                              Icon(
+                                _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                                color: _isPinned ? accentColor : AppColors.textLight,
                               ),
-                              Icon(Icons.keyboard_arrow_down, color: AppColors.textLight),
+                              const SizedBox(width: 12),
+                              Expanded(child: Text('ピン留め', style: TextStyle(color: AppColors.textPrimary))),
+                              Switch(
+                                value: _isPinned,
+                                activeTrackColor: accentColor,
+                                onChanged: (value) {
+                                  setState(() => _isPinned = value);
+                                  _saveNow();
+                                },
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              _isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                              color: _isPinned ? accentColor : AppColors.textLight,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: Text('ピン留め', style: TextStyle(color: AppColors.textPrimary))),
-                            Switch(
-                              value: _isPinned,
-                              activeTrackColor: accentColor,
-                              onChanged: (value) {
-                                setState(() => _isPinned = value);
-                                _saveNow();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (widget.memo != null || _savedMemo != null) ...[
-                        const SizedBox(height: 8),
-                        GestureDetector(
-                          onTap: _showDeleteConfirmation,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.delete, color: Colors.red, size: 20),
-                                SizedBox(width: 8),
-                                Text('メモを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
-                              ],
+                        if (widget.memo != null || _savedMemo != null) ...[
+                          const SizedBox(height: 8),
+                          GestureDetector(
+                            onTap: _showDeleteConfirmation,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.delete, color: Colors.red, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('メモを削除', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500)),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
+                        ],
+                        if (shouldShowBannerAd) ...[
+                          const SizedBox(height: 16),
+                          BannerAdContainer(adUnitId: AdConfig.memoAddBottomBannerAdUnitId),
+                        ],
                       ],
-                      if (shouldShowBannerAd) ...[
-                        const SizedBox(height: 16),
-                        BannerAdContainer(adUnitId: AdConfig.memoAddBottomBannerAdUnitId),
-                      ],
-                    ],
+                    ),
                   ),
                 ),
               ],
