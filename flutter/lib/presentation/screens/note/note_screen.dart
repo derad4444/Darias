@@ -226,12 +226,10 @@ class _MemoContentViewState extends ConsumerState<_MemoContentView> {
               filteredMemos.where((m) => m.tag == selectedTag).toList();
         }
 
-        // 利用可能なタグ（「すべて」を先頭固定、出現順を維持）
-        final tagSet = <String>{};
-        for (final m in memos) {
-          if (m.tag.isNotEmpty) tagSet.add(m.tag);
-        }
-        final availableTags = ['すべて'] + tagSet.toList();
+        // 利用可能なタグ（tagsProviderの登録順を維持、実際に使われているもののみ表示）
+        final usedTagSet = {for (final m in memos) if (m.tag.isNotEmpty) m.tag};
+        final availableTags = ['すべて'] +
+            tags.map((t) => t.name).where((name) => usedTagSet.contains(name)).toList();
 
         return Column(
           children: [
@@ -563,12 +561,10 @@ class _TodoContentViewState extends ConsumerState<_TodoContentView> {
         }).length;
         final completedCount = todos.where((t) => t.isCompleted).length;
 
-        // 利用可能なタグ（「すべて」を先頭固定、出現順を維持）
-        final tagSet = <String>{};
-        for (final t in todos) {
-          if (t.tag.isNotEmpty) tagSet.add(t.tag);
-        }
-        final availableTags = ['すべて'] + tagSet.toList();
+        // 利用可能なタグ（tagsProviderの登録順を維持、実際に使われているもののみ表示）
+        final usedTagSet = {for (final t in todos) if (t.tag.isNotEmpty) t.tag};
+        final availableTags = ['すべて'] +
+            tags.map((t) => t.name).where((name) => usedTagSet.contains(name)).toList();
 
         return Column(
           children: [
