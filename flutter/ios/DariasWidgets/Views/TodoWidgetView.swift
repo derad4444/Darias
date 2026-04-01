@@ -7,6 +7,24 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
+// MARK: - Tag Badge
+
+private struct TagBadge: View {
+    let name: String
+    let color: Color
+    var fontSize: CGFloat = 9
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: fontSize, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color)
+            .cornerRadius(6)
+    }
+}
+
 struct TodoWidgetView: View {
     var entry: TodoWidgetEntry
     @Environment(\.widgetFamily) var family
@@ -32,7 +50,6 @@ struct SmallTodoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            // Header
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
@@ -60,13 +77,14 @@ struct SmallTodoView: View {
             } else {
                 ForEach(entry.todos.prefix(3)) { todo in
                     HStack(spacing: 5) {
-                        Circle()
-                            .fill(WidgetColors.accentGradient)
-                            .frame(width: 6, height: 6)
                         Text(todo.title)
                             .font(.caption)
                             .foregroundColor(WidgetColors.textPrimary)
                             .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if !todo.tag.isEmpty, let color = todo.tagColor {
+                            TagBadge(name: todo.tag, color: color, fontSize: 8)
+                        }
                     }
                 }
                 Spacer()
@@ -87,7 +105,6 @@ struct MediumTodoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Header
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
@@ -124,14 +141,14 @@ struct MediumTodoView: View {
             } else {
                 ForEach(entry.todos.prefix(4)) { todo in
                     HStack(spacing: 8) {
-                        Circle()
-                            .fill(WidgetColors.accentGradient)
-                            .frame(width: 7, height: 7)
                         Text(todo.title)
                             .font(.subheadline)
                             .foregroundColor(WidgetColors.textPrimary)
                             .lineLimit(1)
                         Spacer()
+                        if !todo.tag.isEmpty, let color = todo.tagColor {
+                            TagBadge(name: todo.tag, color: color)
+                        }
                         Text(todo.dueDateText)
                             .font(.caption2)
                             .foregroundColor(WidgetColors.textSecondary)
@@ -155,7 +172,6 @@ struct LargeTodoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
@@ -195,14 +211,14 @@ struct LargeTodoView: View {
                 VStack(spacing: 0) {
                     ForEach(entry.todos.prefix(8)) { todo in
                         HStack(spacing: 8) {
-                            Circle()
-                                .fill(WidgetColors.accentGradient)
-                                .frame(width: 8, height: 8)
                             Text(todo.title)
                                 .font(.subheadline)
                                 .foregroundColor(WidgetColors.textPrimary)
                                 .lineLimit(1)
                             Spacer()
+                            if !todo.tag.isEmpty, let color = todo.tagColor {
+                                TagBadge(name: todo.tag, color: color)
+                            }
                             Text(todo.dueDateText)
                                 .font(.caption2)
                                 .foregroundColor(WidgetColors.textSecondary)

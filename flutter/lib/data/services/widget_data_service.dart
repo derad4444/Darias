@@ -6,6 +6,7 @@ import 'package:home_widget/home_widget.dart';
 import '../models/memo_model.dart';
 import '../models/schedule_model.dart';
 import '../models/todo_model.dart';
+import '../../utils/memo_content_utils.dart';
 
 /// ウィジェット用のスケジュールデータ
 class WidgetSchedule {
@@ -46,6 +47,7 @@ class WidgetMemo {
   final DateTime updatedAt;
   final String tag;
   final bool isPinned;
+  final String? colorHex;
 
   WidgetMemo({
     required this.id,
@@ -54,6 +56,7 @@ class WidgetMemo {
     required this.updatedAt,
     required this.tag,
     required this.isPinned,
+    this.colorHex,
   });
 
   Map<String, dynamic> toJson() => {
@@ -63,6 +66,7 @@ class WidgetMemo {
         'updatedAt': updatedAt.toIso8601String(),
         'tag': tag,
         'isPinned': isPinned,
+        'colorHex': colorHex,
       };
 }
 
@@ -72,12 +76,16 @@ class WidgetTodo {
   final String title;
   final String priority;
   final DateTime? dueDate;
+  final String? colorHex;
+  final String tag;
 
   WidgetTodo({
     required this.id,
     required this.title,
     required this.priority,
     this.dueDate,
+    this.colorHex,
+    this.tag = '',
   });
 
   Map<String, dynamic> toJson() => {
@@ -85,6 +93,8 @@ class WidgetTodo {
         'title': title,
         'priority': priority,
         'dueDate': dueDate?.toIso8601String(),
+        'colorHex': colorHex,
+        'tag': tag,
       };
 }
 
@@ -192,7 +202,7 @@ class WidgetDataService {
   // MARK: - Memo Caching
 
   /// メモをウィジェット用にキャッシュ
-  Future<void> cacheMemos(List<MemoModel> memos) async {
+  Future<void> cacheMemos(List<MemoModel> memos, {Map<String, String> tagColors = const {}}) async {
     if (kIsWeb) return;
     debugPrint('📝 [WidgetDataService] cacheMemos called with ${memos.length} memos');
 
@@ -209,10 +219,11 @@ class WidgetDataService {
       return WidgetMemo(
         id: memo.id,
         title: memo.title,
-        content: memo.content,
+        content: extractPlainText(memo.content),
         updatedAt: memo.updatedAt,
         tag: memo.tag,
         isPinned: memo.isPinned,
+        colorHex: memo.tag.isNotEmpty ? tagColors[memo.tag] : null,
       );
     }).toList();
 
@@ -232,7 +243,7 @@ class WidgetDataService {
   // MARK: - Todo Caching
 
   /// ToDoをウィジェット用にキャッシュ
-  Future<void> cacheTodos(List<TodoModel> todos) async {
+  Future<void> cacheTodos(List<TodoModel> todos, {Map<String, String> tagColors = const {}}) async {
     if (kIsWeb) return;
     debugPrint('✅ [WidgetDataService] cacheTodos called with ${todos.length} todos');
 
@@ -255,6 +266,8 @@ class WidgetDataService {
         title: todo.title,
         priority: todo.priority.name,
         dueDate: todo.dueDate,
+        colorHex: todo.tag.isNotEmpty ? tagColors[todo.tag] : null,
+        tag: todo.tag,
       );
     }).toList();
 

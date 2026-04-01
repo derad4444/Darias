@@ -7,6 +7,24 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
+// MARK: - Tag Badge
+
+private struct TagBadge: View {
+    let name: String
+    let color: Color
+    var fontSize: CGFloat = 9
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: fontSize, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color)
+            .cornerRadius(6)
+    }
+}
+
 struct MemoWidgetView: View {
     var entry: MemoWidgetEntry
     @Environment(\.widgetFamily) var family
@@ -46,7 +64,7 @@ struct SmallMemoView: View {
 
             if let memo = entry.memos.first {
                 VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 3) {
+                    HStack(spacing: 4) {
                         if memo.isPinned {
                             Image(systemName: "pin.fill")
                                 .font(.caption2)
@@ -57,6 +75,10 @@ struct SmallMemoView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(WidgetColors.textPrimary)
                             .lineLimit(1)
+                        Spacer(minLength: 0)
+                        if !memo.tag.isEmpty, let color = memo.tagColor {
+                            TagBadge(name: memo.tag, color: color, fontSize: 8)
+                        }
                     }
                     Text(memo.contentOneLine)
                         .font(.caption2)
@@ -146,9 +168,14 @@ struct MediumMemoView: View {
                                 .lineLimit(1)
                         }
                         Spacer()
-                        Text(memo.updatedText)
-                            .font(.caption2)
-                            .foregroundColor(WidgetColors.textSecondary)
+                        VStack(alignment: .trailing, spacing: 3) {
+                            if !memo.tag.isEmpty, let color = memo.tagColor {
+                                TagBadge(name: memo.tag, color: color)
+                            }
+                            Text(memo.updatedText)
+                                .font(.caption2)
+                                .foregroundColor(WidgetColors.textSecondary)
+                        }
                     }
                 }
             }
@@ -220,6 +247,9 @@ struct LargeMemoView: View {
                                     .foregroundColor(WidgetColors.textPrimary)
                                     .lineLimit(1)
                                 Spacer()
+                                if !memo.tag.isEmpty, let color = memo.tagColor {
+                                    TagBadge(name: memo.tag, color: color)
+                                }
                                 Text(memo.updatedText)
                                     .font(.caption2)
                                     .foregroundColor(WidgetColors.textSecondary)

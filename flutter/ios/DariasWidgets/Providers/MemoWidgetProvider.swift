@@ -17,7 +17,8 @@ struct MemoWidgetProvider: TimelineProvider {
                     content: "メモの内容がここに表示されます",
                     updatedAt: "2026-03-15T13:00:00.000",
                     tag: "",
-                    isPinned: true
+                    isPinned: true,
+                    colorHex: nil
                 )
             ],
             totalCount: 1

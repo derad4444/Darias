@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftUI
 import WidgetKit
 
 // MARK: - Calendar Widget Models
@@ -19,6 +20,11 @@ struct WidgetSchedule: Codable, Identifiable {
     let location: String?
     let isAllDay: Bool
     let colorHex: String?
+
+    var tagColor: Color? {
+        guard let hex = colorHex else { return nil }
+        return Color(hex: hex)
+    }
 
     var timeText: String {
         if isAllDay { return "終日" }
@@ -52,6 +58,30 @@ struct WidgetMemo: Codable, Identifiable {
     let updatedAt: String  // ISO8601 String
     let tag: String
     let isPinned: Bool
+    let colorHex: String?
+
+    init(id: String, title: String, content: String, updatedAt: String, tag: String, isPinned: Bool, colorHex: String? = nil) {
+        self.id = id; self.title = title; self.content = content
+        self.updatedAt = updatedAt; self.tag = tag; self.isPinned = isPinned
+        self.colorHex = colorHex
+    }
+
+    // colorHex はキー自体が存在しない古いキャッシュでも失敗しないよう decodeIfPresent を使う
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id        = try c.decode(String.self, forKey: .id)
+        title     = try c.decode(String.self, forKey: .title)
+        content   = try c.decode(String.self, forKey: .content)
+        updatedAt = try c.decode(String.self, forKey: .updatedAt)
+        tag       = try c.decode(String.self, forKey: .tag)
+        isPinned  = try c.decode(Bool.self,   forKey: .isPinned)
+        colorHex  = try c.decodeIfPresent(String.self, forKey: .colorHex)
+    }
+
+    var tagColor: Color? {
+        guard let hex = colorHex else { return nil }
+        return Color(hex: hex)
+    }
 
     var updatedText: String {
         // "2026-03-08T00:26:37.745" → "3/8更新"
@@ -96,6 +126,29 @@ struct WidgetTodo: Codable, Identifiable {
     let title: String
     let priority: String
     let dueDate: String?   // ISO8601 String or null
+    let colorHex: String?
+    let tag: String
+
+    init(id: String, title: String, priority: String, dueDate: String?, colorHex: String? = nil, tag: String = "") {
+        self.id = id; self.title = title; self.priority = priority
+        self.dueDate = dueDate; self.colorHex = colorHex; self.tag = tag
+    }
+
+    // colorHex・dueDate・tag はキー自体が存在しない古いキャッシュでも失敗しないよう decodeIfPresent を使う
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id       = try c.decode(String.self, forKey: .id)
+        title    = try c.decode(String.self, forKey: .title)
+        priority = try c.decode(String.self, forKey: .priority)
+        dueDate  = try c.decodeIfPresent(String.self, forKey: .dueDate)
+        colorHex = try c.decodeIfPresent(String.self, forKey: .colorHex)
+        tag      = try c.decodeIfPresent(String.self, forKey: .tag) ?? ""
+    }
+
+    var tagColor: Color? {
+        guard let hex = colorHex else { return nil }
+        return Color(hex: hex)
+    }
 
     var priorityEnum: TodoPriority {
         return TodoPriority(rawValue: priority) ?? .medium

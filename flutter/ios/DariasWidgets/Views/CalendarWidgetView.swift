@@ -8,258 +8,6 @@ import UIKit
 import WidgetKit
 import Foundation
 
-struct CalendarWidgetView: View {
-    var entry: CalendarWidgetEntry
-    @Environment(\.widgetFamily) var family
-
-    var body: some View {
-        switch family {
-        case .systemSmall:
-            SmallCalendarView(entry: entry)
-        case .systemMedium:
-            MediumCalendarView(entry: entry)
-        case .systemLarge:
-            LargeCalendarView(entry: entry)
-        default:
-            SmallCalendarView(entry: entry)
-        }
-    }
-}
-
-// MARK: - Small
-
-struct SmallCalendarView: View {
-    var entry: CalendarWidgetEntry
-
-    private var todaySchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        return entry.schedules.filter { $0.startDateParsed.map { calendar.isDateInToday($0) } ?? false }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image("DariasIcon")
-                    .resizable()
-                    .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
-                Text("今日")
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(WidgetColors.primaryPink)
-                Spacer()
-            }
-
-            if todaySchedules.isEmpty {
-                Spacer()
-                VStack(spacing: 4) {
-                    Image(systemName: "calendar.badge.checkmark")
-                        .font(.title2)
-                        .foregroundStyle(WidgetColors.accentGradient)
-                    Text("予定なし")
-                        .font(.caption2)
-                        .foregroundColor(WidgetColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                Spacer()
-            } else {
-                ForEach(todaySchedules.prefix(3)) { schedule in
-                    HStack(spacing: 5) {
-                        Text(schedule.timeText)
-                            .font(.caption2)
-                            .foregroundColor(WidgetColors.primaryPink)
-                        Text(schedule.title)
-                            .font(.caption)
-                            .foregroundColor(WidgetColors.textPrimary)
-                            .lineLimit(1)
-                    }
-                }
-                Spacer()
-            }
-        }
-        .padding(12)
-        .containerBackground(for: .widget) {
-            WidgetColors.backgroundGradient
-        }
-        .widgetURL(URL(string: "darias://open/?page=calendar&homeWidget"))
-    }
-}
-
-// MARK: - Medium
-
-struct MediumCalendarView: View {
-    var entry: CalendarWidgetEntry
-
-    private var todaySchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        return entry.schedules.filter { $0.startDateParsed.map { calendar.isDateInToday($0) } ?? false }
-    }
-
-    private var tomorrowSchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        return entry.schedules.filter { $0.startDateParsed.map { calendar.isDateInTomorrow($0) } ?? false }
-    }
-
-    var body: some View {
-        HStack(spacing: 12) {
-            // 今日
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 5) {
-                    Image("DariasIcon")
-                        .resizable()
-                        .frame(width: 18, height: 18)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                    Text("今日")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(WidgetColors.primaryPink)
-                }
-
-                if todaySchedules.isEmpty {
-                    Text("予定なし")
-                        .font(.caption)
-                        .foregroundColor(WidgetColors.textSecondary)
-                } else {
-                    ForEach(todaySchedules.prefix(3)) { schedule in
-                        HStack(spacing: 4) {
-                            Text(schedule.timeText)
-                                .font(.caption2)
-                                .foregroundColor(WidgetColors.primaryPink)
-                                .frame(width: 36, alignment: .leading)
-                            Text(schedule.title)
-                                .font(.caption)
-                                .foregroundColor(WidgetColors.textPrimary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Divider()
-                .background(WidgetColors.primaryPink.opacity(0.3))
-
-            // 明日
-            VStack(alignment: .leading, spacing: 6) {
-                HStack(spacing: 5) {
-                    Image(systemName: "calendar")
-                        .font(.subheadline)
-                        .foregroundColor(WidgetColors.lavender)
-                    Text("明日")
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .foregroundColor(WidgetColors.lavender)
-                }
-
-                if tomorrowSchedules.isEmpty {
-                    Text("予定なし")
-                        .font(.caption)
-                        .foregroundColor(WidgetColors.textSecondary)
-                } else {
-                    ForEach(tomorrowSchedules.prefix(3)) { schedule in
-                        HStack(spacing: 4) {
-                            Text(schedule.timeText)
-                                .font(.caption2)
-                                .foregroundColor(WidgetColors.lavender)
-                                .frame(width: 36, alignment: .leading)
-                            Text(schedule.title)
-                                .font(.caption)
-                                .foregroundColor(WidgetColors.textPrimary)
-                                .lineLimit(1)
-                        }
-                    }
-                }
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(12)
-        .containerBackground(for: .widget) {
-            WidgetColors.backgroundGradient
-        }
-        .widgetURL(URL(string: "darias://open/?page=calendar&homeWidget"))
-    }
-}
-
-// MARK: - Large
-
-struct LargeCalendarView: View {
-    var entry: CalendarWidgetEntry
-
-    private var todaySchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        return entry.schedules.filter { $0.startDateParsed.map { calendar.isDateInToday($0) } ?? false }
-            .sorted { $0.startDate < $1.startDate }
-    }
-
-    private var tomorrowSchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        return entry.schedules.filter { $0.startDateParsed.map { calendar.isDateInTomorrow($0) } ?? false }
-            .sorted { $0.startDate < $1.startDate }
-    }
-
-    private var dayAfterSchedules: [WidgetSchedule] {
-        let calendar = Calendar.current
-        guard let dayAfter = calendar.date(byAdding: .day, value: 2, to: Date()) else { return [] }
-        return entry.schedules.filter {
-            $0.startDateParsed.map { calendar.isDate($0, inSameDayAs: dayAfter) } ?? false
-        }.sorted { $0.startDate < $1.startDate }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            scheduleSection(title: "今日", color: WidgetColors.primaryPink, schedules: todaySchedules, limit: 5)
-            Divider().padding(.vertical, 8)
-            scheduleSection(title: "明日", color: WidgetColors.lavender, schedules: tomorrowSchedules, limit: 4)
-            Divider().padding(.vertical, 8)
-            scheduleSection(title: "明後日", color: Color.purple.opacity(0.7), schedules: dayAfterSchedules, limit: 3)
-            Spacer()
-        }
-        .padding(14)
-        .containerBackground(for: .widget) {
-            WidgetColors.backgroundGradient
-        }
-        .widgetURL(URL(string: "darias://open/?page=calendar&homeWidget"))
-    }
-
-    @ViewBuilder
-    private func scheduleSection(title: String, color: Color, schedules: [WidgetSchedule], limit: Int) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: "calendar")
-                .font(.caption)
-                .foregroundColor(color)
-            Text(title)
-                .font(.subheadline)
-                .fontWeight(.bold)
-                .foregroundColor(color)
-        }
-        .padding(.bottom, 4)
-
-        if schedules.isEmpty {
-            Text("予定なし")
-                .font(.caption)
-                .foregroundColor(WidgetColors.textSecondary)
-                .padding(.bottom, 4)
-        } else {
-            ForEach(schedules.prefix(limit)) { schedule in
-                HStack(spacing: 6) {
-                    Text(schedule.timeText)
-                        .font(.caption2)
-                        .foregroundColor(color)
-                        .frame(width: 36, alignment: .leading)
-                    Text(schedule.title)
-                        .font(.caption)
-                        .foregroundColor(WidgetColors.textPrimary)
-                        .lineLimit(1)
-                    Spacer()
-                }
-                .padding(.bottom, 3)
-            }
-        }
-    }
-}
-
 // MARK: - Japanese Holidays
 
 private func isJapaneseHoliday(year: Int, month: Int, day: Int) -> Bool {
@@ -422,6 +170,20 @@ private func scheduledDays(in date: Date, schedules: [WidgetSchedule]) -> Set<In
     return days
 }
 
+private func scheduledDaysColors(in date: Date, schedules: [WidgetSchedule]) -> [Int: Color] {
+    let cal = Calendar.current
+    var colors: [Int: Color] = [:]
+    for s in schedules {
+        if let d = s.startDateParsed, cal.isDate(d, equalTo: date, toGranularity: .month) {
+            let day = cal.component(.day, from: d)
+            if colors[day] == nil {
+                colors[day] = s.colorHex.flatMap { Color(hex: $0) } ?? WidgetColors.primaryPink
+            }
+        }
+    }
+    return colors
+}
+
 private func monthLabel(_ date: Date, format: String = "M月") -> String {
     let f = DateFormatter()
     f.locale = Locale(identifier: "ja_JP")
@@ -434,7 +196,7 @@ private func monthLabel(_ date: Date, format: String = "M月") -> String {
 private struct CalendarDayCell: View {
     let day: Int
     let isToday: Bool
-    let hasEvent: Bool
+    let eventColor: Color?
     let isSunday: Bool
     let isSaturday: Bool
     let isHoliday: Bool
@@ -461,7 +223,7 @@ private struct CalendarDayCell: View {
             }
             .frame(width: cellSize, height: cellSize)
             Circle()
-                .fill(hasEvent && !isToday ? WidgetColors.primaryPink : Color.clear)
+                .fill(!isToday ? (eventColor ?? Color.clear) : Color.clear)
                 .frame(width: 3, height: 3)
         }
         .frame(maxWidth: .infinity)
@@ -513,7 +275,7 @@ private struct LargeGridDayCell: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 1) {
+        VStack(alignment: .center, spacing: 1) {
             ZStack {
                 if isToday {
                     Circle()
@@ -534,7 +296,7 @@ private struct LargeGridDayCell: View {
                         .font(.system(size: 6.5))
                         .foregroundColor(.red)
                         .lineLimit(1)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.horizontal, 1)
                         .background(Color.red.opacity(0.2))
                         .cornerRadius(2)
@@ -545,7 +307,7 @@ private struct LargeGridDayCell: View {
                             .font(.system(size: 6.5))
                             .foregroundColor(.white)
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.horizontal, 1)
                             .background(color)
                             .cornerRadius(2)
@@ -554,14 +316,14 @@ private struct LargeGridDayCell: View {
                             .font(.system(size: 6.5))
                             .foregroundColor(color)
                             .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.horizontal, 1)
                     }
                 case .overflow(let n):
                     Text("+\(n)")
                         .font(.system(size: 6.5))
                         .foregroundColor(.gray)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.horizontal, 1)
                 }
             }
@@ -604,7 +366,7 @@ struct SmallCalendarGridView: View {
     var body: some View {
         let cal = Calendar.current
         let (firstWeekday, daysInMonth, rows) = calendarGridData(for: entry.date)
-        let events = scheduledDays(in: entry.date, schedules: entry.schedules)
+        let events = scheduledDaysColors(in: entry.date, schedules: entry.schedules)
         let todayDay = cal.component(.day, from: entry.date)
         let cellSize: CGFloat = 14
 
@@ -634,7 +396,7 @@ struct SmallCalendarGridView: View {
                             let day = row * 7 + col - firstWeekday + 1
                             if day >= 1 && day <= daysInMonth {
                                 CalendarDayCell(day: day, isToday: day == todayDay,
-                                    hasEvent: events.contains(day), isSunday: col == 0,
+                                    eventColor: events[day], isSunday: col == 0,
                                     isSaturday: col == 6, isHoliday: isJapaneseHoliday(year: calYear, month: calMonth, day: day),
                                     cellSize: cellSize)
                             } else {
@@ -682,7 +444,7 @@ struct MediumCalendarGridView: View {
     var body: some View {
         let cal = Calendar.current
         let (firstWeekday, daysInMonth, rows) = calendarGridData(for: entry.date)
-        let events = scheduledDays(in: entry.date, schedules: entry.schedules)
+        let events = scheduledDaysColors(in: entry.date, schedules: entry.schedules)
         let todayDay = cal.component(.day, from: entry.date)
         let cellSize: CGFloat = 15
 
@@ -712,7 +474,7 @@ struct MediumCalendarGridView: View {
                                 let day = row * 7 + col - firstWeekday + 1
                                 if day >= 1 && day <= daysInMonth {
                                     CalendarDayCell(day: day, isToday: day == todayDay,
-                                        hasEvent: events.contains(day), isSunday: col == 0,
+                                        eventColor: events[day], isSunday: col == 0,
                                         isSaturday: col == 6, isHoliday: isJapaneseHoliday(year: calYear, month: calMonth, day: day),
                                         cellSize: cellSize)
                                 } else {
@@ -746,11 +508,15 @@ struct MediumCalendarGridView: View {
                     Spacer()
                 } else {
                     ForEach(upcomingSchedules.prefix(4)) { schedule in
-                        HStack(spacing: 3) {
+                        HStack(spacing: 4) {
+                            let color = schedule.tagColor ?? WidgetColors.primaryPink
+                            Circle()
+                                .fill(color)
+                                .frame(width: 6, height: 6)
                             Text(schedule.startDateParsed.map { shortDate($0) } ?? "")
                                 .font(.system(size: 9))
-                                .foregroundColor(WidgetColors.primaryPink)
-                                .frame(width: 28, alignment: .leading)
+                                .foregroundColor(color)
+                                .frame(width: 24, alignment: .leading)
                             Text(schedule.title)
                                 .font(.system(size: 10))
                                 .foregroundColor(WidgetColors.textPrimary)
