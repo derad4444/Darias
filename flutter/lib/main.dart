@@ -28,32 +28,34 @@ void main() async {
   );
 
   // App Check初期化（不正なCloud Functions呼び出しを防止）
-  // DEBUG: シミュレーター・開発端末用のデバッグプロバイダー
-  // RELEASE: iOS 14+ は App Attest、それ以下は DeviceCheck を使用
-  await FirebaseAppCheck.instance.activate(
-    appleProvider: kDebugMode
-        ? AppleProvider.debug
-        : AppleProvider.appAttestWithDeviceCheckFallback,
-  );
+  if (!kIsWeb) {
+    // DEBUG: シミュレーター・開発端末用のデバッグプロバイダー
+    // RELEASE: iOS 14+ は App Attest、それ以下は DeviceCheck を使用
+    await FirebaseAppCheck.instance.activate(
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.appAttestWithDeviceCheckFallback,
+    );
+  }
 
   // Web版ではログイン状態をローカルストレージに永続化
   if (kIsWeb) {
     await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
   }
 
-  // バックグラウンドメッセージハンドラを設定
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // 広告SDK初期化（Webでは不要）
   if (!kIsWeb) {
+    // バックグラウンドメッセージハンドラを設定
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+    // 広告SDK初期化
     await AdService().initialize();
+
+    // 通知サービス初期化
+    await NotificationService().initialize();
+
+    // ウィジェットデータサービス初期化（ネイティブのみ）
+    await WidgetDataService.shared.initialize();
   }
-
-  // 通知サービス初期化
-  await NotificationService().initialize();
-
-  // ウィジェットデータサービス初期化（ネイティブのみ）
-  await WidgetDataService.shared.initialize();
 
   // Web ではブラウザのネイティブ context menu を無効化し
   // Flutter のローカライズ済みメニュー（日本語）を使用する

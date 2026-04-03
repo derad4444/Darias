@@ -152,7 +152,6 @@ exports.answerAppQuestion = onCall(
       timeoutSeconds: 60,
       minInstances: 0,
       enforceAppCheck: false,
-      secrets: ["OPENAI_API_KEY"],
     },
     async (request) => {
       const {data} = request;

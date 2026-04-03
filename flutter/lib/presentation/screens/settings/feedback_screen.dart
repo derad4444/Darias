@@ -1,7 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -24,6 +27,32 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
   void dispose() {
     _messageController.dispose();
     super.dispose();
+  }
+
+  Future<Map<String, String>> _getDeviceInfo() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final appVersion = '${packageInfo.version} (${packageInfo.buildNumber})';
+
+    String deviceModel = '不明';
+    String iosVersion = '不明';
+    String deviceName = '不明';
+
+    if (!kIsWeb) {
+      try {
+        final deviceInfoPlugin = DeviceInfoPlugin();
+        final iosInfo = await deviceInfoPlugin.iosInfo;
+        deviceModel = iosInfo.model;
+        iosVersion = iosInfo.systemVersion;
+        deviceName = iosInfo.name;
+      } catch (_) {}
+    }
+
+    return {
+      'appVersion': appVersion,
+      'iosVersion': iosVersion,
+      'deviceModel': deviceModel,
+      'deviceName': deviceName,
+    };
   }
 
   bool get _isFormValid {
@@ -55,10 +84,7 @@ class _FeedbackScreenState extends ConsumerState<FeedbackScreen> {
         'createdAt': FieldValue.serverTimestamp(),
         'adminEmailSent': false,
         'userEmailSent': false,
-        'deviceInfo': {
-          'platform': 'web',
-          'appVersion': '1.0.0',
-        },
+        'deviceInfo': await _getDeviceInfo(),
       };
 
       await ref.read(firestoreProvider)
