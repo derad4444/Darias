@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -24,6 +25,15 @@ void main() async {
   // Firebase初期化
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  // App Check初期化（不正なCloud Functions呼び出しを防止）
+  // DEBUG: シミュレーター・開発端末用のデバッグプロバイダー
+  // RELEASE: iOS 14+ は App Attest、それ以下は DeviceCheck を使用
+  await FirebaseAppCheck.instance.activate(
+    appleProvider: kDebugMode
+        ? AppleProvider.debug
+        : AppleProvider.appAttestWithDeviceCheckFallback,
   );
 
   // Web版ではログイン状態をローカルストレージに永続化

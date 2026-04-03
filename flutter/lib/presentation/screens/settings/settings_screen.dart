@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../../data/models/subscription_model.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/ad_service.dart';
@@ -195,6 +197,10 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _confirmDeleteAccount(BuildContext context, WidgetRef ref) async {
+    final isPremium = ref.read(effectiveIsPremiumProvider);
+    final subscription = ref.read(currentSubscriptionProvider);
+    final isAppStorePremium = isPremium && subscription.paymentMethod == PaymentMethod.appStore;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -218,6 +224,35 @@ class SettingsScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
+      // App Store の有料ユーザーには手動キャンセルの案内を表示
+      if (isAppStorePremium && context.mounted) {
+        final understood = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('サブスクリプションについて'),
+            content: const Text(
+              'App Storeのサブスクリプションはアカウント削除後も自動的にはキャンセルされません。\n\n'
+              '【iOSでのキャンセル手順】\n'
+              '設定 → Apple ID → サブスクリプション → DARIAS → サブスクリプションをキャンセル\n\n'
+              'アカウント削除前にキャンセルしましたか？',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('戻る（キャンセルする）'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('削除を続ける'),
+              ),
+            ],
+          ),
+        );
+        if (understood != true || !context.mounted) return;
+      }
+
       final finalConfirm = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -262,15 +297,13 @@ class SettingsScreen extends ConsumerWidget {
           );
           await user.reauthenticateWithCredential(credential);
 
-          // Auth削除を先に実行（Firestoreより先にしないと不整合が発生する）
-          final userId = user.uid;
-          await user.delete();
+          // Cloud Function でFirestoreデータ全削除 + Google Playキャンセル
+          // Auth削除より先に実行（Auth削除後はFirestoreにアクセスできなくなるため）
+          final callable = FirebaseFunctions.instance.httpsCallable('deleteUserAccount');
+          await callable.call();
 
-          // Auth削除成功後にFirestoreデータを削除
-          await ref.read(firestoreProvider)
-              .collection('users')
-              .doc(userId)
-              .delete();
+          // Firestoreデータ削除完了後にAuth削除
+          await user.delete();
 
           if (context.mounted) {
             Navigator.of(context).pop();
@@ -287,6 +320,14 @@ class SettingsScreen extends ConsumerWidget {
             Navigator.of(context).pop();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(_getDeleteErrorMessage(e.code))),
+            );
+          }
+        } on FirebaseFunctionsException catch (e) {
+          debugPrint('❌ アカウント削除 FirebaseFunctionsException: code=${e.code}, message=${e.message}');
+          if (context.mounted) {
+            Navigator.of(context).pop();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('データ削除中にエラーが発生しました: ${e.message}')),
             );
           }
         } catch (e, st) {

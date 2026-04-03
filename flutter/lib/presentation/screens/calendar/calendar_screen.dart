@@ -1843,7 +1843,7 @@ class _ScheduleItem extends ConsumerWidget {
                 // コンテンツ
                 Expanded(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
                         schedule.title,
@@ -1852,10 +1852,12 @@ class _ScheduleItem extends ConsumerWidget {
                           fontWeight: FontWeight.w500,
                           color: Colors.black87,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                       if (schedule.location.isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.location_on,
@@ -1871,6 +1873,7 @@ class _ScheduleItem extends ConsumerWidget {
                                   color: Colors.black54,
                                 ),
                                 overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
                               ),
                             ),
                           ],
@@ -2266,7 +2269,7 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
             // コンテンツ
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
                     schedule.title,
@@ -2277,6 +2280,7 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 2),
                   Text(

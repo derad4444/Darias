@@ -378,11 +378,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         characterId: characterId,
         message: message,
       );
-      setState(() {
-        _displayedMessage = result?.reply ?? 'お返事がありませんでした';
-        _isWaitingForReply = false;
-        _isCharacterReply = true;
-      });
+      if (mounted) {
+        setState(() {
+          _displayedMessage = result?.reply ?? 'お返事がありませんでした';
+          _isWaitingForReply = false;
+          _isCharacterReply = true;
+        });
+      }
       if (mounted && result != null && !_isShowingDialog) {
         if (result.scheduleDetected || result.memoDetected || result.todoDetected) {
           _showActionConfirmDialog(result);
@@ -394,10 +396,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _showRewardedAdDialog();
       }
     } catch (e) {
-      setState(() {
-        _displayedMessage = 'エラーが発生しました。もう一度試してください。';
-        _isWaitingForReply = false;
-      });
+      if (mounted) {
+        setState(() {
+          _displayedMessage = 'エラーが発生しました。もう一度試してください。';
+          _isWaitingForReply = false;
+        });
+      }
     }
   }
 

@@ -51,17 +51,23 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         ref.read(allSchedulesProvider).whenData((schedules) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
+          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheSchedules (init) error: $e');
+          });
         });
         ref.read(memosProvider).whenData((memos) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors);
+          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheMemos (init) error: $e');
+          });
         });
         ref.read(todosProvider).whenData((todos) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors);
+          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheTodos (init) error: $e');
+          });
         });
       });
     }
@@ -99,21 +105,27 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         next.whenData((memos) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors);
+          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheMemos error: $e');
+          });
         });
       });
       ref.listen<AsyncValue<List<TodoModel>>>(todosProvider, (_, next) {
         next.whenData((todos) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors);
+          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheTodos error: $e');
+          });
         });
       });
       ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
         next.whenData((schedules) {
           final tags = ref.read(tagsProvider);
           final tagColors = {for (final t in tags) t.name: t.colorHex};
-          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
+          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheSchedules error: $e');
+          });
         });
       });
       // タグがロード/更新されたら全データを再キャッシュ（初回ロード時のタイミングずれ対策）
@@ -121,13 +133,19 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         if (tags.isEmpty) return;
         final tagColors = {for (final t in tags) t.name: t.colorHex};
         ref.read(allSchedulesProvider).whenData((schedules) {
-          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
+          WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheSchedules (tag update) error: $e');
+          });
         });
         ref.read(memosProvider).whenData((memos) {
-          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors);
+          WidgetDataService.shared.cacheMemos(memos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheMemos (tag update) error: $e');
+          });
         });
         ref.read(todosProvider).whenData((todos) {
-          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors);
+          WidgetDataService.shared.cacheTodos(todos, tagColors: tagColors).catchError((e) {
+            debugPrint('⚠️ cacheTodos (tag update) error: $e');
+          });
         });
       });
     }

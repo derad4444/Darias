@@ -47,9 +47,16 @@ const APP_GUIDE = `
 - **カレンダーから追加**: 右下の＋ボタン
 - **確認**: カレンダー画面（月間表示）
 
+## チャット履歴の確認
+- ホーム画面には最新の返答1件のみ吹き出しで表示される（過去のメッセージはそこでは見られない）
+- 過去の会話履歴は「履歴」ボタン（ホーム画面のキャラクターの下にあるボタン）をタップして確認できる
+- 履歴画面ではチャット・自分会議・日記をタブで切り替えられ、日付ごとに表示される。検索機能もある
+- 会議（自分会議）の結論は、次回のチャット返答にコンテキストとして自動反映される
+
 ## キャラクターについて
 - BIG5性格診断をもとにキャラクターの性格が変化する
 - 診断はチャットの会話を通じて自動的に進む
+- キャラクターはこのアプリ（DARIAS）専用のAIアシスタント。他のサービスやアプリのことは答えられない
 `;
 
 // ============================================================
@@ -97,7 +104,7 @@ async function fetchUserData(userId, dataTypes) {
           .collection("users").doc(userId)
           .collection("todos")
           .where("isCompleted", "==", false)
-          .orderBy("createdAt", "descending")
+          .orderBy("createdAt", "desc")
           .limit(20)
           .get();
 
@@ -145,6 +152,7 @@ exports.answerAppQuestion = onCall(
       timeoutSeconds: 60,
       minInstances: 0,
       enforceAppCheck: false,
+      secrets: ["OPENAI_API_KEY"],
     },
     async (request) => {
       const {data} = request;

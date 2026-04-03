@@ -1,4 +1,4 @@
-platform :ios, '13.0'
+platform :ios, '15.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,9 +39,41 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['CLANG_ENABLE_EXPLICIT_MODULES'] = 'NO'
       config.build_settings['SWIFT_ENABLE_EXPLICIT_MODULES'] = 'NO'
+      config.build_settings['DEBUG_INFORMATION_FORMAT'] = 'dwarf-with-dsym'
+    end
+  end
+
+  # Patch FirebaseFunctions FunctionsContext.swift to fix iOS 16 Swift Concurrency crash.
+  # Root cause: async let + throwing exits scope early, causing swift_task_dealloc fatalError
+  # in the iOS 16 Swift runtime (SR-15609). Fixed in iOS 17+ runtime only.
+  # Fix: replace async let with sequential await to avoid the buggy cleanup path.
+  funcs_context = File.join(installer.sandbox.root,
+    'FirebaseFunctions/FirebaseFunctions/Sources/Internal/FunctionsContext.swift')
+  if File.exist?(funcs_context)
+    content = File.read(funcs_context)
+    if content.include?('async let authToken')
+      patched = content.sub(
+        /    async let authToken = auth\?\.getToken\(forcingRefresh: false\)\n    async let appCheckToken = getAppCheckToken\(options: options\)\n    async let limitedUseAppCheckToken = getLimitedUseAppCheckToken\(options: options\)\n\n    \/\/ Only `authToken` is throwing.*?\n    \/\/ from `try authToken`.*?\n    return try await FunctionsContext\(\n      authToken: authToken,\n      fcmToken: messaging\?\.fcmToken,\n      appCheckToken: appCheckToken,\n      limitedUseAppCheckToken: limitedUseAppCheckToken\n    \)/m,
+        "    // Patched: sequential await instead of async let to fix iOS 16 Swift Concurrency crash.\n" \
+        "    // async let + throwing exits scope early, causing swift_task_dealloc fatalError\n" \
+        "    // in the iOS 16 Swift runtime (SR-15609). Fixed in iOS 17+ runtime only.\n" \
+        "    let authToken = try await auth?.getToken(forcingRefresh: false)\n" \
+        "    let appCheckToken = await getAppCheckToken(options: options)\n" \
+        "    let limitedUseAppCheckToken = await getLimitedUseAppCheckToken(options: options)\n" \
+        "    return FunctionsContext(\n" \
+        "      authToken: authToken,\n" \
+        "      fcmToken: messaging?.fcmToken,\n" \
+        "      appCheckToken: appCheckToken,\n" \
+        "      limitedUseAppCheckToken: limitedUseAppCheckToken\n" \
+        "    )"
+      )
+      File.write(funcs_context, patched)
+      puts "✅ Patched FunctionsContext.swift for iOS 16 compatibility"
+    else
+      puts "ℹ️ FunctionsContext.swift already patched or changed upstream"
     end
   end
 end
