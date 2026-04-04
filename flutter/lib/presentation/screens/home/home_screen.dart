@@ -414,33 +414,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         final accentColor = ref.read(accentColorProvider);
-        if (result.scheduleDetected && result.detectedSchedule != null) {
-          final s = result.detectedSchedule!;
-          final dateStr = s.isAllDay
-              ? '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日（終日）'
-              : '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日 '
-                  '${s.startDate.hour.toString().padLeft(2, '0')}:'
-                  '${s.startDate.minute.toString().padLeft(2, '0')}';
-          return _ActionConfirmDialog(
-            icon: Icons.calendar_today,
-            title: '予定を追加しますか？',
-            rows: [
-              _DialogInfoRow(icon: Icons.text_format, label: '予定', content: s.title),
-              _DialogInfoRow(icon: Icons.calendar_month, label: '開始', content: dateStr),
-              if (s.location.isNotEmpty)
-                _DialogInfoRow(icon: Icons.location_on, label: '場所', content: s.location),
-            ],
+        if (result.scheduleDetected) {
+          return _ScheduleListConfirmDialog(
+            initialSchedules: result.detectedSchedules,
             accentColor: accentColor,
-            showEditButton: true,
-            onAdd: () async {
+            onAdd: (schedules) async {
               Navigator.of(dialogContext).pop();
-              await _saveScheduleModel(s);
+              await _saveScheduleModels(schedules);
             },
-            onEdit: () {
+            onEdit: (schedule) {
               Navigator.of(dialogContext).pop();
               context.push('/calendar/detail', extra: {
-                'schedule': s,
-                'initialDate': s.startDate,
+                'schedule': schedule,
+                'initialDate': schedule.startDate,
               });
             },
             onCancel: () => Navigator.of(dialogContext).pop(),
@@ -532,20 +518,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     ).whenComplete(() => _isShowingDialog = false);
   }
 
-  Future<void> _saveScheduleModel(ScheduleModel schedule) async {
-    try {
-      await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('予定を追加しました')),
-        );
+  Future<void> _saveScheduleModels(List<ScheduleModel> schedules) async {
+    int successCount = 0;
+    for (final schedule in schedules) {
+      try {
+        await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
+        successCount++;
+      } catch (e) {
+        debugPrint('⚠️ 予定の追加に失敗: $e');
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('予定の追加に失敗しました')),
-        );
-      }
+    }
+    if (mounted) {
+      final message = successCount == schedules.length
+          ? '$successCount件の予定を追加しました'
+          : '$successCount/${schedules.length}件の予定を追加しました';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -788,6 +775,226 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 予定リスト確認ダイアログ（1件・複数件共通）
+class _ScheduleListConfirmDialog extends StatefulWidget {
+  final List<ScheduleModel> initialSchedules;
+  final Color accentColor;
+  final void Function(List<ScheduleModel>) onAdd;
+  final void Function(ScheduleModel) onEdit;
+  final VoidCallback onCancel;
+
+  const _ScheduleListConfirmDialog({
+    required this.initialSchedules,
+    required this.accentColor,
+    required this.onAdd,
+    required this.onEdit,
+    required this.onCancel,
+  });
+
+  @override
+  State<_ScheduleListConfirmDialog> createState() =>
+      _ScheduleListConfirmDialogState();
+}
+
+class _ScheduleListConfirmDialogState
+    extends State<_ScheduleListConfirmDialog> {
+  late List<ScheduleModel> _schedules;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedules = List.from(widget.initialSchedules);
+  }
+
+  String _formatDate(ScheduleModel s) {
+    if (s.isAllDay) {
+      return '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日（終日）';
+    }
+    return '${s.startDate.year}年${s.startDate.month}月${s.startDate.day}日 '
+        '${s.startDate.hour.toString().padLeft(2, '0')}:'
+        '${s.startDate.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildButton({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+    Color? textColor,
+    bool isFullWidth = false,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        width: isFullWidth ? double.infinity : null,
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+            color: textColor ?? Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScheduleCard(ScheduleModel s, int index) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEEEEEE),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  s.title,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () => widget.onEdit(s),
+                child: const Text(
+                  '編集',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              const Icon(Icons.calendar_month, size: 13, color: Colors.blue),
+              const SizedBox(width: 4),
+              Text(
+                _formatDate(s),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+            ],
+          ),
+          if (s.location.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.location_on, size: 13, color: Colors.blue),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    s.location,
+                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: GestureDetector(
+              onTap: () => setState(() => _schedules.removeAt(index)),
+              child: const Text(
+                '除外',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _schedules.length;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.calendar_today, size: 32, color: widget.accentColor),
+            const SizedBox(height: 8),
+            Text(
+              count == 0 ? '全て除外されました' : '$count件の予定を追加しますか？',
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (count > 0) ...[
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 320),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < _schedules.length; i++) ...[
+                        if (i > 0) const SizedBox(height: 10),
+                        _buildScheduleCard(_schedules[i], i),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildButton(
+                label: '$count件追加する',
+                color: Colors.blue,
+                onPressed: () => widget.onAdd(_schedules),
+                isFullWidth: true,
+              ),
+            ],
+            const SizedBox(height: 12),
+            _buildButton(
+              label: count == 0 ? '閉じる' : 'キャンセル',
+              color: const Color(0xFFDDDDDD),
+              textColor: Colors.black87,
+              onPressed: widget.onCancel,
+              isFullWidth: true,
+            ),
+          ],
+        ),
       ),
     );
   }

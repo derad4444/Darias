@@ -76,37 +76,34 @@ exports.extractSchedule = onCall(
           return {error: "Failed to parse AI response"};
         }
 
-        // GPTの返答が「予定なし」の場合は、そのまま処理終了
-        if (!scheduleData.hasSchedule) {
-          return {hasSchedule: false, message: "No schedule found"};
+        // 予定が0件の場合はそのまま処理終了
+        const rawSchedules = scheduleData.schedules;
+        if (!Array.isArray(rawSchedules) || rawSchedules.length === 0) {
+          return {schedules: []};
         }
 
-        // 00:00-23:59の場合は自動的にisAllDayをtrueに設定
-        const startDate = new Date(scheduleData.startDate);
-        const endDate = new Date(scheduleData.endDate);
-        const isFullDay = startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
-                         endDate.getHours() === 23 && endDate.getMinutes() === 59;
-        
-        // 予定データを構造化（保存はしない - クライアント側で確認後に保存）
-        const scheduleDoc = {
-          title: scheduleData.title || "",
-          isAllDay: isFullDay || scheduleData.isAllDay || false,
-          startDate: admin.firestore.Timestamp.fromDate(startDate),
-          endDate: admin.firestore.Timestamp.fromDate(endDate),
-          location: scheduleData.location || "",
-          tag: scheduleData.tag || "",
-          memo: scheduleData.memo || "",
-          repeatOption: scheduleData.repeatOption || "none",
-          remindValue: scheduleData.remindValue || 0,
-          remindUnit: scheduleData.remindUnit || "none",
-          created_at: admin.firestore.Timestamp.now(),
-        };
+        // 各予定データを構造化（保存はしない - クライアント側で確認後に保存）
+        const processedSchedules = rawSchedules.map((item) => {
+          const startDate = new Date(item.startDate);
+          const endDate = new Date(item.endDate);
+          const isFullDay = startDate.getHours() === 0 && startDate.getMinutes() === 0 &&
+                           endDate.getHours() === 23 && endDate.getMinutes() === 59;
+          return {
+            title: item.title || "",
+            isAllDay: isFullDay || item.isAllDay || false,
+            startDate: admin.firestore.Timestamp.fromDate(startDate),
+            endDate: admin.firestore.Timestamp.fromDate(endDate),
+            location: item.location || "",
+            tag: item.tag || "",
+            memo: item.memo || "",
+            repeatOption: item.repeatOption || "none",
+            remindValue: item.remindValue || 0,
+            remindUnit: item.remindUnit || "none",
+            created_at: admin.firestore.Timestamp.now(),
+          };
+        });
 
-        return {
-          hasSchedule: true,
-          scheduleData: scheduleDoc,
-          message: "予定楽しんでね！"
-        };
+        return {schedules: processedSchedules};
       } catch (e) {
         console.error("🔥 Error in extractSchedule:", e);
         return {error: "Internal server error"};

@@ -107,18 +107,18 @@ const _concernKeywords = [
 /// メッセージ送信結果
 class SendMessageResult {
   final String reply;
-  final ScheduleModel? detectedSchedule;
-  final bool scheduleDetected;
+  final List<ScheduleModel> detectedSchedules;
   final MemoModel? detectedMemo;
   final bool memoDetected;
   final TodoModel? detectedTodo;
   final bool todoDetected;
   final bool meetingSuggested;
 
+  bool get scheduleDetected => detectedSchedules.isNotEmpty;
+
   SendMessageResult({
     required this.reply,
-    this.detectedSchedule,
-    this.scheduleDetected = false,
+    this.detectedSchedules = const [],
     this.detectedMemo,
     this.memoDetected = false,
     this.detectedTodo,
@@ -336,12 +336,11 @@ class ChatDatasource {
           userMessage: trimmed,
         );
 
-        if (extractResult != null) {
-          debugPrint('✅ 予定抽出成功: ${extractResult.title}');
+        if (extractResult.isNotEmpty) {
+          debugPrint('✅ 予定抽出成功: ${extractResult.length}件');
           return SendMessageResult(
             reply: '予定楽しんでね！',
-            detectedSchedule: extractResult,
-            scheduleDetected: true,
+            detectedSchedules: extractResult,
           );
         }
         debugPrint('ℹ️ 予定は検出されませんでした');
@@ -409,8 +408,8 @@ class ChatDatasource {
     }
   }
 
-  /// Cloud Functionで予定を抽出
-  Future<ScheduleModel?> _extractSchedule({
+  /// Cloud Functionで予定を抽出（複数件対応）
+  Future<List<ScheduleModel>> _extractSchedule({
     required String userId,
     required String userMessage,
   }) async {
@@ -421,31 +420,26 @@ class ChatDatasource {
     });
 
     final data = result.data;
-    final hasSchedule = data['hasSchedule'] as bool? ?? false;
+    final scheduleList = data['schedules'] as List<dynamic>? ?? [];
 
-    if (!hasSchedule) return null;
-
-    final scheduleData = data['scheduleData'] as Map<String, dynamic>?;
-    if (scheduleData == null) return null;
-
-    final title = scheduleData['title'] as String? ?? '';
-    final isAllDay = scheduleData['isAllDay'] as bool? ?? true;
-    final location = scheduleData['location'] as String? ?? '';
-    final memo = scheduleData['memo'] as String? ?? '';
-
-    // startDate/endDate はISO文字列またはTimestampオブジェクト（{_seconds, _nanoseconds}）で返ることがある
-    final startDate = _parseDateField(scheduleData['startDate']) ?? DateTime.now();
-    final endDate = _parseDateField(scheduleData['endDate']) ?? startDate;
-
-    return ScheduleModel(
-      id: '',
-      title: title,
-      startDate: startDate,
-      endDate: endDate,
-      isAllDay: isAllDay,
-      location: location,
-      memo: memo,
-    );
+    return scheduleList.map((item) {
+      final s = item as Map<String, dynamic>;
+      final startDate = _parseDateField(s['startDate']) ?? DateTime.now();
+      final endDate = _parseDateField(s['endDate']) ?? startDate;
+      return ScheduleModel(
+        id: '',
+        title: s['title'] as String? ?? '',
+        startDate: startDate,
+        endDate: endDate,
+        isAllDay: s['isAllDay'] as bool? ?? false,
+        location: s['location'] as String? ?? '',
+        tag: s['tag'] as String? ?? '',
+        memo: s['memo'] as String? ?? '',
+        repeatOption: s['repeatOption'] as String? ?? '',
+        remindValue: s['remindValue'] as int? ?? 0,
+        remindUnit: s['remindUnit'] as String? ?? '',
+      );
+    }).toList();
   }
 
   /// 日付フィールドをパース（ISO文字列 or Timestampオブジェクト対応）

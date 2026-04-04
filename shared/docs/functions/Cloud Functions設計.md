@@ -156,11 +156,23 @@
 #### 3. `extractSchedule`
 - **ソース**: `const/extractSchedule.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: ユーザーメッセージから予定情報を OpenAI で抽出
+- **概要**: ユーザーメッセージから予定情報を OpenAI で抽出（**複数件対応**。2026-04-04 変更）
 - **リソース**: memory `512MiB` / timeout `120秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 - **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **モデル**: `gpt-4o-2024-11-20` / temperature `0`（確定的出力）
+- **返却形式**: `{ schedules: ScheduleData[] }`（空配列 = 予定なし）
+  ```json
+  {
+    "schedules": [
+      { "title": "FA定例", "isAllDay": false, "startDate": Timestamp, "endDate": Timestamp,
+        "location": "小会議①(窓有り)", "tag": "", "memo": "", "repeatOption": "none",
+        "remindValue": 0, "remindUnit": "none" },
+      { "title": "各社定例", ... }
+    ]
+  }
+  ```
 
 #### 4. `generateVoice`
 - **ソース**: `const/generateVoice.js`
