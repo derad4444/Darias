@@ -434,47 +434,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onCancel: () => Navigator.of(dialogContext).pop(),
           );
         }
-        if (result.memoDetected && result.detectedMemo != null) {
-          final m = result.detectedMemo!;
-          return _ActionConfirmDialog(
-            icon: Icons.notes,
-            title: 'メモを保存しますか？',
-            rows: [
-              _DialogInfoRow(icon: Icons.text_snippet, label: 'メモ', content: m.title),
-            ],
-            accentColor: accentColor,
-            showEditButton: true,
-            onAdd: () async {
-              Navigator.of(dialogContext).pop();
-              await _saveMemoModel(m);
-            },
-            onEdit: () {
-              Navigator.of(dialogContext).pop();
-              context.push('/memo/detail', extra: m);
-            },
-            onCancel: () => Navigator.of(dialogContext).pop(),
-          );
+        if (result.memoDetected) {
+          final memos = result.detectedMemos.isNotEmpty
+              ? result.detectedMemos
+              : (result.detectedMemo != null ? [result.detectedMemo!] : <MemoModel>[]);
+          if (memos.isNotEmpty) {
+            return _ActionConfirmDialog(
+              icon: Icons.notes,
+              title: memos.length > 1 ? 'メモを${memos.length}件保存しますか？' : 'メモを保存しますか？',
+              rows: memos
+                  .map((m) => _DialogInfoRow(icon: Icons.text_snippet, label: 'メモ', content: m.title))
+                  .toList(),
+              accentColor: accentColor,
+              showEditButton: memos.length == 1,
+              onAdd: () async {
+                Navigator.of(dialogContext).pop();
+                for (final m in memos) {
+                  await _saveMemoModel(m);
+                }
+              },
+              onEdit: memos.length == 1
+                  ? () {
+                      Navigator.of(dialogContext).pop();
+                      context.push('/memo/detail', extra: memos.first);
+                    }
+                  : null,
+              onCancel: () => Navigator.of(dialogContext).pop(),
+            );
+          }
         }
-        if (result.todoDetected && result.detectedTodo != null) {
-          final t = result.detectedTodo!;
-          return _ActionConfirmDialog(
-            icon: Icons.check_circle_outline,
-            title: 'タスクを追加しますか？',
-            rows: [
-              _DialogInfoRow(icon: Icons.text_snippet, label: 'タスク', content: t.title),
-            ],
-            accentColor: accentColor,
-            showEditButton: true,
-            onAdd: () async {
-              Navigator.of(dialogContext).pop();
-              await _saveTodoModel(t);
-            },
-            onEdit: () {
-              Navigator.of(dialogContext).pop();
-              context.push('/todo/detail', extra: t);
-            },
-            onCancel: () => Navigator.of(dialogContext).pop(),
-          );
+        if (result.todoDetected) {
+          final todos = result.detectedTodos.isNotEmpty
+              ? result.detectedTodos
+              : (result.detectedTodo != null ? [result.detectedTodo!] : <TodoModel>[]);
+          if (todos.isNotEmpty) {
+            return _ActionConfirmDialog(
+              icon: Icons.check_circle_outline,
+              title: todos.length > 1 ? 'タスクを${todos.length}件追加しますか？' : 'タスクを追加しますか？',
+              rows: todos
+                  .map((t) => _DialogInfoRow(icon: Icons.text_snippet, label: 'タスク', content: t.title))
+                  .toList(),
+              accentColor: accentColor,
+              showEditButton: todos.length == 1,
+              onAdd: () async {
+                Navigator.of(dialogContext).pop();
+                for (final t in todos) {
+                  await _saveTodoModel(t);
+                }
+              },
+              onEdit: todos.length == 1
+                  ? () {
+                      Navigator.of(dialogContext).pop();
+                      context.push('/todo/detail', extra: todos.first);
+                    }
+                  : null,
+              onCancel: () => Navigator.of(dialogContext).pop(),
+            );
+          }
         }
         // フォールバック（通常は到達しない）
         return const SizedBox.shrink();

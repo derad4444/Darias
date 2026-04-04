@@ -245,6 +245,55 @@ JSONのみ出力。`;
   },
 
   /**
+   * Classify and Extract - GPT-4o-mini optimized
+   * Classifies user intent and extracts structured data in a single call
+   */
+  classifyAndExtract: (currentDate, currentTime, userMessage) => {
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24*60*60*1000).toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
+    const today = now.toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
+
+    return `現在:${currentDate} ${currentTime}
+今日=${today} 明日=${tomorrow}
+
+ユーザーメッセージ:"${userMessage}"
+
+以下の5種類に分類し、必要なデータを抽出してJSONで返答せよ。
+
+## 分類ルール
+1. **schedule** - 日時＋行動の組み合わせが含まれる（例:「4/10に米米」「明日14時に会議」「来週月曜にジム」）
+2. **memo** - メモ・記録の依頼（例:「メモして」「メモしておいて」「〜を記録して」）
+3. **task** - タスク・やること登録の依頼（例:「タスクに追加」「やることリストに入れて」「〜をTODOに」「ジョギングと買い物をタスクに入れて」）
+4. **app_qa** - アプリの使い方・機能に関する質問（例:「予定の編集方法は？」「タスクはどこで見れる？」）
+5. **chat** - 上記以外の会話・相談・雑談
+
+## 出力形式（JSONのみ。説明不要）
+
+scheduleの場合:
+{"type":"schedule","schedules":[{"title":"行動内容","isAllDay":bool,"startDate":"ISO+09:00","endDate":"ISO+09:00","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}]}
+
+時間なし→00:00-23:59,isAllDay:true / 時間あり→1h継続,isAllDay:false
+startDate/endDateは必ずタイムゾーン+09:00を付けること(例:2025-04-10T00:00:00+09:00)
+予定が0件の場合: {"type":"chat","schedules":[]}
+
+memoの場合（複数可）:
+{"type":"memo","items":["メモ内容1","メモ内容2"]}
+キーワード（メモして等）は除去してコンテンツのみ抽出
+
+taskの場合（複数可）:
+{"type":"task","items":["タスク内容1","タスク内容2"]}
+キーワード（タスクに追加等）は除去してコンテンツのみ抽出
+
+app_qaの場合:
+{"type":"app_qa"}
+
+chatの場合:
+{"type":"chat"}
+
+JSONのみ出力。`;
+  },
+
+  /**
    * Emotion Detection - GPT-4o-mini optimized
    * Enhanced for Japanese emotion recognition
    */

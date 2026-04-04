@@ -130,6 +130,24 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
   void reset() {
     state = Big5DiagnosisState();
   }
+
+  /// Big5診断結果をFirestoreから完全リセット
+  Future<void> resetDiagnosis(String characterId) async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) return;
+
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      await _datasource.resetDiagnosis(
+        userId: userId,
+        characterId: characterId,
+      );
+      state = Big5DiagnosisState();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
 }
 
 /// BIG5診断コントローラーのプロバイダー

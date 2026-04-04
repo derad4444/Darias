@@ -8,8 +8,8 @@ Object.defineProperty(exports, "generateCharacterReply", {
   enumerable: true,
 });
 
-Object.defineProperty(exports, "extractSchedule", {
-  get: () => require("./const/extractSchedule").extractSchedule,
+Object.defineProperty(exports, "classifyAndExtract", {
+  get: () => require("./const/classifyAndExtract").classifyAndExtract,
   enumerable: true,
 });
 

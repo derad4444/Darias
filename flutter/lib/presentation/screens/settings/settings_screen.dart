@@ -11,6 +11,7 @@ import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../../data/models/subscription_model.dart';
 import '../../providers/ad_provider.dart';
+import '../../providers/big5_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/ad_service.dart';
 
@@ -132,6 +133,12 @@ class SettingsScreen extends ConsumerWidget {
                         child: BannerAdContainer(adUnitId: AdConfig.settingsBottomBannerAdUnitId),
                       ),
 
+                    // 性格診断リセット
+                    _DangerButton(
+                      title: '性格診断をリセット',
+                      onTap: () => _confirmResetDiagnosis(context, ref),
+                    ),
+
                     // ログアウト
                     _DangerButton(
                       title: 'ログアウト',
@@ -169,6 +176,57 @@ class SettingsScreen extends ConsumerWidget {
 
   void _openPrivacyPolicy(BuildContext context) {
     context.push('/privacy');
+  }
+
+  Future<void> _confirmResetDiagnosis(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('性格診断をリセット'),
+        content: const Text(
+          'これまでの診断結果・回答・キャラクター属性（夢・口癖など）がすべて削除されます。\nリセット後は最初から診断をやり直せます。\n\nよろしいですか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('リセットする'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final user = ref.read(userDocProvider).valueOrNull;
+      final characterId = user?.characterId;
+      if (characterId == null) return;
+
+      try {
+        await ref
+            .read(big5DiagnosisControllerProvider.notifier)
+            .resetDiagnosis(characterId);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('性格診断をリセットしました'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('リセットに失敗しました: $e')),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {

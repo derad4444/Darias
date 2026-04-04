@@ -159,6 +159,58 @@ class Big5Datasource {
     return result.isEmpty ? null : result;
   }
 
+  /// Big5診断結果を完全リセット
+  Future<void> resetDiagnosis({
+    required String userId,
+    required String characterId,
+  }) async {
+    // 1. big5Progress/current を削除（進捗・回答履歴・完了フラグすべて）
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('big5Progress')
+        .doc('current')
+        .delete();
+
+    // 2. details/current の診断・属性関連フィールドをすべて削除
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('details')
+        .doc('current')
+        .update({
+      'confirmedBig5Scores': FieldValue.delete(),
+      'personalityKey': FieldValue.delete(),
+      'analysis_level': FieldValue.delete(),
+      'sixPersonalities': FieldValue.delete(),
+      'favorite_color': FieldValue.delete(),
+      'favorite_place': FieldValue.delete(),
+      'favorite_word': FieldValue.delete(),
+      'word_tendency': FieldValue.delete(),
+      'strength': FieldValue.delete(),
+      'weakness': FieldValue.delete(),
+      'skill': FieldValue.delete(),
+      'hobby': FieldValue.delete(),
+      'aptitude': FieldValue.delete(),
+      'dream': FieldValue.delete(),
+      'favorite_entertainment_genre': FieldValue.delete(),
+    });
+
+    // 3. generationStatus/current を削除（再生成を許可）
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('generationStatus')
+        .doc('current')
+        .delete();
+  }
+
   /// キャラクター詳細からpersonalityKeyを取得
   Future<String?> fetchPersonalityKey({
     required String userId,

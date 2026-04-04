@@ -43,6 +43,41 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
     }
   }
 
+  void _showResetConfirmDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('診断結果をリセット'),
+        content: const Text(
+          'これまでの診断結果・回答・キャラクター属性（夢・口癖など）がすべて削除されます。\nリセット後は最初から診断をやり直せます。\n\nよろしいですか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              _resetDiagnosis();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('リセットする'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _resetDiagnosis() async {
+    final user = ref.read(userDocProvider).valueOrNull;
+    if (user?.characterId != null) {
+      await ref.read(big5DiagnosisControllerProvider.notifier).resetDiagnosis(
+        user!.characterId!,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(userDocProvider).valueOrNull;
@@ -99,6 +134,7 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
                           )
                         : _StartSection(
                             onStart: _startDiagnosis,
+                            onReset: _showResetConfirmDialog,
                             lastReply: diagnosisState.lastReply,
                             progress: progressAsync?.valueOrNull,
                             accentColor: accentColor,
@@ -366,12 +402,14 @@ class _AnswerButton extends StatelessWidget {
 /// 開始セクション
 class _StartSection extends StatelessWidget {
   final VoidCallback onStart;
+  final VoidCallback onReset;
   final String? lastReply;
   final Big5Progress? progress;
   final Color accentColor;
 
   const _StartSection({
     required this.onStart,
+    required this.onReset,
     this.lastReply,
     this.progress,
     required this.accentColor,
@@ -453,7 +491,9 @@ class _StartSection extends StatelessWidget {
           Text(
             progress?.answeredCount == 0
                 ? '100問の質問に答えて、\nあなたの性格を分析しましょう'
-                : '${progress?.answeredCount ?? 0}問回答済み\n続きから診断を再開できます',
+                : progress?.answeredCount == 100
+                    ? '100問回答済み\n診断が完了しています'
+                    : '${progress?.answeredCount ?? 0}問回答済み\n続きから診断を再開できます',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
               color: AppColors.textSecondary,
             ),
@@ -461,21 +501,37 @@ class _StartSection extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
-          FilledButton.icon(
-            onPressed: onStart,
-            icon: const Icon(Icons.play_arrow),
-            label: Text(
-              progress?.answeredCount == 0 ? '診断を開始' : '診断を続ける',
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: accentColor,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 32,
-                vertical: 16,
+          if ((progress?.answeredCount ?? 0) >= 100) ...[
+            OutlinedButton.icon(
+              onPressed: onReset,
+              icon: const Icon(Icons.refresh, color: Colors.red),
+              label: const Text('診断結果をリセット'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.red,
+                side: const BorderSide(color: Colors.red),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
               ),
             ),
-          ),
+          ] else ...[
+            FilledButton.icon(
+              onPressed: onStart,
+              icon: const Icon(Icons.play_arrow),
+              label: Text(
+                (progress?.answeredCount ?? 0) == 0 ? '診断を開始' : '診断を続ける',
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // 説明
