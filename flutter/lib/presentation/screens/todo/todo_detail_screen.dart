@@ -121,43 +121,40 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                   ]),
                 ),
               ),
-              // 説明欄＋下部項目（残り画面を埋める）
-              SliverFillRemaining(
-                hasScrollBody: false,
+              // 説明欄＋下部項目（スクロール可能・常に表示）
+              SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // 説明テキストフィールド（残りスペースを埋める）
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.05),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: TextField(
-                            controller: _descriptionController,
-                            maxLines: null,
-                            expands: true,
-                            textAlignVertical: TextAlignVertical.top,
-                            decoration: InputDecoration(
-                              hintText: '説明を入力（任意）',
-                              hintStyle: TextStyle(color: AppColors.textLight),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              filled: true,
-                              fillColor: Colors.transparent,
-                              contentPadding: const EdgeInsets.all(12),
+                      // 説明テキストフィールド（コンテンツ高さで伸縮・最低200px）
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
                             ),
+                          ],
+                        ),
+                        child: TextField(
+                          controller: _descriptionController,
+                          maxLines: null,
+                          minLines: 8,
+                          textAlignVertical: TextAlignVertical.top,
+                          decoration: InputDecoration(
+                            hintText: '説明を入力（任意）',
+                            hintStyle: TextStyle(color: AppColors.textLight),
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            filled: true,
+                            fillColor: Colors.transparent,
+                            contentPadding: const EdgeInsets.all(12),
                           ),
                         ),
                       ),
@@ -199,6 +196,7 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
                   ),
                 ),
               ),
+
             ],
           ),
         ),

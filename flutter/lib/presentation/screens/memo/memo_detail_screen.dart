@@ -174,21 +174,15 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                     ]),
                   ),
                 ),
-                // 内容欄＋下部項目
+                // 内容欄＋下部項目（スクロール可能・常に表示）
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // エディタ（コンテンツ量に応じて伸縮、最低200px・最大画面45%）
-                        ConstrainedBox(
-                          constraints: BoxConstraints(
-                            minHeight: 200,
-                            maxHeight: MediaQuery.of(context).size.height * 0.45,
-                          ),
-                          child: _buildEditorArea(accentColor),
-                        ),
+                        // エディタ（コンテンツ高さで伸縮・最低200px）
+                        _buildEditorArea(accentColor),
                         const SizedBox(height: 16),
                         _buildSectionTitle('タグ'),
                         const SizedBox(height: 8),
@@ -341,36 +335,41 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
   }
 
   Widget _buildEditorArea(Color accentColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _MemoToolbar(controller: _quillController, accentColor: accentColor),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.9),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    // コンテンツ高さで伸縮するコンテナ（最低200px）
+    // ページ全体のCustomScrollViewがスクロールを担当するため scrollable: false
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
           ),
-          child: QuillEditor(
-            controller: _quillController,
-            focusNode: _editorFocusNode,
-            scrollController: _editorScrollController,
-            config: const QuillEditorConfig(
-              placeholder: '内容を入力',
-              padding: EdgeInsets.all(12),
-              expands: false,
-              scrollable: true,
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _MemoToolbar(controller: _quillController, accentColor: accentColor),
+          ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 200),
+            child: QuillEditor(
+              controller: _quillController,
+              focusNode: _editorFocusNode,
+              scrollController: _editorScrollController,
+              config: const QuillEditorConfig(
+                placeholder: '内容を入力',
+                padding: EdgeInsets.all(12),
+                expands: false,
+                scrollable: false,
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
