@@ -1,4 +1,5 @@
 const {OpenAI} = require("openai");
+const {formatBig5WithTraits} = require("../src/prompts/templates");
 
 /**
  * 段階1・2用：簡潔なキャラクター属性生成
@@ -16,20 +17,11 @@ async function generateCharacterAttributes(
   const openai = new OpenAI({apiKey});
   const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
 
-  // Big5スコアの文字列化
-  const big5Summary = `
-開放性: ${big5Scores.openness}
-誠実性: ${big5Scores.conscientiousness}
-外向性: ${big5Scores.extraversion}
-協調性: ${big5Scores.agreeableness}
-神経症傾向: ${big5Scores.neuroticism}
-  `.trim();
-
   const prompt = `
 あなたは性格分析の専門家です。以下のBig5性格診断スコアに基づいて、この人物のキャラクター属性を生成してください。
 
-# Big5スコア（0-100）
-${big5Summary}
+# Big5スコア（1-5の範囲）
+${formatBig5WithTraits(big5Scores)}
 
 # 性別
 ${gender}

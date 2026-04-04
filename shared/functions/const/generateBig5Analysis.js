@@ -1,6 +1,7 @@
 const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
+const {formatBig5WithTraits} = require("../src/prompts/templates");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -35,7 +36,7 @@ async function generateBig5Analysis(big5Scores, gender, apiKey, isPremium = fals
     const openai = new OpenAI({apiKey});
 
     // サブスクリプション状態に基づくモデル選択
-    const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
+    const model = "gpt-4o-2024-11-20";
     console.log(`🤖 Using model: ${model}`);
 
     // 3つのレベル分を生成
@@ -89,7 +90,8 @@ async function generateAnalysisLevel(openai, model, big5Scores, gender, level) {
       const response = await openai.chat.completions.create({
         model: model,
         messages: [{role: "user", content: prompt}],
-        temperature: 0.7,
+        temperature: 1,
+        response_format: {type: "json_object"},
       });
 
       let content = response.choices[0].message.content.trim();
@@ -144,11 +146,7 @@ function createPrompt(big5Scores, gender, level, categories) {
   return `以下のBig5性格特性と性別に基づいて、性格解析を生成してください。
 
 Big5スコア (1-5の範囲):
-- 開放性 (Openness): ${big5Scores.openness}
-- 誠実性 (Conscientiousness): ${big5Scores.conscientiousness}
-- 外向性 (Extraversion): ${big5Scores.extraversion}
-- 協調性 (Agreeableness): ${big5Scores.agreeableness}
-- 神経症傾向 (Neuroticism): ${big5Scores.neuroticism}
+${formatBig5WithTraits(big5Scores)}
 
 性別: ${gender === "male" ? "男性" : "女性"}
 解析レベル: ${level}問回答時点 (${levelDescription})

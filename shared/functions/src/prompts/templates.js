@@ -24,6 +24,76 @@ function formatBig5Detailed(scores) {
 - 神経症傾向(Neuroticism): ${scores.neuroticism}/5`;
 }
 
+// Big5各スコア（1-5）の詳細説明
+const TRAIT_DESCRIPTIONS = {
+  openness: {
+    1: "慣れ親しんだ環境を強く好み変化を避ける",
+    2: "安定した慣れた環境を好む",
+    3: "新しさと安定のバランスを取る",
+    4: "新しい体験や創造を好む",
+    5: "非常に好奇心旺盛で創造性と変化を強く求める",
+  },
+  conscientiousness: {
+    1: "自由で柔軟なペースを好み計画に縛られない",
+    2: "柔軟でゆるやかなペースを好む",
+    3: "状況に応じて計画的にも柔軟にもなれる",
+    4: "計画的でルーティンや目標達成を大切にする",
+    5: "非常に几帳面で責任感が強く目標に向けて粘り強い",
+  },
+  extraversion: {
+    1: "一人の時間を強く必要とし内省的",
+    2: "一人の静かな時間を大切にする",
+    3: "状況に応じて社交的にも内向的にもなれる",
+    4: "人との交流が活力源の社交的な性格",
+    5: "非常に社交的でエネルギッシュ、人との交流を強く求める",
+  },
+  agreeableness: {
+    1: "自分の意見や目標を強く優先する",
+    2: "自分軸を大切にする",
+    3: "自分の意見を持ちながら他者とも協調できる",
+    4: "思いやりがあり仲間との協力を重んじる",
+    5: "非常に共感力が高く他者への配慮を最優先にする",
+  },
+  neuroticism: {
+    1: "非常に感情が安定していてストレスに強い",
+    2: "感情が安定していてストレスに強い",
+    3: "感情の波は程々でストレス管理は状況による",
+    4: "感受性が豊かでセルフケアを大切にする",
+    5: "非常に感受性が高く感情の波が大きい",
+  },
+};
+
+// コンパクト表示用の短いラベル
+const TRAIT_SHORT_LABELS = {
+  openness:          {1: "保守的", 2: "安定志向", 3: "バランス型", 4: "好奇心旺盛", 5: "革新的"},
+  conscientiousness: {1: "自由奔放", 2: "柔軟型", 3: "状況対応型", 4: "計画的", 5: "几帳面"},
+  extraversion:      {1: "内省的", 2: "内向的", 3: "両向型", 4: "社交的", 5: "外向的"},
+  agreeableness:     {1: "自己主張型", 2: "自分軸型", 3: "バランス型", 4: "協調的", 5: "共感型"},
+  neuroticism:       {1: "超安定", 2: "安定型", 3: "中程度", 4: "感受性高", 5: "高感受性"},
+};
+
+/**
+ * Big5スコアを数値＋説明の詳細形式でフォーマット
+ * @param {Object} scores - Big5 scores object
+ * @return {string} - 例: "- 開放性(Openness): 3/5（新しさと安定のバランスを取る）"
+ */
+function formatBig5WithTraits(scores) {
+  return `- 開放性(Openness): ${scores.openness}/5（${TRAIT_DESCRIPTIONS.openness[scores.openness]}）
+- 誠実性(Conscientiousness): ${scores.conscientiousness}/5（${TRAIT_DESCRIPTIONS.conscientiousness[scores.conscientiousness]}）
+- 外向性(Extraversion): ${scores.extraversion}/5（${TRAIT_DESCRIPTIONS.extraversion[scores.extraversion]}）
+- 協調性(Agreeableness): ${scores.agreeableness}/5（${TRAIT_DESCRIPTIONS.agreeableness[scores.agreeableness]}）
+- 神経症傾向(Neuroticism): ${scores.neuroticism}/5（${TRAIT_DESCRIPTIONS.neuroticism[scores.neuroticism]}）`;
+}
+
+/**
+ * Big5スコアを数値＋短いラベルのコンパクト形式でフォーマット
+ * @param {Object} scores - Big5 scores object
+ * @return {string} - 例: "O3(バランス型)C4(計画的)E2(内向的)A5(共感型)N1(超安定)"
+ */
+function formatBig5ShortWithTraits(scores) {
+  return `O${scores.openness}(${TRAIT_SHORT_LABELS.openness[scores.openness]})C${scores.conscientiousness}(${TRAIT_SHORT_LABELS.conscientiousness[scores.conscientiousness]})E${scores.extraversion}(${TRAIT_SHORT_LABELS.extraversion[scores.extraversion]})A${scores.agreeableness}(${TRAIT_SHORT_LABELS.agreeableness[scores.agreeableness]})N${scores.neuroticism}(${TRAIT_SHORT_LABELS.neuroticism[scores.neuroticism]})`;
+}
+
 /**
  * BIG5スコアから性格特性テキストを生成
  * @param {Object} big5 - Big5 scores object
@@ -61,7 +131,7 @@ const OPTIMIZED_PROMPTS = {
    * Enhanced for better JSON output and Japanese processing
    */
   big5Analysis: (big5Scores, gender) => {
-    return `Big5:${formatBig5Short(big5Scores)} 性別:${getGenderCode(gender)}
+    return `Big5:${formatBig5ShortWithTraits(big5Scores)} 性別:${getGenderCode(gender)}
 
 以下の性格分析を300-500文字で生成。数値は出力に含めない。
 1.適職分析 2.恋愛傾向 3.ストレス対処 4.学習スタイル 5.意思決定
@@ -94,7 +164,7 @@ ${meeting}
    * Enhanced with todo and meeting data
    */
   diary: (characterType, big5, gender, scheduleSummary, chatSummary, todoSummary, meetingSummary, diaryStyle) => {
-    return `キャラクター:${characterType} 性格:${formatBig5Short(big5)} 性別:${getGenderCode(gender)}
+    return `キャラクター:${characterType} 性格:${formatBig5ShortWithTraits(big5)} 性別:${getGenderCode(gender)}
 予定:${scheduleSummary || "なし"}
 会話:${chatSummary || "なし"}
 達成:${todoSummary || "なし"}
@@ -121,7 +191,7 @@ ${diaryStyle}で日記を200-400文字で作成。日記本文のみ出力。`;
     return `今日ユーザーがアプリ内で行ったこと:
 ${activitiesText}
 
-キャラクター:${characterType} 性格:${formatBig5Short(big5)} 性別:${getGenderCode(gender)}
+キャラクター:${characterType} 性格:${formatBig5ShortWithTraits(big5)} 性別:${getGenderCode(gender)}
 
 以下のJSON形式のみで出力:
 {"facts":["事実1","事実2"],"ai_comment":"コメント"}
@@ -166,7 +236,7 @@ JSONのみ出力。`;
    * Enhanced for consistent character generation
    */
   characterDetails: (big5Scores, gender) => {
-    return `性格:${formatBig5Short(big5Scores)} 性別:${getGenderCode(gender)}
+    return `性格:${formatBig5ShortWithTraits(big5Scores)} 性別:${getGenderCode(gender)}
 
 以下の項目でキャラクター詳細を生成:
 
@@ -190,6 +260,8 @@ module.exports = {
   OPTIMIZED_PROMPTS,
   formatBig5Short,
   formatBig5Detailed,
+  formatBig5WithTraits,
+  formatBig5ShortWithTraits,
   getGenderCode,
   buildPersonalityTraits,
 };

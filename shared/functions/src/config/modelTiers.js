@@ -10,8 +10,8 @@ const MODEL_TIERS = {
       emotionDetect: "gpt-3.5-turbo",     // 感情判定
       scheduleExtract: "gpt-3.5-turbo",   // スケジュール抽出
       diary: "gpt-3.5-turbo",             // 日記生成
-      big5Analysis: "gpt-4o",             // Big5分析（詳細レベル）
-      characterDetails: "gpt-4o"          // キャラ詳細（詳細レベル）
+      big5Analysis: "gpt-4o-2024-11-20",  // Big5分析
+      characterDetails: "gpt-4o"          // キャラ詳細
     },
     features: {
       highQualityAnalysis: true,          // 高品質分析有効（詳細レベル）
@@ -29,12 +29,12 @@ const MODEL_TIERS = {
   premium: {
     maxDailyChats: -1,                    // 無制限（-1）
     allowedModels: {
-      characterReply: "gpt-4o",           // 高品質会話
-      emotionDetect: "gpt-4o-mini",       // 高精度感情判定
-      scheduleExtract: "gpt-4o-mini",     // 高精度スケジュール抽出
-      diary: "gpt-4o",                    // 高品質日記生成
-      big5Analysis: "gpt-4o",             // 詳細Big5分析
-      characterDetails: "gpt-4o"          // 詳細キャラ設定
+      characterReply: "gpt-4o",               // 高品質会話
+      emotionDetect: "gpt-4o-mini",           // 高精度感情判定
+      scheduleExtract: "gpt-4o-mini",         // 高精度スケジュール抽出
+      diary: "gpt-4o",                        // 高品質日記生成
+      big5Analysis: "gpt-4o-2024-11-20",      // 詳細Big5分析
+      characterDetails: "gpt-4o"              // 詳細キャラ設定
     },
     features: {
       highQualityAnalysis: true,          // 高品質分析有効

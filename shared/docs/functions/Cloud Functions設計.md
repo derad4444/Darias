@@ -178,6 +178,19 @@
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
+- **モデル**: `gpt-4o-2024-11-20`（無料・有料ユーザー共通。2026-04-04 変更）
+- **temperature**: `1.0`（`response_format: json_object` で JSON 崩れを防止。2026-04-04 変更）
+- **キャッシュ**: `personalityKey`（例: `O3_C4_E2_A5_N1_male`）で Firestore にキャッシュ。最大 6,250 通り（5^5 × 性別2）
+- **生成レベル**: 3 レベルを並列生成（20問・50問・100問）
+  - 20問: career / romance / stress（3カテゴリ、200-300文字）
+  - 50問: 上記 + learning / decision（5カテゴリ、300-400文字）
+  - 100問: 同上（400-500文字）
+- **Big5プロンプト形式**: 数値＋自然言語説明の詳細形式（2026-04-04 変更）
+  ```
+  - 開放性(Openness): 3/5（新しさと安定のバランスを取る）
+  - 誠実性(Conscientiousness): 4/5（計画的でルーティンや目標達成を大切にする）
+  ...
+  ```
 
 #### 6. `validateAppStoreReceipt`
 - **ソース**: `validateReceipt.js`
@@ -335,6 +348,7 @@ shared/functions/
     │   └── openai.js                 # OpenAI クライアント初期化・安全呼出ラッパー
     ├── prompts/
     │   └── templates.js              # OpenAI プロンプトテンプレート（diary / activityDiary / characterReply / big5Analysis 等）
+    │                                 # Big5フォーマット関数: formatBig5WithTraits（詳細形式）/ formatBig5ShortWithTraits（コンパクト形式）
     ├── functions/                     # スケジュール系・複合関数
     │   ├── scheduledTasks.js          # 祝日登録 + 日記自動生成
     │   ├── generateMonthlyReview.js   # 月次レビュー
@@ -432,4 +446,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-03-13*
+*最終更新: 2026-04-04*
