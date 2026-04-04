@@ -414,17 +414,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       barrierColor: Colors.black.withValues(alpha: 0.4),
       builder: (dialogContext) {
         final accentColor = ref.read(accentColorProvider);
+        final backgroundGradient = ref.read(backgroundGradientProvider);
         if (result.scheduleDetected) {
           return _ScheduleListConfirmDialog(
             initialSchedules: result.detectedSchedules,
             accentColor: accentColor,
+            backgroundGradient: backgroundGradient,
             onAdd: (schedules) async {
               Navigator.of(dialogContext).pop();
               await _saveScheduleModels(schedules);
             },
-            onEdit: (schedule) {
-              Navigator.of(dialogContext).pop();
-              context.push('/calendar/detail', extra: {
+            onEdit: (schedule) async {
+              // ダイアログはpopしない。保存時にpop(true)が返るのでカードを削除する
+              return await context.push<bool>('/calendar/detail', extra: {
                 'schedule': schedule,
                 'initialDate': schedule.startDate,
               });
@@ -784,13 +786,15 @@ class _CharacterDisplayState extends State<_CharacterDisplay> {
 class _ScheduleListConfirmDialog extends StatefulWidget {
   final List<ScheduleModel> initialSchedules;
   final Color accentColor;
+  final LinearGradient backgroundGradient;
   final void Function(List<ScheduleModel>) onAdd;
-  final void Function(ScheduleModel) onEdit;
+  final Future<bool?> Function(ScheduleModel) onEdit;
   final VoidCallback onCancel;
 
   const _ScheduleListConfirmDialog({
     required this.initialSchedules,
     required this.accentColor,
+    required this.backgroundGradient,
     required this.onAdd,
     required this.onEdit,
     required this.onCancel,
@@ -849,20 +853,46 @@ class _ScheduleListConfirmDialogState
     );
   }
 
+  Widget _buildSmallButton({
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.white,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildScheduleCard(ScheduleModel s, int index) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFEEEEEE),
+        color: Colors.white.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
                   s.title,
                   style: const TextStyle(
                     fontSize: 15,
@@ -870,60 +900,56 @@ class _ScheduleListConfirmDialogState
                     color: AppColors.textPrimary,
                   ),
                 ),
-              ),
-              GestureDetector(
-                onTap: () => widget.onEdit(s),
-                child: const Text(
-                  '編集',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_month, size: 13, color: Colors.blue),
+                    const SizedBox(width: 4),
+                    Text(
+                      _formatDate(s),
+                      style: const TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.calendar_month, size: 13, color: Colors.blue),
-              const SizedBox(width: 4),
-              Text(
-                _formatDate(s),
-                style: const TextStyle(fontSize: 13, color: Colors.grey),
-              ),
-            ],
-          ),
-          if (s.location.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.location_on, size: 13, color: Colors.blue),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    s.location,
-                    style: const TextStyle(fontSize: 13, color: Colors.grey),
+                if (s.location.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 13, color: Colors.blue),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          s.location,
+                          style: const TextStyle(fontSize: 13, color: Colors.grey),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ],
               ],
             ),
-          ],
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: () => setState(() => _schedules.removeAt(index)),
-              child: const Text(
-                '除外',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildSmallButton(
+                label: '編集',
+                color: Colors.orange,
+                onPressed: () async {
+                  final saved = await widget.onEdit(s);
+                  if (saved == true && mounted) {
+                    setState(() => _schedules.removeAt(index));
+                  }
+                },
               ),
-            ),
+              const SizedBox(height: 8),
+              _buildSmallButton(
+                label: '除外',
+                color: Colors.red,
+                onPressed: () => setState(() => _schedules.removeAt(index)),
+              ),
+            ],
           ),
         ],
       ),
@@ -939,7 +965,7 @@ class _ScheduleListConfirmDialogState
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: widget.backgroundGradient,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(

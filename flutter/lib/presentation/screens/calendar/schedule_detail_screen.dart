@@ -1121,7 +1121,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       }
 
       if (mounted) {
-        context.pop();
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -1180,7 +1180,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       // 最後に使用したタグを記録
       ref.read(lastUsedScheduleTagProvider.notifier).state = _tag;
       if (mounted) {
-        context.pop();
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
