@@ -79,6 +79,7 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     required String toUserName,
     required String myName,
     required String myEmail,
+    String myName2 = '',
   }) async {
     if (_userId == null) return;
     state = const AsyncValue.loading();
@@ -116,6 +117,7 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
           fromUserName: myName,
           fromUserEmail: myEmail,
           toUserId: toUserId,
+          toUserName: toUserName,
           status: FriendRequestStatus.pending,
           createdAt: DateTime.now(),
         ).toMap(),
@@ -167,6 +169,15 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
 
       await batch.commit();
       state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// フレンド申請を取消（送信側）
+  Future<void> cancelFriendRequest(String requestId) async {
+    try {
+      await _firestore.collection('friendRequests').doc(requestId).delete();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }

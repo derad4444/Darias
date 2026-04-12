@@ -42,6 +42,7 @@ class FriendRequestModel {
   final String fromUserName;
   final String fromUserEmail;
   final String toUserId;
+  final String toUserName;
   final FriendRequestStatus status;
   final DateTime createdAt;
 
@@ -51,6 +52,7 @@ class FriendRequestModel {
     required this.fromUserName,
     required this.fromUserEmail,
     required this.toUserId,
+    this.toUserName = '',
     required this.status,
     required this.createdAt,
   });
@@ -63,6 +65,7 @@ class FriendRequestModel {
       fromUserName: data['fromUserName'] as String? ?? '',
       fromUserEmail: data['fromUserEmail'] as String? ?? '',
       toUserId: data['toUserId'] as String? ?? '',
+      toUserName: data['toUserName'] as String? ?? '',
       status: FriendRequestStatus.fromString(data['status'] as String? ?? 'pending'),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -74,6 +77,7 @@ class FriendRequestModel {
       'fromUserName': fromUserName,
       'fromUserEmail': fromUserEmail,
       'toUserId': toUserId,
+      'toUserName': toUserName,
       'status': status.value,
       'createdAt': Timestamp.fromDate(createdAt),
     };

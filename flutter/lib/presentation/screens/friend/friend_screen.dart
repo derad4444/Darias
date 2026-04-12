@@ -17,9 +17,9 @@ class FriendScreen extends ConsumerWidget {
     final gradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
     final friendsAsync = ref.watch(friendsProvider);
-    final requestsAsync = ref.watch(incomingFriendRequestsProvider);
+    final incomingAsync = ref.watch(incomingFriendRequestsProvider);
 
-    final pendingCount = requestsAsync.valueOrNull?.length ?? 0;
+    final pendingCount = incomingAsync.valueOrNull?.length ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -31,7 +31,7 @@ class FriendScreen extends ConsumerWidget {
             children: [
               // ヘッダー
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
                 child: Row(
                   children: [
                     Text(
@@ -43,40 +43,47 @@ class FriendScreen extends ConsumerWidget {
                       ),
                     ),
                     const Spacer(),
-                    // 申請バッジ
-                    if (pendingCount > 0)
-                      GestureDetector(
-                        onTap: () => _showRequestsSheet(context, ref),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: accentColor.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.person_add, size: 16, color: accentColor),
-                              const SizedBox(width: 4),
-                              Text(
-                                '$pendingCount件の申請',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: accentColor,
-                                  fontWeight: FontWeight.w500,
+                    // 申請管理ボタン（常時表示）
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        IconButton(
+                          onPressed: () => _showRequestsSheet(context, ref),
+                          icon: Icon(Icons.person_add_outlined, color: accentColor),
+                          tooltip: '申請管理',
+                        ),
+                        if (pendingCount > 0)
+                          Positioned(
+                            right: 4,
+                            top: 4,
+                            child: Container(
+                              width: 18,
+                              height: 18,
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '$pendingCount',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
-                    const SizedBox(width: 8),
+                      ],
+                    ),
+                    // フレンド検索ボタン
                     IconButton(
                       onPressed: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const FriendSearchScreen()),
                       ),
                       icon: Icon(Icons.person_search, color: accentColor),
+                      tooltip: 'フレンドを追加',
                     ),
                   ],
                 ),
@@ -116,7 +123,7 @@ class FriendScreen extends ConsumerWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _FriendRequestsSheet(ref: ref),
+      builder: (_) => const _FriendRequestsSheet(),
     );
   }
 }
@@ -150,7 +157,6 @@ class _FriendCard extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // アバター
             CircleAvatar(
               radius: 24,
               backgroundColor: accentColor.withValues(alpha: 0.15),
@@ -164,8 +170,6 @@ class _FriendCard extends ConsumerWidget {
               ),
             ),
             const SizedBox(width: 12),
-
-            // 名前・メール
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,26 +184,16 @@ class _FriendCard extends ConsumerWidget {
                   const SizedBox(height: 2),
                   Text(
                     friend.email,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textLight,
-                    ),
+                    style: TextStyle(fontSize: 12, color: AppColors.textLight),
                   ),
                 ],
               ),
             ),
-
-            // アクションボタン群
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 共有設定
-                _ShareLevelChip(
-                  friend: friend,
-                  accentColor: accentColor,
-                ),
+                _ShareLevelChip(friend: friend, accentColor: accentColor),
                 const SizedBox(width: 8),
-                // 相性診断
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
@@ -244,21 +238,17 @@ class _ShareLevelChip extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final label = friend.shareLevel.label;
     final color = _levelColor(friend.shareLevel);
-
     return GestureDetector(
-      onTap: () {
-        showModalBottomSheet(
-          context: context,
-          isScrollControlled: true,
-          backgroundColor: Colors.transparent,
-          builder: (_) => FriendShareLevelSheet(
-            friend: friend,
-            accentColor: accentColor,
-          ),
-        );
-      },
+      onTap: () => showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => FriendShareLevelSheet(
+          friend: friend,
+          accentColor: accentColor,
+        ),
+      ),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
@@ -267,12 +257,8 @@ class _ShareLevelChip extends ConsumerWidget {
           border: Border.all(color: color.withValues(alpha: 0.4)),
         ),
         child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: color,
-            fontWeight: FontWeight.w500,
-          ),
+          friend.shareLevel.label,
+          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
         ),
       ),
     );
@@ -280,12 +266,9 @@ class _ShareLevelChip extends ConsumerWidget {
 
   Color _levelColor(FriendShareLevel level) {
     switch (level) {
-      case FriendShareLevel.none:
-        return AppColors.textLight;
-      case FriendShareLevel.public:
-        return Colors.blue;
-      case FriendShareLevel.full:
-        return Colors.green;
+      case FriendShareLevel.none:   return AppColors.textLight;
+      case FriendShareLevel.public: return Colors.blue;
+      case FriendShareLevel.full:   return Colors.green;
     }
   }
 }
@@ -303,40 +286,54 @@ class _EmptyFriendView extends StatelessWidget {
         children: [
           Icon(Icons.people_outline, size: 64, color: accentColor.withValues(alpha: 0.4)),
           const SizedBox(height: 16),
-          Text(
-            'フレンドがまだいません',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textLight,
-            ),
-          ),
+          Text('フレンドがまだいません',
+              style: TextStyle(fontSize: 16, color: AppColors.textLight)),
           const SizedBox(height: 8),
-          Text(
-            '右上のボタンからフレンドを検索しましょう',
-            style: TextStyle(
-              fontSize: 13,
-              color: AppColors.textLight.withValues(alpha: 0.7),
-            ),
-          ),
+          Text('右上のボタンからフレンドを検索しましょう',
+              style: TextStyle(fontSize: 13, color: AppColors.textLight.withValues(alpha: 0.7))),
         ],
       ),
     );
   }
 }
 
-/// 申請一覧シート
-class _FriendRequestsSheet extends ConsumerWidget {
-  final WidgetRef ref;
-  const _FriendRequestsSheet({required this.ref});
+// ============================================================
+// 申請管理シート（受信・送信タブ）
+// ============================================================
+class _FriendRequestsSheet extends ConsumerStatefulWidget {
+  const _FriendRequestsSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef widgetRef) {
-    final gradient = widgetRef.watch(backgroundGradientProvider);
-    final accentColor = widgetRef.watch(accentColorProvider);
-    final requestsAsync = widgetRef.watch(incomingFriendRequestsProvider);
+  ConsumerState<_FriendRequestsSheet> createState() => _FriendRequestsSheetState();
+}
+
+class _FriendRequestsSheetState extends ConsumerState<_FriendRequestsSheet>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = ref.watch(backgroundGradientProvider);
+    final accentColor = ref.watch(accentColorProvider);
+    final incomingAsync = ref.watch(incomingFriendRequestsProvider);
+    final outgoingAsync = ref.watch(outgoingFriendRequestsProvider);
+
+    final incomingCount = incomingAsync.valueOrNull?.length ?? 0;
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.6,
+      height: MediaQuery.of(context).size.height * 0.65,
       decoration: BoxDecoration(
         gradient: gradient,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -352,9 +349,9 @@ class _FriendRequestsSheet extends ConsumerWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
             child: Text(
-              'フレンド申請',
+              '申請管理',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -362,83 +359,241 @@ class _FriendRequestsSheet extends ConsumerWidget {
               ),
             ),
           ),
-          Expanded(
-            child: requestsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('エラー: $e')),
-              data: (requests) {
-                if (requests.isEmpty) {
-                  return Center(
-                    child: Text(
-                      '申請はありません',
-                      style: TextStyle(color: AppColors.textLight),
-                    ),
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: requests.length,
-                  itemBuilder: (ctx, i) {
-                    final req = requests[i];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: accentColor.withValues(alpha: 0.15),
+
+          // タブバー
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: accentColor,
+                unselectedLabelColor: AppColors.textLight,
+                indicator: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                tabs: [
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('受信'),
+                        if (incomingCount > 0) ...[
+                          const SizedBox(width: 4),
+                          Container(
+                            width: 18, height: 18,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
                             child: Text(
-                              req.fromUserName.isNotEmpty ? req.fromUserName[0] : '?',
-                              style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  req.fromUserName,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  req.fromUserEmail,
-                                  style: TextStyle(fontSize: 12, color: AppColors.textLight),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              TextButton(
-                                onPressed: () async {
-                                  await widgetRef.read(friendControllerProvider.notifier).acceptFriendRequest(req);
-                                  if (context.mounted) Navigator.pop(context);
-                                },
-                                child: Text('承認', style: TextStyle(color: accentColor)),
+                              '$incomingCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
                               ),
-                              TextButton(
-                                onPressed: () async {
-                                  await widgetRef.read(friendControllerProvider.notifier).rejectFriendRequest(req.id);
-                                  if (context.mounted) Navigator.pop(context);
-                                },
-                                child: const Text('拒否', style: TextStyle(color: Colors.red)),
-                              ),
-                            ],
+                            ),
                           ),
                         ],
-                      ),
-                    );
-                  },
-                );
-              },
+                      ],
+                    ),
+                  ),
+                  const Tab(text: '送信済み'),
+                ],
+              ),
             ),
           ),
+          const SizedBox(height: 8),
+
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // 受信タブ
+                _RequestList(
+                  asyncValue: incomingAsync,
+                  isIncoming: true,
+                  accentColor: accentColor,
+                  emptyMessage: '受信した申請はありません',
+                ),
+                // 送信済みタブ
+                _RequestList(
+                  asyncValue: outgoingAsync,
+                  isIncoming: false,
+                  accentColor: accentColor,
+                  emptyMessage: '送信した申請はありません',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 申請リスト（受信/送信 共通）
+class _RequestList extends ConsumerWidget {
+  final AsyncValue<List<FriendRequestModel>> asyncValue;
+  final bool isIncoming;
+  final Color accentColor;
+  final String emptyMessage;
+
+  const _RequestList({
+    required this.asyncValue,
+    required this.isIncoming,
+    required this.accentColor,
+    required this.emptyMessage,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return asyncValue.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('エラー: $e')),
+      data: (requests) {
+        if (requests.isEmpty) {
+          return Center(
+            child: Text(emptyMessage,
+                style: TextStyle(color: AppColors.textLight)),
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: requests.length,
+          itemBuilder: (ctx, i) => _RequestCard(
+            request: requests[i],
+            isIncoming: isIncoming,
+            accentColor: accentColor,
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 申請カード
+class _RequestCard extends ConsumerWidget {
+  final FriendRequestModel request;
+  final bool isIncoming;
+  final Color accentColor;
+
+  const _RequestCard({
+    required this.request,
+    required this.isIncoming,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final displayName = isIncoming ? request.fromUserName : request.toUserName;
+    final displayEmail = isIncoming ? request.fromUserEmail : '';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: accentColor.withValues(alpha: 0.15),
+            child: Text(
+              displayName.isNotEmpty ? displayName[0] : '?',
+              style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(displayName, style: const TextStyle(fontWeight: FontWeight.w600)),
+                if (displayEmail.isNotEmpty)
+                  Text(displayEmail,
+                      style: TextStyle(fontSize: 12, color: AppColors.textLight)),
+                const SizedBox(height: 2),
+                Text(
+                  isIncoming ? '申請を受け取っています' : '申請中（承認待ち）',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isIncoming ? Colors.orange[700] : AppColors.textLight,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isIncoming) ...[
+            // 承認・拒否ボタン
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 32,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await ref.read(friendControllerProvider.notifier)
+                          .acceptFriendRequest(request);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('${request.fromUserName}さんと\nフレンドになりました')),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: const Text('承認', style: TextStyle(fontSize: 12)),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 28,
+                  child: TextButton(
+                    onPressed: () async {
+                      await ref.read(friendControllerProvider.notifier)
+                          .rejectFriendRequest(request.id);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('拒否', style: TextStyle(color: Colors.red, fontSize: 12)),
+                  ),
+                ),
+              ],
+            ),
+          ] else ...[
+            // キャンセルボタン
+            TextButton(
+              onPressed: () async {
+                await ref.read(friendControllerProvider.notifier)
+                    .cancelFriendRequest(request.id);
+              },
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text('取消', style: TextStyle(color: Colors.red, fontSize: 12)),
+            ),
+          ],
         ],
       ),
     );
