@@ -74,6 +74,11 @@ class SettingsScreen extends ConsumerWidget {
                   children: [
                     const SizedBox(height: 8),
 
+                    // ユーザー情報
+                    _UserInfoCard(user: userAsync.valueOrNull),
+
+                    const SizedBox(height: 8),
+
                     // 通知設定
                     _SettingsCard(
                       title: '通知設定',
@@ -565,6 +570,66 @@ class _PremiumUpgradeCard extends StatelessWidget {
 }
 
 /// 設定カード
+/// ユーザー情報カード
+class _UserInfoCard extends StatelessWidget {
+  final dynamic user; // UserModel?
+
+  const _UserInfoCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final name = user?.name as String?;
+    final email = user?.email as String? ?? '';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: AppColors.textPrimary.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 22,
+              backgroundColor: AppColors.textPrimary.withValues(alpha: 0.08),
+              child: Icon(Icons.person, color: AppColors.textSecondary, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name?.isNotEmpty == true ? name! : '名前未設定',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    email,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SettingsCard extends StatelessWidget {
   final String title;
   final String subtitle;
