@@ -31,12 +31,14 @@ class Big5DiagnosisState {
   final Big5Question? currentQuestion;
   final String? lastReply;
   final String? error;
+  final int? stageCompleted; // 1=20問完了, 2=50問完了, null=通常
 
   Big5DiagnosisState({
     this.isLoading = false,
     this.currentQuestion,
     this.lastReply,
     this.error,
+    this.stageCompleted,
   });
 
   Big5DiagnosisState copyWith({
@@ -45,12 +47,15 @@ class Big5DiagnosisState {
     String? lastReply,
     String? error,
     bool clearQuestion = false,
+    int? stageCompleted,
+    bool clearStageCompleted = false,
   }) {
     return Big5DiagnosisState(
       isLoading: isLoading ?? this.isLoading,
       currentQuestion: clearQuestion ? null : (currentQuestion ?? this.currentQuestion),
       lastReply: lastReply ?? this.lastReply,
       error: error,
+      stageCompleted: clearStageCompleted ? null : (stageCompleted ?? this.stageCompleted),
     );
   }
 }
@@ -112,6 +117,7 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
         currentQuestion: result.nextQuestion,
         lastReply: result.reply,
         clearQuestion: result.nextQuestion == null,
+        stageCompleted: result.stageCompleted,
       );
     } catch (e) {
       state = state.copyWith(
@@ -119,6 +125,11 @@ class Big5DiagnosisController extends StateNotifier<Big5DiagnosisState> {
         error: e.toString(),
       );
     }
+  }
+
+  /// 段階完了ポップアップを表示済みにする
+  void clearStageCompleted() {
+    state = state.copyWith(clearStageCompleted: true);
   }
 
   /// 質問をスキップしてチャットに戻る

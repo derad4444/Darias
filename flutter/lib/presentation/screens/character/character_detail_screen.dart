@@ -174,15 +174,13 @@ final characterDetailDataProvider = StreamProvider.family<CharacterDetailData?, 
   });
 });
 
-/// Big5解析データプロバイダー
-final big5AnalysisDataProvider = FutureProvider.family<Big5AnalysisData?, String>((ref, personalityKey) async {
-  if (personalityKey.isEmpty) return null;
+/// Big5解析データプロバイダー（Firestoreをリアルタイム監視。生成完了時に自動更新）
+final big5AnalysisDataProvider = StreamProvider.family<Big5AnalysisData?, String>((ref, personalityKey) {
+  if (personalityKey.isEmpty) return Stream.value(null);
 
   final firestore = ref.watch(firestoreProvider);
 
-  try {
-    final doc = await firestore.collection('Big5Analysis').doc(personalityKey).get();
-
+  return firestore.collection('Big5Analysis').doc(personalityKey).snapshots().map((doc) {
     if (!doc.exists || doc.data() == null) return null;
 
     final data = doc.data()!;
@@ -203,10 +201,7 @@ final big5AnalysisDataProvider = FutureProvider.family<Big5AnalysisData?, String
       personalityKey: personalityKey,
       analysis100: analysis100,
     );
-  } catch (e) {
-    debugPrint('Failed to fetch Big5 analysis data: $e');
-    return null;
-  }
+  });
 });
 
 /// iOS版CharacterDetailViewと同じデザインのキャラクター詳細画面
@@ -326,6 +321,8 @@ class _CharacterDetailBody extends ConsumerWidget {
                     accentColor: accentColor,
                     analysisLevel: detail.analysisLevel,
                     analysisData: analysisData,
+                    // データ未生成（null）の場合も生成中として表示
+                    isLoading: analysisData == null,
                   ),
                   loading: () => _Big5AnalysisSection(
                     textColor: textColor,

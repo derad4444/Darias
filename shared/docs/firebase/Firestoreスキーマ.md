@@ -180,7 +180,7 @@
 - **diary_type**: `string` *(アクティビティ型のみ)* - 日記種別。`"activity"` 固定
 - **facts**: `array<string>` *(アクティビティ型のみ)* - 当日の活動を事実ベースでまとめた箇条書きリスト（2〜5件）
   - 例: `["タスク「報告書作成」を完了した", "メモ「アイデアメモ」を記録した"]`
-- **ai_comment**: `string` *(アクティビティ型のみ)* - キャラクターが事実に基づいて生成した前向きな一言コメント（150〜200文字）
+- **ai_comment**: `string` *(アクティビティ型のみ)* - キャラクターが事実に基づいて生成した前向きな一言コメント（250〜350文字）。キャラクターの個性（口癖・話し方・夢・強み）とBIG5性格を反映
 
 **diary_type の種別:**
 
@@ -193,7 +193,8 @@
 
 | データ | コレクション | 条件 |
 |--------|------------|------|
-| スケジュール | `users/{uid}/schedules` | `startDate` が当日 |
+| 当日スケジュール | `users/{uid}/schedules` | `startDate` が当日 |
+| 翌日スケジュール | `users/{uid}/schedules` | `startDate` が翌日（上位3件）。明日への言及に使用 |
 | チャット | `users/{uid}/characters/{cid}/posts` | `timestamp` が当日 |
 | 完了Todo | `users/{uid}/todos` | `isCompleted==true` かつ `updatedAt` が当日（上位3件） |
 | 作成Todo | `users/{uid}/todos` | `createdAt` が当日（上位3件） |
@@ -611,5 +612,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-04-12（`users/{userId}/memos` に `showInWidget` フィールド追加）
+**最終更新**: 2026-04-12（`users/{userId}/memos` に `showInWidget` フィールド追加、日記 `ai_comment` 文字数250〜350に変更、翌日スケジュール収集追加）
 **作成者**: Claude Code

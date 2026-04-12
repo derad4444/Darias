@@ -66,9 +66,12 @@ class Big5Datasource {
       }
     }
 
+    final stageCompleted = data['stageCompleted'] as int?;
+
     return Big5AnswerResult(
       reply: reply,
       nextQuestion: nextQuestion,
+      stageCompleted: stageCompleted,
     );
   }
 
@@ -95,8 +98,8 @@ class Big5Datasource {
     Big5Question? question;
     if (hasQuestion) {
       final questionId = data['questionId'] as String?;
-      final questionText = data['questionText'] as String? ?? reply;
-      if (questionId != null) {
+      final questionText = data['questionText'] as String?;
+      if (questionId != null && questionText != null) {
         question = Big5Question(
           id: questionId,
           question: questionText,
@@ -237,10 +240,12 @@ class Big5Datasource {
 class Big5AnswerResult {
   final String reply;
   final Big5Question? nextQuestion;
+  final int? stageCompleted; // 1=20問完了, 2=50問完了, null=通常回答
 
   Big5AnswerResult({
     required this.reply,
     this.nextQuestion,
+    this.stageCompleted,
   });
 }
 

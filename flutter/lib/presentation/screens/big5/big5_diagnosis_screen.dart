@@ -24,6 +24,44 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
     });
   }
 
+  void _showStageCompletionDialog(int stage) {
+    final titles = {
+      1: '🤖 基本プログラム解析 完了！',
+      2: '🧠 学習進化解析 完了！',
+    };
+    final messages = {
+      1: '20問回答お疲れ様でした！\n\nキャラクター詳細で基本的な性格傾向が確認できるようになりました。引き続き診断を続けることで、さらに深い解析が解放されます。',
+      2: '50問回答お疲れ様でした！\n\nより詳細な性格解析データが追加されました。キャラクター詳細で確認できます。',
+    };
+    final accentColor = ref.read(accentColorProvider);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text(
+          titles[stage] ?? '段階完了！',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          messages[stage] ?? '次の段階に進みます。',
+          style: const TextStyle(fontSize: 14, height: 1.6),
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              ref.read(big5DiagnosisControllerProvider.notifier).clearStageCompleted();
+            },
+            style: FilledButton.styleFrom(backgroundColor: accentColor),
+            child: const Text('続ける'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _startDiagnosis() {
     final user = ref.read(userDocProvider).valueOrNull;
     if (user?.characterId != null) {
@@ -80,6 +118,15 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 段階完了を検知してポップアップ表示
+    ref.listen<Big5DiagnosisState>(big5DiagnosisControllerProvider, (prev, next) {
+      if (next.stageCompleted != null && prev?.stageCompleted != next.stageCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showStageCompletionDialog(next.stageCompleted!);
+        });
+      }
+    });
+
     final user = ref.watch(userDocProvider).valueOrNull;
     final diagnosisState = ref.watch(big5DiagnosisControllerProvider);
     final progressAsync = user?.characterId != null
@@ -129,7 +176,6 @@ class _Big5DiagnosisScreenState extends ConsumerState<Big5DiagnosisScreen> {
                         ? _QuestionSection(
                             question: diagnosisState.currentQuestion!,
                             onAnswer: _submitAnswer,
-                            lastReply: diagnosisState.lastReply,
                             accentColor: accentColor,
                           )
                         : _StartSection(
@@ -227,13 +273,11 @@ class _ProgressSection extends StatelessWidget {
 class _QuestionSection extends StatelessWidget {
   final Big5Question question;
   final Function(int) onAnswer;
-  final String? lastReply;
   final Color accentColor;
 
   const _QuestionSection({
     required this.question,
     required this.onAnswer,
-    this.lastReply,
     required this.accentColor,
   });
 

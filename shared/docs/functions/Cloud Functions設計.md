@@ -89,18 +89,19 @@
 
 | フィールド | 型 | 説明 |
 |-----------|-----|------|
-| `reply` | `string` | AI返答テキスト |
+| `reply` | `string` | AI返答テキスト。BIG5回答中（次の質問あり）は空文字。100問完了時は完了メッセージ |
 | `isBig5Question` | `boolean` | BIG5回答モード中かどうか |
 | `voiceUrl` | `string` | 常に `""`（音声はユーザーがスピーカーボタンを押した際に `generateVoice` で別途生成） |
-| `questionId` / `questionText` / `progress` | `string` | BIG5質問モード時のみ |
+| `questionId` / `questionText` / `progress` | `string` | BIG5質問モード時のみ。`questionText` は質問文のみ（選択肢テキストは含まない） |
 | `big5Completed` / `newScores` | - | 100問完了時のみ |
+| `emotion` | `string` | BIG5回答中は常に `""`。通常チャットのみ感情値を返す |
 
 **処理の振り分けロジック（優先順）:**
 
 1. **無意味な入力検出** → フォールバック返答を返す（3文字未満・記号のみ・繰り返し文字等）
 2. **予定照会** (`今日/明日の予定`) → `users/{uid}/schedules` を照会して返答
-3. **BIG5診断トリガー** (`性格診断して` / `性格解析して`) → 次の質問を返し `big5Progress` を更新
-4. **BIG5回答** (1-5の数字 かつ `currentQuestion` が存在) → 回答を記録し段階完了処理、次の質問を返す
+3. **BIG5診断トリガー** (`性格診断して` / `性格解析して`) → 次の質問を `questionText` フィールドで返し `big5Progress` を更新
+4. **BIG5回答** (1-5の数字 かつ `currentQuestion` が存在) → 回答を記録し段階完了処理、次の質問を返す（OpenAI呼び出しなし）
 5. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
 
 > **Flutter側の振り分け（Cloud Function呼び出し前）:**
@@ -254,8 +255,10 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **収集データ**: スケジュール / チャット / 完了Todo / 作成Todo / メモ / 性格診断セッション / 6人会議
-- **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string` を Firestore に保存
+- **収集データ**: 当日スケジュール / 翌日スケジュール（明日への言及用、上位3件）/ チャット / 完了Todo / 作成Todo / メモ / 性格診断セッション / 6人会議
+- **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `dream`(夢) / `strength`(強み) を取得してプロンプトに反映
+- **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
+- **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 
 #### 11. `generateMonthlyReview`
@@ -360,7 +363,7 @@ shared/functions/
     │   └── openai.js                 # OpenAI クライアント初期化・安全呼出ラッパー
     ├── prompts/
     │   └── templates.js              # OpenAI プロンプトテンプレート（diary / activityDiary / characterReply / big5Analysis 等）
-    │                                 # Big5フォーマット関数: formatBig5WithTraits（詳細形式）/ formatBig5ShortWithTraits（コンパクト形式）
+    │                                 # Big5フォーマット関数: buildPersonalityTraits（自然言語形式。diary・characterReply で使用）/ formatBig5ShortWithTraits（コンパクト形式）
     ├── functions/                     # スケジュール系・複合関数
     │   ├── scheduledTasks.js          # 祝日登録 + 日記自動生成
     │   ├── generateMonthlyReview.js   # 月次レビュー
@@ -458,4 +461,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-04-04*
+*最終更新: 2026-04-12*

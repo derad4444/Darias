@@ -661,17 +661,12 @@ exports.generateCharacterReply = onCall(
           const nextQuestion = getNextQuestion(updatedAnsweredQuestions);
 
           if (nextQuestion) {
-            let aiResponse;
-
-            // 段階完了時は固定メッセージを使用
+            // 段階完了時はキャラクター詳細生成をバックグラウンドで実行
+            let completedStage = null;
             if (isStageComplete) {
-              const currentStage = getCharacterStage(currentCount);
-              aiResponse = getStageCompletionMessage(currentStage, gender);
-
-              // 各段階でBIG5スコアを計算
+              completedStage = getCharacterStage(currentCount);
               const currentBig5Scores = calculateBIG5Scores(updatedAnsweredQuestions);
 
-              // 段階的キャラクター詳細生成を実行 (非同期で実行)
               try {
                 const {generateStagedCharacterDetails} =
                   require("./utils/generateStagedCharacterDetails");
@@ -679,24 +674,19 @@ exports.generateCharacterReply = onCall(
                 generateStagedCharacterDetails(
                     characterId,
                     userId,
-                    currentStage,
+                    completedStage,
                     gender,
                     currentBig5Scores,
                     OPENAI_API_KEY.value().trim(),
                 ).catch((error) => {
                   console.error(
                       `Staged character details generation failed ` +
-                      `for stage ${currentStage}:`, error);
+                      `for stage ${completedStage}:`, error);
                 });
               } catch (error) {
                 console.error(
                     "Failed to import generateStagedCharacterDetails:", error);
               }
-            } else {
-              // 固定文パターンからランダム選択
-              const currentStage = getCharacterStage(currentCount);
-              aiResponse = generateEngagingComment(
-                  currentQuestion.id, answerValue, currentStage);
             }
 
             // 進行状況を更新
@@ -708,22 +698,14 @@ exports.generateCharacterReply = onCall(
                   lastAskedAt: admin.firestore.FieldValue.serverTimestamp(),
                 }, {merge: true});
 
-            // BIG5回答時の感情も判定（エラー時はnormalにフォールバック）
-            let big5Emotion = "";
-            try {
-              big5Emotion = await detectEmotion(openai, aiResponse);
-            } catch (emotionError) {
-              console.warn("BIG5 emotion detection failed, using normal:", emotionError);
-              big5Emotion = ""; // normal表情
-            }
-
             return {
-              reply: aiResponse,
+              reply: "",
               isBig5Question: true,
               questionId: nextQuestion.id,
               questionText: nextQuestion.question,
               progress: `${updatedAnsweredQuestions.length + 1}/100`,
-              emotion: big5Emotion,
+              emotion: "",
+              stageCompleted: completedStage, // null, 1(20問), or 2(50問)
             };
           } else {
             // 全質問完了 - BIG5スコアを計算
@@ -819,11 +801,6 @@ exports.generateCharacterReply = onCall(
           const nextQuestion = getNextQuestion(answeredQuestions);
 
           if (nextQuestion) {
-            const questionResponse =
-              `${nextQuestion.question}\n\n以下から選んでね：\n` +
-              `1. 全く当てはまらない\n2. あまり当てはまらない\n` +
-              `3. どちらでもない\n4. やや当てはまる\n5. 非常に当てはまる`;
-
             // 進行状況を保存
             await db.collection("users").doc(userId)
                 .collection("characters").doc(characterId)
@@ -834,11 +811,12 @@ exports.generateCharacterReply = onCall(
                 }, {merge: true});
 
             return {
-              reply: questionResponse,
+              reply: "",
               isBig5Question: true,
               questionId: nextQuestion.id,
+              questionText: nextQuestion.question,
               progress: `${answeredQuestions.length + 1}/100`,
-              emotion: "", // 質問時は通常表情
+              emotion: "",
             };
           } else {
             return {
