@@ -87,6 +87,10 @@ dependencies:
   home_widget: ^0.6.0
   firebase_app_check: ^0.4.2
 
+  # QR Code
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

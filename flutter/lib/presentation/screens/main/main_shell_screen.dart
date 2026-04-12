@@ -20,6 +20,7 @@ import '../calendar/calendar_screen.dart';
 import '../note/note_screen.dart';
 import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
+import '../friend/friend_screen.dart';
 
 /// 現在選択されているタブのインデックス
 final selectedTabProvider = StateProvider<int>((ref) => 0);
@@ -168,7 +169,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const Center(child: Text('エラー')),
           ),
-          // タブ4: 設定
+          // タブ4: フレンド
+          const FriendScreen(),
+          // タブ5: 設定
           const SettingsScreen(),
         ],
       ),
@@ -227,12 +230,20 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
                     ),
                     _TabItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: '設定',
+                      icon: Icons.people_outline,
+                      selectedIcon: Icons.people,
+                      label: 'フレンド',
                       isSelected: selectedTab == 4,
                       accentColor: accentColor,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
+                    ),
+                    _TabItem(
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: '設定',
+                      isSelected: selectedTab == 5,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 5,
                     ),
                   ],
                 ),

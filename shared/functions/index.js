@@ -95,6 +95,11 @@ Object.defineProperty(exports, "deleteUserAccount", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "diagnoseCompatibility", {
+  get: () => require("./const/diagnoseCompatibility").diagnoseCompatibility,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;
