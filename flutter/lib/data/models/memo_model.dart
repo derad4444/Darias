@@ -7,6 +7,7 @@ class MemoModel {
   final String content;
   final String tag;
   final bool isPinned;
+  final bool showInWidget;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -16,6 +17,7 @@ class MemoModel {
     this.content = '',
     this.tag = '',
     this.isPinned = false,
+    this.showInWidget = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -32,6 +34,7 @@ class MemoModel {
       content: data['content'] as String? ?? '',
       tag: data['tag'] as String? ?? '',
       isPinned: data['isPinned'] as bool? ?? false,
+      showInWidget: data['showInWidget'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -43,6 +46,7 @@ class MemoModel {
       'content': content,
       'tag': tag,
       'isPinned': isPinned,
+      'showInWidget': showInWidget,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
     };
@@ -54,6 +58,7 @@ class MemoModel {
     String? content,
     String? tag,
     bool? isPinned,
+    bool? showInWidget,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -63,6 +68,7 @@ class MemoModel {
       content: content ?? this.content,
       tag: tag ?? this.tag,
       isPinned: isPinned ?? this.isPinned,
+      showInWidget: showInWidget ?? this.showInWidget,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -74,6 +80,7 @@ class MemoModel {
     String content = '',
     String tag = '',
     bool isPinned = false,
+    bool showInWidget = false,
   }) {
     final now = DateTime.now();
     return MemoModel(
@@ -82,6 +89,7 @@ class MemoModel {
       content: content,
       tag: tag,
       isPinned: isPinned,
+      showInWidget: showInWidget,
       createdAt: now,
       updatedAt: now,
     );

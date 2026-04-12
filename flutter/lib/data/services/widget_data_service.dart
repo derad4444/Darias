@@ -201,21 +201,23 @@ class WidgetDataService {
 
   // MARK: - Memo Caching
 
-  /// メモをウィジェット用にキャッシュ
+  /// メモをウィジェット用にキャッシュ（showInWidget==trueのメモのみ）
   Future<void> cacheMemos(List<MemoModel> memos, {Map<String, String> tagColors = const {}}) async {
     if (kIsWeb) return;
     debugPrint('📝 [WidgetDataService] cacheMemos called with ${memos.length} memos');
 
-    // ピン留め優先、次に更新日時順
-    final sortedMemos = List<MemoModel>.from(memos)
-      ..sort((a, b) {
-        if (a.isPinned != b.isPinned) {
-          return a.isPinned ? -1 : 1;
-        }
-        return b.updatedAt.compareTo(a.updatedAt);
-      });
+    // ウィジェット表示フラグが立っているメモのみ対象
+    final widgetTargetMemos = memos.where((m) => m.showInWidget).toList();
 
-    final widgetMemos = sortedMemos.take(10).map((memo) {
+    // ピン留め優先、次に更新日時順
+    widgetTargetMemos.sort((a, b) {
+      if (a.isPinned != b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
+
+    final widgetMemos = widgetTargetMemos.map((memo) {
       return WidgetMemo(
         id: memo.id,
         title: memo.title,
@@ -229,7 +231,7 @@ class WidgetDataService {
 
     final encoded = jsonEncode(widgetMemos.map((m) => m.toJson()).toList());
     await HomeWidget.saveWidgetData<String>(_memosKey, encoded);
-    await HomeWidget.saveWidgetData<int>(_memosTotalCountKey, memos.length);
+    await HomeWidget.saveWidgetData<int>(_memosTotalCountKey, widgetTargetMemos.length);
 
     // メモウィジェットを更新
     await HomeWidget.updateWidget(

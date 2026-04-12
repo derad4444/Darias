@@ -39,6 +39,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
 
   String _selectedTag = '';
   bool _isPinned = false;
+  bool _showInWidget = false;
   bool _isSaving = false;
   bool _isDisposed = false;
 
@@ -61,6 +62,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
 
     if (widget.memo != null) {
       _isPinned = widget.memo!.isPinned;
+      _showInWidget = widget.memo!.showInWidget;
     }
 
     // 変更を検知して自動保存スケジュール
@@ -258,6 +260,43 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                             ],
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.widgets_outlined,
+                                color: _showInWidget ? accentColor : AppColors.textLight,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('ウィジェットに表示', style: TextStyle(color: AppColors.textPrimary)),
+                                    Text(
+                                      'ホーム画面のメモウィジェットに表示',
+                                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Switch(
+                                value: _showInWidget,
+                                activeTrackColor: accentColor,
+                                onChanged: (value) {
+                                  setState(() => _showInWidget = value);
+                                  _saveNow();
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
                         if (widget.memo != null || _savedMemo != null) ...[
                           const SizedBox(height: 8),
                           GestureDetector(
@@ -395,6 +434,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
           content: contentJson,
           tag: _selectedTag,
           isPinned: _isPinned,
+          showInWidget: _showInWidget,
         );
         final id = await ref.read(memoControllerProvider.notifier).addMemo(newMemo);
         if (id != null && !_isDisposed) {
@@ -411,6 +451,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
             content: contentJson,
             tag: _selectedTag,
             isPinned: _isPinned,
+            showInWidget: _showInWidget,
             updatedAt: DateTime.now(),
           ),
         );

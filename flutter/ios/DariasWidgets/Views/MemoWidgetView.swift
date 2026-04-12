@@ -25,6 +25,8 @@ private struct TagBadge: View {
     }
 }
 
+// MARK: - Main View
+
 struct MemoWidgetView: View {
     var entry: MemoWidgetEntry
     @Environment(\.widgetFamily) var family
@@ -43,6 +45,94 @@ struct MemoWidgetView: View {
     }
 }
 
+// MARK: - Memo Item Block
+// 件数に応じて均等分割されるメモ1件分のブロック
+
+private struct MemoItemBlock: View {
+    let memo: WidgetMemo
+    let titleFontSize: CGFloat
+    let contentFontSize: CGFloat
+    let showDate: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            // タイトル行
+            HStack(spacing: 4) {
+                if memo.isPinned {
+                    Image(systemName: "pin.fill")
+                        .font(.system(size: titleFontSize - 2))
+                        .foregroundColor(.orange)
+                }
+                Text(memo.title)
+                    .font(.system(size: titleFontSize, weight: .semibold))
+                    .foregroundColor(WidgetColors.textPrimary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if !memo.tag.isEmpty, let color = memo.tagColor {
+                    TagBadge(name: memo.tag, color: color, fontSize: contentFontSize - 1)
+                }
+            }
+            // 本文（残り空間をすべて使う）
+            Text(memo.content.isEmpty ? "内容なし" : memo.content)
+                .font(.system(size: contentFontSize))
+                .foregroundColor(WidgetColors.textSecondary)
+                .lineLimit(nil)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            // 更新日
+            if showDate {
+                Text(memo.updatedText)
+                    .font(.system(size: contentFontSize - 1))
+                    .foregroundColor(WidgetColors.textSecondary.opacity(0.7))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+// MARK: - Adaptive Memo List
+// 件数に応じて均等分割レイアウトを組む共通ビュー
+
+private struct AdaptiveMemoList: View {
+    let memos: [WidgetMemo]
+    let titleFontSize: CGFloat
+    let contentFontSize: CGFloat
+    let showDate: Bool
+    let spacing: CGFloat
+
+    var body: some View {
+        if memos.isEmpty {
+            VStack(spacing: 6) {
+                Image(systemName: "note.text")
+                    .font(.title2)
+                    .foregroundStyle(WidgetColors.accentGradient)
+                Text("ウィジェット表示メモなし")
+                    .font(.caption2)
+                    .foregroundColor(WidgetColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 0) {
+                ForEach(Array(memos.enumerated()), id: \.element.id) { index, memo in
+                    MemoItemBlock(
+                        memo: memo,
+                        titleFontSize: titleFontSize,
+                        contentFontSize: contentFontSize,
+                        showDate: showDate
+                    )
+                    // 最後のアイテム以外に区切り線
+                    if index < memos.count - 1 {
+                        Divider()
+                            .background(WidgetColors.primaryPink.opacity(0.25))
+                            .padding(.vertical, spacing / 2)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+    }
+}
+
 // MARK: - Small
 
 struct SmallMemoView: View {
@@ -50,57 +140,33 @@ struct SmallMemoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // ヘッダー
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
-                    .frame(width: 20, height: 20)
-                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .frame(width: 18, height: 18)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
                 Text("メモ")
-                    .font(.headline)
-                    .fontWeight(.bold)
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(WidgetColors.primaryPink)
                 Spacer()
+                if !entry.memos.isEmpty {
+                    Text("\(entry.memos.count)件")
+                        .font(.system(size: 10))
+                        .foregroundColor(WidgetColors.primaryPink)
+                }
             }
 
-            if let memo = entry.memos.first {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 4) {
-                        if memo.isPinned {
-                            Image(systemName: "pin.fill")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                        Text(memo.title)
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                            .foregroundColor(WidgetColors.textPrimary)
-                            .lineLimit(1)
-                        Spacer(minLength: 0)
-                        if !memo.tag.isEmpty, let color = memo.tagColor {
-                            TagBadge(name: memo.tag, color: color, fontSize: 8)
-                        }
-                    }
-                    Text(memo.contentOneLine)
-                        .font(.caption2)
-                        .foregroundColor(WidgetColors.textSecondary)
-                        .lineLimit(2)
-                }
-                Spacer()
-            } else {
-                Spacer()
-                VStack(spacing: 4) {
-                    Image(systemName: "note.text")
-                        .font(.title2)
-                        .foregroundStyle(WidgetColors.accentGradient)
-                    Text("メモなし")
-                        .font(.caption2)
-                        .foregroundColor(WidgetColors.textSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                Spacer()
-            }
+            // メモ一覧（均等分割）
+            AdaptiveMemoList(
+                memos: entry.memos,
+                titleFontSize: 11,
+                contentFontSize: 10,
+                showDate: false,
+                spacing: 4
+            )
         }
-        .padding(12)
+        .padding(10)
         .containerBackground(for: .widget) {
             WidgetColors.backgroundGradient
         }
@@ -115,6 +181,7 @@ struct MediumMemoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // ヘッダー
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
@@ -125,61 +192,25 @@ struct MediumMemoView: View {
                     .fontWeight(.bold)
                     .foregroundColor(WidgetColors.primaryPink)
                 Spacer()
-                Text("\(entry.totalCount)件")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(WidgetColors.primaryPink.opacity(0.15))
-                    .foregroundColor(WidgetColors.primaryPink)
-                    .clipShape(Capsule())
+                if !entry.memos.isEmpty {
+                    Text("\(entry.memos.count)件")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(WidgetColors.primaryPink.opacity(0.15))
+                        .foregroundColor(WidgetColors.primaryPink)
+                        .clipShape(Capsule())
+                }
             }
 
-            if entry.memos.isEmpty {
-                HStack {
-                    Spacer()
-                    VStack(spacing: 4) {
-                        Image(systemName: "note.text")
-                            .font(.title3)
-                            .foregroundStyle(WidgetColors.accentGradient)
-                        Text("メモなし")
-                            .font(.caption)
-                            .foregroundColor(WidgetColors.textSecondary)
-                    }
-                    Spacer()
-                }
-                .padding(.vertical, 4)
-            } else {
-                ForEach(entry.memos.prefix(3)) { memo in
-                    HStack(spacing: 6) {
-                        if memo.isPinned {
-                            Image(systemName: "pin.fill")
-                                .font(.caption2)
-                                .foregroundColor(.orange)
-                        }
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(memo.title)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(WidgetColors.textPrimary)
-                                .lineLimit(1)
-                            Text(memo.contentOneLine)
-                                .font(.caption)
-                                .foregroundColor(WidgetColors.textSecondary)
-                                .lineLimit(1)
-                        }
-                        Spacer()
-                        VStack(alignment: .trailing, spacing: 3) {
-                            if !memo.tag.isEmpty, let color = memo.tagColor {
-                                TagBadge(name: memo.tag, color: color)
-                            }
-                            Text(memo.updatedText)
-                                .font(.caption2)
-                                .foregroundColor(WidgetColors.textSecondary)
-                        }
-                    }
-                }
-            }
-            Spacer()
+            // メモ一覧（均等分割）
+            AdaptiveMemoList(
+                memos: entry.memos,
+                titleFontSize: 12,
+                contentFontSize: 11,
+                showDate: entry.memos.count <= 2,
+                spacing: 6
+            )
         }
         .padding(12)
         .containerBackground(for: .widget) {
@@ -196,6 +227,7 @@ struct LargeMemoView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // ヘッダー
             HStack(spacing: 6) {
                 Image("DariasIcon")
                     .resizable()
@@ -206,66 +238,26 @@ struct LargeMemoView: View {
                     .fontWeight(.bold)
                     .foregroundColor(WidgetColors.primaryPink)
                 Spacer()
-                Text("\(entry.totalCount)件")
-                    .font(.caption)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(WidgetColors.primaryPink.opacity(0.15))
-                    .foregroundColor(WidgetColors.primaryPink)
-                    .clipShape(Capsule())
+                if !entry.memos.isEmpty {
+                    Text("\(entry.memos.count)件")
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(WidgetColors.primaryPink.opacity(0.15))
+                        .foregroundColor(WidgetColors.primaryPink)
+                        .clipShape(Capsule())
+                }
             }
             .padding(.bottom, 10)
 
-            if entry.memos.isEmpty {
-                Spacer()
-                HStack {
-                    Spacer()
-                    VStack(spacing: 8) {
-                        Image(systemName: "note.text")
-                            .font(.largeTitle)
-                            .foregroundStyle(WidgetColors.accentGradient)
-                        Text("メモなし")
-                            .font(.subheadline)
-                            .foregroundColor(WidgetColors.textSecondary)
-                    }
-                    Spacer()
-                }
-                Spacer()
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(entry.memos.prefix(5)) { memo in
-                        VStack(alignment: .leading, spacing: 3) {
-                            HStack(spacing: 4) {
-                                if memo.isPinned {
-                                    Image(systemName: "pin.fill")
-                                        .font(.caption2)
-                                        .foregroundColor(.orange)
-                                }
-                                Text(memo.title)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(WidgetColors.textPrimary)
-                                    .lineLimit(1)
-                                Spacer()
-                                if !memo.tag.isEmpty, let color = memo.tagColor {
-                                    TagBadge(name: memo.tag, color: color)
-                                }
-                                Text(memo.updatedText)
-                                    .font(.caption2)
-                                    .foregroundColor(WidgetColors.textSecondary)
-                            }
-                            Text(memo.contentOneLine)
-                                .font(.caption)
-                                .foregroundColor(WidgetColors.textSecondary)
-                                .lineLimit(2)
-                        }
-                        .padding(.vertical, 7)
-                        Divider()
-                            .background(WidgetColors.primaryPink.opacity(0.2))
-                    }
-                }
-                Spacer()
-            }
+            // メモ一覧（均等分割）
+            AdaptiveMemoList(
+                memos: entry.memos,
+                titleFontSize: 13,
+                contentFontSize: 12,
+                showDate: true,
+                spacing: 8
+            )
         }
         .padding(14)
         .containerBackground(for: .widget) {

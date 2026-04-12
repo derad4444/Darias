@@ -288,6 +288,7 @@
 - **title**: `string` - タイトル
 - **content**: `string` - 内容
 - **isPinned**: `boolean` - ピン留めフラグ
+- **showInWidget**: `boolean` - ウィジェット表示フラグ（デフォルト: `false`）。`true` のメモのみホーム画面ウィジェットに表示される
 - **tag**: `string` - タグ
 - **createdAt**: `timestamp` - 作成日時
 - **updatedAt**: `timestamp` - 更新日時
@@ -610,5 +611,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-03-21（holidays コレクションをローカル実装に切り替え済みとして注記）
+**最終更新**: 2026-04-12（`users/{userId}/memos` に `showInWidget` フィールド追加）
 **作成者**: Claude Code
