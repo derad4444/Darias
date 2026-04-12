@@ -292,81 +292,91 @@ class _CharacterDetailBody extends ConsumerWidget {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: Column(
-        children: [
-          SizedBox(height: MediaQuery.of(context).padding.top),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          minHeight: MediaQuery.of(context).size.height,
+        ),
+        child: IntrinsicHeight(
+          child: Column(
+            children: [
+              SizedBox(height: MediaQuery.of(context).padding.top),
 
-          // 1つ目のバナー広告（キャラクター画像の上）
-          if (shouldShowBannerAd)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: BannerAdWidget(adUnitId: AdConfig.characterDetailTopBannerAdUnitId),
-            ),
+              // 1つ目のバナー広告（キャラクター画像の上）
+              if (shouldShowBannerAd)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: BannerAdWidget(adUnitId: AdConfig.characterDetailTopBannerAdUnitId),
+                ),
 
-          const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-          // キャラクター画像
-          _CharacterImage(
-            imageFileName: detail.personalityImageFileName,
-            gender: detail.gender,
+              // キャラクター画像
+              _CharacterImage(
+                imageFileName: detail.personalityImageFileName,
+                gender: detail.gender,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Big5解析セクション（analysisLevel >= 100の場合のみ）
+              if (detail.analysisLevel >= 100)
+                big5AnalysisAsync.when(
+                  data: (analysisData) => _Big5AnalysisSection(
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    analysisLevel: detail.analysisLevel,
+                    analysisData: analysisData,
+                  ),
+                  loading: () => _Big5AnalysisSection(
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    analysisLevel: detail.analysisLevel,
+                    analysisData: null,
+                    isLoading: true,
+                  ),
+                  error: (_, __) => _Big5AnalysisSection(
+                    textColor: textColor,
+                    accentColor: accentColor,
+                    analysisLevel: detail.analysisLevel,
+                    analysisData: null,
+                  ),
+                )
+              else if (detail.analysisLevel < 20)
+                _AnalysisNotAvailableSection(textColor: textColor),
+
+              // 情報エリア（値がある場合のみ表示）
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    _InfoRow(label: '好きな色', value: detail.favoriteColor, textColor: textColor),
+                    _InfoRow(label: '好きな場所', value: detail.favoritePlace, textColor: textColor),
+                    _InfoRow(label: '好きな言葉', value: detail.favoriteWord, textColor: textColor),
+                    _InfoRow(label: '言葉の傾向', value: detail.wordTendency, textColor: textColor),
+                    _InfoRow(label: '短所', value: detail.weakness, textColor: textColor),
+                    _InfoRow(label: '長所', value: detail.strength, textColor: textColor),
+                    _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
+                    _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
+                    _InfoRow(label: '適正', value: detail.aptitude, textColor: textColor),
+                    _InfoRow(label: '夢', value: detail.dream, textColor: textColor),
+                  ],
+                ),
+              ),
+
+              // コンテンツが少ない場合にバナーを画面下部に押し下げる
+              const Spacer(),
+
+              // 2つ目のバナー広告（性格表示の一番下）
+              if (shouldShowBannerAd)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: BannerAdWidget(adUnitId: AdConfig.characterDetailBottomBannerAdUnitId),
+                ),
+
+              const SizedBox(height: 16),
+            ],
           ),
-
-          const SizedBox(height: 16),
-
-          // Big5解析セクション（analysisLevel >= 100の場合のみ）
-          if (detail.analysisLevel >= 100)
-            big5AnalysisAsync.when(
-              data: (analysisData) => _Big5AnalysisSection(
-                textColor: textColor,
-                accentColor: accentColor,
-                analysisLevel: detail.analysisLevel,
-                analysisData: analysisData,
-              ),
-              loading: () => _Big5AnalysisSection(
-                textColor: textColor,
-                accentColor: accentColor,
-                analysisLevel: detail.analysisLevel,
-                analysisData: null,
-                isLoading: true,
-              ),
-              error: (_, __) => _Big5AnalysisSection(
-                textColor: textColor,
-                accentColor: accentColor,
-                analysisLevel: detail.analysisLevel,
-                analysisData: null,
-              ),
-            )
-          else if (detail.analysisLevel < 20)
-            _AnalysisNotAvailableSection(textColor: textColor),
-
-          // 情報エリア
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                _InfoRow(label: '好きな色', value: detail.favoriteColor, textColor: textColor),
-                _InfoRow(label: '好きな場所', value: detail.favoritePlace, textColor: textColor),
-                _InfoRow(label: '好きな言葉', value: detail.favoriteWord, textColor: textColor),
-                _InfoRow(label: '言葉の傾向', value: detail.wordTendency, textColor: textColor),
-                _InfoRow(label: '短所', value: detail.weakness, textColor: textColor),
-                _InfoRow(label: '長所', value: detail.strength, textColor: textColor),
-                _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
-                _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
-                _InfoRow(label: '適正', value: detail.aptitude, textColor: textColor),
-                _InfoRow(label: '夢', value: detail.dream, textColor: textColor),
-              ],
-            ),
-          ),
-
-          // 2つ目のバナー広告（性格表示の一番下）
-          if (shouldShowBannerAd)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: BannerAdWidget(adUnitId: AdConfig.characterDetailBottomBannerAdUnitId),
-            ),
-
-          const SizedBox(height: 16),
-        ],
+        ),
       ),
     );
   }
