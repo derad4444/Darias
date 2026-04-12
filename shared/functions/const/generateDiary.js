@@ -29,6 +29,12 @@ async function generateDiary(characterId, userId) {
   const big5 = charData.confirmedBig5Scores;
   const gender = charData.gender || "neutral";
 
+  // キャラクターの個性情報（口癖・話し方・夢・強み）
+  const favoriteWord = charData.favorite_word || "";
+  const wordTendency = charData.word_tendency || "";
+  const dream = charData.dream || "";
+  const strength = charData.strength || "";
+
   // ユーザーのサブスクリプション状態を取得
   let isPremium = false;
   try {
@@ -61,6 +67,29 @@ async function generateDiary(characterId, userId) {
 
   // スケジュールの文字列整形
   const scheduleSummary = scheduleSnap.docs.map((doc) => {
+    const data = doc.data();
+    const time = data.isAllDay ?
+  "終日" :
+  new Date(data.startDate.toDate()).toLocaleTimeString(
+      "ja-JP",
+      {hour: "2-digit", minute: "2-digit"},
+  );
+    return `・${time} ${data.title}`;
+  }).join("\n");
+
+  // 翌日のスケジュール取得（明日への言及に使う）
+  const dayAfterTomorrow = new Date(tomorrow);
+  dayAfterTomorrow.setDate(tomorrow.getDate() + 1);
+
+  const tomorrowScheduleSnap = await db.collection("users").doc(userId)
+      .collection("schedules")
+      .where("startDate", ">=", tomorrow)
+      .where("startDate", "<", dayAfterTomorrow)
+      .orderBy("startDate", "asc")
+      .limit(3)
+      .get();
+
+  const tomorrowScheduleSummary = tomorrowScheduleSnap.docs.map((doc) => {
     const data = doc.data();
     const time = data.isAllDay ?
   "終日" :
@@ -222,6 +251,11 @@ async function generateDiary(characterId, userId) {
       memoSummary,
       meetingSummary,
       big5ProgressSummary,
+      tomorrowScheduleSummary,
+      favoriteWord,
+      wordTendency,
+      dream,
+      strength,
   );
 
   // OpenAI呼び出し

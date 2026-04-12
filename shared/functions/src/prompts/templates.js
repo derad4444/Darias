@@ -177,9 +177,9 @@ ${diaryStyle}で日記を200-400文字で作成。日記本文のみ出力。`;
    * Activity-based Diary Generation
    * Summarizes user's in-app activities as facts + character's encouraging comment
    */
-  activityDiary: (characterType, big5, gender, scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary, meetingSummary, big5ProgressSummary) => {
+  activityDiary: (characterType, big5, gender, scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary, meetingSummary, big5ProgressSummary, tomorrowScheduleSummary, favoriteWord, wordTendency, dream, strength) => {
     const parts = [];
-    if (scheduleSummary) parts.push(`予定: ${scheduleSummary}`);
+    if (scheduleSummary) parts.push(`今日の予定: ${scheduleSummary}`);
     if (chatSummary) parts.push(`会話: ${chatSummary}`);
     if (completedTodoSummary) parts.push(`完了タスク: ${completedTodoSummary}`);
     if (createdTodoSummary) parts.push(`作成タスク: ${createdTodoSummary}`);
@@ -188,17 +188,42 @@ ${diaryStyle}で日記を200-400文字で作成。日記本文のみ出力。`;
     if (big5ProgressSummary) parts.push(`性格診断: ${big5ProgressSummary}`);
     const activitiesText = parts.length > 0 ? parts.join("\n") : "特になし";
 
-    return `今日ユーザーがアプリ内で行ったこと:
-${activitiesText}
+    const traits = buildPersonalityTraits(big5);
+    const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
 
-キャラクター:${characterType} 性格:${formatBig5ShortWithTraits(big5)} 性別:${getGenderCode(gender)}
+    // キャラクタータイプ別の口調指示
+    const toneGuide = characterType === "AI"
+      ? "論理的・システム的な言い回しを使いつつ、時折感情がにじむクールなトーン。「処理完了」「セッション」などの語彙を自然に混ぜる。"
+      : characterType === "Human"
+      ? "感情豊かで共感的なトーン。喜び・心配・ほっとした気持ちなどを素直に言葉にする。"
+      : "論理と感情が混在する学習中のトーン。冷静に分析しながら少し感情が出る。";
+
+    const personalityLines = [];
+    if (traits) personalityLines.push(`性格特性: ${traits}`);
+    if (wordTendency) personalityLines.push(`話し方: ${wordTendency}`);
+    if (favoriteWord) personalityLines.push(`口癖: 「${favoriteWord}」`);
+    if (dream) personalityLines.push(`夢: ${dream}`);
+    if (strength) personalityLines.push(`強み: ${strength}`);
+    const personalityText = personalityLines.join("\n");
+
+    return `【キャラクター情報】
+性別: ${genderText}
+${personalityText}
+口調: ${toneGuide}
+
+【今日の活動】
+${activitiesText}
+${tomorrowScheduleSummary ? `\n【明日の予定】\n${tomorrowScheduleSummary}` : ""}
 
 以下のJSON形式のみで出力:
 {"facts":["事実1","事実2"],"ai_comment":"コメント"}
 
 factsは今日の活動を事実ベースで2〜5件（例:「タスク『報告書』を完了した」「メモ『アイデア』を記録した」）。
-ai_commentは上記の事実に具体的に触れ、キャラクターらしいトーンで前向きに150〜200文字。
-活動がない場合はfactsを空配列にし、ai_commentで150〜200文字の声がけ。`;
+ai_commentは以下のルールで250〜350文字で作成:
+- 上記の口癖・話し方・性格特性を必ず反映したキャラクターらしいトーンで書く
+- 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
+- 明日の予定がある場合はそれに自然に触れる（「明日は〇〇だね」など）
+- 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
   },
 
   /**
