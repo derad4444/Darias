@@ -40,13 +40,20 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen>
       return;
     }
     setState(() => _isSearching = true);
-    final results = await ref
-        .read(friendControllerProvider.notifier)
-        .searchUsers(query.trim());
-    setState(() {
-      _searchResults = results;
-      _isSearching = false;
-    });
+    try {
+      final results = await ref
+          .read(friendControllerProvider.notifier)
+          .searchUsers(query.trim());
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+    } catch (e) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+    }
   }
 
   @override
@@ -155,23 +162,44 @@ class _SearchTab extends ConsumerWidget {
         // 検索フィールド
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: TextField(
-            controller: controller,
-            decoration: InputDecoration(
-              hintText: '名前またはメールアドレスで検索',
-              prefixIcon: Icon(Icons.search, color: accentColor),
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.85),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(14),
-                borderSide: BorderSide.none,
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  decoration: InputDecoration(
+                    hintText: '名前またはメールアドレスで検索',
+                    prefixIcon: Icon(Icons.search, color: accentColor),
+                    filled: true,
+                    fillColor: Colors.white.withValues(alpha: 0.85),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onSubmitted: onSearch,
+                  onChanged: (v) {
+                    if (v.isEmpty) onSearch('');
+                  },
+                ),
               ),
-              contentPadding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            onSubmitted: onSearch,
-            onChanged: (v) {
-              if (v.isEmpty) onSearch('');
-            },
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: () => onSearch(controller.text),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: accentColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('検索'),
+              ),
+            ],
           ),
         ),
 

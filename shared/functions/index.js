@@ -100,6 +100,11 @@ Object.defineProperty(exports, "diagnoseCompatibility", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "searchUsers", {
+  get: () => require("./const/searchUsers").searchUsers,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

@@ -58,40 +58,19 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
   FriendController(this._firestore, this._functions, this._userId)
       : super(const AsyncValue.data(null));
 
-  /// ユーザー検索（名前 or メールアドレス）
+  /// ユーザー検索（Cloud Function経由）
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     if (query.isEmpty || _userId == null) return [];
 
-    final isEmail = query.contains('@');
-    QuerySnapshot snap;
-
-    if (isEmail) {
-      snap = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: query.trim())
-          .limit(10)
-          .get();
-    } else {
-      // 前方一致検索
-      snap = await _firestore
-          .collection('users')
-          .where('name', isGreaterThanOrEqualTo: query)
-          .where('name', isLessThan: '${query}z')
-          .limit(10)
-          .get();
+    try {
+      final callable = _functions.httpsCallable('searchUsers');
+      final result = await callable.call({'query': query.trim()});
+      final data = result.data as Map<String, dynamic>;
+      final users = data['users'] as List<dynamic>? ?? [];
+      return users.map((u) => Map<String, dynamic>.from(u as Map)).toList();
+    } catch (e) {
+      return [];
     }
-
-    return snap.docs
-        .where((doc) => doc.id != _userId)
-        .map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          return {
-            'id': doc.id,
-            'name': data['name'] as String? ?? '',
-            'email': data['email'] as String? ?? '',
-          };
-        })
-        .toList();
   }
 
   /// フレンド申請を送る
