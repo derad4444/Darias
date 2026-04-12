@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
+import 'friend_screen.dart' show FriendRequestsSheet;
 
 class FriendSearchScreen extends ConsumerStatefulWidget {
   const FriendSearchScreen({super.key});
@@ -70,7 +71,7 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen>
             children: [
               // ヘッダー
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.fromLTRB(4, 12, 8, 0),
                 child: Row(
                   children: [
                     IconButton(
@@ -85,6 +86,9 @@ class _FriendSearchScreenState extends ConsumerState<FriendSearchScreen>
                         color: accentColor,
                       ),
                     ),
+                    const Spacer(),
+                    // 申請管理ボタン（メールアイコン）
+                    _RequestsBadgeButton(accentColor: accentColor),
                   ],
                 ),
               ),
@@ -532,6 +536,58 @@ class _QrTabState extends ConsumerState<_QrTab> {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// 申請管理ボタン（バッジ付きメールアイコン）
+class _RequestsBadgeButton extends ConsumerWidget {
+  final Color accentColor;
+  const _RequestsBadgeButton({required this.accentColor});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final incomingAsync = ref.watch(incomingFriendRequestsProvider);
+    final count = incomingAsync.valueOrNull?.length ?? 0;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        IconButton(
+          onPressed: () {
+            showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const FriendRequestsSheet(),
+            );
+          },
+          icon: Icon(Icons.mail_outline, color: accentColor),
+          tooltip: '申請管理',
+        ),
+        if (count > 0)
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              width: 18,
+              height: 18,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

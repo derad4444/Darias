@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 import '../../data/models/friend_model.dart';
 import 'auth_provider.dart';
 
@@ -19,31 +20,31 @@ final friendsProvider = StreamProvider<List<FriendModel>>((ref) {
       .map((snap) => snap.docs.map(FriendModel.fromFirestore).toList());
 });
 
-/// 受信したフレンド申請プロバイダー
+/// 受信したフレンド申請プロバイダー（自分のサブコレクション）
 final incomingFriendRequestsProvider = StreamProvider<List<FriendRequestModel>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
   return ref
       .watch(firestoreProvider)
-      .collection('friendRequests')
-      .where('toUserId', isEqualTo: userId)
-      .where('status', isEqualTo: 'pending')
+      .collection('users')
+      .doc(userId)
+      .collection('incomingRequests')
       .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snap) => snap.docs.map(FriendRequestModel.fromFirestore).toList());
 });
 
-/// 送信したフレンド申請プロバイダー
+/// 送信したフレンド申請プロバイダー（自分のサブコレクション）
 final outgoingFriendRequestsProvider = StreamProvider<List<FriendRequestModel>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   if (userId == null) return Stream.value([]);
 
   return ref
       .watch(firestoreProvider)
-      .collection('friendRequests')
-      .where('fromUserId', isEqualTo: userId)
-      .where('status', isEqualTo: 'pending')
+      .collection('users')
+      .doc(userId)
+      .collection('outgoingRequests')
       .orderBy('createdAt', descending: true)
       .snapshots()
       .map((snap) => snap.docs.map(FriendRequestModel.fromFirestore).toList());
@@ -61,7 +62,6 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
   /// ユーザー検索（Cloud Function経由）
   Future<List<Map<String, dynamic>>> searchUsers(String query) async {
     if (query.isEmpty || _userId == null) return [];
-
     try {
       final callable = _functions.httpsCallable('searchUsers');
       final result = await callable.call({'query': query.trim()});
@@ -79,49 +79,60 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     required String toUserName,
     required String myName,
     required String myEmail,
-    String myName2 = '',
   }) async {
     if (_userId == null) return;
     state = const AsyncValue.loading();
     try {
-      // 既に申請済みか確認
-      final existing = await _firestore
-          .collection('friendRequests')
-          .where('fromUserId', isEqualTo: _userId)
-          .where('toUserId', isEqualTo: toUserId)
-          .where('status', isEqualTo: 'pending')
-          .get();
-
-      if (existing.docs.isNotEmpty) {
-        state = const AsyncValue.data(null);
-        return;
-      }
-
       // 既にフレンドか確認
       final friendDoc = await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('friends')
-          .doc(toUserId)
+          .collection('users').doc(_userId)
+          .collection('friends').doc(toUserId)
           .get();
-
       if (friendDoc.exists) {
         state = const AsyncValue.data(null);
         return;
       }
 
-      await _firestore.collection('friendRequests').add(
-        FriendRequestModel(
-          id: '',
-          fromUserId: _userId,
-          fromUserName: myName,
-          fromUserEmail: myEmail,
-          toUserId: toUserId,
-          toUserName: toUserName,
-          status: FriendRequestStatus.pending,
-          createdAt: DateTime.now(),
-        ).toMap(),
+      // 既に申請済みか確認（outgoingRequests）
+      final existing = await _firestore
+          .collection('users').doc(_userId)
+          .collection('outgoingRequests').doc(toUserId)
+          .get();
+      if (existing.exists) {
+        state = const AsyncValue.data(null);
+        return;
+      }
+
+      final requestId = const Uuid().v4();
+      final now = DateTime.now();
+      final requestData = FriendRequestModel(
+        id: requestId,
+        fromUserId: _userId,
+        fromUserName: myName,
+        fromUserEmail: myEmail,
+        toUserId: toUserId,
+        toUserName: toUserName,
+        status: FriendRequestStatus.pending,
+        createdAt: now,
+      ).toMap();
+
+      final batch = _firestore.batch();
+
+      // 相手の受信ボックスに書き込む
+      batch.set(
+        _firestore.collection('users').doc(toUserId)
+            .collection('incomingRequests').doc(_userId),
+        requestData,
       );
+
+      // 自分の送信ボックスに書き込む
+      batch.set(
+        _firestore.collection('users').doc(_userId)
+            .collection('outgoingRequests').doc(toUserId),
+        requestData,
+      );
+
+      await batch.commit();
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -133,17 +144,26 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     if (_userId == null) return;
     state = const AsyncValue.loading();
     try {
+      // 自分のfriendDocを取得
+      final myDoc = await _firestore.collection('users').doc(_userId).get();
+      final myData = myDoc.data() ?? {};
+
       final batch = _firestore.batch();
 
-      // 申請ステータスを更新
-      batch.update(
-        _firestore.collection('friendRequests').doc(request.id),
-        {'status': 'accepted'},
+      // 申請ドキュメントを削除（両者）
+      batch.delete(
+        _firestore.collection('users').doc(_userId)
+            .collection('incomingRequests').doc(request.fromUserId),
+      );
+      batch.delete(
+        _firestore.collection('users').doc(request.fromUserId)
+            .collection('outgoingRequests').doc(_userId),
       );
 
       // 自分のフレンドリストに追加
       batch.set(
-        _firestore.collection('users').doc(_userId).collection('friends').doc(request.fromUserId),
+        _firestore.collection('users').doc(_userId)
+            .collection('friends').doc(request.fromUserId),
         FriendModel(
           id: request.fromUserId,
           name: request.fromUserName,
@@ -153,11 +173,10 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
         ).toMap(),
       );
 
-      // 相手のフレンドリストにも追加（相手のname/emailを取得）
-      final myDoc = await _firestore.collection('users').doc(_userId).get();
-      final myData = myDoc.data() ?? {};
+      // 相手のフレンドリストに追加
       batch.set(
-        _firestore.collection('users').doc(request.fromUserId).collection('friends').doc(_userId),
+        _firestore.collection('users').doc(request.fromUserId)
+            .collection('friends').doc(_userId),
         FriendModel(
           id: _userId,
           name: myData['name'] as String? ?? '',
@@ -174,24 +193,43 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// フレンド申請を取消（送信側）
-  Future<void> cancelFriendRequest(String requestId) async {
+  /// フレンド申請を拒否
+  Future<void> rejectFriendRequest(FriendRequestModel request) async {
+    if (_userId == null) return;
     try {
-      await _firestore.collection('friendRequests').doc(requestId).delete();
+      final batch = _firestore.batch();
+      // 自分の受信ボックスから削除
+      batch.delete(
+        _firestore.collection('users').doc(_userId)
+            .collection('incomingRequests').doc(request.fromUserId),
+      );
+      // 相手の送信ボックスから削除
+      batch.delete(
+        _firestore.collection('users').doc(request.fromUserId)
+            .collection('outgoingRequests').doc(_userId),
+      );
+      await batch.commit();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
-  /// フレンド申請を拒否
-  Future<void> rejectFriendRequest(String requestId) async {
-    state = const AsyncValue.loading();
+  /// フレンド申請を取消（送信側）
+  Future<void> cancelFriendRequest(FriendRequestModel request) async {
+    if (_userId == null) return;
     try {
-      await _firestore
-          .collection('friendRequests')
-          .doc(requestId)
-          .update({'status': 'rejected'});
-      state = const AsyncValue.data(null);
+      final batch = _firestore.batch();
+      // 自分の送信ボックスから削除
+      batch.delete(
+        _firestore.collection('users').doc(_userId)
+            .collection('outgoingRequests').doc(request.toUserId),
+      );
+      // 相手の受信ボックスから削除
+      batch.delete(
+        _firestore.collection('users').doc(request.toUserId)
+            .collection('incomingRequests').doc(_userId),
+      );
+      await batch.commit();
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -221,48 +259,11 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     if (_userId == null) return;
     try {
       await _firestore
-          .collection('users')
-          .doc(_userId)
-          .collection('friends')
-          .doc(friendId)
+          .collection('users').doc(_userId)
+          .collection('friends').doc(friendId)
           .update({'shareLevel': level.value});
     } catch (e, st) {
       state = AsyncValue.error(e, st);
-    }
-  }
-
-  /// フレンドのBIG5スコアを取得
-  Future<Map<String, double>?> fetchFriendBig5(String friendId) async {
-    try {
-      // フレンドのキャラクターIDを取得
-      final userDoc = await _firestore.collection('users').doc(friendId).get();
-      final userData = userDoc.data();
-      final characterId = userData?['character_id'] as String?;
-      if (characterId == null) return null;
-
-      // BIG5スコアを取得
-      final detailDoc = await _firestore
-          .collection('users')
-          .doc(friendId)
-          .collection('characters')
-          .doc(characterId)
-          .collection('details')
-          .doc('current')
-          .get();
-
-      final detailData = detailDoc.data();
-      final scoresMap = detailData?['confirmedBig5Scores'] as Map<String, dynamic>?;
-      if (scoresMap == null) return null;
-
-      return {
-        'openness': (scoresMap['openness'] as num?)?.toDouble() ?? 3,
-        'conscientiousness': (scoresMap['conscientiousness'] as num?)?.toDouble() ?? 3,
-        'extraversion': (scoresMap['extraversion'] as num?)?.toDouble() ?? 3,
-        'agreeableness': (scoresMap['agreeableness'] as num?)?.toDouble() ?? 3,
-        'neuroticism': (scoresMap['neuroticism'] as num?)?.toDouble() ?? 3,
-      };
-    } catch (e) {
-      return null;
     }
   }
 

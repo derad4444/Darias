@@ -17,9 +17,6 @@ class FriendScreen extends ConsumerWidget {
     final gradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
     final friendsAsync = ref.watch(friendsProvider);
-    final incomingAsync = ref.watch(incomingFriendRequestsProvider);
-
-    final pendingCount = incomingAsync.valueOrNull?.length ?? 0;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -43,40 +40,7 @@ class FriendScreen extends ConsumerWidget {
                       ),
                     ),
                     const Spacer(),
-                    // 申請管理ボタン（常時表示）
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        IconButton(
-                          onPressed: () => _showRequestsSheet(context, ref),
-                          icon: Icon(Icons.person_add_outlined, color: accentColor),
-                          tooltip: '申請管理',
-                        ),
-                        if (pendingCount > 0)
-                          Positioned(
-                            right: 4,
-                            top: 4,
-                            child: Container(
-                              width: 18,
-                              height: 18,
-                              decoration: BoxDecoration(
-                                color: Colors.red,
-                                shape: BoxShape.circle,
-                              ),
-                              alignment: Alignment.center,
-                              child: Text(
-                                '$pendingCount',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    // フレンド検索ボタン
+                    // フレンド検索・申請管理ボタン
                     IconButton(
                       onPressed: () => Navigator.push(
                         context,
@@ -118,14 +82,6 @@ class FriendScreen extends ConsumerWidget {
     );
   }
 
-  void _showRequestsSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _FriendRequestsSheet(),
-    );
-  }
 }
 
 /// フレンドカード
@@ -300,14 +256,14 @@ class _EmptyFriendView extends StatelessWidget {
 // ============================================================
 // 申請管理シート（受信・送信タブ）
 // ============================================================
-class _FriendRequestsSheet extends ConsumerStatefulWidget {
-  const _FriendRequestsSheet();
+class FriendRequestsSheet extends ConsumerStatefulWidget {
+  const FriendRequestsSheet({super.key});
 
   @override
-  ConsumerState<_FriendRequestsSheet> createState() => _FriendRequestsSheetState();
+  ConsumerState<FriendRequestsSheet> createState() => _FriendRequestsSheetState();
 }
 
-class _FriendRequestsSheetState extends ConsumerState<_FriendRequestsSheet>
+class _FriendRequestsSheetState extends ConsumerState<FriendRequestsSheet>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -567,7 +523,7 @@ class _RequestCard extends ConsumerWidget {
                   child: TextButton(
                     onPressed: () async {
                       await ref.read(friendControllerProvider.notifier)
-                          .rejectFriendRequest(request.id);
+                          .rejectFriendRequest(request);
                     },
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -584,7 +540,7 @@ class _RequestCard extends ConsumerWidget {
             TextButton(
               onPressed: () async {
                 await ref.read(friendControllerProvider.notifier)
-                    .cancelFriendRequest(request.id);
+                    .cancelFriendRequest(request);
               },
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
