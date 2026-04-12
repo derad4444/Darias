@@ -11,7 +11,9 @@ import '../../../utils/memo_content_utils.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
+import '../../providers/todo_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/models/todo_model.dart';
 import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 
@@ -42,6 +44,42 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
   bool _showInWidget = false;
   bool _isSaving = false;
   bool _isDisposed = false;
+  int _taskCount = 0;
+
+  /// Quill本文からタスクタイトル一覧を抽出（行頭にtaskIconエンベッドがある行を対象）
+  List<String> _extractTaskTitles() {
+    final ops = _quillController.document.toDelta().operations;
+    final tasks = <String>[];
+    final lineBuffer = StringBuffer();
+    bool lineHasTaskIcon = false;
+    bool isLineStart = true;
+
+    for (final op in ops) {
+      if (!op.isInsert) continue;
+      final data = op.data;
+
+      if (data is Map && (data as Map).containsKey('taskIcon')) {
+        if (isLineStart) lineHasTaskIcon = true;
+        isLineStart = false;
+      } else if (data is String) {
+        for (final ch in data.split('')) {
+          if (ch == '\n') {
+            if (lineHasTaskIcon) {
+              final title = lineBuffer.toString().trim();
+              if (title.isNotEmpty) tasks.add(title);
+            }
+            lineBuffer.clear();
+            lineHasTaskIcon = false;
+            isLineStart = true;
+          } else {
+            lineBuffer.write(ch);
+            isLineStart = false;
+          }
+        }
+      }
+    }
+    return tasks;
+  }
 
   /// 自動保存用タイマー
   Timer? _debounceTimer;
@@ -68,6 +106,9 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     // 変更を検知して自動保存スケジュール
     _titleController.addListener(_onContentChanged);
     _quillController.addListener(_onContentChanged);
+
+    // 初期タスク数
+    _taskCount = _extractTaskTitles().length;
   }
 
   @override
@@ -95,6 +136,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
 
   void _onContentChanged() {
     _scheduleSave();
+    final count = _extractTaskTitles().length;
+    if (count != _taskCount) {
+      setState(() => _taskCount = count);
+    }
   }
 
   /// 2秒後に自動保存（入力が続く間はリセット）
@@ -248,7 +293,18 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                                 color: _isPinned ? accentColor : AppColors.textLight,
                               ),
                               const SizedBox(width: 12),
-                              Expanded(child: Text('ピン留め', style: TextStyle(color: AppColors.textPrimary))),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('ピン留め', style: TextStyle(color: AppColors.textPrimary)),
+                                    Text(
+                                      'メモ一覧の上部に固定します',
+                                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
                               Switch(
                                 value: _isPinned,
                                 activeTrackColor: accentColor,
@@ -295,6 +351,65 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                                 },
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: _taskCount > 0 ? () => _showTaskRegistrationSheet(accentColor) : null,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            decoration: BoxDecoration(
+                              color: _taskCount > 0
+                                  ? accentColor.withValues(alpha: 0.08)
+                                  : Colors.white.withValues(alpha: 0.5),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _taskCount > 0
+                                    ? accentColor.withValues(alpha: 0.4)
+                                    : Colors.grey.withValues(alpha: 0.3),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.checklist_rounded,
+                                        color: _taskCount > 0 ? accentColor : Colors.grey[400], size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _taskCount > 0 ? 'タスクに登録（$_taskCount件）' : 'タスクに登録',
+                                      style: TextStyle(
+                                        color: _taskCount > 0 ? accentColor : Colors.grey[400],
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                RichText(
+                                  text: TextSpan(
+                                    style: TextStyle(
+                                      color: _taskCount > 0
+                                          ? accentColor.withValues(alpha: 0.65)
+                                          : Colors.grey[400],
+                                      fontSize: 11,
+                                    ),
+                                    children: [
+                                      const TextSpan(text: 'タスクアイコン（'),
+                                      WidgetSpan(
+                                        alignment: PlaceholderAlignment.middle,
+                                        child: Icon(Icons.task_alt, size: 12,
+                                            color: _taskCount > 0
+                                                ? accentColor.withValues(alpha: 0.65)
+                                                : Colors.grey[400]),
+                                      ),
+                                      const TextSpan(text: '）付きの行をタスクに登録します'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                         if (widget.memo != null || _savedMemo != null) ...[
@@ -404,6 +519,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                 padding: EdgeInsets.all(12),
                 expands: false,
                 scrollable: false,
+                embedBuilders: [_TaskIconEmbedBuilder()],
               ),
             ),
           ),
@@ -660,6 +776,50 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
       }
     }
   }
+
+  void _showTaskRegistrationSheet(Color accentColor) {
+    final tasks = _extractTaskTitles();
+    if (tasks.isEmpty) return;
+
+    final backgroundGradient = ref.read(backgroundGradientProvider);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _TaskRegistrationSheet(
+        tasks: tasks,
+        accentColor: accentColor,
+        backgroundGradient: backgroundGradient,
+        onRegister: (selected) async {
+          Navigator.pop(ctx);
+          await _registerTasks(selected);
+        },
+      ),
+    );
+  }
+
+  Future<void> _registerTasks(List<String> titles) async {
+    int count = 0;
+    for (final title in titles) {
+      try {
+        await ref.read(todoControllerProvider.notifier).addTodo(
+          TodoModel.create(title: title),
+        );
+        count++;
+      } catch (e) {
+        debugPrint('タスク登録エラー: $e');
+      }
+    }
+    if (mounted && count > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$count件のタスクを登録しました'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }
 
 // ─────────────────────────────────────────
@@ -711,6 +871,26 @@ class _MemoToolbarState extends State<_MemoToolbar> {
   bool _isBlockQuote() =>
       widget.controller.getSelectionStyle().attributes.containsKey(Attribute.blockQuote.key);
 
+  bool _isTaskLine() {
+    final controller = widget.controller;
+    final cursorPos = controller.selection.baseOffset;
+    if (cursorPos < 0) return false;
+    final plainText = controller.document.toPlainText();
+    if (plainText.isEmpty) return false;
+    final safePos = cursorPos.clamp(0, plainText.length);
+    final lineStart = safePos > 0 ? plainText.lastIndexOf('\n', safePos - 1) + 1 : 0;
+    int offset = 0;
+    for (final op in controller.document.toDelta().operations) {
+      if (!op.isInsert) continue;
+      if (offset == lineStart) {
+        return op.data is Map && (op.data as Map).containsKey('taskIcon');
+      }
+      if (offset > lineStart) break;
+      offset += op.length ?? 0;
+    }
+    return false;
+  }
+
   String? _currentColor() =>
       widget.controller.getSelectionStyle().attributes[Attribute.color.key]?.value as String?;
 
@@ -738,6 +918,25 @@ class _MemoToolbarState extends State<_MemoToolbar> {
     widget.controller.formatSelection(
       _isBlockQuote() ? Attribute.clone(Attribute.blockQuote, null) : Attribute.blockQuote,
     );
+  }
+
+  void _toggleTaskLine() {
+    final controller = widget.controller;
+    final cursorPos = controller.selection.baseOffset;
+    if (cursorPos < 0) return;
+    final plainText = controller.document.toPlainText();
+    final safePos = plainText.isEmpty ? 0 : cursorPos.clamp(0, plainText.length);
+    final lineStart = safePos > 0 ? plainText.lastIndexOf('\n', safePos - 1) + 1 : 0;
+    if (_isTaskLine()) {
+      controller.replaceText(lineStart, 1, '', null);
+    } else {
+      controller.replaceText(lineStart, 0, Embeddable('taskIcon', ''), null);
+      // embedの直後にカーソルを移動
+      controller.updateSelection(
+        TextSelection.collapsed(offset: lineStart + 1),
+        ChangeSource.local,
+      );
+    }
   }
 
   void _showColorPicker() {
@@ -784,6 +983,7 @@ class _MemoToolbarState extends State<_MemoToolbar> {
             const _Divider(),
             _Btn(icon: Icons.format_list_bulleted, isActive: _isList('bullet'),  ac: ac, onTap: () => _toggleList(Attribute.ul, 'bullet')),
             _Btn(icon: Icons.format_list_numbered, isActive: _isList('ordered'), ac: ac, onTap: () => _toggleList(Attribute.ol, 'ordered')),
+            _TextBtn(label: 'タスク', isActive: _isTaskLine(), ac: ac, onTap: _toggleTaskLine),
             _Btn(icon: Icons.format_quote,         isActive: _isBlockQuote(),    ac: ac, onTap: _toggleBlockQuote),
             const _Divider(),
             _ColorBtn(currentHex: _currentColor(), ac: ac, onTap: _showColorPicker),
@@ -825,6 +1025,59 @@ class _Btn extends StatelessWidget {
               ? Colors.grey.withValues(alpha: 0.35)
               : isActive ? ac : Colors.grey[600]),
       ),
+    );
+  }
+}
+
+class _TextBtn extends StatelessWidget {
+  final String label;
+  final bool isActive;
+  final Color ac;
+  final VoidCallback? onTap;
+
+  const _TextBtn({required this.label, required this.isActive, required this.ac, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+        decoration: BoxDecoration(
+          color: isActive ? ac.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: onTap == null
+                ? Colors.grey.withValues(alpha: 0.35)
+                : isActive ? ac : Colors.grey[600],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// タスクアイコンのインラインEmbedビルダー
+class _TaskIconEmbedBuilder extends EmbedBuilder {
+  const _TaskIconEmbedBuilder();
+
+  @override
+  String get key => 'taskIcon';
+
+  @override
+  bool get expanded => false;
+
+  @override
+  Widget build(BuildContext context, EmbedContext embedContext) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 3, bottom: 1),
+      child: Icon(Icons.task_alt, size: 13, color: Colors.grey[600]),
     );
   }
 }
@@ -880,6 +1133,116 @@ class _Divider extends StatelessWidget {
       width: 1, height: 20,
       margin: const EdgeInsets.symmetric(horizontal: 4),
       color: Colors.grey.withValues(alpha: 0.25),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+// タスク登録 確認シート
+// ─────────────────────────────────────────
+
+class _TaskRegistrationSheet extends StatefulWidget {
+  final List<String> tasks;
+  final Color accentColor;
+  final Gradient backgroundGradient;
+  final void Function(List<String> selected) onRegister;
+
+  const _TaskRegistrationSheet({
+    required this.tasks,
+    required this.accentColor,
+    required this.backgroundGradient,
+    required this.onRegister,
+  });
+
+  @override
+  State<_TaskRegistrationSheet> createState() => _TaskRegistrationSheetState();
+}
+
+class _TaskRegistrationSheetState extends State<_TaskRegistrationSheet> {
+  late List<bool> _checked;
+
+  @override
+  void initState() {
+    super.initState();
+    _checked = List.filled(widget.tasks.length, true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCount = _checked.where((c) => c).length;
+
+    return Container(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      decoration: BoxDecoration(
+        gradient: widget.backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'タスクに登録',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'メモ内のタスク行をToDoに登録します',
+            style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 12),
+          ...List.generate(widget.tasks.length, (i) {
+            return CheckboxListTile(
+              value: _checked[i],
+              onChanged: (v) => setState(() => _checked[i] = v ?? false),
+              title: Text(widget.tasks[i], style: const TextStyle(fontSize: 15)),
+              activeColor: widget.accentColor,
+              controlAffinity: ListTileControlAffinity.leading,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            );
+          }),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: selectedCount == 0
+                  ? null
+                  : () {
+                      final selected = [
+                        for (int i = 0; i < widget.tasks.length; i++)
+                          if (_checked[i]) widget.tasks[i],
+                      ];
+                      widget.onRegister(selected);
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: widget.accentColor,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text(
+                selectedCount > 0 ? '$selectedCount件を登録する' : '登録する',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
