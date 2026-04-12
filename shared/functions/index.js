@@ -105,6 +105,26 @@ Object.defineProperty(exports, "searchUsers", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "sendFriendRequest", {
+  get: () => require("./const/friendRequest").sendFriendRequest,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "acceptFriendRequest", {
+  get: () => require("./const/friendRequest").acceptFriendRequest,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "rejectFriendRequest", {
+  get: () => require("./const/friendRequest").rejectFriendRequest,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "cancelFriendRequest", {
+  get: () => require("./const/friendRequest").cancelFriendRequest,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

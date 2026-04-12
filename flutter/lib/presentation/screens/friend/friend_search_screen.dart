@@ -304,7 +304,7 @@ class _UserResultCard extends ConsumerWidget {
               onPressed: myUser == null
                   ? null
                   : () async {
-                      await ref
+                      final result = await ref
                           .read(friendControllerProvider.notifier)
                           .sendFriendRequest(
                             toUserId: userId,
@@ -313,8 +313,13 @@ class _UserResultCard extends ConsumerWidget {
                             myEmail: myUser.email,
                           );
                       if (context.mounted) {
+                        final msg = result == 'already_friend'
+                            ? 'すでにフレンドです'
+                            : result == 'already_sent'
+                                ? 'すでに申請済みです'
+                                : 'フレンド申請を送りました';
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('フレンド申請を送りました')),
+                          SnackBar(content: Text(msg)),
                         );
                       }
                     },
@@ -487,7 +492,6 @@ class _QrTabState extends ConsumerState<_QrTab> {
                     myName: myUser?.name ?? '',
                     myEmail: myUser?.email ?? '',
                   );
-
                   if (context.mounted) {
                     setState(() => _showScanner = false);
                     ScaffoldMessenger.of(context).showSnackBar(
