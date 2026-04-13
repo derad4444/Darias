@@ -13,6 +13,7 @@ import '../../../data/models/subscription_model.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/big5_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/character_avatar_widget.dart';
 import '../../../data/services/ad_service.dart';
 
 /// iOS版OptionViewと同じデザインの設定画面
@@ -75,7 +76,10 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(height: 8),
 
                     // ユーザー情報
-                    _UserInfoCard(user: userAsync.valueOrNull),
+                    _UserInfoCard(
+                      user: userAsync.valueOrNull,
+                      userId: ref.watch(currentUserIdProvider) ?? '',
+                    ),
 
                     const SizedBox(height: 8),
 
@@ -571,13 +575,14 @@ class _PremiumUpgradeCard extends StatelessWidget {
 
 /// 設定カード
 /// ユーザー情報カード
-class _UserInfoCard extends StatelessWidget {
+class _UserInfoCard extends ConsumerWidget {
   final dynamic user; // UserModel?
+  final String userId;
 
-  const _UserInfoCard({required this.user});
+  const _UserInfoCard({required this.user, required this.userId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final name = user?.name as String?;
     final email = user?.email as String? ?? '';
 
@@ -594,10 +599,12 @@ class _UserInfoCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 22,
-              backgroundColor: AppColors.textPrimary.withValues(alpha: 0.08),
-              child: Icon(Icons.person, color: AppColors.textSecondary, size: 24),
+            CharacterAvatarWidget(
+              userId: userId,
+              size: 44,
+              fallbackText: '__icon_person__',
+              fallbackBackgroundColor: AppColors.textPrimary.withValues(alpha: 0.08),
+              fallbackTextColor: AppColors.textSecondary,
             ),
             const SizedBox(width: 14),
             Expanded(

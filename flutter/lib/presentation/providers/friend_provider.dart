@@ -162,6 +162,27 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// 保存済み相性診断結果を取得
+  Future<CompatibilityResult?> fetchCompatibilityResult({
+    required String friendId,
+  }) async {
+    if (_userId == null) return null;
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('compatibilityResults')
+          .doc(friendId)
+          .get();
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null) return null;
+      return CompatibilityResult.fromMap(data);
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// 相性診断を実行
   Future<CompatibilityResult?> runCompatibilityDiagnosis({
     required String friendId,

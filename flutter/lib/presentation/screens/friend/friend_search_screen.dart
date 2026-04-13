@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
+import '../../widgets/character_avatar_widget.dart';
 import 'friend_screen.dart' show FriendRequestsSheet;
 
 class FriendSearchScreen extends ConsumerStatefulWidget {
@@ -270,12 +271,12 @@ class _UserResultCard extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: accentColor.withValues(alpha: 0.15),
-            child: Text(
-              name.isNotEmpty ? name[0] : '?',
-              style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
-            ),
+          CharacterAvatarWidget(
+            userId: userId,
+            size: 40,
+            fallbackText: name.isNotEmpty ? name[0] : '?',
+            fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+            fallbackTextColor: accentColor,
           ),
           const SizedBox(width: 12),
           Expanded(

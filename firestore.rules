@@ -5,10 +5,19 @@ service cloud.firestore {
 
     // ユーザー認証が必要な個人データ
     match /users/{userId} {
-      // ユーザー自身のデータのみアクセス可能
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 認証済みユーザーはプロフィール基本情報（name, email, character_id 等）を読み取り可能
+      // ※サブスクリプション等の機密データはサブコレクションで管理されており対象外
+      allow read: if request.auth != null;
 
-      // ユーザーのサブコレクション（予定、日記など）
+      // ユーザー自身は書き込み可能
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // キャラクター詳細（アバター表示用）- 認証済みユーザーが読み取り可能
+      match /characters/{characterId}/details/{detailId} {
+        allow read: if request.auth != null;
+      }
+
+      // ユーザーのサブコレクション（予定、日記など）はユーザー自身のみ
       match /{subcollection=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }

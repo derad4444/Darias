@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../data/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
+import '../../widgets/character_avatar_widget.dart';
 
 class CompatibilityScreen extends ConsumerStatefulWidget {
   final FriendModel friend;
@@ -23,6 +25,7 @@ class CompatibilityScreen extends ConsumerStatefulWidget {
 class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   CompatibilityResult? _result;
   bool _isLoading = false;
+  bool _isInitialLoading = true; // 保存済み結果の読み込み中
   String? _errorMessage;
 
   // アニメーション用
@@ -32,12 +35,36 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   int _messageIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    _loadSavedResult();
+  }
+
+  /// 保存済み結果をFirestoreから取得
+  Future<void> _loadSavedResult() async {
+    final saved = await ref.read(friendControllerProvider.notifier)
+        .fetchCompatibilityResult(friendId: widget.friend.id);
+    if (!mounted) return;
+    if (saved != null) {
+      setState(() {
+        _result = saved;
+        _displayedMessages.addAll(saved.conversation);
+        _showScores = true;
+        _isInitialLoading = false;
+      });
+    } else {
+      setState(() => _isInitialLoading = false);
+    }
+  }
+
+  @override
   void dispose() {
     _messageTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _runDiagnosis() async {
+    _messageTimer?.cancel();
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -91,6 +118,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final userAsync = ref.watch(userDocProvider);
     final myUser = userAsync.valueOrNull;
 
+    final myUserId = ref.watch(currentUserIdProvider) ?? '';
     final myInitial = (myUser?.name ?? '自分').isNotEmpty
         ? (myUser?.name ?? '自分')[0]
         : 'M';
@@ -132,8 +160,14 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _CharacterAvatar(
-                      initial: myInitial,
+                    _LabeledAvatar(
+                      avatar: CharacterAvatarWidget(
+                        userId: myUserId,
+                        size: 64,
+                        fallbackText: myInitial,
+                        fallbackBackgroundColor: accentColor.withValues(alpha: 0.2),
+                        fallbackTextColor: accentColor,
+                      ),
                       label: myUser?.name ?? '自分',
                       color: accentColor,
                     ),
@@ -141,8 +175,14 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Icon(Icons.favorite, color: accentColor.withValues(alpha: 0.6), size: 28),
                     ),
-                    _CharacterAvatar(
-                      initial: friendInitial,
+                    _LabeledAvatar(
+                      avatar: CharacterAvatarWidget(
+                        userId: widget.friend.id,
+                        size: 64,
+                        fallbackText: friendInitial,
+                        fallbackBackgroundColor: Colors.purple.withValues(alpha: 0.2),
+                        fallbackTextColor: Colors.purple,
+                      ),
                       label: widget.friend.name,
                       color: Colors.purple,
                     ),
@@ -152,11 +192,13 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
               // メインコンテンツ
               Expanded(
-                child: _isLoading
-                    ? _buildLoadingView(accentColor)
-                    : _result == null
-                        ? _buildStartView(accentColor, myInitial, friendInitial)
-                        : _buildConversationAndScores(accentColor, myInitial, friendInitial),
+                child: _isInitialLoading
+                    ? Center(child: CircularProgressIndicator(color: accentColor))
+                    : _isLoading
+                        ? _buildLoadingView(accentColor)
+                        : _result == null
+                            ? _buildStartView(accentColor, myInitial, friendInitial)
+                            : _buildConversationAndScores(accentColor, myInitial, friendInitial),
               ),
             ],
           ),
@@ -231,6 +273,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     String myInitial,
     String friendInitial,
   ) {
+    final myUserId = ref.read(currentUserIdProvider) ?? '';
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       children: [
@@ -239,6 +282,8 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
           final msg = entry.value;
           return _MessageBubble(
             message: msg,
+            myUserId: myUserId,
+            friendUserId: widget.friend.id,
             myInitial: myInitial,
             friendInitial: friendInitial,
             accentColor: accentColor,
@@ -298,12 +343,21 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
           ),
           const SizedBox(height: 32),
 
-          // もう一度ボタン
+          // 診断日時と再診断ボタン
+          if (_result?.createdAt != null) ...[
+            Center(
+              child: Text(
+                '前回の診断: ${DateFormat('M月d日 HH:mm').format(_result!.createdAt!)}',
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           Center(
             child: TextButton.icon(
               onPressed: _runDiagnosis,
               icon: Icon(Icons.refresh, color: accentColor),
-              label: Text('もう一度診断する', style: TextStyle(color: accentColor)),
+              label: Text('再診断する', style: TextStyle(color: accentColor)),
             ),
           ),
           const SizedBox(height: 32),
@@ -313,14 +367,14 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   }
 }
 
-/// キャラクターアバター
-class _CharacterAvatar extends StatelessWidget {
-  final String initial;
+/// ラベル付きアバター
+class _LabeledAvatar extends StatelessWidget {
+  final Widget avatar;
   final String label;
   final Color color;
 
-  const _CharacterAvatar({
-    required this.initial,
+  const _LabeledAvatar({
+    required this.avatar,
     required this.label,
     required this.color,
   });
@@ -330,18 +384,7 @@ class _CharacterAvatar extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 32,
-          backgroundColor: color.withValues(alpha: 0.2),
-          child: Text(
-            initial,
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-        ),
+        avatar,
         const SizedBox(height: 6),
         Text(
           label,
@@ -360,12 +403,16 @@ class _CharacterAvatar extends StatelessWidget {
 /// 会話吹き出し
 class _MessageBubble extends StatefulWidget {
   final CompatibilityMessage message;
+  final String myUserId;
+  final String friendUserId;
   final String myInitial;
   final String friendInitial;
   final Color accentColor;
 
   const _MessageBubble({
     required this.message,
+    required this.myUserId,
+    required this.friendUserId,
     required this.myInitial,
     required this.friendInitial,
     required this.accentColor,
@@ -426,17 +473,12 @@ class _MessageBubbleState extends State<_MessageBubble>
                 isMe ? MainAxisAlignment.start : MainAxisAlignment.end,
             children: [
               if (isMe) ...[
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: widget.accentColor.withValues(alpha: 0.2),
-                  child: Text(
-                    widget.myInitial,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: widget.accentColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                CharacterAvatarWidget(
+                  userId: widget.myUserId,
+                  size: 32,
+                  fallbackText: widget.myInitial,
+                  fallbackBackgroundColor: widget.accentColor.withValues(alpha: 0.2),
+                  fallbackTextColor: widget.accentColor,
                 ),
                 const SizedBox(width: 8),
               ],
@@ -461,17 +503,12 @@ class _MessageBubbleState extends State<_MessageBubble>
               ),
               if (!isMe) ...[
                 const SizedBox(width: 8),
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.purple.withValues(alpha: 0.2),
-                  child: Text(
-                    widget.friendInitial,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.purple,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                CharacterAvatarWidget(
+                  userId: widget.friendUserId,
+                  size: 32,
+                  fallbackText: widget.friendInitial,
+                  fallbackBackgroundColor: Colors.purple.withValues(alpha: 0.2),
+                  fallbackTextColor: Colors.purple,
                 ),
               ],
             ],

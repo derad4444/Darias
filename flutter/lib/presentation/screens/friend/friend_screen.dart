@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../../data/models/friend_model.dart';
+import '../../widgets/character_avatar_widget.dart';
 import 'friend_search_screen.dart';
 import 'compatibility_screen.dart';
 import 'friend_share_level_sheet.dart';
@@ -113,17 +114,12 @@ class _FriendCard extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: accentColor.withValues(alpha: 0.15),
-              child: Text(
-                friend.name.isNotEmpty ? friend.name[0] : '?',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
-                ),
-              ),
+            CharacterAvatarWidget(
+              userId: friend.id,
+              size: 48,
+              fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
+              fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+              fallbackTextColor: accentColor,
             ),
             const SizedBox(width: 12),
             Expanded(

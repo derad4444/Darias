@@ -1,5 +1,8 @@
 const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const { admin: adminInstance } = require('./src/utils/firebaseInit');
+
+// admin は遅延初期化済みインスタンスを使用
+const admin = adminInstance;
 
 // .envファイルから環境変数を読み込む
 require('dotenv').config();
@@ -137,12 +140,24 @@ async function verifyReceiptWithApple(receiptData) {
  * サブスクリプション情報を解析
  */
 function parseSubscriptionInfo(latestReceiptInfo, targetTransactionId) {
-  const targetTransaction = latestReceiptInfo.find(
-    transaction => transaction.transaction_id === targetTransactionId
-  );
+  let targetTransaction;
+
+  if (targetTransactionId) {
+    // transaction_id または original_transaction_id で検索
+    targetTransaction = latestReceiptInfo.find(
+      t => t.transaction_id === targetTransactionId
+        || t.original_transaction_id === targetTransactionId,
+    );
+  }
+
+  // 見つからない場合は最新のトランザクションを使用
+  if (!targetTransaction) {
+    targetTransaction = latestReceiptInfo[0];
+    console.log('parseSubscriptionInfo: transactionId not matched, using latest transaction');
+  }
 
   if (!targetTransaction) {
-    throw new Error('Transaction not found in receipt');
+    throw new Error('No transaction found in receipt');
   }
 
   const now = Date.now();
@@ -155,10 +170,11 @@ function parseSubscriptionInfo(latestReceiptInfo, targetTransactionId) {
     start_date: admin.firestore.Timestamp.fromMillis(parseInt(targetTransaction.purchase_date_ms)),
     end_date: admin.firestore.Timestamp.fromMillis(expiresDate),
     payment_method: 'app_store',
-    transaction_id: targetTransactionId,
+    transaction_id: targetTransaction.original_transaction_id || targetTransaction.transaction_id,
+    original_transaction_id: targetTransaction.original_transaction_id || targetTransaction.transaction_id,
     product_id: targetTransaction.product_id,
     auto_renewal: targetTransaction.is_in_intro_offer_period === 'false',
-    updated_at: admin.firestore.Timestamp.now()
+    updated_at: admin.firestore.Timestamp.now(),
   };
 }
 
@@ -366,12 +382,20 @@ exports.appleServerNotification = functions.https.onRequest(async (req, res) => 
       return;
     }
 
-    // originalTransactionId でユーザーを特定
+    // originalTransactionId でユーザーを特定（transaction_id → original_transaction_id の順に検索）
     const db = admin.firestore();
-    const subscriptionSnapshot = await db.collectionGroup('subscription')
+    let subscriptionSnapshot = await db.collectionGroup('subscription')
       .where('transaction_id', '==', originalTransactionId)
       .limit(1)
       .get();
+
+    // transaction_id で見つからない場合は original_transaction_id で検索
+    if (subscriptionSnapshot.empty) {
+      subscriptionSnapshot = await db.collectionGroup('subscription')
+        .where('original_transaction_id', '==', originalTransactionId)
+        .limit(1)
+        .get();
+    }
 
     if (subscriptionSnapshot.empty) {
       console.warn(`appleServerNotification: No user found for txId=${originalTransactionId}`);
@@ -389,9 +413,10 @@ exports.appleServerNotification = functions.https.onRequest(async (req, res) => 
       case 'SUBSCRIBED':
       case 'DID_RENEW': {
         // 購入・更新成功 → プレミアムに
+        // expiresDate は App Store Server Notifications v2 ではミリ秒
         const expiresDateMs = transactionInfo?.expiresDate;
         const endDate = expiresDateMs
-          ? admin.firestore.Timestamp.fromMillis(expiresDateMs)
+          ? admin.firestore.Timestamp.fromMillis(Number(expiresDateMs))
           : null;
         await updateUserSubscription(userId, {
           plan: 'premium',
@@ -399,9 +424,10 @@ exports.appleServerNotification = functions.https.onRequest(async (req, res) => 
           end_date: endDate,
           auto_renewal: true,
           transaction_id: originalTransactionId,
+          original_transaction_id: originalTransactionId,
           updated_at: now,
         });
-        console.log(`appleServerNotification: ${notificationType} → premium userId=${userId}`);
+        console.log(`appleServerNotification: ${notificationType} → premium userId=${userId} end_date=${endDate?.toDate()}`);
         break;
       }
 

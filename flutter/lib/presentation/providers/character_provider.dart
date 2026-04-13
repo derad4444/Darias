@@ -178,6 +178,54 @@ final characterDetailsProvider = StreamProvider<CharacterDetails?>((ref) {
   });
 });
 
+/// 任意のユーザーのキャラクター詳細をFirestoreから取得するプロバイダー
+/// keepAlive: true でアプリ起動中はキャッシュを保持し、再取得を防ぐ
+final userCharacterDetailsProvider =
+    FutureProvider.family<CharacterDetails?, String>((ref, userId) async {
+  ref.keepAlive();
+
+  if (userId.isEmpty) {
+    debugPrint('🎭 userCharacterDetailsProvider: userId is empty, skip');
+    return null;
+  }
+  debugPrint('🎭 userCharacterDetailsProvider: fetching for userId=$userId');
+
+  final firestore = ref.read(firestoreProvider);
+
+  try {
+    // ユーザードキュメントからcharacterIdを取得
+    final userDoc = await firestore.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      debugPrint('🎭 userCharacterDetailsProvider: userDoc not found for $userId');
+      return null;
+    }
+    final characterId = userDoc.data()?['character_id'] as String?;
+    debugPrint('🎭 userCharacterDetailsProvider: characterId=$characterId');
+    if (characterId == null || characterId.isEmpty) return null;
+
+    // キャラクター詳細を取得
+    final detailsDoc = await firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('details')
+        .doc('current')
+        .get();
+
+    if (!detailsDoc.exists || detailsDoc.data() == null) {
+      debugPrint('🎭 userCharacterDetailsProvider: detailsDoc not found');
+      return null;
+    }
+    final details = CharacterDetails.fromMap(detailsDoc.data()!);
+    debugPrint('🎭 userCharacterDetailsProvider: analysisLevel=${details.analysisLevel}, fileName=${details.personalityImageFileName}');
+    return details;
+  } catch (e) {
+    debugPrint('🎭 userCharacterDetailsProvider: error - $e');
+    return null;
+  }
+});
+
 /// キャラクター画像URLのプロバイダー
 final characterImageProvider = FutureProvider<String?>((ref) async {
   final details = ref.watch(characterDetailsProvider).valueOrNull;

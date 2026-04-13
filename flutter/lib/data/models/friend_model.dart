@@ -156,6 +156,7 @@ class CompatibilityResult {
   final String trustComment;
   final String overallComment;
   final List<CompatibilityMessage> conversation;
+  final DateTime? createdAt;
 
   const CompatibilityResult({
     required this.friendshipScore,
@@ -169,12 +170,20 @@ class CompatibilityResult {
     required this.trustComment,
     required this.overallComment,
     required this.conversation,
+    this.createdAt,
   });
 
   factory CompatibilityResult.fromMap(Map<String, dynamic> map) {
     final conv = (map['conversation'] as List<dynamic>? ?? [])
         .map((e) => CompatibilityMessage.fromMap(e as Map<String, dynamic>))
         .toList();
+    DateTime? createdAt;
+    final raw = map['createdAt'];
+    if (raw is Timestamp) {
+      createdAt = raw.toDate();
+    } else if (raw is DateTime) {
+      createdAt = raw;
+    }
     return CompatibilityResult(
       friendshipScore: (map['friendshipScore'] as num?)?.toInt() ?? 0,
       romanceScore: (map['romanceScore'] as num?)?.toInt() ?? 0,
@@ -187,6 +196,7 @@ class CompatibilityResult {
       trustComment: map['trustComment'] as String? ?? '',
       overallComment: map['overallComment'] as String? ?? '',
       conversation: conv,
+      createdAt: createdAt,
     );
   }
 }

@@ -262,6 +262,7 @@ class PurchaseService {
       final callable = _functions.httpsCallable(functionName);
       final result = await callable.call({
         'receiptData': purchase.verificationData.serverVerificationData,
+        'transactionId': purchase.purchaseID,
         'productId': purchase.productID,
       });
 

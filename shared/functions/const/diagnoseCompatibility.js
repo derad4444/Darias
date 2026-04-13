@@ -8,8 +8,10 @@ const {OPENAI_API_KEY} = require("../src/config/config");
 
 const db = getFirestore();
 
-// BIG5スコアを取得
-async function fetchBig5Scores(userId) {
+// ============================================================
+// キャラクター情報（BIG5 + 性別 + 性格）を取得
+// ============================================================
+async function fetchCharacterInfo(userId) {
   try {
     const userDoc = await db.collection("users").doc(userId).get();
     const userData = userDoc.data();
@@ -30,56 +32,97 @@ async function fetchBig5Scores(userId) {
     const scores = detail["confirmedBig5Scores"];
     if (!scores) return null;
 
+    const gender = detail["gender"] ?? userData["characterGender"] ?? "女性";
+    const personalityKey = detail["personalityKey"] ?? "";
+
     return {
       openness: scores.openness ?? 3,
       conscientiousness: scores.conscientiousness ?? 3,
       extraversion: scores.extraversion ?? 3,
       agreeableness: scores.agreeableness ?? 3,
       neuroticism: scores.neuroticism ?? 3,
-      answeredCount: detail["answeredCount"] ?? 0,
       name: userData["name"] ?? "あなた",
+      gender,
+      personalityKey,
     };
   } catch (e) {
-    console.warn("fetchBig5Scores error:", e.message);
+    console.warn("fetchCharacterInfo error:", e.message);
     return null;
   }
 }
 
-// スコア差から相性値（0〜100）を計算
-function calcSimilarity(a, b, invert = false) {
-  const diff = Math.abs(a - b);
-  const similarity = Math.max(0, 100 - diff * 20);
-  return invert ? 100 - similarity : similarity;
+// ============================================================
+// 性別 + BIG5から口調の説明を生成
+// ============================================================
+function buildSpeechStyle(info) {
+  const isFemale = info.gender === "女性";
+  const e = info.extraversion; // 外向性
+  const a = info.agreeableness; // 協調性
+  const n = info.neuroticism; // 神経症傾向
+  const o = info.openness; // 開放性
+  const c = info.conscientiousness; // 誠実性
+
+  const pronoun = isFemale ? "私" : (e >= 4 ? "俺" : "僕");
+  let tone = "";
+
+  if (isFemale) {
+    if (e >= 4) tone = "明るく社交的で、語尾に「〜だよ」「〜ね」「〜かな」を使う元気な女の子";
+    else if (e <= 2) tone = "おっとりしていて、「〜かな」「〜ね」「〜だと思う」など落ち着いた口調の女の子";
+    else tone = "自然体で「〜だよ」「〜ね」「〜かな」をバランスよく使う女の子";
+  } else {
+    if (e >= 4) tone = `ハキハキしていて「${pronoun}はさ」「〜だよな」「〜じゃん」など活発な男の子`;
+    else if (e <= 2) tone = `控えめで「〜だと思う」「〜かな」「〜だね」など落ち着いた口調の男の子`;
+    else tone = `「〜だね」「〜かな」「${pronoun}は〜」など普通の口調の男の子`;
+  }
+
+  // 協調性が高い → 相手を立てる言い回し
+  if (a >= 4) tone += "。相手を気遣う優しい表現を好む";
+  // 神経症傾向が高い → 少し不安がり
+  if (n >= 4) tone += "。少し心配性で感情豊かな面がある";
+  // 開放性が高い → 好奇心旺盛
+  if (o >= 4) tone += "。好奇心旺盛で新しいことに興味を示す";
+  // 誠実性が高い → 丁寧な言い方
+  if (c >= 4) tone += "。物事をしっかり考えてから話す";
+
+  return `一人称:「${pronoun}」、口調:${tone}`;
 }
 
+// ============================================================
 // ジャンル別スコア計算
+// ============================================================
+function calcSimilarity(a, b) {
+  const diff = Math.abs(a - b);
+  return Math.max(0, 100 - diff * 20);
+}
+
 function calcGenreScores(my, friend) {
-  // 友情: 外向性の近さ + 協調性の高さ
+  // 友情: 外向性の近さ + 協調性の高さ + 感情の安定さ
   const friendship = Math.round(
-      (calcSimilarity(my.extraversion, friend.extraversion) * 0.4 +
-      calcSimilarity(my.agreeableness, friend.agreeableness) * 0.4 +
-      (100 - Math.abs(my.neuroticism - friend.neuroticism) * 15) * 0.2),
+      calcSimilarity(my.extraversion, friend.extraversion) * 0.4 +
+      (my.agreeableness + friend.agreeableness) / 2 * 20 * 0.4 +
+      (100 - Math.abs(my.neuroticism - friend.neuroticism) * 15) * 0.2,
   );
 
-  // 恋愛: 神経症傾向の安定さ + 協調性 + 外向性の適度な差
-  const romanceDiff = Math.abs(my.extraversion - friend.extraversion);
-  const romanceExtra = romanceDiff > 1.5 ? 70 : 85; // 少し違うほうが刺激的
-  const romance = Math.round(
-      (calcSimilarity(my.neuroticism, friend.neuroticism) * 0.35 +
+  // 恋愛: スコアを抑えめに（最大85%程度）+ 感情安定 + 協調性
+  // 「相性が良い可能性」程度の表現にとどめる
+  const romanceBase = Math.round(
+      calcSimilarity(my.neuroticism, friend.neuroticism) * 0.4 +
       (my.agreeableness + friend.agreeableness) / 2 * 20 * 0.35 +
-      romanceExtra * 0.3),
+      calcSimilarity(my.openness, friend.openness) * 0.25,
   );
+  const romance = Math.min(82, Math.max(20, romanceBase)); // 上限82%でロマンチックになりすぎを防ぐ
 
   // 仕事: 誠実性の高さ + 開放性の近さ
   const work = Math.round(
-      ((my.conscientiousness + friend.conscientiousness) / 2 * 20 * 0.5 +
-      calcSimilarity(my.openness, friend.openness) * 0.5),
+      (my.conscientiousness + friend.conscientiousness) / 2 * 20 * 0.5 +
+      calcSimilarity(my.openness, friend.openness) * 0.5,
   );
 
-  // 信頼: 協調性 + 神経症傾向の低さ
+  // 信頼: 協調性 + 神経症傾向の低さ + 誠実性
   const trust = Math.round(
-      ((my.agreeableness + friend.agreeableness) / 2 * 20 * 0.5 +
-      (100 - (my.neuroticism + friend.neuroticism) / 2 * 15) * 0.5),
+      (my.agreeableness + friend.agreeableness) / 2 * 20 * 0.4 +
+      (100 - (my.neuroticism + friend.neuroticism) / 2 * 15) * 0.35 +
+      (my.conscientiousness + friend.conscientiousness) / 2 * 20 * 0.25,
   );
 
   const overall = Math.round((friendship + romance + work + trust) / 4);
@@ -93,6 +136,9 @@ function calcGenreScores(my, friend) {
   };
 }
 
+// ============================================================
+// Cloud Function本体
+// ============================================================
 exports.diagnoseCompatibility = onCall(
     {
       region: "asia-northeast1",
@@ -103,69 +149,67 @@ exports.diagnoseCompatibility = onCall(
     },
     async (request) => {
       const {data} = request;
-      const {userId, friendId, myCharacterId} = data;
+      const {userId, friendId} = data;
 
       if (!userId || !friendId) {
         return {error: "Missing userId or friendId"};
       }
 
-      // 双方のBIG5スコアを取得
-      const [myScores, friendScores] = await Promise.all([
-        fetchBig5Scores(userId),
-        fetchBig5Scores(friendId),
+      // 双方のキャラクター情報を取得
+      const [myInfo, friendInfo] = await Promise.all([
+        fetchCharacterInfo(userId),
+        fetchCharacterInfo(friendId),
       ]);
 
-      if (!myScores || !friendScores) {
+      if (!myInfo || !friendInfo) {
         return {error: "BIG5データが不足しています"};
       }
 
-      // ジャンル別スコア計算
-      const scores = calcGenreScores(myScores, friendScores);
+      // スコア計算
+      const scores = calcGenreScores(myInfo, friendInfo);
 
-      // GPTでキャラクター会話 + コメント生成
-      const systemPrompt = `あなたはキャラクター同士の相性診断の会話を生成するAIです。
-2人のキャラクター（${myScores.name}と${friendScores.name}）がBIG5性格診断の結果をもとに、
-相性について会話しています。会話は6〜8ターン程度、自然でフレンドリーな口調で生成してください。
-また、ジャンルごとの一言コメントも生成してください。
+      // 口調スタイル
+      const mySpeech = buildSpeechStyle(myInfo);
+      const friendSpeech = buildSpeechStyle(friendInfo);
 
-形式は必ずJSON形式で返してください:
+      // GPT会話・コメント生成
+      const systemPrompt = `あなたは2人のキャラクター同士の相性診断会話を生成するAIです。
+
+【重要なルール】
+- 会話は6〜8ターン（交互に話す）
+- 各キャラクターは指定された口調・一人称を必ず守る
+- 恋愛については「もしかしたら相性が良いかも」程度に留め、過度にロマンチックな表現は避ける
+- 現実的で自然な友人同士の会話として生成する
+- 各ジャンルのコメントは具体的で、30文字以内の短文
+- 恋愛コメントは「〜かもしれない」「〜の可能性がある」など可能性の表現にする
+
+必ずJSON形式で返してください:
 {
   "conversation": [
     {"isMyCharacter": true, "text": "..."},
-    {"isMyCharacter": false, "text": "..."},
-    ...
+    {"isMyCharacter": false, "text": "..."}
   ],
-  "friendshipComment": "友情についての一言（30文字以内）",
-  "romanceComment": "恋愛についての一言（30文字以内）",
-  "workComment": "仕事についての一言（30文字以内）",
-  "trustComment": "信頼についての一言（30文字以内）",
-  "overallComment": "総合コメント（50文字以内）"
+  "friendshipComment": "友情の一言（30文字以内）",
+  "romanceComment": "恋愛可能性の一言（30文字以内・控えめに）",
+  "workComment": "仕事相性の一言（30文字以内）",
+  "trustComment": "信頼関係の一言（30文字以内）",
+  "overallComment": "総合まとめ（50文字以内）"
 }`;
 
       const userPrompt = `
-【${myScores.name}（自分）のBIG5スコア】
-- 開放性: ${myScores.openness}/5
-- 誠実性: ${myScores.conscientiousness}/5
-- 外向性: ${myScores.extraversion}/5
-- 協調性: ${myScores.agreeableness}/5
-- 神経症傾向: ${myScores.neuroticism}/5
+【${myInfo.name}のキャラクター設定】
+${mySpeech}
+BIG5: 開放性${myInfo.openness} 誠実性${myInfo.conscientiousness} 外向性${myInfo.extraversion} 協調性${myInfo.agreeableness} 神経症${myInfo.neuroticism}
 
-【${friendScores.name}のBIG5スコア】
-- 開放性: ${friendScores.openness}/5
-- 誠実性: ${friendScores.conscientiousness}/5
-- 外向性: ${friendScores.extraversion}/5
-- 協調性: ${friendScores.agreeableness}/5
-- 神経症傾向: ${friendScores.neuroticism}/5
+【${friendInfo.name}のキャラクター設定】
+${friendSpeech}
+BIG5: 開放性${friendInfo.openness} 誠実性${friendInfo.conscientiousness} 外向性${friendInfo.extraversion} 協調性${friendInfo.agreeableness} 神経症${friendInfo.neuroticism}
 
 【相性スコア（参考）】
-- 友情: ${scores.friendship}%
-- 恋愛: ${scores.romance}%
-- 仕事: ${scores.work}%
-- 信頼: ${scores.trust}%
-- 総合: ${scores.overall}%
+友情:${scores.friendship}% / 恋愛:${scores.romance}% / 仕事:${scores.work}% / 信頼:${scores.trust}% / 総合:${scores.overall}%
 
-キャラクター同士がこの相性結果を語り合う会話と、各ジャンルのコメントを生成してください。
-`;
+この2人が相性診断の結果を自然に語り合う会話を生成してください。
+恋愛については軽く触れる程度にし、友情・信頼・仕事の話題を中心にしてください。`;
 
       const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 
@@ -179,33 +223,31 @@ exports.diagnoseCompatibility = onCall(
                 {role: "system", content: systemPrompt},
                 {role: "user", content: userPrompt},
               ],
-              temperature: 0.8,
+              temperature: 0.75,
               max_tokens: 1200,
               response_format: {type: "json_object"},
             },
         );
-
         const raw = completion?.choices?.[0]?.message?.content?.trim() ?? "{}";
         gptResult = JSON.parse(raw);
       } catch (e) {
         console.warn("GPT error:", e.message);
-        // フォールバック
         gptResult = {
           conversation: [
-            {isMyCharacter: true, text: `${friendScores.name}、相性を診断してみたよ！`},
-            {isMyCharacter: false, text: `わあ、気になる！どんな結果だった？`},
-            {isMyCharacter: true, text: `総合${scores.overall}%だって。なかなかいい感じだね`},
-            {isMyCharacter: false, text: `それは嬉しい！これからも仲良くしようね`},
+            {isMyCharacter: true, text: `${friendInfo.name}、相性診断してみたよ`},
+            {isMyCharacter: false, text: `どうだった？気になる`},
+            {isMyCharacter: true, text: `総合${scores.overall}%だって！なかなかいい感じだと思う`},
+            {isMyCharacter: false, text: `それは嬉しいね、これからも仲良くしよう`},
           ],
           friendshipComment: "気を使わない関係が築けそう",
-          romanceComment: "お互いを高め合える関係",
+          romanceComment: "相性が良い可能性はありそう",
           workComment: "役割分担が自然にできるコンビ",
           trustComment: "何でも話せる信頼関係",
           overallComment: "一緒にいると自然体でいられる関係です",
         };
       }
 
-      return {
+      const resultData = {
         friendshipScore: scores.friendship,
         romanceScore: scores.romance,
         workScore: scores.work,
@@ -217,6 +259,27 @@ exports.diagnoseCompatibility = onCall(
         trustComment: gptResult.trustComment ?? "",
         overallComment: gptResult.overallComment ?? "",
         conversation: gptResult.conversation ?? [],
+        createdAt: new Date(),
       };
+
+      // 結果をFirestoreに保存（両方向）
+      try {
+        const batch = db.batch();
+        batch.set(
+            db.collection("users").doc(userId)
+                .collection("compatibilityResults").doc(friendId),
+            resultData,
+        );
+        batch.set(
+            db.collection("users").doc(friendId)
+                .collection("compatibilityResults").doc(userId),
+            resultData,
+        );
+        await batch.commit();
+      } catch (e) {
+        console.warn("Save result error:", e.message);
+      }
+
+      return resultData;
     },
 );
