@@ -70,7 +70,7 @@ class DraggableFabStack extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.add, color: Colors.white),
+                    child: const Icon(Icons.menu, color: Colors.white),
                   ),
                 ),
               ),

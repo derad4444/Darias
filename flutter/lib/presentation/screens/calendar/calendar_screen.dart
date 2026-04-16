@@ -1,16 +1,20 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/models/schedule_model.dart';
+import '../../../data/models/shared_schedule_model.dart';
 import '../../../data/models/holiday_model.dart';
 import '../../../data/models/diary_model.dart';
 import '../../providers/calendar_provider.dart';
+import '../../providers/friend_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../widgets/draggable_fab.dart';
+import '../../widgets/character_avatar_widget.dart';
 import 'schedule_detail_screen.dart' show RecurringEditMode;
 import '../settings/tag_management_screen.dart' show tagsProvider, TagItem;
 import '../../widgets/ads/banner_ad_widget.dart';
@@ -66,13 +70,86 @@ class CalendarScreen extends ConsumerStatefulWidget {
   ConsumerState<CalendarScreen> createState() => _CalendarScreenState();
 }
 
-class _CalendarScreenState extends ConsumerState<CalendarScreen> {
+class _CalendarScreenState extends ConsumerState<CalendarScreen>
+    with WidgetsBindingObserver {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _friendRefreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // フレンド予定を30秒ごとに自動更新（クロスデバイス変更に対応）
+    _friendRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) ref.read(friendScheduleRefreshProvider.notifier).state++;
+    });
+  }
 
   @override
   void dispose() {
+    _friendRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// アプリがフォアグラウンドに戻ったらフレンド予定を再フェッチ
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(friendScheduleRefreshProvider.notifier).state++;
+    }
+  }
+
+  /// カレンダーメニューを表示（予定追加 / フレンド設定）
+  void _showCalendarMenu(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime? selectedDay,
+    Color accentColor,
+    Color textColor,
+    Gradient backgroundGradient,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final screenHeight = MediaQuery.of(sheetCtx).size.height;
+        return SizedBox(
+          height: screenHeight * 0.95,
+          child: _CalendarMenuSheet(
+            accentColor: accentColor,
+            backgroundGradient: backgroundGradient,
+            onAddSchedule: () {
+              Navigator.pop(context);
+              context.push('/calendar/detail', extra: {
+                'schedule': null,
+                'initialDate': selectedDay,
+              });
+            },
+            onFriendSettings: () {
+              Navigator.pop(context);
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (sheetCtx2) {
+                  final h = MediaQuery.of(sheetCtx2).size.height;
+                  return SizedBox(
+                    height: h * 0.95,
+                    child: _FriendScheduleSettingsSheet(
+                      accentColor: accentColor,
+                      backgroundGradient: backgroundGradient,
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        );
+      },
+    );
   }
 
   /// iOS版と同様のボトムシートを表示
@@ -83,6 +160,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     Color accentColor,
     Color textColor,
   ) {
+    // ボトムシートを開くタイミングでフレンド予定を即時リフレッシュ
+    ref.read(friendScheduleRefreshProvider.notifier).state++;
     final backgroundGradient = ref.read(backgroundGradientProvider);
 
     showModalBottomSheet(
@@ -137,13 +216,16 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final monthlyCommentAsync = ref.watch(monthlyCommentProvider(selectedMonth));
     final holidays = ref.watch(holidaysProvider);
 
+    // フレンドの月別スケジュール（選択中フレンドのみ）
+    final friendSchedulesAsync = ref.watch(selectedFriendSchedulesForMonthProvider(selectedMonth));
+    final friendSchedules = friendSchedulesAsync.valueOrNull ?? [];
+
     return Scaffold(
       body: DraggableFabStack(
         visible: !isSearchMode,
-        onTap: () => context.push('/calendar/detail', extra: {
-          'schedule': null,
-          'initialDate': selectedDay,
-        }),
+        onTap: () => _showCalendarMenu(
+          context, ref, selectedDay, accentColor, textColor, backgroundGradient,
+        ),
         accentColor: accentColor,
         child: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
@@ -220,6 +302,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
                           month: selectedMonth,
                           selectedDay: selectedDay,
                           schedules: schedules,
+                          friendSchedules: friendSchedules,
                           holidays: holidays,
                           accentColor: accentColor,
                           textColor: textColor,
@@ -1071,6 +1154,7 @@ class _CalendarGrid extends ConsumerWidget {
   final DateTime month;
   final DateTime? selectedDay;
   final List<ScheduleModel> schedules;
+  final List<SharedScheduleModel> friendSchedules;
   final List<HolidayModel> holidays;
   final Color accentColor;
   final Color textColor;
@@ -1080,6 +1164,7 @@ class _CalendarGrid extends ConsumerWidget {
     required this.month,
     required this.selectedDay,
     required this.schedules,
+    this.friendSchedules = const [],
     required this.holidays,
     required this.accentColor,
     required this.textColor,
@@ -1089,6 +1174,16 @@ class _CalendarGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tags = ref.watch(tagsProvider);
+    // 自分の予定 + フレンドの予定を統合（グリッド表示用）
+    final allSchedules = [
+      ...schedules,
+      ...friendSchedules.map((ss) => ss.schedule),
+    ];
+    // フレンドスケジュールのタグ色マップ（scheduleId → Color）
+    final friendColorMap = <String, Color>{
+      for (final ss in friendSchedules)
+        if (ss.tagColor != null) ss.schedule.id: ss.tagColor!,
+    };
     return Column(
       children: [
         // 曜日ヘッダー（固定）
@@ -1096,7 +1191,7 @@ class _CalendarGrid extends ConsumerWidget {
         const SizedBox(height: 4),
         // 日付グリッド
         Expanded(
-          child: _buildDaysGrid(tags),
+          child: _buildDaysGrid(tags, allSchedules, friendColorMap),
         ),
       ],
     );
@@ -1129,10 +1224,9 @@ class _CalendarGrid extends ConsumerWidget {
     );
   }
 
-  Widget _buildDaysGrid(List<TagItem> tags) {
+  Widget _buildDaysGrid(List<TagItem> tags, List<ScheduleModel> allSchedules, [Map<String, Color> friendColorMap = const {}]) {
     final firstDay = DateTime(month.year, month.month, 1);
     final lastDay = DateTime(month.year, month.month + 1, 0);
-    final daysInMonth = lastDay.day;
     final firstWeekday = firstDay.weekday % 7; // 0=日曜始まり
     final today = DateTime.now();
 
@@ -1166,8 +1260,8 @@ class _CalendarGrid extends ConsumerWidget {
             final weekStart = gridDate(week, 0);
             final weekEnd = gridDate(week, 6);
 
-            // この週と重なる複数日予定
-            final multiDaySchedules = schedules.where((s) {
+            // この週と重なる複数日予定（自分＋フレンド統合）
+            final multiDaySchedules = allSchedules.where((s) {
               final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
               final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
               return sd != ed && !ed.isBefore(weekStart) && !sd.isAfter(weekEnd);
@@ -1182,7 +1276,7 @@ class _CalendarGrid extends ConsumerWidget {
               final date = gridDate(week, wd);
               final outsideMonth = !isInMonth(date);
               final dateOnly = DateTime(date.year, date.month, date.day);
-              final singleDaySchedules = schedules.where((s) {
+              final singleDaySchedules = allSchedules.where((s) {
                 final sd = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
                 final ed = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
                 return sd == ed && sd == dateOnly;
@@ -1207,6 +1301,7 @@ class _CalendarGrid extends ConsumerWidget {
                   accentColor: accentColor,
                   textColor: textColor,
                   tags: tags,
+                  friendColorMap: friendColorMap,
                   dateCircleSize: dateCircleSize,
                   itemFontSize: itemFontSize,
                   scheduleAreaHeight: scheduleAreaHeight,
@@ -1243,7 +1338,7 @@ class _CalendarGrid extends ConsumerWidget {
                   onTap: () => onDaySelected(sd.isBefore(weekStart) ? weekStart : sd),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: _resolveTagColor(schedule.tag, tags, accentColor).withValues(alpha: 0.8),
+                      color: (friendColorMap[schedule.id] ?? _resolveTagColor(schedule.tag, tags, accentColor)).withValues(alpha: 0.8),
                       borderRadius: BorderRadius.only(
                         topLeft: isVisualStart ? r : Radius.zero,
                         bottomLeft: isVisualStart ? r : Radius.zero,
@@ -1304,6 +1399,7 @@ class _CalendarDayCell extends StatelessWidget {
   final Color accentColor;
   final Color textColor;
   final List<TagItem> tags;
+  final Map<String, Color> friendColorMap;
   final double dateCircleSize;
   final double itemFontSize;
   final double scheduleAreaHeight;
@@ -1320,6 +1416,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.accentColor,
     required this.textColor,
     required this.tags,
+    this.friendColorMap = const {},
     required this.dateCircleSize,
     required this.itemFontSize,
     required this.scheduleAreaHeight,
@@ -1445,7 +1542,7 @@ class _CalendarDayCell extends StatelessWidget {
         height: itemH,
         child: _ScheduleBar(
           title: schedule.title,
-          color: _resolveTagColor(schedule.tag, tags, accentColor),
+          color: friendColorMap[schedule.id] ?? _resolveTagColor(schedule.tag, tags, accentColor),
           isHoliday: false,
           isAllDay: schedule.isAllDay,
           fontSize: fontSize,
@@ -2015,10 +2112,12 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
   @override
   Widget build(BuildContext context) {
     final schedules = ref.watch(daySchedulesProvider(_currentDay));
+    final friendSchedules = ref.watch(friendDaySchedulesProvider(_currentDay));
     final holiday = ref.watch(holidayForDateProvider(_currentDay));
     final diary = ref.watch(diaryForDateProvider(_currentDay));
     final hasDiary = diary != null;
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
+    final hasAnySchedules = schedules.isNotEmpty || friendSchedules.isNotEmpty;
 
     return GestureDetector(
       onHorizontalDragEnd: (details) {
@@ -2162,7 +2261,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
 
                           // 予定リスト（終日 / 時間指定で分けて表示）
                           Expanded(
-                            child: schedules.isEmpty
+                            child: !hasAnySchedules
                                 ? Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Text(
@@ -2173,7 +2272,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                                       ),
                                     ),
                                   )
-                                : _buildBottomSheetScheduleList(context, schedules),
+                                : _buildBottomSheetScheduleList(context, schedules, friendSchedules),
                           ),
                         ],
                       ),
@@ -2193,13 +2292,23 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
     );
   }
 
-  Widget _buildBottomSheetScheduleList(BuildContext context, List<ScheduleModel> schedules) {
+  Widget _buildBottomSheetScheduleList(
+    BuildContext context,
+    List<ScheduleModel> schedules,
+    List<SharedScheduleModel> friendSchedules,
+  ) {
     final allDaySchedules = schedules.where((s) => s.isAllDay).toList();
     final timedSchedules = schedules.where((s) => !s.isAllDay).toList()
       ..sort((a, b) => a.startDate.compareTo(b.startDate));
-    final showHeaders = allDaySchedules.isNotEmpty && timedSchedules.isNotEmpty;
+    final friendAllDay = friendSchedules.where((ss) => ss.schedule.isAllDay).toList();
+    final friendTimed = friendSchedules.where((ss) => !ss.schedule.isAllDay).toList()
+      ..sort((a, b) => a.schedule.startDate.compareTo(b.schedule.startDate));
 
-    Widget buildRow(ScheduleModel schedule) => _BottomSheetScheduleRow(
+    final hasAllDay = allDaySchedules.isNotEmpty || friendAllDay.isNotEmpty;
+    final hasTimed = timedSchedules.isNotEmpty || friendTimed.isNotEmpty;
+    final showHeaders = hasAllDay && hasTimed;
+
+    Widget buildMyRow(ScheduleModel schedule) => _BottomSheetScheduleRow(
       schedule: schedule,
       accentColor: widget.accentColor,
       textColor: widget.textColor,
@@ -2214,18 +2323,47 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
       },
     );
 
+    Widget buildFriendRow(SharedScheduleModel ss) => _FriendBottomSheetScheduleRow(
+      sharedSchedule: ss,
+      accentColor: widget.accentColor,
+      textColor: widget.textColor,
+      onTap: () => _showFriendScheduleDetail(context, ss),
+    );
+
     return ListView(
       padding: EdgeInsets.zero,
       children: [
-        if (allDaySchedules.isNotEmpty) ...[
+        if (hasAllDay) ...[
           if (showHeaders) _SectionHeader(label: '終日', textColor: widget.textColor),
-          ...allDaySchedules.map(buildRow),
+          ...allDaySchedules.map(buildMyRow),
+          ...friendAllDay.map(buildFriendRow),
         ],
-        if (timedSchedules.isNotEmpty) ...[
+        if (hasTimed) ...[
           if (showHeaders) _SectionHeader(label: '時間指定', textColor: widget.textColor),
-          ...timedSchedules.map(buildRow),
+          ...timedSchedules.map(buildMyRow),
+          ...friendTimed.map(buildFriendRow),
         ],
       ],
+    );
+  }
+
+  void _showFriendScheduleDetail(BuildContext context, SharedScheduleModel ss) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        final screenHeight = MediaQuery.of(sheetCtx).size.height;
+        return SizedBox(
+          height: screenHeight * 0.95,
+          child: _FriendScheduleDetailSheet(
+            sharedSchedule: ss,
+            accentColor: widget.accentColor,
+            textColor: widget.textColor,
+            backgroundGradient: widget.backgroundGradient,
+          ),
+        );
+      },
     );
   }
 }
@@ -2269,7 +2407,7 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
             // コンテンツ
             Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     schedule.title,
@@ -2280,13 +2418,12 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 2),
                   Text(
                     schedule.isAllDay
                         ? '終日'
-                        : '${schedule.startDate.hour.toString().padLeft(2, '0')}:${schedule.startDate.minute.toString().padLeft(2, '0')}',
+                        : '${schedule.startDate.hour.toString().padLeft(2, '0')}:${schedule.startDate.minute.toString().padLeft(2, '0')} 〜 ${schedule.endDate.hour.toString().padLeft(2, '0')}:${schedule.endDate.minute.toString().padLeft(2, '0')}',
                     style: TextStyle(
                       fontSize: 12,
                       color: textColor.withValues(alpha: 0.6),
@@ -2303,6 +2440,540 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
               size: 20,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// フレンド予定行（ボトムシート内）
+// ============================================================
+class _FriendBottomSheetScheduleRow extends ConsumerWidget {
+  final SharedScheduleModel sharedSchedule;
+  final Color accentColor;
+  final Color textColor;
+  final VoidCallback onTap;
+
+  const _FriendBottomSheetScheduleRow({
+    required this.sharedSchedule,
+    required this.accentColor,
+    required this.textColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final schedule = sharedSchedule.schedule;
+    final tags = ref.watch(tagsProvider);
+    // フレンド側のタグ色を優先、なければ自分のタグ一覧で解決
+    final scheduleColor = sharedSchedule.tagColor ?? _resolveTagColor(schedule.tag, tags, accentColor);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            // カラーバー
+            Container(
+              width: 3,
+              height: 42,
+              decoration: BoxDecoration(
+                color: scheduleColor,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // コンテンツ
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    schedule.title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                      color: textColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    schedule.isAllDay
+                        ? '終日'
+                        : '${schedule.startDate.hour.toString().padLeft(2, '0')}:${schedule.startDate.minute.toString().padLeft(2, '0')} 〜 ${schedule.endDate.hour.toString().padLeft(2, '0')}:${schedule.endDate.minute.toString().padLeft(2, '0')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: textColor.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  // フレンド名（小さく表示）
+                  Text(
+                    '${sharedSchedule.ownerName}さん',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: textColor.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 詳細アイコン
+            Icon(
+              Icons.info_outline,
+              color: textColor.withValues(alpha: 0.4),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// フレンド予定 詳細シート（読み取り専用）
+// ============================================================
+class _FriendScheduleDetailSheet extends ConsumerWidget {
+  final SharedScheduleModel sharedSchedule;
+  final Color accentColor;
+  final Color textColor;
+  final Gradient backgroundGradient;
+
+  const _FriendScheduleDetailSheet({
+    required this.sharedSchedule,
+    required this.accentColor,
+    required this.textColor,
+    required this.backgroundGradient,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final schedule = sharedSchedule.schedule;
+    final tags = ref.watch(tagsProvider);
+    // フレンド側のタグ色を優先、なければ自分のタグ一覧で解決
+    final scheduleColor = sharedSchedule.tagColor ?? _resolveTagColor(schedule.tag, tags, accentColor);
+
+    String formatDateTime(DateTime dt, bool isAllDay) {
+      if (isAllDay) {
+        return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')}';
+      }
+      return '${dt.year}/${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} '
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
+
+    final startStr = formatDateTime(schedule.startDate, schedule.isAllDay);
+    final endStr = formatDateTime(schedule.endDate, schedule.isAllDay);
+    final isSameDay = schedule.startDate.year == schedule.endDate.year &&
+        schedule.startDate.month == schedule.endDate.month &&
+        schedule.startDate.day == schedule.endDate.day;
+    final dateStr = isSameDay ? startStr : '$startStr 〜 $endStr';
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          // ハンドル
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // フレンド名バッジ
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: accentColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              '${sharedSchedule.ownerName}さんの予定',
+              style: TextStyle(fontSize: 12, color: accentColor, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // タイトル
+          Row(
+            children: [
+              Container(
+                width: 4, height: 32,
+                decoration: BoxDecoration(
+                  color: scheduleColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  schedule.title,
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              if (!schedule.isPublic)
+                Icon(Icons.lock, size: 16, color: textColor.withValues(alpha: 0.5)),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 日時
+          _DetailRow(
+            icon: Icons.access_time,
+            text: schedule.isAllDay ? '終日  $dateStr' : dateStr,
+            textColor: textColor,
+          ),
+
+          // タグ
+          if (schedule.tag.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DetailRow(
+              icon: Icons.label_outline,
+              text: schedule.tag,
+              textColor: textColor,
+              iconColor: scheduleColor,
+            ),
+          ],
+
+          // 場所
+          if (schedule.location.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DetailRow(
+              icon: Icons.location_on_outlined,
+              text: schedule.location,
+              textColor: textColor,
+            ),
+          ],
+
+          // メモ
+          if (schedule.memo.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            _DetailRow(
+              icon: Icons.notes,
+              text: schedule.memo,
+              textColor: textColor,
+              maxLines: 5,
+            ),
+          ],
+        ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color textColor;
+  final Color? iconColor;
+  final int maxLines;
+
+  const _DetailRow({
+    required this.icon,
+    required this.text,
+    required this.textColor,
+    this.iconColor,
+    this.maxLines = 2,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: iconColor ?? textColor.withValues(alpha: 0.6)),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontSize: 14, color: textColor),
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ============================================================
+// カレンダーメニューシート（予定追加 / フレンド設定）
+// ============================================================
+class _CalendarMenuSheet extends StatelessWidget {
+  final Color accentColor;
+  final Gradient backgroundGradient;
+  final VoidCallback onAddSchedule;
+  final VoidCallback onFriendSettings;
+
+  const _CalendarMenuSheet({
+    required this.accentColor,
+    required this.backgroundGradient,
+    required this.onAddSchedule,
+    required this.onFriendSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ハンドル
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // 予定を追加
+            _MenuOption(
+              icon: Icons.add_circle_outline,
+              label: '予定を追加',
+              accentColor: accentColor,
+              onTap: onAddSchedule,
+            ),
+            const SizedBox(height: 12),
+
+            // フレンド予定の設定
+            _MenuOption(
+              icon: Icons.people_outline,
+              label: 'フレンド予定の設定',
+              accentColor: accentColor,
+              onTap: onFriendSettings,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  const _MenuOption({
+    required this.icon,
+    required this.label,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.8),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: accentColor, size: 22),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.black87,
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.chevron_right, color: Colors.black26, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================
+// フレンド予定表示設定シート
+// ============================================================
+class _FriendScheduleSettingsSheet extends ConsumerWidget {
+  final Color accentColor;
+  final Gradient backgroundGradient;
+
+  const _FriendScheduleSettingsSheet({
+    required this.accentColor,
+    required this.backgroundGradient,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final friendsAsync = ref.watch(friendsProvider);
+    final selectedIds = ref.watch(selectedFriendIdsProvider);
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+          // ハンドル
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Text(
+                'フレンド予定の表示設定',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
+              ),
+              const Spacer(),
+              // すべて選択 / 全解除ボタン
+              friendsAsync.when(
+                data: (friends) {
+                  final allIds = friends.map((f) => f.id).toSet();
+                  final isAllSelected = allIds.isNotEmpty && allIds.every((id) => selectedIds.contains(id));
+                  return GestureDetector(
+                    onTap: () {
+                      if (isAllSelected) {
+                        ref.read(selectedFriendIdsProvider.notifier).update({});
+                      } else {
+                        ref.read(selectedFriendIdsProvider.notifier).update(Set.from(allIds));
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isAllSelected ? '全解除' : 'すべて選択',
+                        style: TextStyle(fontSize: 13, color: accentColor, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  );
+                },
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          Text(
+            '相手の共有設定がOFFの場合は表示されません',
+            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+          ),
+          const SizedBox(height: 16),
+
+          // フレンドリスト
+          friendsAsync.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Text('エラー: $e'),
+            data: (friends) {
+              if (friends.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'フレンドがいません',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                );
+              }
+              return Column(
+                children: friends.map((friend) {
+                  final isSelected = selectedIds.contains(friend.id);
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        CharacterAvatarWidget(
+                          userId: friend.id,
+                          size: 36,
+                          fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
+                          fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+                          fallbackTextColor: accentColor,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            friend.name,
+                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        Switch(
+                          value: isSelected,
+                          activeColor: accentColor,
+                          onChanged: (value) {
+                            final current = Set<String>.from(selectedIds);
+                            if (value) {
+                              current.add(friend.id);
+                            } else {
+                              current.remove(friend.id);
+                            }
+                            ref.read(selectedFriendIdsProvider.notifier).update(current);
+                          },
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
         ),
       ),
     );

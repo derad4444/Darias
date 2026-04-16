@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-03-07
+**最終更新日**: 2026-04-17
 **ランタイム**: Node.js 20
-**関数数**: 17
+**関数数**: 18
 
 ---
 
@@ -61,7 +61,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 8 関数
+### HTTP Callable (`onCall`) - 9 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -221,7 +221,61 @@
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし（`process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY`、`process.env.GOOGLE_PLAY_PACKAGE_NAME` を実行時に参照）
 
-#### 8. `generateOrReuseMeeting`
+#### 8. `getFriendSchedules`
+- **ソース**: `const/getFriendSchedules.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンドの共有スケジュールを取得する。呼び出し元ユーザーのIDとフレンドIDを元に、フレンドが設定した `shareLevel` に従ってフィルタリングして返す
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+- **その他**: `enforceAppCheck: false`
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `friendId` | `string` | スケジュールを取得したいフレンドのユーザーID |
+| `year` | `number` | 取得対象年 |
+| `month` | `number` | 取得対象月（1〜12） |
+
+**返却値:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `schedules` | `array<map>` | フィルタリング済みスケジュール一覧 |
+
+各スケジュールオブジェクト:
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `id` | `string` | スケジュールID |
+| `title` | `string` | タイトル |
+| `startDate` | `string` | 開始日時（ISO文字列） |
+| `endDate` | `string` | 終了日時（ISO文字列） |
+| `isAllDay` | `boolean` | 終日フラグ |
+| `tag` | `string` | タグ名 |
+| `tagColorHex` | `string \| null` | タグの色（フレンドのタグ設定から取得） |
+| `location` | `string` | 場所 |
+| `memo` | `string` | メモ |
+| `isPublic` | `boolean` | 公開フラグ |
+| `recurringGroupId` | `string \| null` | 繰り返しグループID |
+
+**フィルタリングロジック:**
+
+1. `users/{friendId}/friends/{callerId}` の `shareLevel` を取得
+2. `shareLevel = "none"` → 空配列を返す
+3. `shareLevel = "public"` → `isPublic = false` の予定と、`isPublic = false` タグの予定を除外
+4. `shareLevel = "full"` → 全件返す
+
+**フィールド互換性（旧 `isPrivate` → 新 `isPublic`）:**
+- スケジュール: `isPublic` フィールドが存在すればそちらを優先、なければ `isPrivate !== true` でフォールバック
+- タグ: `isPublic` フィールドが存在すればそちらを優先、なければ `isPrivate !== true` でフォールバック
+
+**副作用**: なし（読み取り専用）
+
+---
+
+#### 9. `generateOrReuseMeeting`
 - **ソース**: `src/functions/generateSixPersonMeeting.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: 6人会議の AI 会話を生成（キャッシュ再利用あり）
@@ -354,6 +408,7 @@ shared/functions/
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateBig5Analysis.js       # BIG5 解析
 │   ├── generateDiary.js              # アクティビティ型日記生成（scheduledDiaryGeneration から呼出）
+│   ├── getFriendSchedules.js         # フレンド共有スケジュール取得（2026-04-17 追加）
 │   └── big5Questions.js              # BIG5 質問定義・スコア計算
 │
 └── src/
@@ -461,4 +516,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-04-12*
+*最終更新: 2026-04-17（`getFriendSchedules` 関数追加、関数数 17 → 18 に更新）*

@@ -55,6 +55,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   String _tag = '';
   int _remindValue = 0;
   String _remindUnit = '';
+  bool _isPublic = true;
   bool _isSaving = false;
   bool _isCreatingRecurring = false;
   int _recurringProgress = 0;
@@ -89,6 +90,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
       _tag = schedule.tag;
       _remindValue = schedule.remindValue;
       _remindUnit = schedule.remindUnit;
+      _isPublic = schedule.isPublic;
     } else {
       // 新規作成時の初期値：iOS版と同じ「次の時間の0分」
       final now = DateTime.now();
@@ -309,6 +311,42 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                           label: _getNotificationLabel(),
                           textColor: textColor,
                           onTap: () => _showNotificationPicker(accentColor, textColor),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 公開設定セクション
+                      _buildGlassSection(
+                        title: '公開設定',
+                        textColor: textColor,
+                        child: Row(
+                          children: [
+                            Icon(
+                              _isPublic ? Icons.visibility_outlined : Icons.lock_outline,
+                              color: textColor.withOpacity(0.7),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('公開する', style: TextStyle(color: textColor, fontSize: 15)),
+                                  Text(
+                                    _isPublic
+                                        ? 'フレンドの共有設定に従って表示されます'
+                                        : 'OFFにすると「完全公開」フレンドのみ閲覧可',
+                                    style: TextStyle(fontSize: 12, color: textColor.withOpacity(0.6)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _isPublic,
+                              activeColor: accentColor,
+                              onChanged: (value) => setState(() => _isPublic = value),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -1035,6 +1073,20 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
                 },
               );
             }),
+            const Divider(height: 1),
+            // タグ管理へのリンク
+            ListTile(
+              leading: Icon(Icons.settings_outlined, color: accentColor),
+              title: Text(
+                'タグを管理する',
+                style: TextStyle(color: accentColor, fontWeight: FontWeight.w500),
+              ),
+              trailing: Icon(Icons.chevron_right, color: accentColor.withOpacity(0.7)),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/tag-management');
+              },
+            ),
             const SizedBox(height: 20),
           ],
         ),
@@ -1075,6 +1127,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           repeatOption: '',
           remindValue: _remindValue,
           remindUnit: _remindUnit,
+          isPublic: _isPublic,
         );
         await ref.read(calendarControllerProvider.notifier).addSchedule(newSchedule);
         // 最後に使用したタグを記録
@@ -1096,6 +1149,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           repeatOption: _repeatSettings.type.name == 'none' ? '' : _repeatSettings.type.name,
           remindValue: _remindValue,
           remindUnit: _remindUnit,
+          isPublic: _isPublic,
         );
 
         if (widget.recurringEditMode == RecurringEditMode.all &&
@@ -1164,6 +1218,7 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
           remindValue: _remindValue,
           remindUnit: _remindUnit,
           recurringGroupId: groupId,
+          isPublic: _isPublic,
         );
 
         await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);

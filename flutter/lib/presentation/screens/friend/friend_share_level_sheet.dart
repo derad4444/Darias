@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/friend_model.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/calendar_provider.dart';
 
 class FriendShareLevelSheet extends ConsumerWidget {
   final FriendModel friend;
@@ -58,6 +59,8 @@ class FriendShareLevelSheet extends ConsumerWidget {
               onTap: () async {
                 await ref.read(friendControllerProvider.notifier)
                     .updateShareLevel(friend.id, level);
+                // フレンド予定を即時リフレッシュ
+                ref.read(friendScheduleRefreshProvider.notifier).state++;
                 if (context.mounted) Navigator.pop(context);
               },
             );
@@ -136,9 +139,9 @@ class _ShareLevelOption extends StatelessWidget {
       case FriendShareLevel.none:
         return (Icons.visibility_off_outlined, '予定を一切共有しません');
       case FriendShareLevel.public:
-        return (Icons.visibility_outlined, '非公開フラグのない予定を共有します');
+        return (Icons.visibility_outlined, '非公開設定・非公開タグでない予定を共有します');
       case FriendShareLevel.full:
-        return (Icons.public, '非公開設定の予定も含めてすべて共有します');
+        return (Icons.public, '非公開設定の予定・非公開タグの予定も含めてすべて共有します');
     }
   }
 }

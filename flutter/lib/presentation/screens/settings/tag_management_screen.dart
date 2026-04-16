@@ -42,12 +42,14 @@ class TagItem {
   final String name;
   final Color color;
   final String memo;
+  final bool isPublic;
 
   const TagItem({
     required this.id,
     required this.name,
     required this.color,
     this.memo = '',
+    this.isPublic = true,
   });
 
   TagItem copyWith({
@@ -55,22 +57,32 @@ class TagItem {
     String? name,
     Color? color,
     String? memo,
+    bool? isPublic,
   }) {
     return TagItem(
       id: id ?? this.id,
       name: name ?? this.name,
       color: color ?? this.color,
       memo: memo ?? this.memo,
+      isPublic: isPublic ?? this.isPublic,
     );
   }
 
   factory TagItem.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    // isPublicフィールドがあればそちらを優先、なければ旧isPrivateフィールドで判定
+    final bool isPublic;
+    if (data.containsKey('isPublic')) {
+      isPublic = data['isPublic'] as bool? ?? true;
+    } else {
+      isPublic = !(data['isPrivate'] as bool? ?? false);
+    }
     return TagItem(
       id: doc.id,
       name: data['name'] as String? ?? '',
       color: _hexToColor(data['colorHex'] as String? ?? '#2196f3'),
       memo: data['memo'] as String? ?? '',
+      isPublic: isPublic,
     );
   }
 
@@ -81,6 +93,7 @@ class TagItem {
       'name': name,
       'colorHex': _colorToHex(color),
       'memo': memo,
+      'isPublic': isPublic,
     };
   }
 
@@ -330,6 +343,13 @@ class _TagRow extends StatelessWidget {
             ),
           ),
 
+          // 非公開アイコン（isPublic=falseの場合）
+          if (!tag.isPublic)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: Icon(Icons.lock, size: 16, color: textColor.withValues(alpha: 0.5)),
+            ),
+
           // 編集ボタン
           IconButton(
             onPressed: onEdit,
@@ -375,6 +395,7 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
   late TextEditingController _nameController;
   late TextEditingController _memoController;
   late Color _selectedColor;
+  late bool _isPublic;
 
   bool get isEditing => widget.tag != null;
 
@@ -384,6 +405,7 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
     _nameController = TextEditingController(text: widget.tag?.name ?? '');
     _memoController = TextEditingController(text: widget.tag?.memo ?? '');
     _selectedColor = widget.tag?.color ?? Colors.blue;
+    _isPublic = widget.tag?.isPublic ?? true;
   }
 
   @override
@@ -514,6 +536,37 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
                   ),
                 ),
 
+                const SizedBox(height: 16),
+
+                // 非公開設定
+                _SectionCard(
+                  title: '公開設定',
+                  textColor: widget.textColor,
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, size: 20, color: widget.textColor.withValues(alpha: 0.7)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('公開する', style: TextStyle(color: widget.textColor, fontSize: 15)),
+                            Text(
+                              'OFFにすると「全公開」フレンドのみ閲覧可',
+                              style: TextStyle(fontSize: 12, color: widget.textColor.withValues(alpha: 0.6)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch(
+                        value: _isPublic,
+                        activeColor: widget.accentColor,
+                        onChanged: (value) => setState(() => _isPublic = value),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // 使用件数（編集時のみ）
                 if (isEditing) ...[
                   const SizedBox(height: 16),
@@ -557,6 +610,7 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
       name: trimmedName,
       color: _selectedColor,
       memo: _memoController.text.trim(),
+      isPublic: _isPublic,
     );
     widget.onSave(tag);
     Navigator.pop(context);

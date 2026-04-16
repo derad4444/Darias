@@ -125,6 +125,11 @@ Object.defineProperty(exports, "cancelFriendRequest", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "getFriendSchedules", {
+  get: () => require("./const/getFriendSchedules").getFriendSchedules,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

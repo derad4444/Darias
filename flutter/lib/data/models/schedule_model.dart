@@ -14,6 +14,7 @@ class ScheduleModel {
   final int remindValue;
   final String remindUnit;
   final String? recurringGroupId;
+  final bool isPublic;
 
   const ScheduleModel({
     required this.id,
@@ -28,6 +29,7 @@ class ScheduleModel {
     this.remindValue = 0,
     this.remindUnit = '',
     this.recurringGroupId,
+    this.isPublic = true,
   });
 
   /// 期間が複数日にわたるかどうか
@@ -71,6 +73,7 @@ class ScheduleModel {
       remindValue: data['remindValue'] as int? ?? 0,
       remindUnit: data['remindUnit'] as String? ?? '',
       recurringGroupId: data['recurringGroupId'] as String?,
+      isPublic: data['isPublic'] as bool? ?? true,
     );
   }
 
@@ -88,6 +91,7 @@ class ScheduleModel {
       'remindValue': remindValue,
       'remindUnit': remindUnit,
       'recurringGroupId': recurringGroupId,
+      'isPublic': isPublic,
     };
   }
 
@@ -104,6 +108,7 @@ class ScheduleModel {
     int? remindValue,
     String? remindUnit,
     String? recurringGroupId,
+    bool? isPublic,
   }) {
     return ScheduleModel(
       id: id ?? this.id,
@@ -118,6 +123,7 @@ class ScheduleModel {
       remindValue: remindValue ?? this.remindValue,
       remindUnit: remindUnit ?? this.remindUnit,
       recurringGroupId: recurringGroupId ?? this.recurringGroupId,
+      isPublic: isPublic ?? this.isPublic,
     );
   }
 }

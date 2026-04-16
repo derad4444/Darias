@@ -248,6 +248,7 @@
 - **remindUnit**: `string` - リマインダー単位
 - **notificationSettings**: `map` - 通知設定
 - **created_at**: `timestamp` - 作成日時
+- **isPublic**: `boolean` - フレンド公開フラグ（デフォルト: `true`）。`false` にすると `shareLevel = "full"` のフレンドのみ閲覧可。旧フィールド `isPrivate` との互換性あり（`isPublic` が存在しない場合は `isPrivate !== true` でフォールバック）
 
 **インデックス:**
 - `recurringGroupId` (ASC) + `startDate` (ASC)
@@ -309,11 +310,44 @@
 - **name**: `string` - タグ名（例: "仕事", "プライベート"）
 - **colorHex**: `string` - タグ色（16進数、例: "#2196f3"）
 - **memo**: `string` - メモ（任意、デフォルト: ""）
+- **isPublic**: `boolean` - フレンド公開フラグ（デフォルト: `true`）。`false` にすると `shareLevel = "full"` のフレンドのみこのタグの予定を閲覧可。旧フィールド `isPrivate` との互換性あり（`isPublic` が存在しない場合は `isPrivate !== true` でフォールバック）
 
 **インデックス:**
 - `name` (ASC)
 
 **備考:** 以前はiOS側はUserDefaults、Flutter側はSharedPreferencesにローカル保存していたが、クロスプラットフォーム同期のためFirestoreに移行。
+
+---
+
+### `users/{userId}/friends`
+
+**用途**: フレンド（相互登録ユーザー）の管理と予定共有レベル設定
+**ドキュメントID**: フレンドのFirebase Auth UID
+
+**フィールド:**
+
+- **id**: `string` - フレンドのユーザーID
+- **name**: `string` - フレンドの表示名
+- **shareLevel**: `string` - フレンドへの予定公開レベル（`"none"` / `"public"` / `"full"`）
+  - `none`: 予定を一切共有しない
+  - `public`: `isPublic = true` かつ `isPublic = true` のタグの予定を共有
+  - `full`: 非公開予定・非公開タグの予定を含めてすべて共有
+- **createdAt**: `timestamp` - フレンド登録日時
+
+**重要**: `users/{A}/friends/{B}.shareLevel` は「AがBに対して自分の予定をどのレベルで見せるか」を意味する。`getFriendSchedules` Cloud Function はこのフィールドを参照してフィルタリングを行う。
+
+---
+
+### `users/{userId}/settings`
+
+**用途**: ユーザーのアプリ設定（クロスデバイス・クロスプラットフォーム同期）
+**ドキュメントID**: 設定種別固定
+
+#### `users/{userId}/settings/calendarSettings`
+
+**フィールド:**
+
+- **selectedFriendIds**: `array<string>` - カレンダーに表示するフレンドIDのリスト。SharedPreferences/localStorage の代わりにFirestoreで永続化することで全プラットフォームで同期される
 
 ---
 
@@ -570,10 +604,12 @@ users/{userId}
 │       ├── [従来型] content
 │       └── [アクティビティ型] diary_type / facts[] / ai_comment
 ├── subscription/current
-├── schedules/{docId}
+├── schedules/{docId}           ← isPublic フィールド追加（2026-04-17）
 ├── todos/{docId}
 ├── memos/{docId}
-├── tags/{docId}
+├── tags/{docId}                ← isPublic フィールド追加（2026-04-17）
+├── friends/{friendUserId}      ← 新規（2026-04-17）フレンド共有設定
+├── settings/calendarSettings   ← 新規（2026-04-17）カレンダー設定
 └── diary/{docId}
 
 shared_meetings/{id}
@@ -612,5 +648,5 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-04-12（`users/{userId}/memos` に `showInWidget` フィールド追加、日記 `ai_comment` 文字数250〜350に変更、翌日スケジュール収集追加）
+**最終更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends` サブコレクション・`users/{userId}/settings/calendarSettings` 追加、`schedules` に `isPublic` フィールド追加、`tags` に `isPublic` フィールド追加）
 **作成者**: Claude Code

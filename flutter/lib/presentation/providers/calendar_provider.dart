@@ -1,12 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/calendar_datasource.dart';
 import '../../data/models/schedule_model.dart';
+import '../../data/models/shared_schedule_model.dart';
 import '../../data/models/holiday_model.dart';
 import '../../data/models/monthly_comment_model.dart';
 import '../../data/services/widget_data_service.dart';
 import '../../data/services/japanese_holiday_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
+import 'friend_provider.dart';
 import '../screens/settings/tag_management_screen.dart';
 
 /// CalendarDatasourceのプロバイダー
@@ -276,6 +281,141 @@ final lastUsedScheduleTagProvider = StateProvider<String>((ref) => '');
 
 /// 検索テキストの状態
 final calendarSearchTextProvider = StateProvider<String>((ref) => '');
+
+// ============================================================
+// フレンド予定共有
+// ============================================================
+
+// ---------------------------------------------------------------
+// フレンドID選択（SharedPreferences で永続化）
+// ---------------------------------------------------------------
+class SelectedFriendIdsNotifier extends StateNotifier<Set<String>> {
+  final FirebaseFirestore _firestore;
+  final String? _userId;
+
+  SelectedFriendIdsNotifier(this._firestore, this._userId) : super({}) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    if (_userId == null) return;
+    try {
+      final doc = await _firestore
+          .collection('users').doc(_userId)
+          .collection('settings').doc('calendarSettings')
+          .get();
+      if (doc.exists) {
+        final ids = List<String>.from(doc.data()?['selectedFriendIds'] ?? []);
+        debugPrint('[SelectedFriendIds] loaded: $ids');
+        if (mounted) state = Set.from(ids);
+      }
+    } catch (e) {
+      debugPrint('[SelectedFriendIds] load error: $e');
+    }
+  }
+
+  void update(Set<String> ids) {
+    state = ids;
+    _save();
+  }
+
+  Future<void> _save() async {
+    if (_userId == null) return;
+    try {
+      await _firestore
+          .collection('users').doc(_userId)
+          .collection('settings').doc('calendarSettings')
+          .set({'selectedFriendIds': state.toList()}, SetOptions(merge: true));
+      debugPrint('[SelectedFriendIds] saved: ${state.toList()}');
+    } catch (e) {
+      debugPrint('[SelectedFriendIds] save error: $e');
+    }
+  }
+}
+
+/// カレンダーに表示中のフレンドID集合（複数選択可・Firestore永続化）
+final selectedFriendIdsProvider =
+    StateNotifierProvider<SelectedFriendIdsNotifier, Set<String>>(
+  (ref) => SelectedFriendIdsNotifier(
+    ref.watch(firestoreProvider),
+    ref.watch(currentUserIdProvider),
+  ),
+);
+
+/// フレンド予定の手動リフレッシュカウンター
+final friendScheduleRefreshProvider = StateProvider<int>((ref) => 0);
+
+/// 選択フレンドの指定月スケジュール（Cloud Function 経由、月単位でキャッシュ）
+final selectedFriendSchedulesForMonthProvider =
+    FutureProvider.family<List<SharedScheduleModel>, DateTime>(
+  (ref, month) async {
+    // リフレッシュトリガーを監視（変化するたびに再フェッチ）
+    ref.watch(friendScheduleRefreshProvider);
+    final selectedIds = ref.watch(selectedFriendIdsProvider);
+    if (selectedIds.isEmpty) return [];
+
+    final friends = ref.watch(friendsProvider).valueOrNull ?? [];
+    final functions = FirebaseFunctions.instanceFor(region: 'asia-northeast1');
+    final results = <SharedScheduleModel>[];
+
+    for (final friendId in selectedIds) {
+      // フレンド名を取得
+      String friendName = '';
+      for (final f in friends) {
+        if (f.id == friendId) {
+          friendName = f.name;
+          break;
+        }
+      }
+
+      try {
+        final callable = functions.httpsCallable('getFriendSchedules');
+        final result = await callable.call({
+          'friendId': friendId,
+          'year': month.year,
+          'month': month.month,
+        });
+        final data = result.data as Map<String, dynamic>;
+        final schedulesList = data['schedules'] as List<dynamic>? ?? [];
+
+        for (final s in schedulesList) {
+          final map = Map<String, dynamic>.from(s as Map);
+          results.add(SharedScheduleModel.fromFunctionData(
+            map,
+            ownerId: friendId,
+            ownerName: friendName,
+          ));
+        }
+      } catch (e) {
+        debugPrint('[FriendSchedule] Error fetching for $friendId: $e');
+      }
+    }
+
+    return results;
+  },
+);
+
+/// 特定の日のフレンドスケジュール
+final friendDaySchedulesProvider =
+    Provider.family<List<SharedScheduleModel>, DateTime>((ref, day) {
+  final selectedIds = ref.watch(selectedFriendIdsProvider);
+  if (selectedIds.isEmpty) return [];
+
+  final month = DateTime(day.year, day.month, 1);
+  final asyncSchedules = ref.watch(selectedFriendSchedulesForMonthProvider(month));
+
+  return asyncSchedules.when(
+    data: (schedules) => schedules.where((ss) {
+      final s = ss.schedule;
+      final startDay = DateTime(s.startDate.year, s.startDate.month, s.startDate.day);
+      final endDay = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
+      final targetDay = DateTime(day.year, day.month, day.day);
+      return !targetDay.isBefore(startDay) && !targetDay.isAfter(endDay);
+    }).toList(),
+    loading: () => [],
+    error: (_, __) => [],
+  );
+});
 
 /// 検索モードの状態
 final calendarSearchModeProvider = StateProvider<bool>((ref) => false);
