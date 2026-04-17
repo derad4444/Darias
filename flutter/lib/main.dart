@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_colors.dart';
 import 'data/services/ad_service.dart';
+import 'data/services/bgm_player.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
@@ -86,7 +87,11 @@ class DariasApp extends ConsumerWidget {
     ref.listen(characterImageProvider, (_, __) {});
 
     return GestureDetector(
-      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      onTap: () {
+        FocusManager.instance.primaryFocus?.unfocus();
+        // Webの自動再生ポリシーでブロックされたBGMをユーザー操作後に再生
+        BGMPlayer.shared.resumeIfPending();
+      },
       child: MaterialApp.router(
       title: 'DARIAS',
       debugShowCheckedModeBanner: false,

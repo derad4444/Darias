@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/bgm_player.dart';
 import '../../../data/services/widget_data_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -39,6 +40,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   @override
   void initState() {
     super.initState();
+    // iOSのRootView.onAppearと同様にBGMを開始
+    BGMPlayer.shared.playBGM('assets/audio/DARIAS BGM.mp3');
     if (!kIsWeb) {
       _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
       // コールドスタート（ウィジェットタップによるアプリ起動）の処理

@@ -9,6 +9,9 @@ class BGMPlayer {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isInitialized = false;
 
+  /// Web自動再生ポリシーによる再生待ちアセットパス
+  String? _pendingAssetPath;
+
   BGMPlayer._();
 
   /// BGMを再生
@@ -35,10 +38,23 @@ class BGMPlayer {
 
       await _audioPlayer.play();
       _isInitialized = true;
+      _pendingAssetPath = null;
       debugPrint('🎵 BGM再生開始: $assetPath');
     } catch (e) {
+      // Web自動再生ポリシーによるブロックの場合、ユーザー操作後に再試行するためパスを保持
+      if (kIsWeb) {
+        _pendingAssetPath = assetPath;
+      }
       debugPrint('❌ BGM再生失敗: $e');
     }
+  }
+
+  /// ユーザー操作後にWeb自動再生ポリシーで保留中のBGMを再生する
+  Future<void> resumeIfPending() async {
+    if (!kIsWeb) return;
+    final path = _pendingAssetPath;
+    if (path == null) return;
+    await playBGM(path);
   }
 
   /// URLからBGMを再生
