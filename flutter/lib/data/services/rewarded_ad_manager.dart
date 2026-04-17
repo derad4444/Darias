@@ -14,7 +14,7 @@ enum RewardedAdState {
 /// リワード広告マネージャー
 class RewardedAdManager {
   RewardedAd? _rewardedAd;
-  RewardedAdState _state = RewardedAdState.loading;
+  RewardedAdState _state = RewardedAdState.error;
   String? _adUnitId;
 
   // コールバック

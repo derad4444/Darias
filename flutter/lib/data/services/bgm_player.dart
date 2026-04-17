@@ -50,11 +50,20 @@ class BGMPlayer {
   }
 
   /// ユーザー操作後にWeb自動再生ポリシーで保留中のBGMを再生する
+  /// setAssetは初回で完了済みのため、play()のみ再試行する
   Future<void> resumeIfPending() async {
     if (!kIsWeb) return;
-    final path = _pendingAssetPath;
-    if (path == null) return;
-    await playBGM(path);
+    if (_pendingAssetPath == null) return;
+    try {
+      // 音量はsetAsset後に設定済みのため、play()のみ呼ぶ
+      // （再度setAssetすると音量がデフォルトにリセットされる可能性があるため）
+      await _audioPlayer.play();
+      _isInitialized = true;
+      _pendingAssetPath = null;
+      debugPrint('🎵 BGM再生再開（Web自動再生ポリシー解除後）');
+    } catch (e) {
+      debugPrint('❌ BGM resume失敗: $e');
+    }
   }
 
   /// URLからBGMを再生
@@ -89,10 +98,12 @@ class BGMPlayer {
 
   /// ミュート設定
   Future<void> setMuted(bool muted) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('bgmMuted', muted);
+
     if (muted) {
       await _audioPlayer.setVolume(0);
     } else {
-      final prefs = await SharedPreferences.getInstance();
       final savedVolume = prefs.getDouble('bgmVolume') ?? 0.5;
       await _audioPlayer.setVolume(savedVolume);
     }

@@ -4,7 +4,7 @@
 
 **最終更新日**: 2026-04-17
 **ランタイム**: Node.js 20
-**関数数**: 18
+**関数数**: 27
 
 ---
 
@@ -29,7 +29,7 @@
 │           Cloud Functions (Node.js 20)        │
 │                                               │
 │  ┌─────────────┐  ┌────────────────────────┐ │
-│  │ onCall (8)   │  │ onSchedule (5)         │ │
+│  │ onCall (14)  │  │ onSchedule (5)         │ │
 │  │ クライアント  │  │ 定期バッチ処理          │ │
 │  │ から直接呼出  │  │ (日次/月次/年次)        │ │
 │  └──────┬──────┘  └───────────┬────────────┘ │
@@ -61,7 +61,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 9 関数
+### HTTP Callable (`onCall`) - 15 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -119,7 +119,79 @@
 - `details/current` の `confirmedBig5Scores`, `analysis_level`, `sixPersonalities` を更新（100問完了時）
 - `PersonalityStatsMetadata` を更新（100問完了時・バックグラウンド）
 
-#### 2. `answerAppQuestion`
+#### 2. `classifyAndExtract`
+- **ソース**: `const/classifyAndExtract.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: チャット入力メッセージを AI（gpt-4o-mini）で5種類に分類し、memo/task/schedule の場合はその内容も同時に抽出して返す。全チャット送信時に必ず呼び出される振り分けゲートウェイ
+- **リソース**: memory `256MiB` / timeout `60秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: `OPENAI_API_KEY`
+- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **モデル**: `gpt-4o-mini` / temperature `0`（確定的分類）
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `userMessage` | `string` | ユーザーが入力したメッセージ |
+
+**返却値（分類別）:**
+
+```javascript
+// memo（複数件対応）
+{ "type": "memo", "items": ["メモ内容1", "メモ内容2"] }
+
+// task（複数件対応）
+{ "type": "task", "items": ["タスク内容1", "タスク内容2"] }
+
+// schedule（複数件対応）
+{
+  "type": "schedule",
+  "schedules": [
+    {
+      "title": string,
+      "isAllDay": boolean,
+      "startDate": Timestamp,   // +09:00 付き ISO 文字列 → Firestore Timestamp に変換済み
+      "endDate": Timestamp,
+      "location": string,
+      "tag": string,
+      "memo": string,
+      "repeatOption": "none",
+      "remindValue": 0,
+      "remindUnit": "none",
+      "created_at": Timestamp
+    }
+  ]
+}
+
+// app_qa（内容抽出なし）
+{ "type": "app_qa" }
+
+// chat（内容抽出なし）
+{ "type": "chat" }
+```
+
+**分類の優先順位と判定基準:**
+
+| 分類 | 判定基準 |
+|------|---------|
+| `schedule` | 日時＋行動の組み合わせ（例: 「明日14時に会議」） |
+| `memo` | メモ・記録の依頼（例: 「〇〇をメモして」） |
+| `task` | タスク・TODO登録の依頼（例: 「〇〇をタスクに追加」） |
+| `app_qa` | アプリの使い方・機能に関する質問 |
+| `chat` | 上記以外の会話・相談・雑談 |
+
+**エラー時フォールバック**: `{ "type": "chat" }` を返してキャラクター返答を継続
+
+**プロンプト**: `OPTIMIZED_PROMPTS.classifyAndExtract(currentDate, currentTime, userMessage)` を使用
+
+**副作用**: なし（Firestore への書き込みは行わない）
+
+> **設計方針**: 旧バージョンではキーワードベース（contains）の静的判定を Flutter クライアント側で行っていたが、「4/10に米米」などの日付パターンだけのメッセージを schedule として検出できない・誤検知が多い等の問題があったため、AI ベースの分類（本関数）に移行した。
+
+---
+
+#### 3. `answerAppQuestion`
 - **ソース**: `const/answerAppQuestion.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: アプリの使い方に関する質問、またはユーザー自身のデータ（予定・タスク・メモ）に関する質問に回答する
@@ -275,6 +347,51 @@
 
 ---
 
+#### 10. `diagnoseCompatibility`
+- **ソース**: `const/diagnoseCompatibility.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンドとのカテゴリ別相性診断を実行する。BIG5スコアから全カテゴリのスコアを決定論的に算出し、指定カテゴリの会話・コメント・アドバイスを AI 生成して Firestore に保存する
+- **リソース**: memory `512MiB` / timeout `90秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: `OPENAI_API_KEY`
+- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **モデル**: `gpt-4.1-mini` / temperature `0.75`
+- **キャッシュ**: `compatibilityCache/{big5Key}_{category}` でカテゴリ別に Firestore にキャッシュ
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `userId` | `string` | 診断を実行するユーザーの Firebase Auth UID |
+| `friendId` | `string` | 相性診断対象のフレンドのユーザーID |
+| `category` | `string` | 診断カテゴリ（`"friendship"` / `"romance"` / `"work"` / `"trust"`） |
+
+**返却値:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `comment` | `string` | カテゴリ相性の現状コメント（30文字以内） |
+| `advice` | `string` | 相性を活かすためのアドバイス（60文字以内） |
+| `conversation` | `array<map>` | キャラクター会話（4〜5ターン）。`{isMyCharacter: bool, text: string}` の配列 |
+| `big5Key` | `string` | BIG5キャッシュキー（`fp1\|fp2` のソート済み連結） |
+| `scores` | `map` | 全カテゴリのスコア（決定論的算出）`{friendship, romance, work, trust, overall}` |
+
+**スコア算出アルゴリズム（BIG5から決定論的）:**
+
+| カテゴリ | 計算式 |
+|---------|--------|
+| friendship | 外向性の類似度×40% + (双方の協調性平均)×20×40% + (100 - 神経症差分×15)×20% |
+| romance | 神経症の類似度×40% + (双方の協調性平均)×20×35% + 開放性の類似度×25%（上限82%・下限20%） |
+| work | (双方の誠実性平均)×20×50% + 開放性の類似度×50% |
+| trust | (双方の協調性平均)×20×40% + (100 - 双方の神経症平均×15)×35% + (双方の誠実性平均)×20×25% |
+| overall | (friendship + romance + work + trust) / 4 |
+
+**副作用（Firestore書き込み）:**
+- `compatibilityCache/{big5Key}_{category}` にカテゴリ別キャッシュ保存（カテゴリデータのみ）
+- `users/{userId}/compatibilityResults/{friendId}` に診断結果をマージ保存（`scores`・カテゴリフィールド・`unlockedCategories` を更新）
+
+---
+
 #### 9. `generateOrReuseMeeting`
 - **ソース**: `src/functions/generateSixPersonMeeting.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
@@ -285,6 +402,128 @@
 - **利用制限**: 無料ユーザー生涯1回 / プレミアムユーザー月30回（`usage_tracking` で管理）
 - **モデル**: 会議生成 `gpt-4o-2024-11-20`、カテゴリ判定 `gpt-4o-mini`
 - **キャッシュ**: `personalityKey` のみでマッチング（カテゴリ非依存）、閲覧済み除外
+
+#### 11. `searchUsers`
+- **ソース**: `const/searchUsers.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンド追加のためのユーザー検索。名前（前方一致）またはメールアドレス（完全一致）で Firestore を検索する。管理者権限を使って他ユーザーの基本情報を取得する
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+- **その他**: `enforceAppCheck: false`、認証必須（`auth` が null なら `{users:[]}` を返す）
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `query` | `string` | 検索クエリ（名前 or メールアドレス） |
+
+**返却値:**
+
+| フィールド | 型 | 説明 |
+|-----------|-----|------|
+| `users` | `array<{id, name, email}>` | 検索結果（自分自身は除外） |
+
+**検索ロジック:**
+- `@` を含む場合: `email` フィールドの完全一致（上限10件）
+- それ以外: `name` フィールドの前方一致（範囲クエリ、上限20件）
+
+---
+
+#### 12. `sendFriendRequest`
+- **ソース**: `const/friendRequest.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンド申請を送る。送信者の `outgoingRequests` と受信者の `incomingRequests` 両方に同じドキュメントをアトミックに書き込む（管理者権限が必要なため Cloud Function 経由）
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+- **その他**: `enforceAppCheck: false`
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `toUserId` | `string` | 申請先ユーザーID |
+| `toUserName` | `string` | 申請先ユーザー名 |
+| `myName` | `string` | 自分の名前 |
+| `myEmail` | `string` | 自分のメールアドレス |
+
+**返却値（result フィールドのみ）:**
+
+| result値 | 意味 |
+|---------|------|
+| `"sent"` | 申請成功 |
+| `"already_friend"` | 既にフレンド関係 |
+| `"already_sent"` | 既に申請済み |
+| `"error"` | エラー |
+
+---
+
+#### 13. `acceptFriendRequest`
+- **ソース**: `const/friendRequest.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンド申請を承認する。双方の申請ドキュメントを削除し、双方の `friends` サブコレクションにフレンドドキュメントを追加する（バッチ書き込み）
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `fromUserId` | `string` | 申請を送ったユーザーID |
+
+**副作用（Firestore書き込み）:**
+- `incomingRequests/{fromUserId}`・`outgoingRequests/{toUserId}` を削除
+- 双方の `friends/{相手のUID}` にドキュメントを作成（`shareLevel: "none"` で初期化）
+
+---
+
+#### 14. `rejectFriendRequest`
+- **ソース**: `const/friendRequest.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: フレンド申請を拒否する。双方の申請ドキュメントを削除する（フレンドドキュメントは作成しない）
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `fromUserId` | `string` | 申請を送ったユーザーID |
+
+---
+
+#### 15. `cancelFriendRequest`
+- **ソース**: `const/friendRequest.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: 自分が送ったフレンド申請を取消する。双方の申請ドキュメントを削除する
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `toUserId` | `string` | 申請先ユーザーID |
+
+---
+
+#### 16. `deleteUserAccount`
+- **ソース**: `deleteUserAccount.js`
+- **API バージョン**: **v1** (`firebase-functions` — `functions.https.onCall`)
+- **概要**: アカウント削除処理。①サブスクリプション情報を取得、②Google Play のアクティブなサブスクリプションをキャンセル、③Firestore の全サブコレクションを再帰削除する。App Store のサブスクリプションはサーバー側でキャンセル不可のためユーザーに手動キャンセルを案内する
+- **リソース**: 未指定（v1 デフォルト）
+- **リージョン**: 未指定（v1 デフォルト）
+- **secrets**: なし（`process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY` を参照）
+
+**処理フロー（Flutter 側の責務含む）:**
+1. Cloud Function を呼び出して Firestore データを削除
+2. Cloud Function の成功後、Flutter 側で Firebase Auth のアカウントを削除（`user.delete()`）
+
+> **注意**: App Store のサブスクリプションはサーバー側でキャンセル不可。ユーザーはアカウント削除前に設定アプリから手動キャンセルが必要。
 
 ---
 
@@ -368,11 +607,31 @@ Firestore ドキュメント作成時に自動実行。
 
 ---
 
-### HTTP Endpoints (`onRequest`) - 2 関数
+### HTTP Endpoints (`onRequest`) - 3 関数
 
 REST API として直接アクセス可能。
 
-#### 16. `generateMonthlyReviewHttp`
+#### 25. `appleServerNotification`
+- **ソース**: `validateReceipt.js`
+- **API バージョン**: **v1** (`firebase-functions` — `functions.https.onRequest`)
+- **概要**: Apple Server-to-Server Notifications の受信エンドポイント。App Store からサブスクリプションのライフサイクルイベント（更新・解約・支払い失敗等）を受け取り、対応するユーザーの `subscription/current` を自動更新する
+- **リソース**: 未指定（v1 デフォルト）
+- **リージョン**: 未指定（v1 デフォルト）
+- **secrets**: なし（`process.env.APPLE_SHARED_SECRET` を参照）
+- **URL**: `https://{region}-{projectId}.cloudfunctions.net/appleServerNotification`
+
+**処理対象イベント（notificationType）:**
+
+| notificationType | 処理内容 |
+|-----------------|---------|
+| `SUBSCRIBED` / `DID_RENEW` | `status: "active"` に更新・`end_date` を更新 |
+| `EXPIRED` / `REVOKE` / `REFUND` | `status: "free"` に更新 |
+| `DID_FAIL_TO_RENEW` | `status: "grace_period"` に更新 |
+| その他 | ログ記録のみ（スキップ） |
+
+---
+
+#### 27. `generateMonthlyReviewHttp`
 - **ソース**: `src/functions/generateMonthlyReview.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: 月次レビューのテスト・手動実行用 HTTP エンドポイント
@@ -380,7 +639,7 @@ REST API として直接アクセス可能。
 - **リージョン**: `asia-northeast1`
 - **secrets**: なし
 
-#### 17. `health`
+#### 28. `health`
 - **ソース**: `health.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
 - **概要**: ヘルスチェック（Cloud Run モニタリング用）
@@ -404,11 +663,16 @@ shared/functions/
 │
 ├── const/                            # AI・音声系の callable 関数
 │   ├── generateCharacterReply.js     # キャラクター返信生成
-│   ├── extractSchedule.js            # 予定抽出
+│   ├── classifyAndExtract.js         # AI メッセージ分類・抽出（振り分けゲートウェイ）
+│   ├── answerAppQuestion.js          # アプリ Q&A 回答
+│   ├── extractSchedule.js            # 予定抽出（旧方式・後方互換用）
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateBig5Analysis.js       # BIG5 解析
 │   ├── generateDiary.js              # アクティビティ型日記生成（scheduledDiaryGeneration から呼出）
-│   ├── getFriendSchedules.js         # フレンド共有スケジュール取得（2026-04-17 追加）
+│   ├── getFriendSchedules.js         # フレンド共有スケジュール取得
+│   ├── diagnoseCompatibility.js      # カテゴリ別相性診断
+│   ├── searchUsers.js                # フレンド追加用ユーザー検索
+│   ├── friendRequest.js              # フレンド申請（send/accept/reject/cancel）4関数
 │   └── big5Questions.js              # BIG5 質問定義・スコア計算
 │
 └── src/
@@ -458,7 +722,7 @@ shared/functions/
 
 | 変数名 | 用途 | 使用関数 |
 |--------|------|---------|
-| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, extractSchedule, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration |
+| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, extractSchedule, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility |
 | `GMAIL_USER` | Gmail 送信元アドレス | sendRegistrationEmail, sendContactEmail |
 | `GMAIL_APP_PASSWORD` | Gmail アプリパスワード | sendRegistrationEmail, sendContactEmail |
 
@@ -516,4 +780,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-04-17（`getFriendSchedules` 関数追加、関数数 17 → 18 に更新）*
+*最終更新: 2026-04-17（`getFriendSchedules` 関数追加 17→18；`diagnoseCompatibility` 追加 18→19；`classifyAndExtract`・`searchUsers`・`sendFriendRequest`・`acceptFriendRequest`・`rejectFriendRequest`・`cancelFriendRequest`・`deleteUserAccount`・`appleServerNotification` を漏れなく追記 19→27）*

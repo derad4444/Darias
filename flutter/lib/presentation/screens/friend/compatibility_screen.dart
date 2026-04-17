@@ -1,114 +1,239 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/models/friend_model.dart';
+import '../../../data/services/rewarded_ad_manager.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
+import 'compatibility_category_screen.dart';
+
+/// カテゴリ定義
+class CompatibilityCategoryMeta {
+  final String key;
+  final String icon;
+  final String label;
+  final String description;
+  final Color color;
+
+  const CompatibilityCategoryMeta({
+    required this.key,
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+  });
+}
+
+const kCompatibilityCategories = [
+  CompatibilityCategoryMeta(
+    key: 'friendship',
+    icon: '👫',
+    label: '友情',
+    description: '友人としての付き合い方・日常の相性',
+    color: Colors.blue,
+  ),
+  CompatibilityCategoryMeta(
+    key: 'romance',
+    icon: '💫',
+    label: '恋愛',
+    description: '感情的な相性・コミュニケーションスタイル',
+    color: Colors.pink,
+  ),
+  CompatibilityCategoryMeta(
+    key: 'work',
+    icon: '💼',
+    label: '仕事',
+    description: '協力・役割分担・強みの活かし方',
+    color: Colors.orange,
+  ),
+  CompatibilityCategoryMeta(
+    key: 'trust',
+    icon: '🤝',
+    label: '信頼',
+    description: '誠実さ・長期的な信頼関係',
+    color: Colors.green,
+  ),
+];
 
 class CompatibilityScreen extends ConsumerStatefulWidget {
   final FriendModel friend;
-  final String myCharacterId;
 
   const CompatibilityScreen({
     super.key,
     required this.friend,
-    required this.myCharacterId,
   });
 
   @override
-  ConsumerState<CompatibilityScreen> createState() => _CompatibilityScreenState();
+  ConsumerState<CompatibilityScreen> createState() =>
+      _CompatibilityScreenState();
 }
 
 class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
-  CompatibilityResult? _result;
-  bool _isLoading = false;
-  bool _isInitialLoading = true; // 保存済み結果の読み込み中
+  CompatibilityDocument? _document;
+  bool _isInitialLoading = true;
+  String? _processingCategoryKey;
   String? _errorMessage;
 
-  // アニメーション用
-  final List<CompatibilityMessage> _displayedMessages = [];
-  bool _showScores = false;
-  Timer? _messageTimer;
-  int _messageIndex = 0;
+  /// Firestoreリロードを待たず即時反映するローカルステート
+  final Set<String> _localUnlocked = {};
+  final Map<String, CategoryDiagnosis> _localCategories = {};
+
+  final RewardedAdManager _rewardedAdManager = RewardedAdManager();
 
   @override
   void initState() {
     super.initState();
-    _loadSavedResult();
-  }
-
-  /// 保存済み結果をFirestoreから取得
-  Future<void> _loadSavedResult() async {
-    final saved = await ref.read(friendControllerProvider.notifier)
-        .fetchCompatibilityResult(friendId: widget.friend.id);
-    if (!mounted) return;
-    if (saved != null) {
-      setState(() {
-        _result = saved;
-        _displayedMessages.addAll(saved.conversation);
-        _showScores = true;
-        _isInitialLoading = false;
-      });
-    } else {
-      setState(() => _isInitialLoading = false);
+    _loadDocument();
+    if (!kIsWeb) {
+      _rewardedAdManager.loadAd();
     }
   }
 
   @override
   void dispose() {
-    _messageTimer?.cancel();
+    _rewardedAdManager.dispose();
     super.dispose();
   }
 
-  Future<void> _runDiagnosis() async {
-    _messageTimer?.cancel();
+  // ─────────────────────────────────────────
+  // Firestoreからドキュメント読み込み
+  // ─────────────────────────────────────────
+  Future<void> _loadDocument() async {
+    final doc = await ref
+        .read(friendControllerProvider.notifier)
+        .fetchCompatibilityDocument(friendId: widget.friend.id);
+    if (!mounted) return;
     setState(() {
-      _isLoading = true;
+      _document = doc;
+      if (doc != null) {
+        // Firestoreの解放済みリストをローカルにマージ
+        _localUnlocked.addAll(doc.unlockedCategories);
+        // Firestoreのカテゴリデータをローカルにマージ
+        for (final cat in kCompatibilityCategories) {
+          if (!_localCategories.containsKey(cat.key)) {
+            final catDiag = doc.categoryFor(cat.key);
+            if (catDiag != null) _localCategories[cat.key] = catDiag;
+          }
+        }
+      }
+      _isInitialLoading = false;
+    });
+  }
+
+  bool _isUnlocked(String key) => _localUnlocked.contains(key);
+  CategoryDiagnosis? _getDiagnosis(String key) => _localCategories[key];
+
+  // ─────────────────────────────────────────
+  // カテゴリタップ処理
+  // ─────────────────────────────────────────
+  Future<void> _onCategoryTap(CompatibilityCategoryMeta cat) async {
+    if (_processingCategoryKey != null) return;
+
+    final isPremium = ref.read(effectiveIsPremiumProvider);
+
+    // Web版: 無料ユーザーはブロック
+    if (kIsWeb && !isPremium) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Web版の相性診断は有料プランのみご利用いただけます'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    final existingDiagnosis = _getDiagnosis(cat.key);
+
+    if (existingDiagnosis != null) {
+      // 解放済み → 広告なしで詳細画面へ
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CompatibilityCategoryScreen(
+            friend: widget.friend,
+            category: cat,
+            diagnosis: existingDiagnosis,
+            animateOnEntry: false,
+          ),
+        ),
+      );
+      // 戻ってきたらFirestoreを再読み込み（スコア等の更新のため）
+      await _loadDocument();
+      return;
+    }
+
+    // 未解放 → AI診断 + 広告
+    setState(() {
+      _processingCategoryKey = cat.key;
       _errorMessage = null;
-      _displayedMessages.clear();
-      _showScores = false;
-      _messageIndex = 0;
     });
 
-    final result = await ref.read(friendControllerProvider.notifier)
-        .runCompatibilityDiagnosis(
-          friendId: widget.friend.id,
-          myCharacterId: widget.myCharacterId,
-        );
+    CategoryDiagnosis? diagnosis;
 
-    setState(() => _isLoading = false);
+    if (!kIsWeb) {
+      final diagnosisFuture = ref
+          .read(friendControllerProvider.notifier)
+          .runCategoryDiagnosis(
+            friendId: widget.friend.id,
+            category: cat.key,
+          );
 
-    if (result == null) {
+      final adCompleter = Completer<void>();
+      _rewardedAdManager.onAdDismissed = () {
+        if (!adCompleter.isCompleted) adCompleter.complete();
+      };
+      final showed = await _rewardedAdManager.showAd();
+      if (!showed) adCompleter.complete();
+
+      await Future.wait([
+        adCompleter.future,
+        diagnosisFuture.then((r) => diagnosis = r),
+      ]);
+      _rewardedAdManager.loadAd();
+    } else {
+      // Web版プレミアム: 広告なしで診断
+      diagnosis = await ref
+          .read(friendControllerProvider.notifier)
+          .runCategoryDiagnosis(
+            friendId: widget.friend.id,
+            category: cat.key,
+          );
+    }
+
+    if (!mounted) return;
+    setState(() => _processingCategoryKey = null);
+
+    if (diagnosis == null) {
       setState(() => _errorMessage = '診断に失敗しました。もう一度お試しください。');
       return;
     }
 
-    setState(() => _result = result);
-    _startMessageAnimation(result.conversation);
-  }
-
-  void _startMessageAnimation(List<CompatibilityMessage> messages) {
-    if (messages.isEmpty) {
-      setState(() => _showScores = true);
-      return;
-    }
-
-    _messageTimer = Timer.periodic(const Duration(milliseconds: 1200), (timer) {
-      if (_messageIndex >= messages.length) {
-        timer.cancel();
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) setState(() => _showScores = true);
-        });
-        return;
-      }
-      setState(() {
-        _displayedMessages.add(messages[_messageIndex]);
-        _messageIndex++;
-      });
+    // ローカルステートを即時更新（Firestoreのリロードを待たない）
+    setState(() {
+      _localUnlocked.add(cat.key);
+      _localCategories[cat.key] = diagnosis!;
     });
+
+    // カテゴリ詳細画面へ（初回なのでアニメーションあり）
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CompatibilityCategoryScreen(
+          friend: widget.friend,
+          category: cat,
+          diagnosis: diagnosis!,
+          animateOnEntry: true,
+        ),
+      ),
+    );
+
+    // 戻ってきたらFirestoreを再読み込み（スコア等の更新のため）
+    await _loadDocument();
   }
 
   @override
@@ -117,257 +242,442 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
     final myUser = userAsync.valueOrNull;
-
     final myUserId = ref.watch(currentUserIdProvider) ?? '';
-    final myInitial = (myUser?.name ?? '自分').isNotEmpty
-        ? (myUser?.name ?? '自分')[0]
-        : 'M';
-    final friendInitial = widget.friend.name.isNotEmpty
-        ? widget.friend.name[0]
-        : 'F';
+    final isPremium = ref.watch(effectiveIsPremiumProvider);
+
+    final myName = myUser?.name ?? '自分';
+    final myInitial = myName.isNotEmpty ? myName[0] : 'M';
+    final friendInitial =
+        widget.friend.name.isNotEmpty ? widget.friend.name[0] : 'F';
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        leading: IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: Icon(Icons.arrow_back_ios, color: accentColor),
+        ),
+        title: Text(
+          '相性診断',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: accentColor,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+      ),
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
         child: SafeArea(
-          child: Column(
-            children: [
-              // ヘッダー
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: Row(
+          child: _isInitialLoading
+              ? Center(child: CircularProgressIndicator(color: accentColor))
+              : ListView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   children: [
-                    IconButton(
-                      onPressed: () => Navigator.pop(context),
-                      icon: Icon(Icons.arrow_back_ios, color: accentColor),
-                    ),
-                    Text(
-                      '相性診断',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
+                    _buildAvatarRow(
+                        accentColor, myUserId, myName, myInitial, friendInitial),
+                    const SizedBox(height: 24),
+
+                    if (_errorMessage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(color: Colors.red, fontSize: 13),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                    ],
+
+                    // Web無料ユーザー向け案内
+                    if (kIsWeb && !isPremium) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: Colors.amber.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline,
+                                color: Colors.amber, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Web版の相性診断は有料プランのみご利用いただけます',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    ...kCompatibilityCategories.map((cat) => _buildCategoryCard(
+                          cat,
+                          accentColor,
+                          isPremium,
+                        )),
+
+                    if (!isPremium && !kIsWeb) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '無料ユーザーは広告視聴で各カテゴリを診断できます',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary.withValues(alpha: 0.7),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+
+                    // 全カテゴリ解放時の総合スコア
+                    if (_isAllUnlocked) ...[
+                      const SizedBox(height: 20),
+                      _buildOverallCard(accentColor),
+                    ],
                   ],
                 ),
-              ),
-
-              // キャラクターアイコン行
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _LabeledAvatar(
-                      avatar: CharacterAvatarWidget(
-                        userId: myUserId,
-                        size: 64,
-                        fallbackText: myInitial,
-                        fallbackBackgroundColor: accentColor.withValues(alpha: 0.2),
-                        fallbackTextColor: accentColor,
-                      ),
-                      label: myUser?.name ?? '自分',
-                      color: accentColor,
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Icon(Icons.favorite, color: accentColor.withValues(alpha: 0.6), size: 28),
-                    ),
-                    _LabeledAvatar(
-                      avatar: CharacterAvatarWidget(
-                        userId: widget.friend.id,
-                        size: 64,
-                        fallbackText: friendInitial,
-                        fallbackBackgroundColor: Colors.purple.withValues(alpha: 0.2),
-                        fallbackTextColor: Colors.purple,
-                      ),
-                      label: widget.friend.name,
-                      color: Colors.purple,
-                    ),
-                  ],
-                ),
-              ),
-
-              // メインコンテンツ
-              Expanded(
-                child: _isInitialLoading
-                    ? Center(child: CircularProgressIndicator(color: accentColor))
-                    : _isLoading
-                        ? _buildLoadingView(accentColor)
-                        : _result == null
-                            ? _buildStartView(accentColor, myInitial, friendInitial)
-                            : _buildConversationAndScores(accentColor, myInitial, friendInitial),
-              ),
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildLoadingView(Color accentColor) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          CircularProgressIndicator(color: accentColor),
-          const SizedBox(height: 20),
-          Text(
-            'キャラクターが話し合っています...',
-            style: TextStyle(color: accentColor, fontSize: 15),
+  bool get _isAllUnlocked =>
+      kCompatibilityCategories.every((c) => _isUnlocked(c.key));
+
+  // ─────────────────────────────────────────
+  // アバター行
+  // ─────────────────────────────────────────
+  Widget _buildAvatarRow(Color accentColor, String myUserId, String myName,
+      String myInitial, String friendInitial) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _LabeledAvatar(
+          avatar: CharacterAvatarWidget(
+            userId: myUserId,
+            size: 60,
+            fallbackText: myInitial,
+            fallbackBackgroundColor: accentColor.withValues(alpha: 0.2),
+            fallbackTextColor: accentColor,
           ),
-        ],
-      ),
+          label: myName,
+          color: accentColor,
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Icon(
+            Icons.compare_arrows,
+            color: accentColor.withValues(alpha: 0.5),
+            size: 28,
+          ),
+        ),
+        _LabeledAvatar(
+          avatar: CharacterAvatarWidget(
+            userId: widget.friend.id,
+            size: 60,
+            fallbackText: friendInitial,
+            fallbackBackgroundColor: Colors.indigo.withValues(alpha: 0.2),
+            fallbackTextColor: Colors.indigo,
+          ),
+          label: widget.friend.name,
+          color: Colors.indigo,
+        ),
+      ],
     );
   }
 
-  Widget _buildStartView(Color accentColor, String myInitial, String friendInitial) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (_errorMessage != null) ...[
-              Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red, fontSize: 14),
-                textAlign: TextAlign.center,
+  // ─────────────────────────────────────────
+  // カテゴリカード（処理中 / 解放済み / 未解放）
+  // ─────────────────────────────────────────
+  Widget _buildCategoryCard(
+      CompatibilityCategoryMeta cat, Color accentColor, bool isPremium) {
+    final isProcessing = _processingCategoryKey == cat.key;
+    final isUnlocked = _isUnlocked(cat.key);
+    final anyProcessing = _processingCategoryKey != null;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cat.color.withValues(alpha: 0.2)),
+      ),
+      child: isProcessing
+          ? Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+              child: Row(
+                children: [
+                  Text(cat.icon, style: const TextStyle(fontSize: 22)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${cat.label}を診断中...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: cat.color,
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: cat.color),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-            ],
-            Text(
-              '${widget.friend.name}との相性を診断します',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.center,
+            )
+          : isUnlocked
+              ? _buildUnlockedTile(cat)
+              : _buildLockedTile(cat, accentColor, isPremium, anyProcessing),
+    );
+  }
+
+  /// 解放済みカード（スコアバッジ + 「結果を見る」）
+  Widget _buildUnlockedTile(CompatibilityCategoryMeta cat) {
+    final score = _document?.scores?.scoreFor(cat.key) ??
+        _getDiagnosis(cat.key)?.score ??
+        0;
+    final hasScore = score > 0;
+
+    return InkWell(
+      onTap: () => _onCategoryTap(cat),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Text(cat.icon, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    cat.label,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: cat.color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (hasScore) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: score / 100,
+                        backgroundColor: cat.color.withValues(alpha: 0.12),
+                        valueColor: AlwaysStoppedAnimation<Color>(cat.color),
+                        minHeight: 5,
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      '結果を見る',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: cat.color.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              'BIG5性格診断をもとに\nキャラクターが相性を語り合います',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _runDiagnosis,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
+            const SizedBox(width: 12),
+            if (hasScore) ...[
+              Text(
+                '$score%',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: cat.color,
                 ),
               ),
-              child: const Text('診断スタート', style: TextStyle(fontSize: 16)),
-            ),
+              const SizedBox(width: 4),
+            ],
+            Icon(Icons.chevron_right,
+                color: cat.color.withValues(alpha: 0.6), size: 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildConversationAndScores(
-    Color accentColor,
-    String myInitial,
-    String friendInitial,
-  ) {
-    final myUserId = ref.read(currentUserIdProvider) ?? '';
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      children: [
-        // 会話
-        ..._displayedMessages.asMap().entries.map((entry) {
-          final msg = entry.value;
-          return _MessageBubble(
-            message: msg,
-            myUserId: myUserId,
-            friendUserId: widget.friend.id,
-            myInitial: myInitial,
-            friendInitial: friendInitial,
-            accentColor: accentColor,
-          );
-        }),
+  /// 未解放カード（診断するボタン）
+  Widget _buildLockedTile(CompatibilityCategoryMeta cat, Color accentColor,
+      bool isPremium, bool anyProcessing) {
+    final isWebFree = kIsWeb && !isPremium;
 
-        // スコアカード（会話終了後に表示）
-        if (_showScores && _result != null) ...[
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 16),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          Text(cat.icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  cat.label,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: isWebFree ? cat.color.withValues(alpha: 0.4) : cat.color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  cat.description,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary
+                        .withValues(alpha: isWebFree ? 0.4 : 1.0),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isWebFree)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock_outline, size: 12,
+                      color: Colors.grey.withValues(alpha: 0.6)),
+                  const SizedBox(width: 4),
+                  Text(
+                    '有料のみ',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.grey.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: anyProcessing ? null : () => _onCategoryTap(cat),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: anyProcessing
+                      ? accentColor.withValues(alpha: 0.4)
+                      : accentColor,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isPremium) ...[
+                      const Icon(Icons.play_circle_outline,
+                          size: 14, color: Colors.white),
+                      const SizedBox(width: 4),
+                    ],
+                    const Text(
+                      '診断する',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ─────────────────────────────────────────
+  // 総合スコアカード（全カテゴリ解放後）
+  // ─────────────────────────────────────────
+  Widget _buildOverallCard(Color accentColor) {
+    final overall = _document?.scores?.overall ?? 0;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            accentColor.withValues(alpha: 0.15),
+            accentColor.withValues(alpha: 0.05),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        children: [
           Text(
-            'ジャンル別相性',
+            '総合相性スコア',
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
               color: accentColor,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-          _ScoreCard(
-            icon: '👫',
-            label: '友情',
-            score: _result!.friendshipScore,
-            comment: _result!.friendshipComment,
-            color: Colors.blue,
-          ),
-          _ScoreCard(
-            icon: '💕',
-            label: '恋愛',
-            score: _result!.romanceScore,
-            comment: _result!.romanceComment,
-            color: Colors.pink,
-          ),
-          _ScoreCard(
-            icon: '💼',
-            label: '仕事',
-            score: _result!.workScore,
-            comment: _result!.workComment,
-            color: Colors.orange,
-          ),
-          _ScoreCard(
-            icon: '🤝',
-            label: '信頼',
-            score: _result!.trustScore,
-            comment: _result!.trustComment,
-            color: Colors.green,
-          ),
-
-          // 総合スコア
           const SizedBox(height: 8),
-          _OverallScoreCard(
-            score: _result!.overallScore,
-            comment: _result!.overallComment,
-            accentColor: accentColor,
-          ),
-          const SizedBox(height: 32),
-
-          // 診断日時と再診断ボタン
-          if (_result?.createdAt != null) ...[
-            Center(
-              child: Text(
-                '前回の診断: ${DateFormat('M月d日 HH:mm').format(_result!.createdAt!)}',
-                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                '$overall',
+                style: TextStyle(
+                  fontSize: 52,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Center(
-            child: TextButton.icon(
-              onPressed: _runDiagnosis,
-              icon: Icon(Icons.refresh, color: accentColor),
-              label: Text('再診断する', style: TextStyle(color: accentColor)),
-            ),
+              Text(
+                '%',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 32),
         ],
-      ],
+      ),
     );
   }
 }
 
-/// ラベル付きアバター
+// ─────────────────────────────────────────
+// ラベル付きアバター
+// ─────────────────────────────────────────
 class _LabeledAvatar extends StatelessWidget {
   final Widget avatar;
   final String label;
@@ -396,342 +706,6 @@ class _LabeledAvatar extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ],
-    );
-  }
-}
-
-/// 会話吹き出し
-class _MessageBubble extends StatefulWidget {
-  final CompatibilityMessage message;
-  final String myUserId;
-  final String friendUserId;
-  final String myInitial;
-  final String friendInitial;
-  final Color accentColor;
-
-  const _MessageBubble({
-    required this.message,
-    required this.myUserId,
-    required this.friendUserId,
-    required this.myInitial,
-    required this.friendInitial,
-    required this.accentColor,
-  });
-
-  @override
-  State<_MessageBubble> createState() => _MessageBubbleState();
-}
-
-class _MessageBubbleState extends State<_MessageBubble>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-    _fadeAnim = Tween<double>(begin: 0, end: 1).animate(_controller);
-    _slideAnim = Tween<Offset>(
-      begin: widget.message.isMyCharacter
-          ? const Offset(-0.3, 0)
-          : const Offset(0.3, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final isMe = widget.message.isMyCharacter;
-    final bubbleColor = isMe
-        ? widget.accentColor.withValues(alpha: 0.15)
-        : Colors.purple.withValues(alpha: 0.1);
-    final borderColor = isMe
-        ? widget.accentColor.withValues(alpha: 0.4)
-        : Colors.purple.withValues(alpha: 0.3);
-
-    return FadeTransition(
-      opacity: _fadeAnim,
-      child: SlideTransition(
-        position: _slideAnim,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.start : MainAxisAlignment.end,
-            children: [
-              if (isMe) ...[
-                CharacterAvatarWidget(
-                  userId: widget.myUserId,
-                  size: 32,
-                  fallbackText: widget.myInitial,
-                  fallbackBackgroundColor: widget.accentColor.withValues(alpha: 0.2),
-                  fallbackTextColor: widget.accentColor,
-                ),
-                const SizedBox(width: 8),
-              ],
-              Flexible(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: bubbleColor,
-                    borderRadius: BorderRadius.only(
-                      topLeft: Radius.circular(isMe ? 4 : 16),
-                      topRight: Radius.circular(isMe ? 16 : 4),
-                      bottomLeft: const Radius.circular(16),
-                      bottomRight: const Radius.circular(16),
-                    ),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Text(
-                    widget.message.text,
-                    style: const TextStyle(fontSize: 14, height: 1.5),
-                  ),
-                ),
-              ),
-              if (!isMe) ...[
-                const SizedBox(width: 8),
-                CharacterAvatarWidget(
-                  userId: widget.friendUserId,
-                  size: 32,
-                  fallbackText: widget.friendInitial,
-                  fallbackBackgroundColor: Colors.purple.withValues(alpha: 0.2),
-                  fallbackTextColor: Colors.purple,
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ジャンル別スコアカード
-class _ScoreCard extends StatefulWidget {
-  final String icon;
-  final String label;
-  final int score;
-  final String comment;
-  final Color color;
-
-  const _ScoreCard({
-    required this.icon,
-    required this.label,
-    required this.score,
-    required this.comment,
-    required this.color,
-  });
-
-  @override
-  State<_ScoreCard> createState() => _ScoreCardState();
-}
-
-class _ScoreCardState extends State<_ScoreCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _widthAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-    _widthAnim = Tween<double>(begin: 0, end: widget.score / 100)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(widget.icon, style: const TextStyle(fontSize: 20)),
-              const SizedBox(width: 8),
-              Text(
-                widget.label,
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: widget.color,
-                ),
-              ),
-              const Spacer(),
-              Text(
-                '${widget.score}%',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: widget.color,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // スコアバー
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: AnimatedBuilder(
-              animation: _widthAnim,
-              builder: (context, _) {
-                return LinearProgressIndicator(
-                  value: _widthAnim.value,
-                  backgroundColor: widget.color.withValues(alpha: 0.15),
-                  valueColor: AlwaysStoppedAnimation<Color>(widget.color),
-                  minHeight: 8,
-                );
-              },
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            widget.comment,
-            style: TextStyle(fontSize: 13, color: Colors.grey[600], height: 1.4),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 総合スコアカード
-class _OverallScoreCard extends StatefulWidget {
-  final int score;
-  final String comment;
-  final Color accentColor;
-
-  const _OverallScoreCard({
-    required this.score,
-    required this.comment,
-    required this.accentColor,
-  });
-
-  @override
-  State<_OverallScoreCard> createState() => _OverallScoreCardState();
-}
-
-class _OverallScoreCardState extends State<_OverallScoreCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _scaleAnim = Tween<double>(begin: 0.8, end: 1.0)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
-    Future.delayed(const Duration(milliseconds: 400), () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnim,
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              widget.accentColor.withValues(alpha: 0.2),
-              widget.accentColor.withValues(alpha: 0.05),
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: widget.accentColor.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              '総合相性',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: widget.accentColor,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Text(
-                  '${widget.score}',
-                  style: TextStyle(
-                    fontSize: 56,
-                    fontWeight: FontWeight.bold,
-                    color: widget.accentColor,
-                  ),
-                ),
-                Text(
-                  '%',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: widget.accentColor,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              widget.comment,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

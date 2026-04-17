@@ -19,12 +19,14 @@ class VolumeSettings {
   final double characterVolume;
   final bool bgmMuted;
   final bool characterMuted;
+  final bool isLoaded;
 
   const VolumeSettings({
     this.bgmVolume = 0.5,
     this.characterVolume = 0.8,
     this.bgmMuted = false,
     this.characterMuted = false,
+    this.isLoaded = false,
   });
 
   VolumeSettings copyWith({
@@ -32,12 +34,14 @@ class VolumeSettings {
     double? characterVolume,
     bool? bgmMuted,
     bool? characterMuted,
+    bool? isLoaded,
   }) {
     return VolumeSettings(
       bgmVolume: bgmVolume ?? this.bgmVolume,
       characterVolume: characterVolume ?? this.characterVolume,
       bgmMuted: bgmMuted ?? this.bgmMuted,
       characterMuted: characterMuted ?? this.characterMuted,
+      isLoaded: isLoaded ?? this.isLoaded,
     );
   }
 }
@@ -52,15 +56,19 @@ class VolumeSettingsNotifier extends StateNotifier<VolumeSettings> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    state = VolumeSettings(
-      bgmVolume: prefs.getDouble('bgmVolume') ?? 0.5,
-      characterVolume: prefs.getDouble('characterVolume') ?? 0.8,
-      bgmMuted: prefs.getBool('bgmMuted') ?? false,
-      characterMuted: prefs.getBool('characterMuted') ?? false,
-    );
     _bgmVolumeBeforeMute = prefs.getDouble('bgmVolumeBeforeMute') ?? 0.5;
     _characterVolumeBeforeMute =
         prefs.getDouble('characterVolumeBeforeMute') ?? 0.8;
+    final bgmMuted = prefs.getBool('bgmMuted') ?? false;
+    final bgmVolume = prefs.getDouble('bgmVolume') ?? 0.5;
+    debugPrint('🔊 VolumeSettings _load: bgmMuted=$bgmMuted, bgmVolume=$bgmVolume');
+    state = VolumeSettings(
+      bgmVolume: bgmVolume,
+      characterVolume: prefs.getDouble('characterVolume') ?? 0.8,
+      bgmMuted: bgmMuted,
+      characterMuted: prefs.getBool('characterMuted') ?? false,
+      isLoaded: true,
+    );
   }
 
   Future<void> _save() async {
@@ -72,6 +80,7 @@ class VolumeSettingsNotifier extends StateNotifier<VolumeSettings> {
     await prefs.setDouble('bgmVolumeBeforeMute', _bgmVolumeBeforeMute);
     await prefs.setDouble(
         'characterVolumeBeforeMute', _characterVolumeBeforeMute);
+    debugPrint('🔊 VolumeSettings _save: bgmMuted=${state.bgmMuted}, bgmVolume=${state.bgmVolume}');
   }
 
   void setBgmVolume(double volume) {
@@ -158,7 +167,9 @@ class VolumeSettingsScreen extends ConsumerWidget {
       ),
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
-        child: SafeArea(
+        child: !settings.isLoaded
+            ? Center(child: CircularProgressIndicator(color: accentColor))
+            : SafeArea(
           child: ListView(
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.all(16),

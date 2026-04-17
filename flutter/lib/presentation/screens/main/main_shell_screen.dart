@@ -22,6 +22,7 @@ import '../note/note_screen.dart';
 import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
+import '../settings/volume_settings_screen.dart';
 
 /// 現在選択されているタブのインデックス
 final selectedTabProvider = StateProvider<int>((ref) => 0);
@@ -42,6 +43,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.initState();
     // iOSのRootView.onAppearと同様にBGMを開始
     BGMPlayer.shared.playBGM('assets/audio/DARIAS BGM.mp3');
+    // 音量設定プロバイダーを早期初期化してミュート状態をロードしておく
+    ref.read(volumeSettingsProvider);
     if (!kIsWeb) {
       _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
       // コールドスタート（ウィジェットタップによるアプリ起動）の処理

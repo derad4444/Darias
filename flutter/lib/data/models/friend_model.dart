@@ -145,18 +145,25 @@ class FriendModel {
 
 /// 相性診断結果モデル
 class CompatibilityResult {
-  final int friendshipScore;   // 友情
-  final int romanceScore;      // 恋愛
-  final int workScore;         // 仕事
-  final int trustScore;        // 信頼
-  final int overallScore;      // 総合
+  final int friendshipScore;
+  final int romanceScore;
+  final int workScore;
+  final int trustScore;
+  final int overallScore;
   final String friendshipComment;
   final String romanceComment;
   final String workComment;
   final String trustComment;
   final String overallComment;
+  final String friendshipAdvice;
+  final String romanceAdvice;
+  final String workAdvice;
+  final String trustAdvice;
   final List<CompatibilityMessage> conversation;
   final DateTime? createdAt;
+  final String? big5Key;
+  /// 解放済みカテゴリ（例: ["friendship", "romance"]）
+  final List<String> unlockedCategories;
 
   const CompatibilityResult({
     required this.friendshipScore,
@@ -169,8 +176,14 @@ class CompatibilityResult {
     required this.workComment,
     required this.trustComment,
     required this.overallComment,
+    this.friendshipAdvice = '',
+    this.romanceAdvice = '',
+    this.workAdvice = '',
+    this.trustAdvice = '',
     required this.conversation,
     this.createdAt,
+    this.big5Key,
+    this.unlockedCategories = const [],
   });
 
   factory CompatibilityResult.fromMap(Map<String, dynamic> map) {
@@ -195,8 +208,14 @@ class CompatibilityResult {
       workComment: map['workComment'] as String? ?? '',
       trustComment: map['trustComment'] as String? ?? '',
       overallComment: map['overallComment'] as String? ?? '',
+      friendshipAdvice: map['friendshipAdvice'] as String? ?? '',
+      romanceAdvice: map['romanceAdvice'] as String? ?? '',
+      workAdvice: map['workAdvice'] as String? ?? '',
+      trustAdvice: map['trustAdvice'] as String? ?? '',
       conversation: conv,
       createdAt: createdAt,
+      big5Key: map['big5Key'] as String?,
+      unlockedCategories: List<String>.from(map['unlockedCategories'] as List? ?? []),
     );
   }
 }
@@ -216,5 +235,158 @@ class CompatibilityMessage {
       isMyCharacter: map['isMyCharacter'] as bool? ?? true,
       text: map['text'] as String? ?? '',
     );
+  }
+}
+
+// ============================================================
+// カテゴリ別相性診断（新設計）
+// ============================================================
+
+/// 全カテゴリのスコア（BIG5から決定論的に算出）
+class CompatibilityScores {
+  final int friendship;
+  final int romance;
+  final int work;
+  final int trust;
+  final int overall;
+
+  const CompatibilityScores({
+    required this.friendship,
+    required this.romance,
+    required this.work,
+    required this.trust,
+    required this.overall,
+  });
+
+  factory CompatibilityScores.fromMap(Map<String, dynamic> map) {
+    return CompatibilityScores(
+      friendship: (map['friendship'] as num?)?.toInt() ?? 0,
+      romance: (map['romance'] as num?)?.toInt() ?? 0,
+      work: (map['work'] as num?)?.toInt() ?? 0,
+      trust: (map['trust'] as num?)?.toInt() ?? 0,
+      overall: (map['overall'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  int scoreFor(String key) {
+    switch (key) {
+      case 'friendship': return friendship;
+      case 'romance': return romance;
+      case 'work': return work;
+      case 'trust': return trust;
+      default: return overall;
+    }
+  }
+}
+
+/// 1カテゴリの診断結果（会話 + コメント + アドバイス）
+class CategoryDiagnosis {
+  final int score;
+  final String comment;
+  final String advice;
+  final List<CompatibilityMessage> conversation;
+  final String? big5Key;
+  final DateTime? createdAt;
+
+  const CategoryDiagnosis({
+    required this.score,
+    required this.comment,
+    required this.advice,
+    required this.conversation,
+    this.big5Key,
+    this.createdAt,
+  });
+
+  /// Cloud Function レスポンス（category + scores 付き）から生成
+  factory CategoryDiagnosis.fromFunctionResult(
+      Map<String, dynamic> data, String categoryKey) {
+    final conv = (data['conversation'] as List<dynamic>? ?? [])
+        .map((e) => CompatibilityMessage.fromMap(e as Map<String, dynamic>))
+        .toList();
+    final scores = CompatibilityScores.fromMap(
+        (data['scores'] as Map<dynamic, dynamic>?)
+                ?.map((k, v) => MapEntry(k.toString(), v)) ??
+            {});
+    return CategoryDiagnosis(
+      score: scores.scoreFor(categoryKey),
+      comment: data['comment'] as String? ?? '',
+      advice: data['advice'] as String? ?? '',
+      conversation: conv,
+      big5Key: data['big5Key'] as String?,
+    );
+  }
+
+  /// Firestoreドキュメントのカテゴリフィールドから生成
+  factory CategoryDiagnosis.fromDocField(
+      Map<String, dynamic> catMap, int score) {
+    final conv = (catMap['conversation'] as List<dynamic>? ?? [])
+        .map((e) => CompatibilityMessage.fromMap(e as Map<String, dynamic>))
+        .toList();
+    DateTime? createdAt;
+    final raw = catMap['createdAt'];
+    if (raw is Timestamp) createdAt = raw.toDate();
+    return CategoryDiagnosis(
+      score: score,
+      comment: catMap['comment'] as String? ?? '',
+      advice: catMap['advice'] as String? ?? '',
+      conversation: conv,
+      big5Key: catMap['big5Key'] as String?,
+      createdAt: createdAt,
+    );
+  }
+}
+
+/// 相性診断ドキュメント（Firestore全体）
+class CompatibilityDocument {
+  final List<String> unlockedCategories;
+  final CompatibilityScores? scores;
+  final CategoryDiagnosis? friendship;
+  final CategoryDiagnosis? romance;
+  final CategoryDiagnosis? work;
+  final CategoryDiagnosis? trust;
+
+  const CompatibilityDocument({
+    required this.unlockedCategories,
+    this.scores,
+    this.friendship,
+    this.romance,
+    this.work,
+    this.trust,
+  });
+
+  factory CompatibilityDocument.fromMap(Map<String, dynamic> map) {
+    CompatibilityScores? scores;
+    if (map['scores'] is Map) {
+      scores = CompatibilityScores.fromMap(
+          (map['scores'] as Map<dynamic, dynamic>)
+              .map((k, v) => MapEntry(k.toString(), v)));
+    }
+
+    CategoryDiagnosis? parseCat(String key) {
+      if (map[key] is! Map) return null;
+      final catMap = (map[key] as Map<dynamic, dynamic>)
+          .map((k, v) => MapEntry(k.toString(), v));
+      return CategoryDiagnosis.fromDocField(catMap, scores?.scoreFor(key) ?? 0);
+    }
+
+    return CompatibilityDocument(
+      unlockedCategories:
+          List<String>.from(map['unlockedCategories'] as List? ?? []),
+      scores: scores,
+      friendship: parseCat('friendship'),
+      romance: parseCat('romance'),
+      work: parseCat('work'),
+      trust: parseCat('trust'),
+    );
+  }
+
+  CategoryDiagnosis? categoryFor(String key) {
+    switch (key) {
+      case 'friendship': return friendship;
+      case 'romance': return romance;
+      case 'work': return work;
+      case 'trust': return trust;
+      default: return null;
+    }
   }
 }

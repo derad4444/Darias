@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/models/friend_model.dart';
 import 'auth_provider.dart';
@@ -183,10 +185,53 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// 相性診断を実行
-  Future<CompatibilityResult?> runCompatibilityDiagnosis({
+  /// カテゴリを解放済みとしてFirestoreに記録
+  Future<void> unlockCategory({
     required String friendId,
-    required String myCharacterId,
+    required String category,
+  }) async {
+    if (_userId == null) return;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('compatibilityResults')
+          .doc(friendId)
+          .set(
+            {'unlockedCategories': FieldValue.arrayUnion([category])},
+            SetOptions(merge: true),
+          );
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// 相性診断ドキュメント全体を取得（新設計）
+  Future<CompatibilityDocument?> fetchCompatibilityDocument({
+    required String friendId,
+  }) async {
+    if (_userId == null) return null;
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('compatibilityResults')
+          .doc(friendId)
+          .get();
+      if (!doc.exists) return null;
+      final data = doc.data();
+      if (data == null) return null;
+      return CompatibilityDocument.fromMap(data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// カテゴリ別相性診断を実行（Cloud Function経由）
+  /// Cloud Function側でFirestoreへの保存・unlockedCategories更新も行う
+  Future<CategoryDiagnosis?> runCategoryDiagnosis({
+    required String friendId,
+    required String category,
   }) async {
     if (_userId == null) return null;
     try {
@@ -194,7 +239,27 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
       final result = await callable.call({
         'userId': _userId,
         'friendId': friendId,
-        'myCharacterId': myCharacterId,
+        'category': category,
+      });
+      // Firebase Functions returns Map<Object?, Object?> — JSON round-trip converts to Map<String, dynamic>
+      final data = jsonDecode(jsonEncode(result.data)) as Map<String, dynamic>;
+      return CategoryDiagnosis.fromFunctionResult(data, category);
+    } catch (e) {
+      debugPrint('❌ runCategoryDiagnosis error: $e');
+      return null;
+    }
+  }
+
+  /// 相性診断を実行（BIG5キャッシュはCloud Function側で処理）
+  Future<CompatibilityResult?> runCompatibilityDiagnosis({
+    required String friendId,
+  }) async {
+    if (_userId == null) return null;
+    try {
+      final callable = _functions.httpsCallable('diagnoseCompatibility');
+      final result = await callable.call({
+        'userId': _userId,
+        'friendId': friendId,
       });
       final data = result.data as Map<String, dynamic>;
       return CompatibilityResult.fromMap(data);

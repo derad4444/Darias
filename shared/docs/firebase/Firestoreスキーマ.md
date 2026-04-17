@@ -3,7 +3,7 @@
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
 **最終更新日**: 2026-03-07
-**トップレベルコレクション**: 8
+**トップレベルコレクション**: 9
 
 ---
 
@@ -17,6 +17,7 @@
 6. [ad_analytics](#ad_analytics) - 広告分析データ
 7. [holidays](#holidays) - 祝日データ
 8. [system](#system) - システム設定
+9. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
 
 ---
 
@@ -319,6 +320,74 @@
 
 ---
 
+### `users/{userId}/incomingRequests`
+
+**用途**: 自分が受信したフレンド申請を管理
+**ドキュメントID**: 申請送信者の Firebase Auth UID
+
+**フィールド:**
+
+- **fromUserId**: `string` - 申請を送ったユーザーのID
+- **fromUserName**: `string` - 申請送信者の表示名
+- **fromUserEmail**: `string` - 申請送信者のメールアドレス
+- **toUserId**: `string` - 申請を受け取ったユーザーのID（自分）
+- **toUserName**: `string` - 申請受信者の表示名
+- **status**: `string` - ステータス（`"pending"` / `"accepted"` / `"rejected"`）
+- **createdAt**: `timestamp` - 申請日時
+
+**備考**: `sendFriendRequest` Cloud Function が申請送信者の `outgoingRequests` と申請受信者の `incomingRequests` 両方に書き込む。承認・拒否後は適宜削除される。
+
+---
+
+### `users/{userId}/outgoingRequests`
+
+**用途**: 自分が送信したフレンド申請を管理
+**ドキュメントID**: 申請受信者の Firebase Auth UID
+
+**フィールド:**
+
+- **fromUserId**: `string` - 申請を送ったユーザーのID（自分）
+- **fromUserName**: `string` - 申請送信者の表示名
+- **fromUserEmail**: `string` - 申請送信者のメールアドレス
+- **toUserId**: `string` - 申請を受け取ったユーザーのID
+- **toUserName**: `string` - 申請受信者の表示名
+- **status**: `string` - ステータス（`"pending"` / `"accepted"` / `"rejected"`）
+- **createdAt**: `timestamp` - 申請日時
+
+**備考**: フレンド承認後は対応するドキュメントが削除される。
+
+---
+
+### `users/{userId}/compatibilityResults`
+
+**用途**: フレンドとの相性診断結果を保存（カテゴリ別）
+**ドキュメントID**: フレンドの Firebase Auth UID
+
+**フィールド:**
+
+- **scores**: `map` - 全カテゴリの相性スコア（BIG5から決定論的に算出）
+  - **friendship**: `number` - 友情スコア（0〜100）
+  - **romance**: `number` - 恋愛スコア（0〜100、上限82）
+  - **work**: `number` - 仕事スコア（0〜100）
+  - **trust**: `number` - 信頼スコア（0〜100）
+  - **overall**: `number` - 総合スコア（0〜100）
+- **unlockedCategories**: `array<string>` - 診断済みカテゴリのリスト（例: `["friendship", "romance"]`）。`FieldValue.arrayUnion` で追記される
+- **friendship**: `map` *(解放済みの場合)* - 友情カテゴリの診断結果
+  - **comment**: `string` - 相性コメント（30文字以内）
+  - **advice**: `string` - アドバイス（60文字以内）
+  - **conversation**: `array<map>` - キャラクター会話（4〜5ターン）
+    - **isMyCharacter**: `boolean` - 自分のキャラクターの発言かどうか
+    - **text**: `string` - セリフ
+  - **big5Key**: `string` - キャッシュキー（`fp1|fp2` ソート済み）
+  - **createdAt**: `timestamp` - 診断実行日時
+- **romance**: `map` *(同上)*
+- **work**: `map` *(同上)*
+- **trust**: `map` *(同上)*
+
+**備考**: `diagnoseCompatibility` Cloud Function が `set({merge: true})` で書き込む。スコアは再診断時に上書きされるが、カテゴリデータは蓄積される。
+
+---
+
 ### `users/{userId}/friends`
 
 **用途**: フレンド（相互登録ユーザー）の管理と予定共有レベル設定
@@ -555,6 +624,36 @@
 
 ---
 
+## `compatibilityCache`
+
+**用途**: 相性診断のカテゴリ別 AI 生成結果をキャッシュ。同じ BIG5 スコアの組み合わせ × カテゴリに対して再生成を省略する
+**ドキュメントID**: `{big5Fingerprint1}|{big5Fingerprint2}_{category}`（例: `o2c3e4a3n2|o3c4e3a4n2_friendship`）
+
+**キーの生成ルール:**
+- BIG5指紋形式: `o{O}c{C}e{E}a{A}n{N}`（各スコア1〜5）
+- 2人の指紋をアルファベット順でソートして `|` で連結
+- キャッシュは双方向で共有される（A↔B と B↔A は同じキャッシュ）
+
+**フィールド:**
+
+- **comment**: `string` - 相性コメント（30文字以内）
+- **advice**: `string` - アドバイス（60文字以内）
+- **conversation**: `array<map>` - キャラクター会話
+  - **isMyCharacter**: `boolean` - 元の生成時に「自分キャラ」だったかどうか（キャッシュ再利用時は needsFlip で反転）
+  - **text**: `string` - セリフ
+- **big5Key**: `string` - キャッシュキー自身（冗長だが参照用）
+- **createdAt**: `timestamp` - キャッシュ生成日時
+
+**備考:**
+- `diagnoseCompatibility` Cloud Function のみが書き込む（クライアントからの直接アクセス不可）
+- キャッシュヒット時は `isMyCharacter` を `needsFlip` フラグで反転してから返す
+- カテゴリ別（4カテゴリ）にそれぞれ独立してキャッシュされる
+- 理論上のキャッシュ数: 5^10 × 4カテゴリ / 2（対称性） = 約3,900万通り（BIG5の組み合わせ爆発のため実質ヒット率は低い）
+
+**アクセス権限**: 書き込みは Cloud Function のみ
+
+---
+
 ## データフロー
 
 ```
@@ -608,8 +707,14 @@ users/{userId}
 ├── todos/{docId}
 ├── memos/{docId}
 ├── tags/{docId}                ← isPublic フィールド追加（2026-04-17）
-├── friends/{friendUserId}      ← 新規（2026-04-17）フレンド共有設定
-├── settings/calendarSettings   ← 新規（2026-04-17）カレンダー設定
+├── friends/{friendUserId}                  ← 新規（2026-04-17）フレンド共有設定
+├── incomingRequests/{fromUserId}           ← 新規（2026-04-17）受信フレンド申請
+├── outgoingRequests/{toUserId}             ← 新規（2026-04-17）送信フレンド申請
+├── compatibilityResults/{friendUserId}     ← 新規（2026-04-17）相性診断結果
+│   ├── scores {}
+│   ├── unlockedCategories []
+│   └── {category}: { comment, advice, conversation[], big5Key, createdAt }
+├── settings/calendarSettings               ← 新規（2026-04-17）カレンダー設定
 └── diary/{docId}
 
 shared_meetings/{id}
@@ -645,8 +750,9 @@ Big5Analysis/{personalityKey}
 | `ad_analytics` | 不可 | 認証ユーザー（作成のみ） |
 | `holidays` | 全員 | 管理者のみ |
 | `system` | 全員 | 不可 |
+| `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
 
 ---
 
-**最終更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends` サブコレクション・`users/{userId}/settings/calendarSettings` 追加、`schedules` に `isPublic` フィールド追加、`tags` に `isPublic` フィールド追加）
+**最終更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
 **作成者**: Claude Code

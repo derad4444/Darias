@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../../data/models/friend_model.dart';
@@ -94,9 +93,6 @@ class _FriendCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userDocProvider);
-    final myCharacterId = userAsync.valueOrNull?.characterId ?? '';
-
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -152,7 +148,6 @@ class _FriendCard extends ConsumerWidget {
                     MaterialPageRoute(
                       builder: (_) => CompatibilityScreen(
                         friend: friend,
-                        myCharacterId: myCharacterId,
                       ),
                     ),
                   ),
