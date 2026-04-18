@@ -1,20 +1,28 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../data/services/notification_service.dart';
-import 'character_provider.dart';
+import 'auth_provider.dart';
 
-/// NotificationServiceのプロバイダー
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
 });
 
-/// 通知許可状態のプロバイダー
 final notificationPermissionProvider =
     FutureProvider<AuthorizationStatus>((ref) async {
   final service = ref.watch(notificationServiceProvider);
   return await service.getPermissionStatus();
+});
+
+/// ログイン状態が変わるたびにFCMトークンをFirestoreへ同期
+final fcmTokenSyncProvider = Provider<void>((ref) {
+  if (kIsWeb) return;
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId != null) {
+    Future.microtask(() => NotificationService().saveFcmToken(userId));
+  }
 });
 
 // ────────────────────────────────────────
@@ -76,7 +84,6 @@ class NotificationSettingsNotifier
     state = state.copyWith(scheduleNotifications: value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keySchedule, value);
-    // 予定通知はスケジュール保存時に個別に設定されるため、ここではトピック購読のみ
     final service = _ref.read(notificationServiceProvider);
     if (value) {
       service.subscribeToTopic('schedule');
@@ -91,13 +98,20 @@ class NotificationSettingsNotifier
     await prefs.setBool(_keyDiary, value);
 
     final service = _ref.read(notificationServiceProvider);
+    final userId = _ref.read(currentUserIdProvider);
+
+    // Firestoreのフラグを更新（Cloud FunctionsのFCM送信可否に使用）
+    if (userId != null) {
+      await service.setDiaryNotificationsEnabled(userId, value);
+    }
+
+    // 古いローカル日記通知をキャンセル（FCMへ移行済み）
+    await service.cancelDailyDiaryNotification();
+
     if (value) {
-      // キャラクター名を取得して日記通知をスケジュール
-      final character = _ref.read(currentCharacterProvider).valueOrNull;
-      final name = character?.name ?? 'キャラクター';
-      await service.scheduleDailyDiaryNotification(name);
+      service.subscribeToTopic('diary');
     } else {
-      await service.cancelDailyDiaryNotification();
+      service.unsubscribeFromTopic('diary');
     }
   }
 }

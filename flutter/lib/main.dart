@@ -17,6 +17,7 @@ import 'data/services/notification_service.dart';
 import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/character_provider.dart';
+import 'presentation/providers/notification_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/router/app_router.dart';
 
@@ -85,6 +86,9 @@ class DariasApp extends ConsumerWidget {
 
     // キャラクター画像URLをアプリ起動直後からプリロード（各画面表示前にキャッシュしておく）
     ref.listen(characterImageProvider, (_, __) {});
+
+    // ログイン状態変化時にFCMトークンをFirestoreへ同期
+    ref.watch(fcmTokenSyncProvider);
 
     return GestureDetector(
       onTap: () {

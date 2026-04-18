@@ -1,8 +1,7 @@
-// src/functions/scheduledTasks.js - 軽量化版
+// src/functions/scheduledTasks.js
 
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 
-// 遅延インポートで軽量化
 let CONFIG; let Logger; let generateHolidaysForTwoYears; let generateDiary; let admin; let errorHandler;
 let logger;
 
@@ -20,23 +19,20 @@ function initializeDependencies() {
 }
 
 /**
- * 日記自動生成（毎日23:50 JST）
+ * 日記自動生成（毎日23:50 JST）+ 生成後にFCMプッシュ通知を送信
  */
 const scheduledDiaryGeneration = onSchedule(
     {
-      schedule: "50 23 * * *", // 毎日23:50 JST
+      schedule: "50 23 * * *",
       timeZone: "Asia/Tokyo",
       region: "asia-northeast1",
       memory: "1GiB",
       timeoutSeconds: 540,
     },
     async (event) => {
-      // 実行時に依存関係を初期化
       initializeDependencies();
 
       const db = admin.firestore();
-
-      // 全ユーザーを取得
       const usersSnapshot = await db.collection("users").get();
 
       logger.info("Starting daily diary generation", {
@@ -47,15 +43,52 @@ const scheduledDiaryGeneration = onSchedule(
       let errorCount = 0;
       let totalCharacters = 0;
 
-      // 並行制御: 同時に5件まで処理
       const pLimit = (await import("p-limit")).default;
       const limit = pLimit(5);
 
-      const processCharacter = async (userId, characterId) => {
+      /**
+       * 日記を生成し、FCMトークンがあれば通知を送信する
+       */
+      const processCharacter = async (userId, characterId, characterName, fcmToken, diaryNotificationsEnabled) => {
         try {
           await generateDiary(characterId, userId);
           successCount++;
           logger.info("Diary generated successfully", {userId, characterId});
+
+          // FCMプッシュ通知を送信（トークンあり、かつ通知が有効な場合）
+          if (fcmToken && diaryNotificationsEnabled !== false) {
+            try {
+              await admin.messaging().send({
+                token: fcmToken,
+                notification: {
+                  title: `${characterName}の日記`,
+                  body: `${characterName}が今日の日記を書きました`,
+                },
+                data: {
+                  type: "diary",
+                  userId,
+                  characterId,
+                },
+                apns: {
+                  payload: {aps: {sound: "default"}},
+                },
+                android: {
+                  notification: {sound: "default"},
+                },
+              });
+              logger.info("Diary notification sent", {userId});
+            } catch (notifError) {
+              // 無効なトークンは削除してクリーンアップ
+              if (notifError.code === "messaging/registration-token-not-registered") {
+                await db.collection("users").doc(userId)
+                    .update({fcmToken: admin.firestore.FieldValue.delete()});
+                logger.info("Cleaned up invalid FCM token", {userId});
+              } else {
+                logger.error("Failed to send diary notification", notifError, {userId});
+              }
+            }
+          }
+
           return {success: true, userId, characterId};
         } catch (error) {
           errorCount++;
@@ -66,21 +99,20 @@ const scheduledDiaryGeneration = onSchedule(
 
       const promises = [];
 
-      // 各ユーザーのキャラクターを取得して処理
       for (const userDoc of usersSnapshot.docs) {
         const userId = userDoc.id;
         const userData = userDoc.data();
         const characterId = userData.character_id;
+        const fcmToken = userData.fcmToken || null;
+        const diaryNotificationsEnabled = userData.diaryNotificationsEnabled;
 
         logger.info("Checking user", {userId, characterId});
 
-        // character_idが存在し、details/currentドキュメントがあるか確認
         if (!characterId) {
           logger.info("User has no character_id", {userId});
           continue;
         }
 
-        // キャラクター詳細が存在するか確認
         const detailsDoc = await db.collection("users").doc(userId)
             .collection("characters").doc(characterId)
             .collection("details").doc("current").get();
@@ -90,46 +122,39 @@ const scheduledDiaryGeneration = onSchedule(
           continue;
         }
 
+        const characterName = detailsDoc.data()?.name || "キャラクター";
         totalCharacters++;
-        promises.push(limit(() => processCharacter(userId, characterId)));
+        promises.push(limit(() => processCharacter(userId, characterId, characterName, fcmToken, diaryNotificationsEnabled)));
       }
 
       const results = await Promise.allSettled(promises);
 
-      // 失敗した処理を集計
       const failures = results
-          .filter((result) => result.status === "rejected" ||
-              !result.value?.success)
+          .filter((result) => result.status === "rejected" || !result.value?.success)
           .map((result) => result.value || result.reason);
 
       logger.success("Daily diary generation completed", {
         totalUsers: usersSnapshot.docs.length,
-        totalCharacters: totalCharacters,
+        totalCharacters,
         success: successCount,
         errors: errorCount,
-        // 最初の5件のみログ
         failures: failures.length > 0 ? failures.slice(0, 5) : undefined,
       });
     },
 );
-
-
-// キャラクター詳細生成は段階的生成に統合されました
-// generateCharacterReply.js での BIG5 診断完了時にリアルタイム生成
 
 /**
  * 祝日登録（毎年1月1日1:00 JST）
  */
 const scheduledHolidays = onSchedule(
     {
-      schedule: "0 1 1 1 *", // 毎年1月1日1:00 JST
+      schedule: "0 1 1 1 *",
       region: "asia-northeast1",
       timeZone: "Asia/Tokyo",
       memory: "512MiB",
       timeoutSeconds: 300,
     },
     async (event) => {
-      // 実行時に依存関係を初期化
       initializeDependencies();
 
       const now = new Date();

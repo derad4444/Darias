@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -7,10 +9,10 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
 import '../../data/models/schedule_model.dart';
+import '../../firebase_options.dart';
 import 'notification_web_helper_stub.dart'
     if (dart.library.html) 'notification_web_helper.dart';
 
-/// プッシュ通知・ローカル通知サービス
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -23,9 +25,7 @@ class NotificationService {
   static const String _scheduleChannelId = 'schedule_channel';
   static const String _diaryChannelId = 'diary_channel';
 
-  // Web: タイマーベースのスケジューリング（アプリ起動中のみ有効）
   final Map<String, Timer> _webTimers = {};
-  Timer? _webDiaryTimer;
 
   // ────────────────────────────────────────
   // 初期化
@@ -33,7 +33,6 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (kIsWeb) {
-      // Web: FCMフォアグラウンドメッセージのみ設定
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
       return;
     }
@@ -62,7 +61,7 @@ class NotificationService {
       ),
     );
 
-    // Android 通知チャンネル作成
+    // Android 通知チャンネル
     await _localPlugin!
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
@@ -82,15 +81,63 @@ class NotificationService {
           importance: Importance.defaultImportance,
         ));
 
-    // FCM フォアグラウンドメッセージ
+    // 古いローカル日記通知を削除（FCMへ移行）
+    await _localPlugin!.cancel(_diaryNotificationId);
+
+    // iOS: フォアグラウンド時もバナー表示
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
+  }
+
+  // ────────────────────────────────────────
+  // FCM トークン管理
+  // ────────────────────────────────────────
+
+  /// ログイン後にFCMトークンをFirestoreへ保存
+  Future<void> saveFcmToken(String userId) async {
+    if (kIsWeb) return;
+    try {
+      final token = await _messaging.getToken();
+      if (token == null) return;
+
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({'fcmToken': token});
+
+      _messaging.onTokenRefresh.listen((newToken) {
+        FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({'fcmToken': newToken}).catchError((_) {});
+      });
+    } catch (e) {
+      debugPrint('NotificationService: saveFcmToken failed: $e');
+    }
+  }
+
+  /// 日記通知の有効/無効をFirestoreへ保存（Cloud Functionsが参照）
+  Future<void> setDiaryNotificationsEnabled(String userId, bool enabled) async {
+    if (kIsWeb) return;
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .update({'diaryNotificationsEnabled': enabled});
+    } catch (e) {
+      debugPrint('NotificationService: setDiaryNotificationsEnabled failed: $e');
+    }
   }
 
   // ────────────────────────────────────────
   // 通知許可
   // ────────────────────────────────────────
 
-  /// 現在の許可状態を取得
   Future<AuthorizationStatus> getPermissionStatus() async {
     if (kIsWeb) {
       return isWebNotificationGranted
@@ -101,7 +148,6 @@ class NotificationService {
     return settings.authorizationStatus;
   }
 
-  /// 許可をリクエスト
   Future<bool> requestPermission() async {
     if (kIsWeb) {
       return await requestWebNotificationPermission();
@@ -125,10 +171,9 @@ class NotificationService {
   }
 
   // ────────────────────────────────────────
-  // 予定通知
+  // 予定通知（ローカル）
   // ────────────────────────────────────────
 
-  /// 予定のリマインダーをスケジュール
   Future<void> scheduleForSchedule(ScheduleModel schedule) async {
     if (schedule.remindValue <= 0 || schedule.remindUnit.isEmpty) return;
 
@@ -168,7 +213,6 @@ class NotificationService {
     );
   }
 
-  /// 予定の通知をキャンセル
   Future<void> cancelScheduleNotification(String scheduleId) async {
     if (kIsWeb) {
       _cancelWebTimer(scheduleId);
@@ -178,51 +222,11 @@ class NotificationService {
   }
 
   // ────────────────────────────────────────
-  // 日記通知（毎日23:55）
+  // 日記通知（FCMベース。ローカル通知はキャンセルのみ残す）
   // ────────────────────────────────────────
 
-  /// 日記通知を毎日23:55にスケジュール
-  Future<void> scheduleDailyDiaryNotification(String characterName) async {
-    if (kIsWeb) {
-      _scheduleWebDiary(characterName);
-      return;
-    }
-
-    await _localPlugin?.cancel(_diaryNotificationId);
-
-    final now = DateTime.now();
-    var notifyAt = DateTime(now.year, now.month, now.day, 23, 55);
-    if (notifyAt.isBefore(now)) {
-      notifyAt = notifyAt.add(const Duration(days: 1));
-    }
-
-    await _localPlugin?.zonedSchedule(
-      _diaryNotificationId,
-      '${characterName}の日記',
-      'キャラクターが今日の日記を書きました',
-      tz.TZDateTime.from(notifyAt, tz.local),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _diaryChannelId,
-          '日記通知',
-          importance: Importance.defaultImportance,
-        ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.time, // 毎日繰り返し
-    );
-  }
-
-  /// 日記通知をキャンセル
+  /// 古いローカル日記通知をキャンセル（FCMへ移行済みのため登録は不要）
   Future<void> cancelDailyDiaryNotification() async {
-    if (kIsWeb) {
-      _webDiaryTimer?.cancel();
-      _webDiaryTimer = null;
-      return;
-    }
     await _localPlugin?.cancel(_diaryNotificationId);
   }
 
@@ -284,31 +288,37 @@ class NotificationService {
     _webTimers.remove(scheduleId);
   }
 
-  void _scheduleWebDiary(String characterName) {
-    _webDiaryTimer?.cancel();
-    final now = DateTime.now();
-    var notifyAt = DateTime(now.year, now.month, now.day, 23, 55);
-    if (notifyAt.isBefore(now)) {
-      notifyAt = notifyAt.add(const Duration(days: 1));
-    }
-    _webDiaryTimer = Timer(notifyAt.difference(now), () {
-      showWebNotification('${characterName}の日記',
-          body: 'キャラクターが今日の日記を書きました');
-      // 翌日のためにもう一度スケジュール
-      _scheduleWebDiary(characterName);
-    });
+  /// フォアグラウンド受信: Androidはローカル通知で表示（iOSはOS側で自動表示）
+  Future<void> _onForegroundMessage(RemoteMessage message) async {
+    final notification = message.notification;
+    if (notification == null || _localPlugin == null) return;
+
+    // iOSはsetForegroundNotificationPresentationOptionsで表示済み
+    if (defaultTargetPlatform == TargetPlatform.iOS) return;
+
+    await _localPlugin!.show(
+      message.hashCode,
+      notification.title,
+      notification.body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          _diaryChannelId,
+          '日記通知',
+          importance: Importance.defaultImportance,
+        ),
+      ),
+    );
   }
 
-  /// バッジをクリア
   Future<void> clearBadge() async {}
-
-  void _onForegroundMessage(dynamic message) {
-    debugPrint('NotificationService: foreground message received');
-  }
 }
 
-/// バックグラウンドメッセージハンドラ（トップレベル）
+/// バックグラウンドメッセージハンドラ（トップレベル・別isolate）
+/// notification フィールドがあるFCMメッセージはOSが自動表示するため、
+/// Firebaseの初期化のみ行う
 @pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(dynamic message) async {
-  debugPrint('NotificationService: background message received');
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 }
