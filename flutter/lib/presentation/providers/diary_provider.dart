@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/diary_datasource.dart';
 import '../../data/models/diary_model.dart';
+import '../../data/services/hint_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
 
@@ -52,6 +53,37 @@ final diaryForDateProvider = Provider.family<DiaryModel?, DateTime>((ref, date) 
     },
   );
 });
+
+/// 新しい日記があるかどうかのプロバイダー（カレンダータブバッジ用）
+final hasNewDiaryProvider = FutureProvider<bool>((ref) async {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return false;
+
+  final diariesAsync = ref.watch(currentCharacterDiariesProvider);
+  final diaries = diariesAsync.valueOrNull;
+  if (diaries == null || diaries.isEmpty) return false;
+
+  final latestDate = diaries.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
+  final hint = HintService(userId);
+  final lastSeen = await hint.getLastSeenDiaryDate();
+  if (lastSeen == null) return true;
+
+  final latest = DateTime(latestDate.year, latestDate.month, latestDate.day);
+  final seen = DateTime(lastSeen.year, lastSeen.month, lastSeen.day);
+  return latest.isAfter(seen);
+});
+
+/// 日記バッジクリア（カレンダータブタップ時に呼ぶ）
+Future<void> clearDiaryBadge(WidgetRef ref) async {
+  final userId = ref.read(currentUserIdProvider);
+  if (userId == null) return;
+  final diariesAsync = ref.read(currentCharacterDiariesProvider);
+  final diaries = diariesAsync.valueOrNull;
+  if (diaries == null || diaries.isEmpty) return;
+  final latestDate = diaries.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
+  await HintService(userId).setLastSeenDiaryDate(latestDate);
+  ref.invalidate(hasNewDiaryProvider);
+}
 
 /// 日記コントローラー
 class DiaryController extends StateNotifier<AsyncValue<void>> {

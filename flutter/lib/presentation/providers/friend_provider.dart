@@ -51,6 +51,14 @@ final outgoingFriendRequestsProvider = StreamProvider<List<FriendRequestModel>>(
       .map((snap) => snap.docs.map(FriendRequestModel.fromFirestore).toList());
 });
 
+/// 未承認フレンド申請の件数プロバイダー（フレンドタブバッジ用）
+final pendingFriendRequestCountProvider = Provider<int>((ref) {
+  final requestsAsync = ref.watch(incomingFriendRequestsProvider);
+  return requestsAsync.valueOrNull
+      ?.where((r) => r.status == FriendRequestStatus.pending)
+      .length ?? 0;
+});
+
 /// フレンド操作コントローラー
 class FriendController extends StateNotifier<AsyncValue<void>> {
   final FirebaseFirestore _firestore;

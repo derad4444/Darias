@@ -57,6 +57,24 @@ class HintService {
     await prefs.setBool(_onboardingFullKey, true);
   }
 
+  // ── 日記バッジ管理 ────────────────────────────────────
+
+  /// 最後に確認した日記の日付（YYYY-MM-DD形式）
+  Future<DateTime?> getLastSeenDiaryDate() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString('diary_last_seen_$userId');
+    if (str == null) return null;
+    return DateTime.tryParse(str);
+  }
+
+  Future<void> setLastSeenDiaryDate(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      'diary_last_seen_$userId',
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+    );
+  }
+
   // ── アカウント削除時のクリーンアップ ─────────────────
 
   static Future<void> clearAllForUser(String userId) async {

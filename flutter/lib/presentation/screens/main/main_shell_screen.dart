@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:home_widget/home_widget.dart';
 import '../../../core/theme/app_colors.dart';
@@ -23,6 +24,8 @@ import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
 import '../settings/volume_settings_screen.dart';
+import '../../providers/friend_provider.dart';
+import '../../providers/diary_provider.dart';
 
 /// 現在選択されているタブのインデックス
 final selectedTabProvider = StateProvider<int>((ref) => 0);
@@ -80,6 +83,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     }
   }
 
+  void _updateAppBadge(WidgetRef ref) {
+    final count = ref.read(pendingFriendRequestCountProvider);
+    final hasNewDiary = ref.read(hasNewDiaryProvider).valueOrNull ?? false;
+    FlutterAppBadger.updateBadgeCount(count + (hasNewDiary ? 1 : 0));
+  }
+
   void _handleWidgetUri(Uri? uri) {
     if (uri == null) return;
     // darias://open/?page=todo  → queryParameters['page'] = 'todo'
@@ -106,6 +115,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final selectedTab = ref.watch(selectedTabProvider);
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
+    final pendingFriendCount = ref.watch(pendingFriendRequestCountProvider);
+    final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
+
+    // アプリアイコンバッジ更新（iOS only）
+    if (!kIsWeb) {
+      ref.listen<int>(pendingFriendRequestCountProvider, (_, __) => _updateAppBadge(ref));
+      ref.listen<AsyncValue<bool>>(hasNewDiaryProvider, (_, __) => _updateAppBadge(ref));
+    }
 
     if (!kIsWeb) {
       ref.listen<AsyncValue<List<MemoModel>>>(memosProvider, (_, next) {
@@ -217,7 +234,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: '予定',
                       isSelected: selectedTab == 1,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 1,
+                      showBadge: hasNewDiary,
+                      onTap: () {
+                        ref.read(selectedTabProvider.notifier).state = 1;
+                        clearDiaryBadge(ref).then((_) {
+                          if (!kIsWeb) _updateAppBadge(ref);
+                        });
+                      },
                     ),
                     _TabItem(
                       icon: Icons.note_outlined,
@@ -241,6 +264,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: 'フレンド',
                       isSelected: selectedTab == 4,
                       accentColor: accentColor,
+                      badgeCount: pendingFriendCount,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
                     ),
                     _TabItem(
@@ -270,6 +294,8 @@ class _TabItem extends StatelessWidget {
   final bool isSelected;
   final Color accentColor;
   final VoidCallback onTap;
+  final int badgeCount;
+  final bool showBadge;
 
   const _TabItem({
     required this.icon,
@@ -278,10 +304,13 @@ class _TabItem extends StatelessWidget {
     required this.isSelected,
     required this.accentColor,
     required this.onTap,
+    this.badgeCount = 0,
+    this.showBadge = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasBadge = badgeCount > 0 || showBadge;
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
@@ -290,10 +319,40 @@ class _TabItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              isSelected ? selectedIcon : icon,
-              color: isSelected ? accentColor : AppColors.textLight,
-              size: 24,
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  isSelected ? selectedIcon : icon,
+                  color: isSelected ? accentColor : AppColors.textLight,
+                  size: 24,
+                ),
+                if (hasBadge)
+                  Positioned(
+                    top: -4,
+                    right: -6,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: badgeCount > 0
+                          ? Text(
+                              badgeCount > 99 ? '99+' : '$badgeCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                height: 1.6,
+                              ),
+                              textAlign: TextAlign.center,
+                            )
+                          : const SizedBox(width: 8, height: 8),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(
