@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-04-17
+**最終更新日**: 2026-04-18
 **ランタイム**: Node.js 20
-**関数数**: 27
+**関数数**: 28
 
 ---
 
@@ -61,7 +61,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 15 関数
+### HTTP Callable (`onCall`) - 16 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -511,7 +511,57 @@
 
 ---
 
-#### 16. `deleteUserAccount`
+#### 16. `extractFromImage`
+- **ソース**: `const/extractFromImage.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: 画像（JPEG base64）を GPT-4o-mini Vision で解析し、メモ・タスク・予定・複数予定のいずれかの JSON データを抽出して返す。無料ユーザーはクライアント側でリワード広告を表示した上で呼び出す
+- **リソース**: memory `512MiB` / timeout `60秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: `OPENAI_API_KEY`
+- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **モデル**: `gpt-4o-mini`（Vision）/ temperature `0` / `response_format: json_object`
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `imageBase64` | `string` | JPEG 画像の base64 文字列（クライアント側で最大 1024px・品質 75% に圧縮済み） |
+| `targetType` | `string` | 抽出タイプ: `"schedule"` / `"memo"` / `"todo"` / `"schedules"`（複数予定一括） |
+
+**返却値（targetType 別）:**
+
+```javascript
+// schedule（単件）
+{ "result": { "title", "isAllDay", "startDate": Timestamp, "endDate": Timestamp, "location", "memo" } }
+
+// memo
+{ "result": { "title", "content" } }
+
+// todo
+{ "result": { "title", "description", "dueDate": Timestamp | null, "priority": "low"|"medium"|"high" } }
+
+// schedules（複数件一括）
+{ "result": { "schedules": [ { "title", "isAllDay", "startDate": Timestamp, "endDate": Timestamp, "location", "memo" }, ... ] } }
+```
+
+**エラー時:**
+```javascript
+{ "error": "Missing required fields" | "Invalid targetType" | "AI processing failed" | "Failed to parse AI response" }
+```
+
+**Timestamp 変換:**
+- `schedule` / `schedules` の `startDate` / `endDate`、`todo` の `dueDate` は Firestore `Timestamp` 形式に変換して返す
+
+**副作用**: なし（Firestore への書き込みは行わない）
+
+**Flutter 側の対応ファイル:**
+- `lib/data/datasources/remote/image_extraction_datasource.dart` — `extractFromImage()` / `extractSchedulesFromImage()`
+- `lib/presentation/widgets/image_scan_button.dart` — メモ・タスク・予定の単件スキャン UI
+- `lib/presentation/screens/calendar/bulk_schedule_confirmation_screen.dart` — 複数予定の確認・一括保存 UI
+
+---
+
+#### 17. `deleteUserAccount`
 - **ソース**: `deleteUserAccount.js`
 - **API バージョン**: **v1** (`firebase-functions` — `functions.https.onCall`)
 - **概要**: アカウント削除処理。①サブスクリプション情報を取得、②Google Play のアクティブなサブスクリプションをキャンセル、③Firestore の全サブコレクションを再帰削除する。App Store のサブスクリプションはサーバー側でキャンセル不可のためユーザーに手動キャンセルを案内する
@@ -671,6 +721,7 @@ shared/functions/
 │   ├── generateDiary.js              # アクティビティ型日記生成（scheduledDiaryGeneration から呼出）
 │   ├── getFriendSchedules.js         # フレンド共有スケジュール取得
 │   ├── diagnoseCompatibility.js      # カテゴリ別相性診断
+│   ├── extractFromImage.js           # 画像→メモ/タスク/予定/複数予定 AI抽出（Vision）
 │   ├── searchUsers.js                # フレンド追加用ユーザー検索
 │   ├── friendRequest.js              # フレンド申請（send/accept/reject/cancel）4関数
 │   └── big5Questions.js              # BIG5 質問定義・スコア計算
@@ -722,7 +773,7 @@ shared/functions/
 
 | 変数名 | 用途 | 使用関数 |
 |--------|------|---------|
-| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, extractSchedule, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility |
+| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, extractSchedule, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility, extractFromImage |
 | `GMAIL_USER` | Gmail 送信元アドレス | sendRegistrationEmail, sendContactEmail |
 | `GMAIL_APP_PASSWORD` | Gmail アプリパスワード | sendRegistrationEmail, sendContactEmail |
 
@@ -780,4 +831,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-04-17（`getFriendSchedules` 関数追加 17→18；`diagnoseCompatibility` 追加 18→19；`classifyAndExtract`・`searchUsers`・`sendFriendRequest`・`acceptFriendRequest`・`rejectFriendRequest`・`cancelFriendRequest`・`deleteUserAccount`・`appleServerNotification` を漏れなく追記 19→27）*
+*最終更新: 2026-04-18（`extractFromImage` 追加 27→28；FCM プッシュ通知（`scheduledDiaryGeneration` → FCM 送信）を `scheduledTasks.js` に実装済み）*
