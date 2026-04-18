@@ -167,7 +167,7 @@ class _ImageScanButtonState extends ConsumerState<ImageScanButton> {
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Icon(Icons.document_scanner_outlined),
+          : const Icon(Icons.camera_alt_outlined),
       tooltip: 'AIで画像から読み取り',
       onPressed: _isProcessing ? null : _onTap,
     );

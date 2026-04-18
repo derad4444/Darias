@@ -592,16 +592,17 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
 
   void _applyExtractedMemo(Map<String, dynamic> data) {
     if ((data['title'] as String?)?.isNotEmpty == true) {
-      _titleController.text = data['title'] as String;
+      setState(() => _titleController.text = data['title'] as String);
     }
     final content = data['content'] as String?;
     if (content != null && content.isNotEmpty) {
-      final newController = buildQuillController(content);
-      setState(() {
-        _quillController.dispose();
-        _quillController = newController;
-        _quillController.addListener(_onContentChanged);
-      });
+      final docLength = _quillController.document.length;
+      _quillController.replaceText(
+        0,
+        docLength > 1 ? docLength - 1 : 0,
+        content,
+        null,
+      );
     }
   }
 

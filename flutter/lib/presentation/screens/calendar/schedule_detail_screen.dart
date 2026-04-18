@@ -511,34 +511,37 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
             ),
           ),
 
-          // AI画像スキャンボタン
-          ImageScanButton(
-            targetType: 'schedule',
-            onExtracted: _applyExtractedSchedule,
-          ),
-
-          // 保存ボタン
-          GestureDetector(
-            onTap: _titleController.text.isEmpty || _isSaving ? null : _saveSchedule,
-            child: _isSaving
-                ? SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: accentColor,
-                    ),
-                  )
-                : Text(
-                    '保存',
-                    style: TextStyle(
-                      color: _titleController.text.isEmpty
-                          ? accentColor.withOpacity(0.5)
-                          : accentColor,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+          // カメラ + 保存ボタン（右側にまとめる）
+          Row(
+            children: [
+              ImageScanButton(
+                targetType: 'schedule',
+                onExtracted: _applyExtractedSchedule,
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: _titleController.text.isEmpty || _isSaving ? null : _saveSchedule,
+                child: _isSaving
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: accentColor,
+                        ),
+                      )
+                    : Text(
+                        '保存',
+                        style: TextStyle(
+                          color: _titleController.text.isEmpty
+                              ? accentColor.withOpacity(0.5)
+                              : accentColor,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+              ),
+            ],
           ),
         ],
       ),

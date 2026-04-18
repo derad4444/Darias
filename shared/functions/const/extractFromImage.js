@@ -37,6 +37,31 @@ const PROMPTS = {
 }
 `.trim(),
 
+  schedules: (currentDate) => `
+現在日時: ${currentDate}
+この画像からすべての予定・イベント情報を抽出してください。
+カレンダー、チラシ、スケジュール表など複数の予定が含まれる場合はすべて抽出してください。
+
+以下のJSON形式のみで返してください（他のテキスト不要）:
+{
+  "schedules": [
+    {
+      "title": "予定のタイトル",
+      "isAllDay": false,
+      "startDate": "YYYY-MM-DDTHH:mm:ss",
+      "endDate": "YYYY-MM-DDTHH:mm:ss",
+      "location": "場所（不明な場合は空文字）",
+      "memo": "備考（不明な場合は空文字）"
+    }
+  ]
+}
+
+- 予定が1件も見つからない場合は schedules を空配列で返す
+- 日時が不明な場合は今日の日付・現在時刻を使用
+- 終了日時が不明な場合は開始から1時間後
+- 終日イベントの場合はisAllDay: true
+`.trim(),
+
   todo: (currentDate) => `
 現在日時: ${currentDate}
 この画像からタスク・TODOの情報を抽出してください。
@@ -70,7 +95,7 @@ exports.extractFromImage = onCall(
         return {error: "Missing required fields"};
       }
 
-      if (!["schedule", "memo", "todo"].includes(targetType)) {
+      if (!["schedule", "memo", "todo", "schedules"].includes(targetType)) {
         return {error: "Invalid targetType"};
       }
 
@@ -135,6 +160,16 @@ exports.extractFromImage = onCall(
             data.endDate = admin.firestore.Timestamp.fromDate(new Date(data.endDate));
           }
         } catch (_) {}
+      }
+
+      if (targetType === "schedules" && Array.isArray(data.schedules)) {
+        data.schedules = data.schedules.map((s) => {
+          try {
+            if (s.startDate) s.startDate = admin.firestore.Timestamp.fromDate(new Date(s.startDate));
+            if (s.endDate) s.endDate = admin.firestore.Timestamp.fromDate(new Date(s.endDate));
+          } catch (_) {}
+          return s;
+        });
       }
 
       if (targetType === "todo" && data.dueDate) {

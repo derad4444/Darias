@@ -1,20 +1,26 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../data/datasources/remote/image_extraction_datasource.dart';
 import '../../../data/models/schedule_model.dart';
 import '../../../data/models/shared_schedule_model.dart';
 import '../../../data/models/holiday_model.dart';
 import '../../../data/models/diary_model.dart';
+import '../../../data/services/rewarded_ad_service.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/friend_provider.dart';
+import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
 import '../../widgets/draggable_fab.dart';
 import '../../widgets/character_avatar_widget.dart';
+import 'bulk_schedule_confirmation_screen.dart';
 import 'schedule_detail_screen.dart' show RecurringEditMode;
 import '../settings/tag_management_screen.dart' show tagsProvider, TagItem;
 import '../../widgets/ads/banner_ad_widget.dart';
@@ -128,6 +134,10 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                 'initialDate': selectedDay,
               });
             },
+            onScanImage: () {
+              Navigator.pop(context);
+              _showBulkScheduleScan(context, ref);
+            },
             onFriendSettings: () {
               Navigator.pop(context);
               showModalBottomSheet(
@@ -150,6 +160,117 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
         );
       },
     );
+  }
+
+  /// 画像から複数予定を一括スキャン
+  Future<void> _showBulkScheduleScan(BuildContext context, WidgetRef ref) async {
+    final isPremium = ref.read(effectiveIsPremiumProvider);
+
+    // 無料ユーザーはリワード広告
+    if (!isPremium) {
+      final adService = RewardedAdService();
+      await adService.load();
+      if (!context.mounted) return;
+      final rewarded = await adService.showAndAwaitReward();
+      if (!rewarded) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('広告を最後まで視聴するとご利用いただけます')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
+
+    // 画像ソース選択
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              leading: const Icon(Icons.camera_alt_outlined),
+              title: const Text('カメラで撮影'),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('ライブラリから選択'),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final XFile? image = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 75,
+    );
+    if (image == null) return;
+
+    if (!context.mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('AIが画像を読み取り中...'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final bytes = await image.readAsBytes();
+      final base64Str = base64Encode(bytes);
+      final datasource = ImageExtractionDatasource();
+      final schedules = await datasource.extractSchedulesFromImage(
+        imageBase64: base64Str,
+      );
+
+      if (!context.mounted) return;
+      Navigator.of(context).pop(); // ローディング閉じる
+
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => BulkScheduleConfirmationScreen(rawSchedules: schedules),
+        ),
+      );
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('画像の読み取りに失敗しました。もう一度お試しください')),
+        );
+      }
+    }
   }
 
   /// iOS版と同様のボトムシートを表示
@@ -2725,12 +2846,14 @@ class _CalendarMenuSheet extends StatelessWidget {
   final Color accentColor;
   final Gradient backgroundGradient;
   final VoidCallback onAddSchedule;
+  final VoidCallback onScanImage;
   final VoidCallback onFriendSettings;
 
   const _CalendarMenuSheet({
     required this.accentColor,
     required this.backgroundGradient,
     required this.onAddSchedule,
+    required this.onScanImage,
     required this.onFriendSettings,
   });
 
@@ -2762,6 +2885,15 @@ class _CalendarMenuSheet extends StatelessWidget {
               label: '予定を追加',
               accentColor: accentColor,
               onTap: onAddSchedule,
+            ),
+            const SizedBox(height: 12),
+
+            // 画像から一括読み取り
+            _MenuOption(
+              icon: Icons.camera_alt_outlined,
+              label: '画像から予定を一括読み取り',
+              accentColor: accentColor,
+              onTap: onScanImage,
             ),
             const SizedBox(height: 12),
 

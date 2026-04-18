@@ -25,6 +25,27 @@ class ImageExtractionDatasource {
     return Map<String, dynamic>.from(data['result'] as Map);
   }
 
+  /// 画像から複数予定を一括抽出する
+  Future<List<Map<String, dynamic>>> extractSchedulesFromImage({
+    required String imageBase64,
+  }) async {
+    final callable = _functions.httpsCallable('extractFromImage');
+    final result = await callable.call({
+      'imageBase64': imageBase64,
+      'targetType': 'schedules',
+    });
+
+    final data = Map<String, dynamic>.from(result.data as Map);
+    if (data.containsKey('error')) {
+      throw Exception(data['error']);
+    }
+    final resultMap = Map<String, dynamic>.from(data['result'] as Map);
+    final schedulesList = resultMap['schedules'] as List? ?? [];
+    return schedulesList
+        .map((s) => Map<String, dynamic>.from(s as Map))
+        .toList();
+  }
+
   /// Firestore Timestampをすれ表したMapをDateTimeに変換
   static DateTime? parseTimestamp(dynamic value) {
     if (value == null) return null;
