@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/datasources/remote/image_extraction_datasource.dart';
 import '../../../data/models/todo_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/image_scan_button.dart';
 import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 
@@ -84,6 +86,10 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          ImageScanButton(
+            targetType: 'todo',
+            onExtracted: _applyExtractedTodo,
+          ),
           TextButton(
             onPressed: _titleController.text.isEmpty || _isSaving ? null : _saveTodo,
             child: _isSaving
@@ -779,6 +785,29 @@ class _TodoDetailScreenState extends ConsumerState<TodoDetailScreen> {
       case TodoPriority.high:
         return Colors.red;
     }
+  }
+
+  void _applyExtractedTodo(Map<String, dynamic> data) {
+    setState(() {
+      if ((data['title'] as String?)?.isNotEmpty == true) {
+        _titleController.text = data['title'] as String;
+      }
+      if ((data['description'] as String?)?.isNotEmpty == true) {
+        _descriptionController.text = data['description'] as String;
+      }
+      final due = ImageExtractionDatasource.parseTimestamp(data['dueDate']);
+      if (due != null) {
+        _dueDate = due;
+        _hasDueDate = true;
+      }
+      final priority = data['priority'] as String?;
+      if (priority != null) {
+        _priority = TodoPriority.values.firstWhere(
+          (p) => p.name == priority,
+          orElse: () => TodoPriority.medium,
+        );
+      }
+    });
   }
 
   Future<void> _saveTodo() async {

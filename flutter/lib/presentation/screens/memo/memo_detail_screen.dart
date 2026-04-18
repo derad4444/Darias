@@ -13,6 +13,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/image_scan_button.dart';
 import '../../../data/models/todo_model.dart';
 import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
@@ -183,6 +184,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
           backgroundColor: Colors.transparent,
           elevation: 0,
           actions: [
+            ImageScanButton(
+              targetType: 'memo',
+              onExtracted: _applyExtractedMemo,
+            ),
             _isSaving
                 ? Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -582,6 +587,21 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     } finally {
       _isSaving = false;
       if (!_isDisposed && mounted) setState(() {});
+    }
+  }
+
+  void _applyExtractedMemo(Map<String, dynamic> data) {
+    if ((data['title'] as String?)?.isNotEmpty == true) {
+      _titleController.text = data['title'] as String;
+    }
+    final content = data['content'] as String?;
+    if (content != null && content.isNotEmpty) {
+      final newController = buildQuillController(content);
+      setState(() {
+        _quillController.dispose();
+        _quillController = newController;
+        _quillController.addListener(_onContentChanged);
+      });
     }
   }
 

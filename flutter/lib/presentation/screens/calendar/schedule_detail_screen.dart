@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../data/datasources/remote/image_extraction_datasource.dart';
 import '../../../data/models/repeat_settings.dart';
 import '../../../data/models/schedule_model.dart';
 import '../../../data/services/notification_service.dart';
@@ -13,6 +14,7 @@ import '../../providers/ad_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/image_scan_button.dart';
 import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 import 'repeat_settings_screen.dart';
@@ -507,6 +509,12 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
               color: accentColor,
               size: 28,
             ),
+          ),
+
+          // AI画像スキャンボタン
+          ImageScanButton(
+            targetType: 'schedule',
+            onExtracted: _applyExtractedSchedule,
           ),
 
           // 保存ボタン
@@ -1092,6 +1100,25 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
         ),
       ),
     );
+  }
+
+  void _applyExtractedSchedule(Map<String, dynamic> data) {
+    setState(() {
+      if ((data['title'] as String?)?.isNotEmpty == true) {
+        _titleController.text = data['title'] as String;
+      }
+      if ((data['location'] as String?)?.isNotEmpty == true) {
+        _locationController.text = data['location'] as String;
+      }
+      if ((data['memo'] as String?)?.isNotEmpty == true) {
+        _memoController.text = data['memo'] as String;
+      }
+      _isAllDay = (data['isAllDay'] as bool?) ?? _isAllDay;
+      final start = ImageExtractionDatasource.parseTimestamp(data['startDate']);
+      final end = ImageExtractionDatasource.parseTimestamp(data['endDate']);
+      if (start != null) _startDate = start;
+      if (end != null) _endDate = end;
+    });
   }
 
   Future<void> _saveSchedule() async {

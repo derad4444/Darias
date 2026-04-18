@@ -130,6 +130,11 @@ Object.defineProperty(exports, "getFriendSchedules", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "extractFromImage", {
+  get: () => require("./const/extractFromImage").extractFromImage,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;
