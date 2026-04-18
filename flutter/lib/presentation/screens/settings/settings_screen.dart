@@ -15,6 +15,7 @@ import '../../providers/big5_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../widgets/character_avatar_widget.dart';
 import '../../../data/services/ad_service.dart';
+import '../../../data/services/hint_service.dart';
 
 /// iOS版OptionViewと同じデザインの設定画面
 class SettingsScreen extends ConsumerWidget {
@@ -87,6 +88,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: '通知設定',
                       subtitle: '予定・日記の通知を管理',
+                      icon: Icons.notifications_outlined,
                       onTap: () => context.push('/notification-settings'),
                     ),
 
@@ -94,6 +96,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: '音量設定',
                       subtitle: 'BGM・キャラクター音声の音量調整',
+                      icon: Icons.volume_up_outlined,
                       onTap: () => context.push('/volume-settings'),
                     ),
 
@@ -101,6 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: '背景色・文字色',
                       subtitle: colorSettings.useGradient ? 'グラデーション' : '一色',
+                      icon: Icons.palette_outlined,
                       onTap: () => context.push('/theme-settings'),
                     ),
 
@@ -108,7 +112,16 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: 'タグ管理',
                       subtitle: '予定のタグを作成・編集',
+                      icon: Icons.label_outlined,
                       onTap: () => context.push('/tag-management'),
+                    ),
+
+                    // 使い方ガイド
+                    _SettingsCard(
+                      title: '使い方ガイド',
+                      subtitle: '機能の説明・操作方法を確認',
+                      icon: Icons.help_outline,
+                      onTap: () => context.push('/help-guide'),
                     ),
 
                     const SizedBox(height: 16),
@@ -125,11 +138,13 @@ class SettingsScreen extends ConsumerWidget {
                     _SettingsCard(
                       title: '利用規約',
                       subtitle: 'サービス利用規約を確認',
+                      icon: Icons.article_outlined,
                       onTap: () => _openTermsOfService(context),
                     ),
                     _SettingsCard(
                       title: 'プライバシーポリシー',
                       subtitle: '個人情報の取り扱いについて',
+                      icon: Icons.privacy_tip_outlined,
                       onTap: () => _openPrivacyPolicy(context),
                     ),
 
@@ -368,6 +383,9 @@ class SettingsScreen extends ConsumerWidget {
           // Auth削除より先に実行（Auth削除後はFirestoreにアクセスできなくなるため）
           final callable = FirebaseFunctions.instance.httpsCallable('deleteUserAccount');
           await callable.call();
+
+          // SharedPreferencesのヒントキーを削除
+          await HintService.clearAllForUser(user.uid);
 
           // Firestoreデータ削除完了後にAuth削除
           await user.delete();
@@ -641,11 +659,15 @@ class _SettingsCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final IconData? icon;
+  final Color? iconColor;
 
   const _SettingsCard({
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.icon,
+    this.iconColor,
   });
 
   @override
@@ -665,6 +687,10 @@ class _SettingsCard extends StatelessWidget {
           ),
           child: Row(
             children: [
+              if (icon != null) ...[
+                Icon(icon, size: 20, color: iconColor ?? AppColors.textSecondary),
+                const SizedBox(width: 12),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

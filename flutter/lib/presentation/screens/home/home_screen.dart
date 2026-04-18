@@ -25,6 +25,7 @@ import '../../providers/character_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
+import '../../widgets/inline_hint_banner.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -171,6 +172,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     characterGender: userAsync.valueOrNull?.characterGender,
                   ),
                 ),
+              ),
+
+              // ホームヒントバナー（初回のみ・上部）
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                child: HomeHintBanner(userId: ref.watch(currentUserIdProvider) ?? ''),
               ),
 
               // 下部UI（操作エリア）

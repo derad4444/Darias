@@ -9,7 +9,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/subscription_provider.dart';
+import '../../providers/character_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
+import '../../widgets/inline_hint_banner.dart';
+import '../../../data/services/hint_service.dart';
 import 'compatibility_category_screen.dart';
 
 /// カテゴリ定義
@@ -250,6 +253,16 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final friendInitial =
         widget.friend.name.isNotEmpty ? widget.friend.name[0] : 'F';
 
+    final myDetails = ref.watch(characterDetailsProvider).valueOrNull;
+    final friendDetailsAsync = ref.watch(userCharacterDetailsProvider(widget.friend.id));
+
+    final myBig5Done = (myDetails?.confirmedBig5Scores?.isNotEmpty ?? false);
+    final friendBig5Done = friendDetailsAsync.valueOrNull?.confirmedBig5Scores?.isNotEmpty ?? false;
+    // どちらかまだロード中の場合はボタンを活性にしておく（false alertを避ける）
+    final big5DataLoaded = !ref.watch(characterDetailsProvider).isLoading &&
+        !friendDetailsAsync.isLoading;
+    final big5Ready = !big5DataLoaded || (myBig5Done && friendBig5Done);
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -279,7 +292,16 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                   children: [
                     _buildAvatarRow(
                         accentColor, myUserId, myName, myInitial, friendInitial),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 12),
+
+                    // 相性診断ヒントバナー（初回のみ、アバターの下）
+                    InlineHintBanner(
+                      userId: myUserId,
+                      feature: HintService.kCompatibility,
+                      message: '無料ユーザーは各カテゴリを動画広告視聴で解放できます。診断には自分とフレンド双方のBIG5診断完了が必要です。',
+                      icon: Icons.favorite_border,
+                    ),
+                    const SizedBox(height: 12),
 
                     if (_errorMessage != null) ...[
                       Container(
@@ -295,6 +317,35 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
+                    ],
+
+                    // BIG5未完了の場合の案内（データロード完了後のみ表示）
+                    if (big5DataLoaded && !big5Ready) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.orange.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline, color: Colors.orange, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                (!myBig5Done && !friendBig5Done)
+                                    ? '診断には自分と${widget.friend.name}さん双方のBIG5診断完了が必要です'
+                                    : !myBig5Done
+                                        ? '診断にはあなたのBIG5診断完了が必要です。チャットで"性格診断して"と送ってください'
+                                        : '診断には${widget.friend.name}さんのBIG5診断完了が必要です',
+                                style: const TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
 
                     // Web無料ユーザー向け案内
@@ -328,6 +379,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                           cat,
                           accentColor,
                           isPremium,
+                          big5Ready,
                         )),
 
                     if (!isPremium && !kIsWeb) ...[
@@ -403,7 +455,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   // カテゴリカード（処理中 / 解放済み / 未解放）
   // ─────────────────────────────────────────
   Widget _buildCategoryCard(
-      CompatibilityCategoryMeta cat, Color accentColor, bool isPremium) {
+      CompatibilityCategoryMeta cat, Color accentColor, bool isPremium, bool big5Ready) {
     final isProcessing = _processingCategoryKey == cat.key;
     final isUnlocked = _isUnlocked(cat.key);
     final anyProcessing = _processingCategoryKey != null;
@@ -444,7 +496,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
             )
           : isUnlocked
               ? _buildUnlockedTile(cat)
-              : _buildLockedTile(cat, accentColor, isPremium, anyProcessing),
+              : _buildLockedTile(cat, accentColor, isPremium, anyProcessing, big5Ready),
     );
   }
 
@@ -521,8 +573,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
   /// 未解放カード（診断するボタン）
   Widget _buildLockedTile(CompatibilityCategoryMeta cat, Color accentColor,
-      bool isPremium, bool anyProcessing) {
+      bool isPremium, bool anyProcessing, bool big5Ready) {
     final isWebFree = kIsWeb && !isPremium;
+    final isDisabled = !big5Ready || anyProcessing;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -581,19 +634,22 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
             )
           else
             GestureDetector(
-              onTap: anyProcessing ? null : () => _onCategoryTap(cat),
+              onTap: isDisabled ? null : () => _onCategoryTap(cat),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 decoration: BoxDecoration(
-                  color: anyProcessing
-                      ? accentColor.withValues(alpha: 0.4)
+                  color: isDisabled
+                      ? accentColor.withValues(alpha: 0.3)
                       : accentColor,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (!isPremium) ...[
+                    if (!big5Ready) ...[
+                      const Icon(Icons.lock_outline, size: 12, color: Colors.white),
+                      const SizedBox(width: 4),
+                    ] else if (!isPremium) ...[
                       const Icon(Icons.play_circle_outline,
                           size: 14, color: Colors.white),
                       const SizedBox(width: 4),

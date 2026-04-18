@@ -12,10 +12,13 @@ import '../../providers/memo_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/todo_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../widgets/image_scan_button.dart';
+import '../../widgets/inline_hint_banner.dart';
 import '../../../data/models/todo_model.dart';
 import '../../../data/services/ad_service.dart';
+import '../../../data/services/hint_service.dart';
 import '../settings/tag_management_screen.dart';
 
 /// メモ詳細・編集画面
@@ -233,6 +236,15 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        // メモツールバーヒントバナー（初回のみ）
+                        InlineHintBanner(
+                          userId: ref.watch(currentUserIdProvider) ?? '',
+                          feature: HintService.kMemo,
+                          message: 'ツールバーの「タスク」ボタンを押すと行頭にタスクマークが付きます。タスクマーク付きの行が1件以上あると「タスクに登録」ボタンが表示されます。',
+                          icon: Icons.check_box_outlined,
+                        ),
+                        const SizedBox(height: 8),
+
                         // エディタ（コンテンツ高さで伸縮・最低200px）
                         _buildEditorArea(accentColor),
                         const SizedBox(height: 16),

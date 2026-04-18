@@ -19,6 +19,8 @@ import '../../providers/todo_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/hint_service.dart';
+import '../../providers/auth_provider.dart';
 
 /// 6人会議画面（iOS版SixPersonMeetingViewと同じフロー）
 class MeetingScreen extends ConsumerStatefulWidget {
@@ -54,6 +56,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     super.initState();
     _topicController.addListener(_onTextChanged);
     _loadUsageCount();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _showHelpIfFirstVisit());
     _topicFocusNode = FocusNode(
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
@@ -76,6 +79,16 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
   void _onTextChanged() {
     setState(() {});
+  }
+
+  Future<void> _showHelpIfFirstVisit() async {
+    final userId = ref.read(currentUserIdProvider) ?? '';
+    final service = HintService(userId);
+    final shown = await service.isShown(HintService.kMeeting);
+    if (!shown && mounted) {
+      await service.markShown(HintService.kMeeting);
+      _showCharacterExplanation();
+    }
   }
 
   Future<void> _loadUsageCount() async {

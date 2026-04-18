@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../../data/models/friend_model.dart';
+import '../../../data/services/hint_service.dart';
 import '../../widgets/character_avatar_widget.dart';
+import '../../widgets/inline_hint_banner.dart';
 import 'friend_search_screen.dart';
 import 'compatibility_screen.dart';
 import 'friend_share_level_sheet.dart';
@@ -51,6 +54,14 @@ class FriendScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
+              ),
+
+              // フレンドヒントバナー（初回のみ）
+              InlineHintBanner(
+                userId: ref.watch(currentUserIdProvider) ?? '',
+                feature: HintService.kFriend,
+                message: 'フレンドごとに予定の共有レベルを設定できます：非公開・公開（公開設定の予定のみ）・全公開（すべて）。フレンドカードの設定ボタンから変更できます。',
+                icon: Icons.people_outline,
               ),
 
               // フレンド一覧

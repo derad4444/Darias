@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -18,9 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     _loadVersion();
     if (kIsWeb) {
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) context.go('/');
-      });
+      Future.delayed(const Duration(seconds: 2), () => _navigate());
     }
   }
 
@@ -33,10 +33,27 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
+  Future<void> _navigate() async {
+    if (!mounted) return;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final hasSeenSlides = doc.data()?['hasSeenOnboardingSlides'] as bool? ?? false;
+      if (mounted) {
+        context.go(hasSeenSlides ? '/' : '/onboarding');
+        return;
+      }
+    }
+    if (mounted) context.go('/');
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: kIsWeb ? null : () => context.go('/'),
+      onTap: kIsWeb ? null : () => _navigate(),
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(

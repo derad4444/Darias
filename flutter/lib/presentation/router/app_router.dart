@@ -30,6 +30,8 @@ import '../screens/settings/volume_settings_screen.dart';
 import '../screens/settings/terms_of_service_screen.dart';
 import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/splash/splash_screen.dart';
+import '../screens/onboarding/onboarding_screen.dart';
+import '../screens/settings/help_guide_screen.dart';
 
 /// Auth状態変化をGoRouterに通知するChangeNotifier
 /// ルーターを再生成せずにredirectだけ再評価させるために使用
@@ -68,8 +70,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuthRoute = state.matchedLocation == '/login' ||
           state.matchedLocation == '/register';
 
-      // スプラッシュ画面は常に通す
+      // スプラッシュ・オンボーディング画面は常に通す
       if (isSplash) return null;
+      if (state.matchedLocation == '/onboarding') return null;
 
       if (!isLoggedIn && !isAuthRoute) {
         return '/login';
@@ -283,6 +286,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/privacy',
         name: 'privacy',
         builder: (context, state) => const PrivacyPolicyScreen(),
+      ),
+
+      // オンボーディング
+      GoRoute(
+        path: '/onboarding',
+        name: 'onboarding',
+        builder: (context, state) => const OnboardingScreen(),
+      ),
+
+      // 使い方ガイド
+      GoRoute(
+        path: '/help-guide',
+        name: 'help-guide',
+        builder: (context, state) => const HelpGuideScreen(),
       ),
 
     ],

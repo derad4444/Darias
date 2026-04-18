@@ -44,9 +44,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             characterGender: _selectedGender,
           );
       if (mounted) {
-        // タブをホームにリセット
-        ref.read(selectedTabProvider.notifier).state = 0;
-        context.go('/');
+        context.go('/onboarding');
       }
     } catch (e) {
       if (mounted) {

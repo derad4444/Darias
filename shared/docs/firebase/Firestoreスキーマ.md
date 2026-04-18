@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-03-07
+**最終更新日**: 2026-04-19
 **トップレベルコレクション**: 9
 
 ---
@@ -37,7 +37,8 @@
 - **emailMessageId**: `string` - 送信メールID
 - **emailSentAt**: `timestamp` - メール送信日時
 - **subscriptionStatus**: `string` - サブスクリプション状態 (`"premium"` / `"free"`)。`subscription/current` と同期。Cloud Functions・iOS PurchaseManager が書き込み
-- **hasCompletedOnboarding**: `boolean` - オンボーディング完了フラグ
+- **hasCompletedOnboarding**: `boolean` - キャラクター作成完了フラグ（アカウント登録時の初期セットアップ完了を示す。オンボーディングスライドの表示制御には使用しない）
+- **hasSeenOnboardingSlides**: `boolean` - オンボーディングスライド視聴済みフラグ。`false` またはフィールドなしの場合、次回ログイン時にスライドを表示する。スキップ or 「始める！」ボタン押下時に `true` へ更新
 - **characterGender**: `string` - キャラクター性別
 - **usage_tracking**: `map` - 会議機能の利用回数追跡（プレミアムユーザーのみ書き込み）
   - **meeting_count_this_month**: `number` - 今月の会議利用回数
@@ -754,5 +755,6 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
+**最終更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  
+**前回更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
 **作成者**: Claude Code
