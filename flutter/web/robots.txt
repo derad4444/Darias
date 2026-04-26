@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://darias-app.web.app/sitemap.xml

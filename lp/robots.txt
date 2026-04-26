@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://my-character-app.web.app/sitemap.xml

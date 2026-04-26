@@ -130,6 +130,8 @@ class SettingsScreen extends ConsumerWidget {
                     _SocialSupportCard(
                       onInstagramTap: () => _openInstagram(),
                       onContactTap: () => context.push('/feedback'),
+                      onCompanySiteTap: () => _openCompanySite(),
+                      onWebAppTap: () => _openWebApp(),
                     ),
 
                     const SizedBox(height: 16),
@@ -189,6 +191,20 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _openInstagram() async {
     const instagramUrl = 'https://www.instagram.com/darias_1024/';
     final uri = Uri.parse(instagramUrl);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openCompanySite() async {
+    final uri = Uri.parse('https://aswant.web.app');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openWebApp() async {
+    final uri = Uri.parse('https://darias-app.web.app');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
@@ -730,10 +746,14 @@ class _SettingsCard extends StatelessWidget {
 class _SocialSupportCard extends StatelessWidget {
   final VoidCallback onInstagramTap;
   final VoidCallback onContactTap;
+  final VoidCallback onCompanySiteTap;
+  final VoidCallback onWebAppTap;
 
   const _SocialSupportCard({
     required this.onInstagramTap,
     required this.onContactTap,
+    required this.onCompanySiteTap,
+    required this.onWebAppTap,
   });
 
   @override
@@ -750,6 +770,76 @@ class _SocialSupportCard extends StatelessWidget {
         ),
         child: Column(
           children: [
+            // お問い合わせ
+            GestureDetector(
+              onTap: onContactTap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.mail,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'お問い合わせ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textLight,
+                      size: 20,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Divider(
+              height: 1,
+              color: AppColors.textPrimary.withValues(alpha: 0.2),
+            ),
+            // Web版アプリ
+            GestureDetector(
+              onTap: onWebAppTap,
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.language,
+                      color: Colors.teal,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Web版アプリ',
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      Icons.open_in_new,
+                      color: AppColors.textLight,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Divider(
+              height: 1,
+              color: AppColors.textPrimary.withValues(alpha: 0.2),
+            ),
             // Instagram
             GestureDetector(
               onTap: onInstagramTap,
@@ -785,22 +875,22 @@ class _SocialSupportCard extends StatelessWidget {
               height: 1,
               color: AppColors.textPrimary.withValues(alpha: 0.2),
             ),
-            // お問い合わせ
+            // 会社HP
             GestureDetector(
-              onTap: onContactTap,
+              onTap: onCompanySiteTap,
               behavior: HitTestBehavior.opaque,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.mail,
-                      color: Colors.blue,
+                      Icons.business,
+                      color: Colors.brown,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      'お問い合わせ',
+                      '会社HP',
                       style: TextStyle(
                         fontSize: 15,
                         color: AppColors.textPrimary,
@@ -808,9 +898,9 @@ class _SocialSupportCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     Icon(
-                      Icons.chevron_right,
+                      Icons.open_in_new,
                       color: AppColors.textLight,
-                      size: 20,
+                      size: 18,
                     ),
                   ],
                 ),
