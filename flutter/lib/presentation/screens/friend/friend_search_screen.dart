@@ -559,8 +559,8 @@ class _RequestsBadgeButton extends ConsumerWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        IconButton(
-          onPressed: () {
+        GestureDetector(
+          onTap: () {
             showModalBottomSheet(
               context: context,
               isScrollControlled: true,
@@ -568,8 +568,14 @@ class _RequestsBadgeButton extends ConsumerWidget {
               builder: (_) => const FriendRequestsSheet(),
             );
           },
-          icon: Icon(Icons.mail_outline, color: accentColor),
-          tooltip: '申請管理',
+          child: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: accentColor,
+            ),
+            child: const Icon(Icons.mail_outline, color: Colors.white, size: 22),
+          ),
         ),
         if (count > 0)
           Positioned(

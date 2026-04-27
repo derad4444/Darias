@@ -44,13 +44,19 @@ class FriendScreen extends ConsumerWidget {
                     ),
                     const Spacer(),
                     // フレンド検索・申請管理ボタン
-                    IconButton(
-                      onPressed: () => Navigator.push(
+                    GestureDetector(
+                      onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const FriendSearchScreen()),
                       ),
-                      icon: Icon(Icons.person_search, color: accentColor),
-                      tooltip: 'フレンドを追加',
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: accentColor,
+                        ),
+                        child: const Icon(Icons.person_search, color: Colors.white, size: 22),
+                      ),
                     ),
                   ],
                 ),
@@ -104,83 +110,68 @@ class _FriendCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.85),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CompatibilityScreen(friend: friend),
+        ),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CharacterAvatarWidget(
-              userId: friend.id,
-              size: 48,
-              fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
-              fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
-              fallbackTextColor: accentColor,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    friend.name.isNotEmpty ? friend.name : '名前未設定',
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    friend.email,
-                    style: TextStyle(fontSize: 12, color: AppColors.textLight),
-                  ),
-                ],
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CharacterAvatarWidget(
+                userId: friend.id,
+                size: 48,
+                fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
+                fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+                fallbackTextColor: accentColor,
               ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ShareLevelChip(friend: friend, accentColor: accentColor),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => CompatibilityScreen(
-                        friend: friend,
-                      ),
-                    ),
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text(
-                      '相性診断',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.white,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      friend.name.isNotEmpty ? friend.name : '名前未設定',
+                      style: const TextStyle(
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      friend.email,
+                      style: TextStyle(fontSize: 12, color: AppColors.textLight),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _ShareLevelChip(friend: friend, accentColor: accentColor),
+                  const SizedBox(width: 8),
+                  Icon(Icons.chevron_right,
+                      color: accentColor.withValues(alpha: 0.5), size: 20),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

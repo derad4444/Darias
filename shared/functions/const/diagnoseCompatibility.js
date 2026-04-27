@@ -140,7 +140,7 @@ function calcGenreScores(my, friend) {
       (my.agreeableness + friend.agreeableness) / 2 * 20 * 0.35 +
       calcSimilarity(my.openness, friend.openness) * 0.25,
   );
-  const romance = Math.min(82, Math.max(20, romanceBase));
+  const romance = Math.min(100, Math.max(0, romanceBase));
 
   const work = Math.round(
       (my.conscientiousness + friend.conscientiousness) / 2 * 20 * 0.5 +

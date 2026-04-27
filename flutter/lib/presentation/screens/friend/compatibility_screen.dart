@@ -14,6 +14,7 @@ import '../../widgets/character_avatar_widget.dart';
 import '../../widgets/inline_hint_banner.dart';
 import '../../../data/services/hint_service.dart';
 import 'compatibility_category_screen.dart';
+import '../../providers/calendar_provider.dart';
 
 /// カテゴリ定義
 class CompatibilityCategoryMeta {
@@ -253,6 +254,12 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final friendInitial =
         widget.friend.name.isNotEmpty ? widget.friend.name[0] : 'F';
 
+    final friends = ref.watch(friendsProvider).valueOrNull ?? [];
+    final currentFriend = friends.firstWhere(
+      (f) => f.id == widget.friend.id,
+      orElse: () => widget.friend,
+    );
+
     final myDetails = ref.watch(characterDetailsProvider).valueOrNull;
     final friendDetailsAsync = ref.watch(userCharacterDetailsProvider(widget.friend.id));
 
@@ -271,7 +278,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
           icon: Icon(Icons.arrow_back_ios, color: accentColor),
         ),
         title: Text(
-          '相性診断',
+          'フレンド詳細',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
@@ -293,6 +300,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                     _buildAvatarRow(
                         accentColor, myUserId, myName, myInitial, friendInitial),
                     const SizedBox(height: 12),
+
+                    // 予定の共有設定
+                    _buildShareLevelSection(accentColor, currentFriend, ref),
+                    const SizedBox(height: 4),
 
                     // 相性診断ヒントバナー（初回のみ、アバターの下）
                     InlineHintBanner(
@@ -408,6 +419,131 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
   bool get _isAllUnlocked =>
       kCompatibilityCategories.every((c) => _isUnlocked(c.key));
+
+  // ─────────────────────────────────────────
+  // 予定の共有設定セクション
+  // ─────────────────────────────────────────
+  Widget _buildShareLevelSection(Color accentColor, FriendModel currentFriend, WidgetRef ref) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.calendar_month_outlined, size: 15, color: accentColor),
+              const SizedBox(width: 6),
+              Text(
+                '予定の共有設定',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: accentColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Align(
+              key: ValueKey(currentFriend.shareLevel),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _shareLevelDescription(currentFriend.shareLevel),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _shareLevelColor(currentFriend.shareLevel),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: FriendShareLevel.values.map((level) {
+              final isSelected = currentFriend.shareLevel == level;
+              final color = _shareLevelColor(level);
+              final icon = _shareLevelIcon(level);
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () async {
+                    await ref
+                        .read(friendControllerProvider.notifier)
+                        .updateShareLevel(currentFriend.id, level);
+                    ref.read(friendScheduleRefreshProvider.notifier).state++;
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? color.withValues(alpha: 0.15)
+                          : Colors.grey.withValues(alpha: 0.07),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: isSelected ? color : Colors.transparent,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Icon(icon,
+                            size: 18,
+                            color: isSelected ? color : Colors.grey[400]),
+                        const SizedBox(height: 4),
+                        Text(
+                          level.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected ? color : Colors.grey[400],
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _shareLevelColor(FriendShareLevel level) {
+    switch (level) {
+      case FriendShareLevel.none:   return AppColors.textLight;
+      case FriendShareLevel.public: return Colors.blue;
+      case FriendShareLevel.full:   return Colors.green;
+    }
+  }
+
+  IconData _shareLevelIcon(FriendShareLevel level) {
+    switch (level) {
+      case FriendShareLevel.none:   return Icons.visibility_off_outlined;
+      case FriendShareLevel.public: return Icons.visibility_outlined;
+      case FriendShareLevel.full:   return Icons.public;
+    }
+  }
+
+  String _shareLevelDescription(FriendShareLevel level) {
+    switch (level) {
+      case FriendShareLevel.none:
+        return '予定を一切共有しません';
+      case FriendShareLevel.public:
+        return '非公開設定・非公開タグでない予定を共有します';
+      case FriendShareLevel.full:
+        return '非公開設定の予定・非公開タグの予定も含めてすべて共有します';
+    }
+  }
 
   // ─────────────────────────────────────────
   // アバター行
