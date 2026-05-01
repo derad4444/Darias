@@ -26,6 +26,7 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
 import '../../widgets/inline_hint_banner.dart';
+import 'chat_opener.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -44,6 +45,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isPlayingVoice = false;
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
+  bool _openerLoaded = false;
 
 
   /// 初期メッセージリスト
@@ -71,7 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // 時間帯挨拶 or ランダムメッセージを選択（1/3の確率で挨拶）
+    // 暫定メッセージ（オープナーがロードされるまで表示）
     final hour = DateTime.now().hour;
     final useGreeting = Random().nextInt(3) == 0;
     if (useGreeting) {
@@ -84,6 +86,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     } else {
       _displayedMessage = _initialMessages[Random().nextInt(_initialMessages.length)];
+    }
+    // スマートオープナーをポストフレームで非同期ロード
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChatOpener());
+  }
+
+  Future<void> _loadChatOpener() async {
+    if (!mounted || _openerLoaded) return;
+    _openerLoaded = true;
+    final schedules = ref.read(allSchedulesProvider).valueOrNull ?? [];
+    final todos = ref.read(todosProvider).valueOrNull ?? [];
+    final opener = await computeChatOpener(allSchedules: schedules, allTodos: todos);
+    if (mounted) {
+      setState(() {
+        _displayedMessage = opener.text;
+        _isCharacterReply = true;
+      });
     }
   }
 
@@ -142,6 +160,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _isWaitingForReply = false;
           _isCharacterReply = true;
         });
+        if (result != null) saveLastQuestion(result.reply);
       }
     } catch (e, st) {
       debugPrint('❌ _triggerMeetingFollowup error: $e\n$st');
@@ -465,6 +484,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _isCharacterReply = true;
           _showMeetingBanner = result?.meetingSuggested ?? false;
         });
+        if (result != null) saveLastQuestion(result.reply);
       }
       if (mounted && result != null && !_isShowingDialog) {
         if (result.scheduleDetected || result.memoDetected || result.todoDetected) {
