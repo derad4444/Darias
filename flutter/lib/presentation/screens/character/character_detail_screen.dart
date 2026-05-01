@@ -341,6 +341,29 @@ class _CharacterDetailBody extends ConsumerWidget {
               else if (detail.analysisLevel < 20)
                 _AnalysisNotAvailableSection(textColor: textColor),
 
+              // 性格診断ボタン（100問未完了の場合のみ）
+              if (detail.analysisLevel < 100) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => context.push('/big5'),
+                      icon: const Icon(Icons.psychology),
+                      label: Text(
+                        detail.analysisLevel == 0 ? '性格診断を開始する' : '性格診断を続ける',
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: accentColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+
               // 情報エリア（値がある場合のみ表示）
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

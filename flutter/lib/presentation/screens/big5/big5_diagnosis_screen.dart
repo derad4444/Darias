@@ -545,7 +545,23 @@ class _StartSection extends StatelessWidget {
           ),
           const SizedBox(height: 32),
 
+          FilledButton.icon(
+            onPressed: onStart,
+            icon: const Icon(Icons.play_arrow),
+            label: Text(
+              (progress?.answeredCount ?? 0) == 0 ? '性格診断を開始' : '性格診断を続ける',
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: accentColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32,
+                vertical: 16,
+              ),
+            ),
+          ),
           if ((progress?.answeredCount ?? 0) >= 100) ...[
+            const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: onReset,
               icon: const Icon(Icons.refresh, color: Colors.red),
@@ -553,22 +569,6 @@ class _StartSection extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
                 side: const BorderSide(color: Colors.red),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 32,
-                  vertical: 16,
-                ),
-              ),
-            ),
-          ] else ...[
-            FilledButton.icon(
-              onPressed: onStart,
-              icon: const Icon(Icons.play_arrow),
-              label: Text(
-                (progress?.answeredCount ?? 0) == 0 ? '診断を開始' : '診断を続ける',
-              ),
-              style: FilledButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                   horizontal: 32,
                   vertical: 16,

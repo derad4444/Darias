@@ -33,6 +33,10 @@ import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 
+/// 新規登録直後にオンボーディングへ誘導するフラグ
+/// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
+final needsOnboardingProvider = StateProvider<bool>((ref) => false);
+
 /// Auth状態変化をGoRouterに通知するChangeNotifier
 /// ルーターを再生成せずにredirectだけ再評価させるために使用
 class _AuthChangeNotifier extends ChangeNotifier {
@@ -79,6 +83,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggedIn && isAuthRoute) {
+        if (ref.read(needsOnboardingProvider)) {
+          Future.microtask(() => ref.read(needsOnboardingProvider.notifier).state = false);
+          return '/onboarding';
+        }
         return '/';
       }
 

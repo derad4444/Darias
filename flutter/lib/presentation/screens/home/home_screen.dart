@@ -93,6 +93,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  void _showRoadmapResetConfirmDialog(String characterId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('診断結果をリセット'),
+        content: const Text(
+          'これまでの診断結果・回答・キャラクター属性がすべて削除されます。\nリセット後は最初から診断をやり直せます。\n\nよろしいですか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await ref.read(big5DiagnosisControllerProvider.notifier).resetDiagnosis(characterId);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('リセットする'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 会議後フォローアップ: 結論をAIに送信してレスポンスを表示
   void _triggerMeetingFollowup(String conclusion) async {
     if (!mounted) return;
@@ -286,6 +312,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         answeredCount: progress?.answeredCount ?? 0,
                         accentColor: accentColor,
                         backgroundGradient: backgroundGradient,
+                        onDiagnose: () => context.push('/big5'),
+                        onReset: () => _showRoadmapResetConfirmDialog(characterId),
                       ),
                       loading: () => const SizedBox.shrink(),
                       error: (_, __) => const SizedBox.shrink(),
@@ -1324,11 +1352,15 @@ class _BIG5ProgressBar extends StatelessWidget {
   final int answeredCount;
   final Color accentColor;
   final Gradient? backgroundGradient;
+  final VoidCallback? onDiagnose;
+  final VoidCallback? onReset;
 
   const _BIG5ProgressBar({
     required this.answeredCount,
     required this.accentColor,
     this.backgroundGradient,
+    this.onDiagnose,
+    this.onReset,
   });
 
   @override
@@ -1430,6 +1462,8 @@ class _BIG5ProgressBar extends StatelessWidget {
           answeredCount: answeredCount,
           accentColor: accentColor,
           backgroundGradient: backgroundGradient,
+          onDiagnose: onDiagnose,
+          onReset: onReset,
         ),
       ),
     );
@@ -1441,11 +1475,15 @@ class _PersonalityRoadmapPage extends StatefulWidget {
   final int answeredCount;
   final Color accentColor;
   final Gradient? backgroundGradient;
+  final VoidCallback? onDiagnose;
+  final VoidCallback? onReset;
 
   const _PersonalityRoadmapPage({
     required this.answeredCount,
     required this.accentColor,
     this.backgroundGradient,
+    this.onDiagnose,
+    this.onReset,
   });
 
   @override
@@ -1659,18 +1697,50 @@ class _PersonalityRoadmapPageState extends State<_PersonalityRoadmapPage> {
 
                 const SizedBox(height: 24),
 
-                // 閉じるボタン
+                // 性格診断するボタン
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context),
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onDiagnose?.call();
+                    },
+                    icon: const Icon(Icons.play_arrow),
+                    label: Text(
+                      answeredCount == 0
+                          ? '性格診断を開始する'
+                          : answeredCount >= 100
+                              ? '性格診断をもう一度する'
+                              : '性格診断を続ける',
+                    ),
                     style: FilledButton.styleFrom(
                       backgroundColor: accentColor,
+                      foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: const Text('閉じる'),
                   ),
                 ),
+
+                // リセットボタン（100問完了時のみ）
+                if (answeredCount >= 100) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        widget.onReset?.call();
+                      },
+                      icon: const Icon(Icons.refresh, color: Colors.red),
+                      label: const Text('診断結果をリセット'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        side: const BorderSide(color: Colors.red),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
               ],
             ),

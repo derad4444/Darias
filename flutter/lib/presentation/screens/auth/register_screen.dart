@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../main/main_shell_screen.dart';
+import '../../router/app_router.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -37,16 +37,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     });
 
     try {
+      // authStateChangesによるredirectが発火する前にフラグを立てる
+      ref.read(needsOnboardingProvider.notifier).state = true;
       await ref.read(authControllerProvider.notifier).signUp(
             email: _emailController.text.trim(),
             password: _passwordController.text,
             name: _nameController.text.trim(),
             characterGender: _selectedGender,
           );
-      if (mounted) {
-        context.go('/onboarding');
-      }
     } catch (e) {
+      ref.read(needsOnboardingProvider.notifier).state = false;
       if (mounted) {
         setState(() {
           _errorMessage = _getErrorMessage(e);

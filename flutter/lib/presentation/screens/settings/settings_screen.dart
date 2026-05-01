@@ -403,18 +403,13 @@ class SettingsScreen extends ConsumerWidget {
           // SharedPreferencesのヒントキーを削除
           await HintService.clearAllForUser(user.uid);
 
-          // Firestoreデータ削除完了後にAuth削除
-          await user.delete();
+          // Auth削除前にローディングダイアログを閉じる
+          // （user.delete()がauth状態を変化させGoRouterがリダイレクトするため、
+          //   削除後にNavigator操作するとスタック競合で黒画面になる）
+          if (context.mounted) Navigator.of(context).pop();
 
-          if (context.mounted) {
-            Navigator.of(context).pop();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('アカウントを削除しました'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
+          // Firestoreデータ削除完了後にAuth削除 → GoRouterが自動で/loginへ遷移
+          await user.delete();
         } on FirebaseAuthException catch (e) {
           debugPrint('❌ アカウント削除 FirebaseAuthException: code=${e.code}, message=${e.message}');
           if (context.mounted) {
