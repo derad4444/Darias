@@ -3,9 +3,8 @@ const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
 const {formatBig5WithTraits} = require("../src/prompts/templates");
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 const db = admin.firestore();
 
 /**

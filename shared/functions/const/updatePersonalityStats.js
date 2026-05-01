@@ -1,8 +1,7 @@
 const admin = require("firebase-admin");
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 const db = admin.firestore();
 
 /**

@@ -10,7 +10,12 @@ let firestoreInstance = null;
 function getAdmin() {
   if (!adminInstance) {
     const admin = require("firebase-admin");
-    if (!admin.apps.length) {
+    // admin.apps.length ではなくデフォルトアプリの存在を確認する。
+    // Firebase Functions v2 ランタイムが内部的に名前付きアプリを初期化するため
+    // apps.length > 0 でもデフォルトアプリが存在しないケースがある。
+    try {
+      admin.app();
+    } catch (e) {
       admin.initializeApp();
     }
     adminInstance = admin;

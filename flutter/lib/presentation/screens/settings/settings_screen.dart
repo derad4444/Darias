@@ -397,7 +397,7 @@ class SettingsScreen extends ConsumerWidget {
 
           // Cloud Function でFirestoreデータ全削除 + Google Playキャンセル
           // Auth削除より先に実行（Auth削除後はFirestoreにアクセスできなくなるため）
-          final callable = FirebaseFunctions.instance.httpsCallable('deleteUserAccount');
+          final callable = FirebaseFunctions.instanceFor(region: 'asia-northeast1').httpsCallable('deleteUserAccount');
           await callable.call();
 
           // SharedPreferencesのヒントキーを削除
@@ -481,7 +481,8 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
-    controller.dispose();
+    // dialogのclose animationが完了してから破棄する
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     return result;
   }
 

@@ -1,5 +1,5 @@
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
+const {onCall, HttpsError} = require('firebase-functions/v2/https');
+const {getFirestore} = require('./src/utils/firebaseInit');
 require('dotenv').config();
 
 /**
@@ -15,15 +15,17 @@ require('dotenv').config();
  *
  * 呼び出し側(Flutter)はこの関数が成功してから Firebase Auth を削除すること。
  */
-exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'User must be authenticated');
+exports.deleteUserAccount = onCall(
+  {region: 'asia-northeast1', memory: '256MiB', timeoutSeconds: 60, enforceAppCheck: false},
+  async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'User must be authenticated');
   }
 
-  const userId = context.auth.uid;
+  const userId = request.auth.uid;
   console.log(`deleteUserAccount: started for userId=${userId}`);
 
-  const db = admin.firestore();
+  const db = getFirestore();
 
   // 1. サブスクリプション情報を取得
   let paymentMethod = null;
@@ -74,7 +76,7 @@ exports.deleteUserAccount = functions.https.onCall(async (data, context) => {
     console.log(`deleteUserAccount: Firestore data recursively deleted for userId=${userId}`);
   } catch (deleteError) {
     console.error(`deleteUserAccount: Failed to delete Firestore data for userId=${userId}:`, deleteError);
-    throw new functions.https.HttpsError('internal', `Failed to delete user data: ${deleteError.message}`);
+    throw new HttpsError('internal', `Failed to delete user data: ${deleteError.message}`);
   }
 
   console.log(`deleteUserAccount: completed successfully for userId=${userId}`);

@@ -6,10 +6,8 @@ const nodemailer = require('nodemailer');
 const { logger } = require('../utils/logger');
 const { GMAIL_USER, GMAIL_APP_PASSWORD } = require('../config/config');
 
-// Firebase Admin初期化（未初期化の場合のみ）
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 
 // Gmail SMTPを使用したメール送信設定
 const createTransporter = () => {

@@ -4,9 +4,8 @@ const {generatePersonalityKey} = require("./generatePersonalityKey");
 const {generateBig5Analysis} = require("./generateBig5Analysis");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 const db = admin.firestore();
 
 /**

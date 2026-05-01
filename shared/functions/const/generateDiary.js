@@ -4,10 +4,8 @@ const admin = require("firebase-admin");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 
-// Firebaseの初期化
-if (!admin.apps.length) {
-  admin.initializeApp();
-}
+// Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 const db = admin.firestore();
 
 /**

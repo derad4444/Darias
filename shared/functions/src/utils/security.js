@@ -1,6 +1,7 @@
 // src/utils/security.js
 
 const admin = require("firebase-admin");
+try { admin.app(); } catch (e) { admin.initializeApp(); }
 const {ErrorTypes} = require("./errorHandler");
 const {Logger} = require("./logger");
 
