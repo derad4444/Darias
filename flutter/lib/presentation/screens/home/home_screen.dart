@@ -43,6 +43,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isShowingDialog = false;
   bool _isPlayingVoice = false;
   bool _isCharacterReply = false;
+  bool _showMeetingBanner = false;
 
 
   /// 初期メッセージリスト
@@ -92,13 +93,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  /// 会議後フォローアップ: 固定メッセージを吹き出しに表示
-  void _triggerMeetingFollowup(String conclusion) {
-    if (mounted) {
-      setState(() {
-        _displayedMessage = '会議お疲れ様！続きがあれば話しかけてね';
-        _isCharacterReply = false;
-      });
+  /// 会議後フォローアップ: 結論をAIに送信してレスポンスを表示
+  void _triggerMeetingFollowup(String conclusion) async {
+    if (!mounted) return;
+    setState(() {
+      _displayedMessage = '会議お疲れ様！結論を受け取ったよ…';
+      _isCharacterReply = false;
+      _isWaitingForReply = true;
+    });
+
+    try {
+      final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+      debugPrint('🔄 _triggerMeetingFollowup: characterId=$characterId, conclusion=${conclusion.length}chars');
+      final result = await ref.read(chatControllerProvider.notifier).sendMessage(
+        characterId: characterId,
+        message: '【自分会議の結論】$conclusion',
+      );
+      debugPrint('✅ _triggerMeetingFollowup: reply=${result?.reply?.substring(0, 20)}');
+      if (mounted) {
+        setState(() {
+          _displayedMessage = result?.reply ?? '会議お疲れ様！続きがあれば話しかけてね';
+          _isWaitingForReply = false;
+          _isCharacterReply = true;
+        });
+      }
+    } catch (e, st) {
+      debugPrint('❌ _triggerMeetingFollowup error: $e\n$st');
+      if (mounted) {
+        setState(() {
+          _displayedMessage = '会議お疲れ様！続きがあれば話しかけてね';
+          _isWaitingForReply = false;
+        });
+      }
     }
   }
 
@@ -190,6 +216,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // 自分会議提案バナー
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOut,
+                      child: _showMeetingBanner
+                          ? _MeetingSuggestionBanner(
+                              accentColor: accentColor,
+                              onOpen: () {
+                                setState(() => _showMeetingBanner = false);
+                                context.push('/meeting');
+                              },
+                              onDismiss: () => setState(() => _showMeetingBanner = false),
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+
                     // 自分会議ボタンと履歴ボタン
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -371,6 +413,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     setState(() {
       _isWaitingForReply = true;
+      _showMeetingBanner = false;
       _chatController.clear();
     });
 
@@ -392,6 +435,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _displayedMessage = result?.reply ?? 'お返事がありませんでした';
           _isWaitingForReply = false;
           _isCharacterReply = true;
+          _showMeetingBanner = result?.meetingSuggested ?? false;
         });
       }
       if (mounted && result != null && !_isShowingDialog) {
@@ -2168,6 +2212,73 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
           ),
         );
       },
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// 自分会議提案バナー
+// ─────────────────────────────────────────────
+class _MeetingSuggestionBanner extends StatelessWidget {
+  final Color accentColor;
+  final VoidCallback onOpen;
+  final VoidCallback onDismiss;
+
+  const _MeetingSuggestionBanner({
+    required this.accentColor,
+    required this.onOpen,
+    required this.onDismiss,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: accentColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accentColor.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.psychology_outlined, size: 18, color: accentColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '自分会議で整理してみる？',
+              style: TextStyle(
+                fontSize: 13,
+                color: accentColor,
+                height: 1.4,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onOpen,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '開く',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: accentColor,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onDismiss,
+            child: Icon(Icons.close, size: 18, color: accentColor.withValues(alpha: 0.6)),
+          ),
+        ],
+      ),
     );
   }
 }
