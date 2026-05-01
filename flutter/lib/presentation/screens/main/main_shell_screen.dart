@@ -18,8 +18,7 @@ import '../../providers/todo_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../settings/tag_management_screen.dart';
 import '../home/home_screen.dart';
-import '../calendar/calendar_screen.dart';
-import '../note/note_screen.dart';
+import '../plan/plan_screen.dart';
 import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
@@ -95,12 +94,13 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final page = uri.queryParameters['page'];
     if (page == 'calendar') {
       ref.read(selectedTabProvider.notifier).state = 1;
+      ref.read(planSegmentProvider.notifier).state = PlanSegment.schedule;
     } else if (page == 'todo') {
-      ref.read(selectedTabProvider.notifier).state = 2;
-      ref.read(noteSegmentProvider.notifier).state = NoteSegment.todo;
+      ref.read(selectedTabProvider.notifier).state = 1;
+      ref.read(planSegmentProvider.notifier).state = PlanSegment.todo;
     } else if (page == 'memo') {
-      ref.read(selectedTabProvider.notifier).state = 2;
-      ref.read(noteSegmentProvider.notifier).state = NoteSegment.memo;
+      ref.read(selectedTabProvider.notifier).state = 1;
+      ref.read(planSegmentProvider.notifier).state = PlanSegment.memo;
     }
   }
 
@@ -180,11 +180,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         children: [
           // タブ0: ホーム
           const HomeScreen(),
-          // タブ1: 予定（カレンダー）
-          const CalendarScreen(),
-          // タブ2: ノート（日記・Todo・メモ統合）
-          const NoteScreen(),
-          // タブ3: 詳細（キャラクター詳細）
+          // タブ1: 予定・タスク・メモ（統合）
+          const PlanScreen(),
+          // タブ2: 詳細（キャラクター詳細）
           userAsync.when(
             data: (user) => CharacterDetailScreen(
               characterId: user?.characterId ?? '',
@@ -192,9 +190,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const Center(child: Text('エラー')),
           ),
-          // タブ4: フレンド
+          // タブ3: フレンド
           const FriendScreen(),
-          // タブ5: 設定
+          // タブ4: 設定
           const SettingsScreen(),
         ],
       ),
@@ -229,9 +227,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
                     ),
                     _TabItem(
-                      icon: Icons.calendar_today_outlined,
-                      selectedIcon: Icons.calendar_today,
-                      label: '予定',
+                      icon: Icons.menu_book_outlined,
+                      selectedIcon: Icons.menu_book,
+                      label: '手帳',
                       isSelected: selectedTab == 1,
                       accentColor: accentColor,
                       showBadge: hasNewDiary,
@@ -243,37 +241,29 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       },
                     ),
                     _TabItem(
-                      icon: Icons.note_outlined,
-                      selectedIcon: Icons.note,
-                      label: 'ノート',
+                      icon: Icons.person_outline,
+                      selectedIcon: Icons.person,
+                      label: '詳細',
                       isSelected: selectedTab == 2,
                       accentColor: accentColor,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 2,
                     ),
                     _TabItem(
-                      icon: Icons.person_outline,
-                      selectedIcon: Icons.person,
-                      label: '詳細',
-                      isSelected: selectedTab == 3,
-                      accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
-                    ),
-                    _TabItem(
                       icon: Icons.people_outline,
                       selectedIcon: Icons.people,
                       label: 'フレンド',
-                      isSelected: selectedTab == 4,
+                      isSelected: selectedTab == 3,
                       accentColor: accentColor,
                       badgeCount: pendingFriendCount,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
                     ),
                     _TabItem(
                       icon: Icons.settings_outlined,
                       selectedIcon: Icons.settings,
                       label: '設定',
-                      isSelected: selectedTab == 5,
+                      isSelected: selectedTab == 4,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 5,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
                     ),
                   ],
                 ),

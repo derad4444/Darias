@@ -351,6 +351,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
           context, ref, selectedDay, accentColor, textColor, backgroundGradient,
         ),
         accentColor: accentColor,
+        characterWidget: isSearchMode ? null : _CharacterWithComment(
+          monthlyComment: monthlyCommentAsync.when(
+            data: (comment) => comment,
+            loading: () => '今月のひとことを読み込み中...',
+            error: (e, st) => '今月もあなたらしく過ごしてください',
+          ),
+          isLoading: monthlyCommentAsync.isLoading,
+        ),
         child: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
@@ -447,21 +455,6 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                   ),
                 ),
 
-                // キャラクターと月次コメント（カレンダー下に専用エリアを確保）
-                SizedBox(
-                  height: 160,
-                  child: Transform.translate(
-                    offset: const Offset(-20, 0),
-                    child: _CharacterWithComment(
-                      monthlyComment: monthlyCommentAsync.when(
-                        data: (comment) => comment,
-                        loading: () => '今月のひとことを読み込み中...',
-                        error: (e, st) => '今月もあなたらしく過ごしてください',
-                      ),
-                      isLoading: monthlyCommentAsync.isLoading,
-                    ),
-                  ),
-                ),
               ],
             ],
           ),
@@ -1834,6 +1827,18 @@ class _CharacterWithComment extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ドラッグ可能であることを示すハンドル
+              Center(
+                child: Container(
+                  width: 32,
+                  height: 3,
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade400,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
               Text(
                 '今月のひとこと',
                 style: TextStyle(

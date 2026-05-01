@@ -75,8 +75,8 @@ class NoteScreen extends ConsumerWidget {
                 ),
                 Expanded(
                   child: selectedSegment == NoteSegment.memo
-                      ? const _MemoContentView()
-                      : const _TodoContentView(),
+                      ? const MemoContentView()
+                      : const TodoContentView(),
                 ),
               ],
             ),
@@ -179,14 +179,14 @@ class _SegmentButton extends StatelessWidget {
 }
 
 /// メモコンテンツビュー
-class _MemoContentView extends ConsumerStatefulWidget {
-  const _MemoContentView();
+class MemoContentView extends ConsumerStatefulWidget {
+  const MemoContentView();
 
   @override
-  ConsumerState<_MemoContentView> createState() => _MemoContentViewState();
+  ConsumerState<MemoContentView> createState() => MemoContentViewState();
 }
 
-class _MemoContentViewState extends ConsumerState<_MemoContentView> {
+class MemoContentViewState extends ConsumerState<MemoContentView> {
   final TextEditingController _searchController = TextEditingController();
 
   String get _selectedTag => ref.read(memoSelectedTagProvider);
@@ -503,14 +503,14 @@ class _MemoCard extends StatelessWidget {
 }
 
 /// Todoコンテンツビュー
-class _TodoContentView extends ConsumerStatefulWidget {
-  const _TodoContentView();
+class TodoContentView extends ConsumerStatefulWidget {
+  const TodoContentView();
 
   @override
-  ConsumerState<_TodoContentView> createState() => _TodoContentViewState();
+  ConsumerState<TodoContentView> createState() => TodoContentViewState();
 }
 
-class _TodoContentViewState extends ConsumerState<_TodoContentView> {
+class TodoContentViewState extends ConsumerState<TodoContentView> {
   String _selectedFilter = 'すべて';
   final TextEditingController _searchController = TextEditingController();
 
