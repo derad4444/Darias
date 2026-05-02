@@ -21,10 +21,11 @@ exports.classifyAndExtract = onCall(
       }
       const {data} = request;
       try {
-        const {userMessage} = data;
-        if (!userMessage) {
+        const {userMessage: rawMessage} = data;
+        if (!rawMessage) {
           return {error: "Missing userMessage"};
         }
+        const userMessage = rawMessage.substring(0, 100);
 
         // 現在の日付情報を取得（日本時間）
         const now = new Date();
@@ -53,7 +54,6 @@ exports.classifyAndExtract = onCall(
               model: "gpt-4o-mini",
               messages: [{role: "user", content: prompt}],
               temperature: 0,
-              max_tokens: 200,
             },
         );
 

@@ -204,9 +204,10 @@ exports.checkSubscriptionStatus = functions.scheduler.onSchedule({
 }, async (event) => {
   const db = admin.firestore();
 
-  // アクティブなサブスクリプションを取得
+  // 期限切れのアクティブサブスクのみ取得（end_date が現在より前のもの）
   const activeSubscriptions = await db.collectionGroup('subscription')
     .where('status', '==', 'active')
+    .where('end_date', '<', admin.firestore.Timestamp.now())
     .get();
 
   const batch = db.batch();

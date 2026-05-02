@@ -307,7 +307,6 @@ ${friendSpeech}
                 {role: "user", content: userPrompt},
               ],
               temperature: 0.75,
-              max_tokens: 600,
               response_format: {type: "json_object"},
             },
         );

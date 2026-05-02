@@ -97,6 +97,9 @@ exports.extractFromImage = onCall(
       if (!imageBase64 || !targetType) {
         return {error: "Missing required fields"};
       }
+      if (imageBase64.length > 2_000_000) {
+        throw new HttpsError("invalid-argument", "画像サイズが大きすぎます");
+      }
 
       if (!["schedule", "memo", "todo", "schedules"].includes(targetType)) {
         return {error: "Invalid targetType"};

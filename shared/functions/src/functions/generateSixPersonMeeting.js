@@ -52,7 +52,6 @@ async function detectConcernCategoryWithAI(concern, openai) {
 
 カテゴリID（英語）のみ出力してください。`,
       }],
-      max_tokens: 20,
       temperature: 0,
     });
 
@@ -635,7 +634,6 @@ async function generateConversationWithAI(
           {role: "user", content: prompt},
         ],
         temperature: 0.8,
-        max_tokens: 3000,
         response_format: {type: "json_object"},
       },
   );

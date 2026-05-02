@@ -239,6 +239,7 @@ exports.answerAppQuestion = onCall(
       if (!userId || !userMessage) {
         return {error: "Missing userId or userMessage"};
       }
+      const trimmedMessage = userMessage.substring(0, 100);
 
       try {
         // 必要に応じてユーザーデータを取得
@@ -273,10 +274,9 @@ exports.answerAppQuestion = onCall(
               model: "gpt-4o-mini",
               messages: [
                 {role: "system", content: systemPrompt},
-                {role: "user", content: userMessage},
+                {role: "user", content: trimmedMessage},
               ],
               temperature: 0.7,
-              max_tokens: 200,
             },
         );
 

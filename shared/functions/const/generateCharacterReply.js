@@ -23,7 +23,6 @@ async function detectEmotion(openai, messageText) {
           model: "gpt-4o-mini",
           messages: [{role: "user", content: emotionPrompt}],
           temperature: 0.3,
-          max_tokens: 20,
         },
     );
 
@@ -880,7 +879,6 @@ exports.generateCharacterReply = onCall(
               model: model,
               messages: messages,
               temperature: 0.8,
-              max_tokens: 150, // 出力100文字相当
             },
         );
 
