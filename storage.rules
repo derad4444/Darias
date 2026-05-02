@@ -3,7 +3,8 @@ rules_version = '2';
 // Firebase Storage Security Rules for Character Images
 service firebase.storage {
   match /b/{bucket}/o {
-    // すべてのファイルを一時的に公開（テスト用）
+    // キャラクター画像・音声はアプリ共有資産のため読み取り公開
+    // 書き込みは Cloud Functions（Admin SDK）のみ許可（ルール外）
     match /{allPaths=**} {
       allow read: if true;
       allow write: if false;
