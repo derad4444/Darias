@@ -86,7 +86,7 @@
 
 ### ユーザーが自分で行う手順の案内
 
-ユーザー自身が手動で操作しなければならない手順（コンソール操作・アップロード・外部サービス設定など）が出てきた場合は、**リンクを必ず一緒に記載すること**。
+ユーザー自身が手動で操作しなければならない手順（ブラウザ操作・コンソール操作・アップロード・外部サービス設定など）が出てきた場合は、**該当ページへのリンクを必ず一緒に記載すること**。特定のページに直接飛べる深いリンクがある場合はそちらを優先する。
 
 よく使うリンク:
 | 操作 | リンク |
@@ -98,6 +98,8 @@
 | Firebase Console → Functions | https://console.firebase.google.com/project/my-character-app/functions |
 | Firebase Console → Firestore | https://console.firebase.google.com/project/my-character-app/firestore |
 | Google reCAPTCHA Console | https://www.google.com/recaptcha/admin |
+
+上記以外のサービス（GitHub、Google Cloud Console、各種ダッシュボード等）でもブラウザで行う作業が発生した場合は、その都度リンクを調べて記載する。
 
 ## プロジェクト情報
 
