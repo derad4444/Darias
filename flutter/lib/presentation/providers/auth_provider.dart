@@ -171,3 +171,14 @@ final authControllerProvider =
     ref.watch(firestoreProvider),
   );
 });
+
+/// ログイン状態が変わるたびに lastLoginAt をFirestoreへ同期
+final lastLoginAtSyncProvider = Provider<void>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId != null) {
+    Future.microtask(() => FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .update({'lastLoginAt': FieldValue.serverTimestamp()}));
+  }
+});

@@ -16,6 +16,7 @@ import 'data/services/bgm_player.dart';
 import 'data/services/notification_service.dart';
 import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
+import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/character_provider.dart';
 import 'presentation/providers/notification_provider.dart';
 import 'presentation/providers/theme_provider.dart';
@@ -89,6 +90,8 @@ class DariasApp extends ConsumerWidget {
 
     // ログイン状態変化時にFCMトークンをFirestoreへ同期
     ref.watch(fcmTokenSyncProvider);
+    // ログイン状態変化時に lastLoginAt をFirestoreへ同期
+    ref.watch(lastLoginAtSyncProvider);
 
     return GestureDetector(
       onTap: () {

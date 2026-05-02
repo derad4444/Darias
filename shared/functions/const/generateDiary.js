@@ -61,6 +61,7 @@ async function generateDiary(characterId, userId) {
       .collection("schedules")
       .where("startDate", ">=", today)
       .where("startDate", "<", tomorrow)
+      .limit(3)
       .get();
 
   // スケジュールの文字列整形
@@ -104,6 +105,7 @@ async function generateDiary(characterId, userId) {
       .collection("posts")
       .where("timestamp", ">=", today)
       .where("timestamp", "<", tomorrow)
+      .limit(5)
       .get();
 
   // チャットの文字列整形

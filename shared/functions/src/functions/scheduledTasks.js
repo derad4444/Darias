@@ -113,6 +113,17 @@ const scheduledDiaryGeneration = onSchedule(
           continue;
         }
 
+        // 7日以上ログインなしのユーザーはスキップ（lastLoginAtなしは対象に含める）
+        const lastLoginAt = userData.lastLoginAt;
+        if (lastLoginAt) {
+          const sevenDaysAgo = new Date();
+          sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+          if (lastLoginAt.toDate() < sevenDaysAgo) {
+            logger.info("User inactive for 7+ days, skipping", {userId});
+            continue;
+          }
+        }
+
         const detailsDoc = await db.collection("users").doc(userId)
             .collection("characters").doc(characterId)
             .collection("details").doc("current").get();

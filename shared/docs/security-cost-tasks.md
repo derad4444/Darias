@@ -96,25 +96,28 @@ if (request.auth.uid !== data.userId) {
 
 ## 🟡 優先度：中（コスト）
 
-### [ ] T04: generateDiary.js の当日スケジュール取得に limit() を追加
+### [x] T04: generateDiary.js の当日スケジュール取得に limit() を追加（2026-05-02 完了）
 
-**問題**: `generateDiary.js` 内の当日スケジュール取得クエリに `.limit()` なし
+**問題**: `generateDiary.js` 内の当日スケジュール・チャット取得クエリに `.limit()` なし（AIプロンプトに全件流れてトークンコスト増加）
 
-**対象**: `const/generateDiary.js` 行 60-64
+**対象**: `const/generateDiary.js`
 
-**実装方針**: `.limit(10)` 追加（1日の予定が10件を超えることはほぼない）
+**実装内容**:
+- 行 60-64: 今日のスケジュール → `.limit(3)` 追加
+- 行 102-107: 今日のチャット投稿 → `.limit(5)` 追加
 
 ---
 
-### [ ] T05: scheduledTasks.js の全ユーザー取得を見直し
+### [x] T05: 非アクティブユーザーの日記生成をスキップ（2026-05-02 完了）
 
-**問題**: `db.collection("users").get()` で全ユーザーを毎日無制限読み込み
+**問題**: 7日以上ログインしていないユーザーにも毎日日記生成が走りコスト増加
 
-**対象**: `src/functions/scheduledTasks.js` 行 36
+**実装内容**:
+- `flutter/lib/presentation/providers/auth_provider.dart`: `lastLoginAtSyncProvider` 追加（アプリ起動＆ログイン時に `lastLoginAt` をFirestoreへ書き込み）
+- `flutter/lib/main.dart`: `ref.watch(lastLoginAtSyncProvider)` 追加
+- `src/functions/scheduledTasks.js`: `lastLoginAt` が7日以上前のユーザーをスキップ
 
-**実装方針**:  
-日記生成が必要なユーザー（プレミアム or 一定期間内にアクティブなユーザー）に絞る条件を追加するか、  
-現状のユーザー数規模であればコスト影響が軽微なため経過観察でも可。
+**既存ユーザーの扱い**: `lastLoginAt` フィールドなし → スキップしない（日記生成対象に含める）
 
 ---
 
