@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -36,8 +35,7 @@ class MemoDetailScreen extends ConsumerStatefulWidget {
   ConsumerState<MemoDetailScreen> createState() => _MemoDetailScreenState();
 }
 
-class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
-    with WidgetsBindingObserver {
+class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
   late final TextEditingController _titleController;
   late final QuillController _quillController;
   late final FocusNode _editorFocusNode;
@@ -48,6 +46,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
   bool _showInWidget = false;
   bool _isSaving = false;
   bool _isDisposed = false;
+  bool _hasUnsavedChanges = false;
   int _taskCount = 0;
 
   /// Quill本文からタスクタイトル一覧を抽出（行頭にtaskIconエンベッドがある行を対象）
@@ -62,7 +61,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
       if (!op.isInsert) continue;
       final data = op.data;
 
-      if (data is Map && (data as Map).containsKey('taskIcon')) {
+      if (data is Map && data.containsKey('taskIcon')) {
         if (isLineStart) lineHasTaskIcon = true;
         isLineStart = false;
       } else if (data is String) {
@@ -85,17 +84,12 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     return tasks;
   }
 
-  /// 自動保存用タイマー
-  Timer? _debounceTimer;
-
   /// 新規作成後に保存済みメモを追跡（ID取得のため）
   MemoModel? _savedMemo;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-
     _titleController = TextEditingController(text: widget.memo?.title ?? '');
     _quillController = buildQuillController(widget.memo?.content ?? '');
     _editorFocusNode = FocusNode();
@@ -118,10 +112,6 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
   @override
   void dispose() {
     _isDisposed = true;
-    WidgetsBinding.instance.removeObserver(this);
-    _debounceTimer?.cancel();
-    // 画面離脱時に未保存の変更を即時保存（setState は呼ばれない）
-    _saveNow();
     _titleController.dispose();
     _quillController.dispose();
     _editorFocusNode.dispose();
@@ -129,34 +119,11 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     super.dispose();
   }
 
-  /// アプリがバックグラウンドに入ったときに保存
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      _debounceTimer?.cancel();
-      _saveNow();
-    }
-  }
-
   void _onContentChanged() {
-    _scheduleSave();
+    if (!_hasUnsavedChanges) setState(() => _hasUnsavedChanges = true);
     final count = _extractTaskTitles().length;
     if (count != _taskCount) {
       setState(() => _taskCount = count);
-    }
-  }
-
-  /// 2秒後に自動保存（入力が続く間はリセット）
-  void _scheduleSave() {
-    _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(seconds: 2), _saveNow);
-  }
-
-  /// 即時保存（画面離脱・バックグラウンド時に呼ぶ）
-  void _saveNow() {
-    _debounceTimer?.cancel();
-    if (_titleController.text.isNotEmpty) {
-      _persistMemo();
     }
   }
 
@@ -167,10 +134,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
 
     return PopScope(
+      canPop: !_hasUnsavedChanges,
       onPopInvokedWithResult: (didPop, _) {
-        if (didPop) {
-          _debounceTimer?.cancel();
-          _saveNow();
+        if (!didPop && _hasUnsavedChanges) {
+          _showDiscardConfirmation();
         }
       },
       child: Scaffold(
@@ -178,7 +145,13 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
         appBar: AppBar(
           leading: IconButton(
             icon: Icon(Icons.close, color: AppColors.textPrimary),
-            onPressed: () => context.pop(),
+            onPressed: () {
+              if (_hasUnsavedChanges) {
+                _showDiscardConfirmation();
+              } else {
+                context.pop();
+              }
+            },
           ),
           title: Text(
             widget.memo == null && _savedMemo == null ? '新規メモ' : 'メモ編集',
@@ -326,8 +299,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                                 value: _isPinned,
                                 activeTrackColor: accentColor,
                                 onChanged: (value) {
-                                  setState(() => _isPinned = value);
-                                  _saveNow();
+                                  setState(() {
+                                    _isPinned = value;
+                                    _hasUnsavedChanges = true;
+                                  });
                                 },
                               ),
                             ],
@@ -363,8 +338,10 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                                 value: _showInWidget,
                                 activeTrackColor: accentColor,
                                 onChanged: (value) {
-                                  setState(() => _showInWidget = value);
-                                  _saveNow();
+                                  setState(() {
+                                    _showInWidget = value;
+                                    _hasUnsavedChanges = true;
+                                  });
                                 },
                               ),
                             ],
@@ -589,11 +566,12 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
           ),
         );
       }
+      if (!_isDisposed && mounted) setState(() => _hasUnsavedChanges = false);
     } catch (e) {
-      debugPrint('🔴 メモ自動保存エラー: $e');
+      debugPrint('🔴 メモ保存エラー: $e');
       if (!_isDisposed && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('自動保存に失敗しました: $e')),
+          SnackBar(content: Text('保存に失敗しました: $e')),
         );
       }
     } finally {
@@ -618,11 +596,35 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
     }
   }
 
-  /// 手動保存ボタン：保存後に画面を閉じる
+  /// 保存ボタン：保存後に画面を閉じる
   Future<void> _saveAndPop() async {
-    _debounceTimer?.cancel();
     await _persistMemo();
     if (mounted) context.pop();
+  }
+
+  void _showDiscardConfirmation() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('変更を破棄しますか？'),
+        content: const Text('保存されていない変更は失われます。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.pop();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('破棄'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showTagSelection(Color accentColor) {
@@ -671,9 +673,11 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                         isSelected: _selectedTag.isEmpty,
                         accentColor: accentColor,
                         onTap: () {
-                          setState(() => _selectedTag = '');
+                          setState(() {
+                            _selectedTag = '';
+                            _hasUnsavedChanges = true;
+                          });
                           Navigator.pop(sheetContext);
-                          _saveNow();
                         },
                       ),
                       const SizedBox(height: 8),
@@ -686,9 +690,11 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen>
                               isSelected: _selectedTag == tag.name,
                               accentColor: accentColor,
                               onTap: () {
-                                setState(() => _selectedTag = tag.name);
+                                setState(() {
+                                  _selectedTag = tag.name;
+                                  _hasUnsavedChanges = true;
+                                });
                                 Navigator.pop(sheetContext);
-                                _saveNow();
                               },
                             ),
                           )),
