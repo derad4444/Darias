@@ -586,18 +586,27 @@ class _TagEditSheetState extends ConsumerState<_TagEditSheet> {
   }
 
   void _showColorPicker() {
+    final backgroundGradient = ref.read(backgroundGradientProvider);
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => _ColorPickerSheet(
-        initialColor: _selectedColor,
-        onColorSelected: (color) {
-          setState(() => _selectedColor = color);
-        },
-      ),
+      builder: (context) {
+        final height = MediaQuery.of(context).size.height * 0.95;
+        return SizedBox(
+          height: height,
+          child: _ColorPickerSheet(
+            initialColor: _selectedColor,
+            backgroundGradient: backgroundGradient,
+            onColorSelected: (color) {
+              setState(() => _selectedColor = color);
+            },
+          ),
+        );
+      },
     );
   }
 
@@ -762,10 +771,12 @@ class _SectionCard extends StatelessWidget {
 /// カラーピッカーシート
 class _ColorPickerSheet extends StatefulWidget {
   final Color initialColor;
+  final Gradient backgroundGradient;
   final ValueChanged<Color> onColorSelected;
 
   const _ColorPickerSheet({
     required this.initialColor,
+    required this.backgroundGradient,
     required this.onColorSelected,
   });
 
@@ -829,9 +840,15 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      decoration: BoxDecoration(
+        gradient: widget.backgroundGradient,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: SafeArea(
+      top: false,
+      child: SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             width: 40,
@@ -883,6 +900,8 @@ class _ColorPickerSheetState extends State<_ColorPickerSheet> {
           ),
           const SizedBox(height: 20),
         ],
+      ),
+      ),
       ),
     );
   }

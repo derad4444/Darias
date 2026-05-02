@@ -2,7 +2,7 @@
 // フレンド申請の送受信をCloud Functionで管理（管理者権限でFirestoreに書き込む）
 
 const {onCall} = require("firebase-functions/v2/https");
-const {getFirestore} = require("../src/utils/firebaseInit");
+const {getFirestore, admin} = require("../src/utils/firebaseInit");
 const {v4: uuidv4} = require("uuid");
 
 const db = getFirestore();
@@ -60,6 +60,38 @@ exports.sendFriendRequest = onCall(
       );
 
       await batch.commit();
+
+      // 相手にFCMプッシュ通知を送信
+      try {
+        const toUserDoc = await db.collection("users").doc(toUserId).get();
+        const fcmToken = toUserDoc.data()?.fcmToken;
+        if (fcmToken) {
+          await admin.messaging().send({
+            token: fcmToken,
+            notification: {
+              title: "フレンド申請が届きました",
+              body: `${myName ?? "ユーザー"}さんからフレンド申請が届きました`,
+            },
+            data: {
+              type: "friend_request",
+              fromUserId,
+            },
+            apns: {
+              payload: {aps: {sound: "default"}},
+            },
+            android: {
+              notification: {sound: "default"},
+            },
+          });
+        }
+      } catch (notifError) {
+        // 通知失敗はリクエスト自体の失敗にしない（ログのみ）
+        if (notifError.code === "messaging/registration-token-not-registered") {
+          await db.collection("users").doc(toUserId)
+              .update({fcmToken: admin.firestore.FieldValue.delete()});
+        }
+      }
+
       return {result: "sent"};
     },
 );
