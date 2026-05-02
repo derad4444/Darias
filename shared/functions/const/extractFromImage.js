@@ -1,7 +1,7 @@
 // const/extractFromImage.js
 // 画像からスケジュール・メモ・タスクを抽出するCloud Function
 
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {admin} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
@@ -89,6 +89,9 @@ exports.extractFromImage = onCall(
       enforceAppCheck: false,
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {imageBase64, targetType} = request.data;
 
       if (!imageBase64 || !targetType) {

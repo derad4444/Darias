@@ -1,6 +1,6 @@
 // functions/const/extractSchedule.js
 
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {getFirestore, admin} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
@@ -17,7 +17,13 @@ exports.extractSchedule = onCall(
       enforceAppCheck: false, // App Checkを無効化
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {data} = request;
+      if (data.userId && request.auth.uid !== data.userId) {
+        throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
+      }
       try {
         const {userId, userMessage} = data;
         if (!userId || !userMessage) {

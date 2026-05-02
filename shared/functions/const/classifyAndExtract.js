@@ -1,7 +1,7 @@
 // functions/const/classifyAndExtract.js
 // AIによるメッセージ分類＋内容抽出（memo/task/schedule/app_qa/chat）
 
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {admin} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
@@ -16,6 +16,9 @@ exports.classifyAndExtract = onCall(
       enforceAppCheck: false,
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {data} = request;
       try {
         const {userMessage} = data;

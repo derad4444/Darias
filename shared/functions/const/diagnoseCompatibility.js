@@ -1,7 +1,7 @@
 // functions/const/diagnoseCompatibility.js
 // カテゴリ別相性診断を生成するCloud Function
 
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {getFirestore} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
@@ -203,7 +203,13 @@ exports.diagnoseCompatibility = onCall(
       enforceAppCheck: false,
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {userId, friendId, category} = request.data;
+      if (request.auth.uid !== userId) {
+        throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
+      }
 
       if (!userId || !friendId || !category) {
         return {error: "Missing userId, friendId, or category"};

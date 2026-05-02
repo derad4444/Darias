@@ -1,7 +1,7 @@
 // functions/const/answerAppQuestion.js
 // アプリに関する質問 & ユーザーデータ参照に答えるCloud Function
 
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {getFirestore} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
@@ -227,8 +227,14 @@ exports.answerAppQuestion = onCall(
       enforceAppCheck: false,
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {data} = request;
       const {userId, userMessage, dataTypes = []} = data;
+      if (request.auth.uid !== userId) {
+        throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
+      }
 
       if (!userId || !userMessage) {
         return {error: "Missing userId or userMessage"};

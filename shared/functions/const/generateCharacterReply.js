@@ -1,5 +1,5 @@
 // functions/const/generateCharacterReply.js
-const {onCall} = require("firebase-functions/v2/https");
+const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {getNextQuestion, calculateBIG5Scores, BIG5_QUESTIONS} =
   require("./big5Questions");
@@ -430,7 +430,13 @@ exports.generateCharacterReply = onCall(
       enforceAppCheck: false, // App Checkを無効化
     },
     async (request) => {
+      if (!request.auth) {
+        throw new HttpsError("unauthenticated", "認証が必要です");
+      }
       const {data} = request;
+      if (data.userId && request.auth.uid !== data.userId) {
+        throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
+      }
       try {
         const {characterId, userMessage, userId, isPremium, chatHistory, meetingContext} = data;
         if (!characterId || !userMessage || !userId) {
