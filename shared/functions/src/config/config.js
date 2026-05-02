@@ -1,7 +1,5 @@
 // src/config/index.js
 
-const functions = require("firebase-functions");
-
 // .env 環境変数の .value() 互換ラッパー
 function createEnvSecret(name) {
   return {

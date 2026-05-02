@@ -35,7 +35,7 @@ class PurchaseService {
     FirebaseFunctions? functions,
   })  : _inAppPurchase = inAppPurchase ?? InAppPurchase.instance,
         _datasource = datasource ?? SubscriptionDatasource(),
-        _functions = functions ?? FirebaseFunctions.instance;
+        _functions = functions ?? FirebaseFunctions.instanceFor(region: 'asia-northeast1');
 
   /// 利用可能かどうか
   bool get isAvailable => _isAvailable;

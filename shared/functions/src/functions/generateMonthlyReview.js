@@ -295,6 +295,17 @@ exports.generateMonthlyReviewHttp = onRequest(
       timeoutSeconds: 300,
     },
     async (req, res) => {
+      // 管理者専用エンドポイント: Firebase ID トークンで認証チェック
+      const idToken = req.headers.authorization?.split("Bearer ")?.[1];
+      if (!idToken) {
+        return res.status(401).json({error: "Unauthorized"});
+      }
+      try {
+        await admin.auth().verifyIdToken(idToken);
+      } catch {
+        return res.status(401).json({error: "Unauthorized"});
+      }
+
       try {
         const {userId} = req.body;
 
