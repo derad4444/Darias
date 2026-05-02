@@ -200,7 +200,7 @@ exports.diagnoseCompatibility = onCall(
       memory: "512MiB",
       timeoutSeconds: 90,
       minInstances: 0,
-      enforceAppCheck: false,
+      enforceAppCheck: true,
     },
     async (request) => {
       if (!request.auth) {

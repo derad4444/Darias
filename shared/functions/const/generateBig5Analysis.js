@@ -229,6 +229,7 @@ const generateBig5AnalysisCallable = onCall(
       region: "asia-northeast1",
       memory: "1GiB",
       timeoutSeconds: 300,
+      enforceAppCheck: true,
     },
     async (request) => {
       const {data} = request;

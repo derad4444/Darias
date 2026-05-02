@@ -14,7 +14,7 @@ exports.extractSchedule = onCall(
       memory: "512MiB",
       timeoutSeconds: 120,
       minInstances: 0,
-      enforceAppCheck: false, // App Checkを無効化
+      enforceAppCheck: true,
     },
     async (request) => {
       if (!request.auth) {

@@ -426,7 +426,7 @@ exports.generateCharacterReply = onCall(
       memory: "1GiB",
       timeoutSeconds: 300,
       minInstances: 0,
-      enforceAppCheck: false, // App Checkを無効化
+      enforceAppCheck: true,
     },
     async (request) => {
       if (!request.auth) {

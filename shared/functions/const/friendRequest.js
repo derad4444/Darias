@@ -11,7 +11,7 @@ const db = getFirestore();
 // フレンド申請を送る
 // ============================================================
 exports.sendFriendRequest = onCall(
-    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: false},
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
     async (request) => {
       const {auth} = request;
       if (!auth) return {error: "Unauthorized"};
@@ -100,7 +100,7 @@ exports.sendFriendRequest = onCall(
 // フレンド申請を承認
 // ============================================================
 exports.acceptFriendRequest = onCall(
-    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: false},
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
     async (request) => {
       const {auth} = request;
       if (!auth) return {error: "Unauthorized"};
@@ -170,7 +170,7 @@ exports.acceptFriendRequest = onCall(
 // フレンド申請を拒否
 // ============================================================
 exports.rejectFriendRequest = onCall(
-    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: false},
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
     async (request) => {
       const {auth} = request;
       if (!auth) return {error: "Unauthorized"};
@@ -196,7 +196,7 @@ exports.rejectFriendRequest = onCall(
 // フレンド申請を取消（送信者側）
 // ============================================================
 exports.cancelFriendRequest = onCall(
-    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: false},
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
     async (request) => {
       const {auth} = request;
       if (!auth) return {error: "Unauthorized"};

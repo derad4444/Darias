@@ -12,7 +12,7 @@ exports.searchUsers = onCall(
       memory: "256MiB",
       timeoutSeconds: 30,
       minInstances: 0,
-      enforceAppCheck: false,
+      enforceAppCheck: true,
     },
     async (request) => {
       const {auth} = request;

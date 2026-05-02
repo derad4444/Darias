@@ -26,6 +26,7 @@ exports.generateVoice = onCall(
       memory: "512MiB",
       timeoutSeconds: 60,
       minInstances: 0,
+      enforceAppCheck: true,
     },
     async (request) => {
       // 認証チェック

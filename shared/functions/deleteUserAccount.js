@@ -16,7 +16,7 @@ require('dotenv').config();
  * 呼び出し側(Flutter)はこの関数が成功してから Firebase Auth を削除すること。
  */
 exports.deleteUserAccount = onCall(
-  {region: 'asia-northeast1', memory: '256MiB', timeoutSeconds: 60, enforceAppCheck: false},
+  {region: 'asia-northeast1', memory: '256MiB', timeoutSeconds: 60, enforceAppCheck: true},
   async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'User must be authenticated');

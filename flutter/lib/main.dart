@@ -31,15 +31,14 @@ void main() async {
   );
 
   // App Check初期化（不正なCloud Functions呼び出しを防止）
-  if (!kIsWeb) {
-    // DEBUG: シミュレーター・開発端末用のデバッグプロバイダー
-    // RELEASE: iOS 14+ は App Attest、それ以下は DeviceCheck を使用
-    await FirebaseAppCheck.instance.activate(
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.appAttestWithDeviceCheckFallback,
-    );
-  }
+  await FirebaseAppCheck.instance.activate(
+    providerApple: kDebugMode
+        ? const AppleDebugProvider()
+        : const AppleAppAttestWithDeviceCheckFallbackProvider(),
+    providerWeb: kDebugMode
+        ? WebDebugProvider()
+        : ReCaptchaV3Provider('6Lfsb9UsAAAAAIVWwRXMfZbzaILBvB8F7exqsYBT'),
+  );
 
   // Web版ではログイン状態をローカルストレージに永続化
   if (kIsWeb) {

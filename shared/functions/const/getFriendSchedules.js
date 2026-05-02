@@ -7,7 +7,7 @@ const {getFirestore} = require("../src/utils/firebaseInit");
 const db = getFirestore();
 
 exports.getFriendSchedules = onCall(
-    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: false},
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
     async (request) => {
       const {auth} = request;
       if (!auth) return {error: "Unauthorized"};

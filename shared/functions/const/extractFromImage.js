@@ -86,7 +86,7 @@ exports.extractFromImage = onCall(
       memory: "512MiB",
       timeoutSeconds: 60,
       minInstances: 0,
-      enforceAppCheck: false,
+      enforceAppCheck: true,
     },
     async (request) => {
       if (!request.auth) {
