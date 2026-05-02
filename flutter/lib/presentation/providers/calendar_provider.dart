@@ -282,6 +282,9 @@ final lastUsedScheduleTagProvider = StateProvider<String>((ref) => '');
 /// 検索テキストの状態
 final calendarSearchTextProvider = StateProvider<String>((ref) => '');
 
+/// カレンダーのタグフィルター（'すべて' = フィルターなし）
+final calendarSelectedTagProvider = StateProvider<String>((ref) => 'すべて');
+
 // ============================================================
 // フレンド予定共有
 // ============================================================

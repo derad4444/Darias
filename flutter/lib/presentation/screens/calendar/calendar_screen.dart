@@ -337,6 +337,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     final isSearchMode = ref.watch(calendarSearchModeProvider);
     final searchText = ref.watch(calendarSearchTextProvider);
     final filteredSchedules = ref.watch(filteredSchedulesProvider);
+    final calendarSelectedTag = ref.watch(calendarSelectedTagProvider);
     final monthlyCommentAsync = ref.watch(monthlyCommentProvider(selectedMonth));
     final holidays = ref.watch(holidaysProvider);
 
@@ -430,10 +431,14 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                       }
                     },
                     child: schedulesAsync.when(
-                      data: (schedules) => _CalendarGrid(
+                      data: (schedules) {
+                        final tagFiltered = calendarSelectedTag == 'すべて'
+                            ? schedules
+                            : schedules.where((s) => s.tag == calendarSelectedTag).toList();
+                        return _CalendarGrid(
                           month: selectedMonth,
                           selectedDay: selectedDay,
-                          schedules: schedules,
+                          schedules: tagFiltered,
                           friendSchedules: friendSchedules,
                           holidays: holidays,
                           accentColor: accentColor,
@@ -448,7 +453,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
                               textColor,
                             );
                           },
-                        ),
+                        );
+                      },
                       loading: () => const Center(child: CircularProgressIndicator()),
                       error: (e, st) => Center(child: Text('エラー: $e', style: TextStyle(color: textColor))),
                     ),
@@ -2240,7 +2246,11 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final schedules = ref.watch(daySchedulesProvider(_currentDay));
+    final allDaySchedules = ref.watch(daySchedulesProvider(_currentDay));
+    final calendarSelectedTag = ref.watch(calendarSelectedTagProvider);
+    final schedules = calendarSelectedTag == 'すべて'
+        ? allDaySchedules
+        : allDaySchedules.where((s) => s.tag == calendarSelectedTag).toList();
     final friendSchedules = ref.watch(friendDaySchedulesProvider(_currentDay));
     final holiday = ref.watch(holidayForDateProvider(_currentDay));
     final diary = ref.watch(diaryForDateProvider(_currentDay));
@@ -2913,10 +2923,10 @@ class _CalendarMenuSheet extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // フレンド予定の設定
+            // 表示設定
             _MenuOption(
-              icon: Icons.people_outline,
-              label: 'フレンド予定の設定',
+              icon: Icons.visibility_outlined,
+              label: '表示設定',
               accentColor: accentColor,
               onTap: onFriendSettings,
             ),
@@ -2973,7 +2983,7 @@ class _MenuOption extends StatelessWidget {
 }
 
 // ============================================================
-// フレンド予定表示設定シート
+// カレンダー表示設定シート（タグ絞り込み＋フレンド予定）
 // ============================================================
 class _FriendScheduleSettingsSheet extends ConsumerWidget {
   final Color accentColor;
@@ -2988,6 +2998,8 @@ class _FriendScheduleSettingsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final friendsAsync = ref.watch(friendsProvider);
     final selectedIds = ref.watch(selectedFriendIdsProvider);
+    final tags = ref.watch(tagsProvider);
+    final selectedTag = ref.watch(calendarSelectedTagProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -2999,129 +3011,198 @@ class _FriendScheduleSettingsSheet extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-          // ハンドル
-          Center(
-            child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            children: [
-              Text(
-                'フレンド予定の表示設定',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: accentColor,
+            // ハンドル
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
-              const Spacer(),
-              // すべて選択 / 全解除ボタン
-              friendsAsync.when(
-                data: (friends) {
-                  final allIds = friends.map((f) => f.id).toSet();
-                  final isAllSelected = allIds.isNotEmpty && allIds.every((id) => selectedIds.contains(id));
+            ),
+            const SizedBox(height: 20),
+
+            // ── タグ絞り込み ──
+            Text(
+              'タグ絞り込み',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: accentColor,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '自分の予定のみ絞り込みます',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 12),
+
+            if (tags.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  'タグが登録されていません',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ['すべて', ...tags.map((t) => t.name)].map((label) {
+                  final isSelected = selectedTag == label;
+                  final chipColor = label == 'すべて'
+                      ? accentColor
+                      : tags.firstWhere((t) => t.name == label, orElse: () => TagItem(id: '', name: label, color: accentColor)).color;
                   return GestureDetector(
-                    onTap: () {
-                      if (isAllSelected) {
-                        ref.read(selectedFriendIdsProvider.notifier).update({});
-                      } else {
-                        ref.read(selectedFriendIdsProvider.notifier).update(Set.from(allIds));
-                      }
-                    },
+                    onTap: () => ref.read(calendarSelectedTagProvider.notifier).state = label,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                       decoration: BoxDecoration(
-                        color: accentColor.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
+                        color: isSelected ? chipColor : Colors.white.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: isSelected ? chipColor : chipColor.withValues(alpha: 0.4),
+                          width: 1.5,
+                        ),
                       ),
                       child: Text(
-                        isAllSelected ? '全解除' : 'すべて選択',
-                        style: TextStyle(fontSize: 13, color: accentColor, fontWeight: FontWeight.w500),
+                        label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                          color: isSelected ? Colors.white : chipColor,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          Text(
-            '相手の共有設定がOFFの場合は表示されません',
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 16),
-
-          // フレンドリスト
-          friendsAsync.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Text('エラー: $e'),
-            data: (friends) {
-              if (friends.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'フレンドがいません',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                );
-              }
-              return Column(
-                children: friends.map((friend) {
-                  final isSelected = selectedIds.contains(friend.id);
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        CharacterAvatarWidget(
-                          userId: friend.id,
-                          size: 36,
-                          fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
-                          fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
-                          fallbackTextColor: accentColor,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            friend.name,
-                            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        Switch(
-                          value: isSelected,
-                          activeColor: accentColor,
-                          onChanged: (value) {
-                            final current = Set<String>.from(selectedIds);
-                            if (value) {
-                              current.add(friend.id);
-                            } else {
-                              current.remove(friend.id);
-                            }
-                            ref.read(selectedFriendIdsProvider.notifier).update(current);
-                          },
-                        ),
-                      ],
                     ),
                   );
                 }).toList(),
-              );
-            },
-          ),
-        ],
+              ),
+
+            const SizedBox(height: 28),
+            Divider(color: Colors.grey.withValues(alpha: 0.3)),
+            const SizedBox(height: 20),
+
+            // ── フレンドの予定 ──
+            Row(
+              children: [
+                Text(
+                  'フレンドの予定',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                  ),
+                ),
+                const Spacer(),
+                friendsAsync.when(
+                  data: (friends) {
+                    final allIds = friends.map((f) => f.id).toSet();
+                    final isAllSelected = allIds.isNotEmpty && allIds.every((id) => selectedIds.contains(id));
+                    return GestureDetector(
+                      onTap: () {
+                        if (isAllSelected) {
+                          ref.read(selectedFriendIdsProvider.notifier).update({});
+                        } else {
+                          ref.read(selectedFriendIdsProvider.notifier).update(Set.from(allIds));
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          isAllSelected ? '全解除' : 'すべて選択',
+                          style: TextStyle(fontSize: 13, color: accentColor, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    );
+                  },
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '相手の共有設定がOFFの場合は表示されません',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+
+            friendsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Text('エラー: $e'),
+              data: (friends) {
+                if (friends.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Text(
+                      'フレンドがいません',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                  );
+                }
+                return Column(
+                  children: friends.map((friend) {
+                    final isSelected = selectedIds.contains(friend.id);
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: accentColor.withValues(alpha: 0.4),
+                                width: 2,
+                              ),
+                            ),
+                            child: CharacterAvatarWidget(
+                              userId: friend.id,
+                              size: 44,
+                              fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
+                              fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+                              fallbackTextColor: accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              friend.name,
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                          Switch(
+                            value: isSelected,
+                            activeColor: accentColor,
+                            onChanged: (value) {
+                              final current = Set<String>.from(selectedIds);
+                              if (value) {
+                                current.add(friend.id);
+                              } else {
+                                current.remove(friend.id);
+                              }
+                              ref.read(selectedFriendIdsProvider.notifier).update(current);
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

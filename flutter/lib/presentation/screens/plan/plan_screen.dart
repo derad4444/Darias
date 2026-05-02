@@ -7,7 +7,7 @@ import '../../widgets/draggable_fab.dart';
 import '../calendar/calendar_screen.dart';
 import '../note/note_screen.dart';
 
-enum PlanSegment { schedule, todo, memo }
+enum PlanSegment { schedule, memo, todo }
 
 /// 予定・タスク・メモを統合したタブ画面
 final planSegmentProvider = StateProvider<PlanSegment>((ref) => PlanSegment.schedule);
@@ -63,10 +63,10 @@ class PlanScreen extends ConsumerWidget {
                         removeTop: true,
                         child: const CalendarScreen(),
                       ),
-                      // タスク
-                      const SafeArea(top: false, child: TodoContentView()),
                       // メモ
                       const SafeArea(top: false, child: MemoContentView()),
+                      // タスク
+                      const SafeArea(top: false, child: TodoContentView()),
                     ],
                   ),
                 ),
@@ -106,6 +106,12 @@ class _PlanSegmentControl extends StatelessWidget {
             PlanSegment.todo => 'タスク',
             PlanSegment.memo => 'メモ',
           };
+          final icon = switch (segment) {
+            PlanSegment.schedule => Icons.calendar_today,
+            PlanSegment.memo => Icons.edit_note,
+            PlanSegment.todo => Icons.check_circle_outline,
+          };
+          final color = isSelected ? accentColor : AppColors.textSecondary;
           return Expanded(
             child: GestureDetector(
               onTap: () => onChanged(segment),
@@ -125,14 +131,20 @@ class _PlanSegmentControl extends StatelessWidget {
                         ]
                       : null,
                 ),
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    color: isSelected ? accentColor : AppColors.textSecondary,
-                  ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(icon, size: 14, color: color),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: color,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

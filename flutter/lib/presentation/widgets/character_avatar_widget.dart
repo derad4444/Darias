@@ -41,29 +41,36 @@ class CharacterAvatarWidget extends ConsumerWidget {
         textColor: fallbackTextColor,
       ),
       data: (details) {
-        if (details == null) {
-          return _FallbackAvatar(
-            size: size,
-            text: fallbackText,
-            backgroundColor: fallbackBackgroundColor,
-            textColor: fallbackTextColor,
+        // キャラクター未設定 or 診断未完了: デフォルト画像を表示
+        if (details == null || details.personalityImageFileName == null) {
+          final defaultPath = (details?.gender == '男性')
+              ? 'assets/images/android_male.png'
+              : 'assets/images/android_female.png';
+          return ClipOval(
+            child: SizedBox(
+              width: size,
+              height: size,
+              child: OverflowBox(
+                maxHeight: size * 2,
+                alignment: Alignment.topCenter,
+                child: Image.asset(
+                  defaultPath,
+                  width: size,
+                  height: size * 2,
+                  fit: BoxFit.fitWidth,
+                  alignment: Alignment.topCenter,
+                ),
+              ),
+            ),
           );
         }
-        final fileName = details.personalityImageFileName;
-        if (fileName == null) {
-          return _FallbackAvatar(
-            size: size,
-            text: fallbackText,
-            backgroundColor: fallbackBackgroundColor,
-            textColor: fallbackTextColor,
-          );
-        }
+
         final gender = details.gender == '男性'
             ? firebase_image.CharacterGender.male
             : firebase_image.CharacterGender.female;
 
         return _CharacterImageAvatar(
-          fileName: fileName,
+          fileName: details.personalityImageFileName!,
           gender: gender,
           size: size,
           fallbackText: fallbackText,

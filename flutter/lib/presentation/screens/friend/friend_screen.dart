@@ -455,12 +455,12 @@ class _RequestCard extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            backgroundColor: accentColor.withValues(alpha: 0.15),
-            child: Text(
-              displayName.isNotEmpty ? displayName[0] : '?',
-              style: TextStyle(color: accentColor, fontWeight: FontWeight.bold),
-            ),
+          CharacterAvatarWidget(
+            userId: isIncoming ? request.fromUserId : request.toUserId,
+            size: 44,
+            fallbackText: displayName.isNotEmpty ? displayName[0] : '?',
+            fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
+            fallbackTextColor: accentColor,
           ),
           const SizedBox(width: 12),
           Expanded(

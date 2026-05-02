@@ -7,6 +7,7 @@ import '../../providers/theme_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/calendar_provider.dart';
 import '../../widgets/draggable_fab.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
@@ -14,10 +15,10 @@ import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
 
 /// ノートのセグメント
-enum NoteSegment { memo, todo }
+enum NoteSegment { schedule, memo, todo }
 
 /// 現在選択されているセグメント
-final noteSegmentProvider = StateProvider<NoteSegment>((ref) => NoteSegment.memo);
+final noteSegmentProvider = StateProvider<NoteSegment>((ref) => NoteSegment.schedule);
 
 /// メモタブで選択中のタグフィルター
 final memoSelectedTagProvider = StateProvider<String>((ref) => 'すべて');
@@ -36,7 +37,9 @@ class NoteScreen extends ConsumerWidget {
     final backgroundGradient = ref.watch(backgroundGradientProvider);
 
     void onFabTap() {
-      if (selectedSegment == NoteSegment.memo) {
+      if (selectedSegment == NoteSegment.schedule) {
+        context.push('/calendar/detail', extra: {'initialDate': DateTime.now()});
+      } else if (selectedSegment == NoteSegment.memo) {
         final selectedTag = ref.read(memoSelectedTagProvider);
         final initialTag = (selectedTag != 'すべて') ? selectedTag : '';
         context.push('/memo/detail', extra: {'initialTag': initialTag});
@@ -74,9 +77,11 @@ class NoteScreen extends ConsumerWidget {
                   ),
                 ),
                 Expanded(
-                  child: selectedSegment == NoteSegment.memo
-                      ? const MemoContentView()
-                      : const TodoContentView(),
+                  child: switch (selectedSegment) {
+                    NoteSegment.schedule => const ScheduleContentView(),
+                    NoteSegment.memo => const MemoContentView(),
+                    NoteSegment.todo => const TodoContentView(),
+                  },
                 ),
               ],
             ),
@@ -111,7 +116,17 @@ class _SegmentControl extends StatelessWidget {
         children: [
           Expanded(
             child: _SegmentButton(
+              label: '予定',
+              icon: Icons.calendar_today,
+              isSelected: selectedSegment == NoteSegment.schedule,
+              accentColor: accentColor,
+              onTap: () => onSegmentChanged(NoteSegment.schedule),
+            ),
+          ),
+          Expanded(
+            child: _SegmentButton(
               label: 'メモ',
+              icon: Icons.edit_note,
               isSelected: selectedSegment == NoteSegment.memo,
               accentColor: accentColor,
               onTap: () => onSegmentChanged(NoteSegment.memo),
@@ -120,6 +135,7 @@ class _SegmentControl extends StatelessWidget {
           Expanded(
             child: _SegmentButton(
               label: 'タスク',
+              icon: Icons.check_circle_outline,
               isSelected: selectedSegment == NoteSegment.todo,
               accentColor: accentColor,
               onTap: () => onSegmentChanged(NoteSegment.todo),
@@ -133,12 +149,14 @@ class _SegmentControl extends StatelessWidget {
 
 class _SegmentButton extends StatelessWidget {
   final String label;
+  final IconData icon;
   final bool isSelected;
   final Color accentColor;
   final VoidCallback onTap;
 
   const _SegmentButton({
     required this.label,
+    required this.icon,
     required this.isSelected,
     required this.accentColor,
     required this.onTap,
@@ -146,6 +164,7 @@ class _SegmentButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final color = isSelected ? accentColor : AppColors.textSecondary;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -164,16 +183,218 @@ class _SegmentButton extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-            color: isSelected ? accentColor : AppColors.textSecondary,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                color: color,
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// 予定コンテンツビュー
+class ScheduleContentView extends ConsumerWidget {
+  const ScheduleContentView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final accentColor = ref.watch(accentColorProvider);
+    final schedulesAsync = ref.watch(allSchedulesProvider);
+    final tags = ref.watch(tagsProvider);
+    final tagColorMap = {for (final t in tags) t.name: t.color};
+
+    return schedulesAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('エラー: $e')),
+      data: (schedules) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final upcoming = schedules
+            .where((s) {
+              final endDay = DateTime(s.endDate.year, s.endDate.month, s.endDate.day);
+              return !endDay.isBefore(today);
+            })
+            .toList()
+          ..sort((a, b) => a.startDate.compareTo(b.startDate));
+
+        if (upcoming.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.calendar_today, size: 60, color: Colors.grey.withValues(alpha: 0.5)),
+                const SizedBox(height: 16),
+                Text(
+                  '予定がありません',
+                  style: TextStyle(fontSize: 18, color: Colors.grey.withValues(alpha: 0.7)),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: upcoming.length,
+          itemBuilder: (context, index) {
+            final schedule = upcoming[index];
+            final tagColor = tagColorMap[schedule.tag];
+            final hasTagColor = tagColor != null;
+            final startDay = DateTime(schedule.startDate.year, schedule.startDate.month, schedule.startDate.day);
+            final isToday = startDay == today;
+            final isPast = startDay.isBefore(today);
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: GestureDetector(
+                onTap: () => context.push('/calendar/detail', extra: {'schedule': schedule}),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: hasTagColor
+                        ? tagColor.withValues(alpha: 0.05)
+                        : Colors.white.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(14),
+                    border: hasTagColor
+                        ? Border(left: BorderSide(color: tagColor, width: 4))
+                        : null,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      // 日付バッジ
+                      Container(
+                        width: 46,
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isToday
+                              ? accentColor
+                              : isPast
+                                  ? Colors.grey.withValues(alpha: 0.15)
+                                  : (hasTagColor ? tagColor.withValues(alpha: 0.15) : accentColor.withValues(alpha: 0.1)),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          children: [
+                            Text(
+                              '${schedule.startDate.month}/${schedule.startDate.day}',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isToday ? Colors.white : (hasTagColor ? tagColor : accentColor),
+                              ),
+                            ),
+                            if (schedule.isMultiDay)
+                              Text(
+                                '〜${schedule.endDate.month}/${schedule.endDate.day}',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: isToday ? Colors.white.withValues(alpha: 0.8) : (hasTagColor ? tagColor : accentColor).withValues(alpha: 0.7),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                if (isToday)
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 6),
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: accentColor,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '今日',
+                                      style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
+                                Expanded(
+                                  child: Text(
+                                    schedule.title,
+                                    style: const TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (!schedule.isAllDay) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                '${schedule.startDate.hour.toString().padLeft(2, '0')}:${schedule.startDate.minute.toString().padLeft(2, '0')}',
+                                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              ),
+                            ],
+                            if (schedule.location.isNotEmpty) ...[
+                              const SizedBox(height: 3),
+                              Row(
+                                children: [
+                                  Icon(Icons.location_on, size: 12, color: AppColors.textSecondary),
+                                  const SizedBox(width: 2),
+                                  Expanded(
+                                    child: Text(
+                                      schedule.location,
+                                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (schedule.tag.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (tagColor ?? accentColor).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            schedule.tag,
+                            style: TextStyle(fontSize: 11, color: tagColor ?? accentColor),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
