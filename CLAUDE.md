@@ -84,6 +84,21 @@
 - コード変更後は毎回アプリを再起動する（Flutter Web: Chromeプロセスをosascriptで終了 → flutter run）
 - ChromeはSIGKILL(-9)で終了しない（SharedPreferences/Firebase Authデータが消える）
 
+### ユーザーが自分で行う手順の案内
+
+ユーザー自身が手動で操作しなければならない手順（コンソール操作・アップロード・外部サービス設定など）が出てきた場合は、**リンクを必ず一緒に記載すること**。
+
+よく使うリンク:
+| 操作 | リンク |
+|-----|-------|
+| App Store Connect（アプリ管理・審査提出） | https://appstoreconnect.apple.com |
+| Transporter（IPA アップロード）| https://apps.apple.com/jp/app/transporter/id1450874784 |
+| Firebase Console | https://console.firebase.google.com/project/my-character-app |
+| Firebase Console → App Check | https://console.firebase.google.com/project/my-character-app/appcheck |
+| Firebase Console → Functions | https://console.firebase.google.com/project/my-character-app/functions |
+| Firebase Console → Firestore | https://console.firebase.google.com/project/my-character-app/firestore |
+| Google reCAPTCHA Console | https://www.google.com/recaptcha/admin |
+
 ## プロジェクト情報
 
 - Flutter: `/Users/onoderaryousuke/Desktop/development-D/DARIAS/flutter`
