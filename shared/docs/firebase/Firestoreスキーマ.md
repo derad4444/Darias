@@ -43,6 +43,7 @@
 - **usage_tracking**: `map` - 会議機能の利用回数追跡（プレミアムユーザーのみ書き込み）
   - **meeting_count_this_month**: `number` - 今月の会議利用回数
   - **last_meeting_month**: `string` - 最後に会議を利用した月（YYYY-MM形式）。現在月と異なる場合はカウントをリセット
+- **lastLoginAt**: `timestamp` - 最終ログイン日時。アプリ起動時に Flutter クライアント（`lastLoginAtSyncProvider`）が `FieldValue.serverTimestamp()` で書き込む。`scheduledDiaryGeneration` が7日以上未更新のユーザーの日記生成をスキップする際に参照。フィールドなしの既存ユーザーはスキップ対象外
 
 **アクセス権限**: ユーザー自身のデータのみ読み書き可
 
@@ -144,7 +145,7 @@
 **フィールド:**
 
 - **content**: `string` - ユーザーのメッセージ（最大100文字。クライアントUI＆Cloud Function 双方で制限）
-- **analysis_result**: `string` - キャラクターの返答（AI生成、最大150トークン相当）
+- **analysis_result**: `string` - キャラクターの返答（AI生成。max_tokens 指定なし、プロンプトで120文字以内を指示）
 - **timestamp**: `timestamp` - 投稿日時
 
 **備考:**
@@ -755,6 +756,7 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  
-**前回更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
+**最終更新**: 2026-05-02（`users/{userId}.lastLoginAt` フィールド追加；`posts.analysis_result` の max_tokens 記述を削除）  
+**前回更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  
+**前々回更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
 **作成者**: Claude Code

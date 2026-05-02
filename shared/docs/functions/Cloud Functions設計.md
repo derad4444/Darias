@@ -2,8 +2,8 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-04-18
-**ランタイム**: Node.js 20
+**最終更新日**: 2026-05-02
+**ランタイム**: Node.js 22
 **関数数**: 28
 
 ---
@@ -26,7 +26,7 @@
         │
         ▼
 ┌──────────────────────────────────────────────┐
-│           Cloud Functions (Node.js 20)        │
+│           Cloud Functions (Node.js 22)        │
 │                                               │
 │  ┌─────────────┐  ┌────────────────────────┐ │
 │  │ onCall (14)  │  │ onSchedule (5)         │ │
@@ -64,6 +64,10 @@
 ### HTTP Callable (`onCall`) - 16 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
+
+**共通セキュリティ仕様（全 onCall 関数）:**
+- `request.auth` が null の場合は `unauthenticated` エラーを返す（未認証リクエストを全てブロック）
+- 以下の関数は追加で `request.auth.uid === data.userId` を検証し、不一致の場合は `permission-denied` エラーを返す: `generateCharacterReply`, `answerAppQuestion`, `extractSchedule`, `diagnoseCompatibility`
 
 #### 1. `generateCharacterReply`
 - **ソース**: `const/generateCharacterReply.js`
@@ -133,7 +137,7 @@
 
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
-| `userMessage` | `string` | ユーザーが入力したメッセージ |
+| `userMessage` | `string` | ユーザーが入力したメッセージ（Cloud Function 側で **100文字** に切り詰め） |
 
 **返却値（分類別）:**
 
@@ -205,7 +209,7 @@
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
 | `userId` | `string` | Firebase Auth UID |
-| `userMessage` | `string` | ユーザーのメッセージ |
+| `userMessage` | `string` | ユーザーのメッセージ（Cloud Function 側で **100文字** に切り詰め） |
 | `dataTypes` | `array<string>` | Firestoreから取得するデータ種別（`"schedules"` / `"todos"` / `"memos"`） |
 
 **返却値:**
@@ -525,7 +529,7 @@
 
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
-| `imageBase64` | `string` | JPEG 画像の base64 文字列（クライアント側で最大 1024px・品質 75% に圧縮済み） |
+| `imageBase64` | `string` | JPEG 画像の base64 文字列（クライアント側で最大 1024px・品質 75% に圧縮済み。Cloud Function 側で **2MB 上限**チェックあり。超過時は `invalid-argument` エラー） |
 | `targetType` | `string` | 抽出タイプ: `"schedule"` / `"memo"` / `"todo"` / `"schedules"`（複数予定一括） |
 
 **返却値（targetType 別）:**
@@ -616,11 +620,12 @@ Cloud Scheduler による定期実行バッチ。
 #### 12. `checkSubscriptionStatus`
 - **ソース**: `validateReceipt.js`
 - **API バージョン**: **v1** (`firebase-functions` — `functions.scheduler.onSchedule`)
-- **概要**: 期限切れサブスクリプションを検出し free に更新
+- **概要**: 期限切れサブスクリプションを検出し free に更新（`appleServerNotification` のバックアップ）
 - **スケジュール**: `0 0 * * *` (毎日 00:00 JST)
 - **リソース**: 未指定（v1 デフォルト）
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし
+- **クエリ**: `collectionGroup('subscription').where('status','==','active').where('end_date','<', now)` — 期限切れのもののみ取得（有効期間中は読み取らない）
 
 #### 13. `backfillSixPersonalities`
 - **ソース**: `src/functions/generateSixPersonMeeting.js`
@@ -751,7 +756,7 @@ shared/functions/
 
 | パッケージ | バージョン | 用途 |
 |-----------|----------|------|
-| `firebase-functions` | ^6.0.1 | Cloud Functions ランタイム (v1/v2 両方使用) |
+| `firebase-functions` | ^7.2.5 | Cloud Functions ランタイム (v1/v2 両方使用) |
 | `firebase-admin` | ^12.6.0 | Firestore / Auth / Storage 管理 |
 | `firebase-tools` | ^14.5.1 | Firebase CLI（デプロイ用） |
 | `openai` | ^4.97.0 | OpenAI API（チャット・解析・会議生成） |
