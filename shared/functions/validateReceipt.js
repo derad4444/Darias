@@ -91,9 +91,8 @@ exports.validateAppStoreReceipt = functions.https.onCall(async (data, context) =
 async function verifyReceiptWithApple(receiptData) {
   const axios = require('axios');
 
-  // Shared Secretを環境変数または設定から取得
-  const sharedSecret = process.env.APPLE_SHARED_SECRET ||
-                       (functions.config().apple ? functions.config().apple.shared_secret : null);
+  // Shared Secretを環境変数から取得
+  const sharedSecret = process.env.APPLE_SHARED_SECRET || null;
 
   if (!sharedSecret) {
     console.error('Apple Shared Secret is not configured');
