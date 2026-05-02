@@ -74,7 +74,7 @@ if (request.auth.uid !== data.userId) {
 
 ## 🔴 優先度：高（コスト）
 
-### [ ] T03: classifyAndExtract に max_tokens を追加
+### [x] T03: classifyAndExtract に max_tokens を追加（2026-05-02 完了）
 
 **問題**: 唯一 `max_tokens` 未設定。通常は短い JSON を返すが、モデルが長い回答を生成するリスク
 
