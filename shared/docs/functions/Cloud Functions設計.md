@@ -437,7 +437,7 @@
 #### 12. `sendFriendRequest`
 - **ソース**: `const/friendRequest.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: フレンド申請を送る。送信者の `outgoingRequests` と受信者の `incomingRequests` 両方に同じドキュメントをアトミックに書き込む（管理者権限が必要なため Cloud Function 経由）
+- **概要**: フレンド申請を送る。送信者の `outgoingRequests` と受信者の `incomingRequests` 両方に同じドキュメントをアトミックに書き込む（管理者権限が必要なため Cloud Function 経由）。書き込み成功後、受信者の `fcmToken` を取得してFCMプッシュ通知を送信する（アプリ未起動時も届く）。通知失敗はリクエスト自体の失敗にはしない。
 - **リソース**: memory `256MiB` / timeout `30秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: なし
