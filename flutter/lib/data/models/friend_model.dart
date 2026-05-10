@@ -239,6 +239,72 @@ class CompatibilityMessage {
 }
 
 // ============================================================
+// フレンド質問結果
+// ============================================================
+
+// ============================================================
+// 質問履歴エントリ
+// ============================================================
+
+/// 「フレンドのことを聞く」1件の履歴
+class AskHistoryEntry {
+  final String id;
+  final String friendId;
+  final String friendName;
+  final String question;
+  final String recommendation;
+  final List<CompatibilityMessage> conversation;
+  final DateTime createdAt;
+
+  const AskHistoryEntry({
+    required this.id,
+    required this.friendId,
+    required this.friendName,
+    required this.question,
+    required this.recommendation,
+    required this.conversation,
+    required this.createdAt,
+  });
+
+  factory AskHistoryEntry.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
+    final conv = (data['conversation'] as List<dynamic>? ?? [])
+        .map((e) => CompatibilityMessage.fromMap(e as Map<String, dynamic>))
+        .toList();
+    return AskHistoryEntry(
+      id: doc.id,
+      friendId: data['friendId'] as String? ?? '',
+      friendName: data['friendName'] as String? ?? '',
+      question: data['question'] as String? ?? '',
+      recommendation: data['recommendation'] as String? ?? '',
+      conversation: conv,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+    );
+  }
+}
+
+/// キャラクター会話でフレンドの好みを回答した結果
+class FriendAskResult {
+  final List<CompatibilityMessage> conversation;
+  final String recommendation;
+
+  const FriendAskResult({
+    required this.conversation,
+    required this.recommendation,
+  });
+
+  factory FriendAskResult.fromMap(Map<String, dynamic> map) {
+    final conv = (map['conversation'] as List<dynamic>? ?? [])
+        .map((e) => CompatibilityMessage.fromMap(e as Map<String, dynamic>))
+        .toList();
+    return FriendAskResult(
+      conversation: conv,
+      recommendation: map['recommendation'] as String? ?? '',
+    );
+  }
+}
+
+// ============================================================
 // カテゴリ別相性診断（新設計）
 // ============================================================
 
@@ -344,6 +410,7 @@ class CompatibilityDocument {
   final CategoryDiagnosis? romance;
   final CategoryDiagnosis? work;
   final CategoryDiagnosis? trust;
+  final bool isStale;
 
   const CompatibilityDocument({
     required this.unlockedCategories,
@@ -352,6 +419,7 @@ class CompatibilityDocument {
     this.romance,
     this.work,
     this.trust,
+    this.isStale = false,
   });
 
   factory CompatibilityDocument.fromMap(Map<String, dynamic> map) {
@@ -377,6 +445,7 @@ class CompatibilityDocument {
       romance: parseCat('romance'),
       work: parseCat('work'),
       trust: parseCat('trust'),
+      isStale: map['isStale'] as bool? ?? false,
     );
   }
 

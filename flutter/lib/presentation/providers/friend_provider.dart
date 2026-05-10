@@ -59,6 +59,30 @@ final pendingFriendRequestCountProvider = Provider<int>((ref) {
       .length ?? 0;
 });
 
+/// 未読の相性診断通知件数プロバイダー
+/// フレンドが自分との相性診断を実行すると friendNotifications/{friendId} に isRead: false が書き込まれる
+final unreadCompatibilityCountProvider = StreamProvider<int>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return Stream.value(0);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(userId)
+      .collection('friendNotifications')
+      .where('type', isEqualTo: 'compatibility')
+      .where('isRead', isEqualTo: false)
+      .snapshots()
+      .map((snap) => snap.docs.length);
+});
+
+/// フレンドタブ合計バッジ数（申請 + 未読相性診断）
+final friendTabBadgeCountProvider = Provider<int>((ref) {
+  final pending = ref.watch(pendingFriendRequestCountProvider);
+  final unreadCompatibility = ref.watch(unreadCompatibilityCountProvider).valueOrNull ?? 0;
+  return pending + unreadCompatibility;
+});
+
 /// フレンド操作コントローラー
 class FriendController extends StateNotifier<AsyncValue<void>> {
   final FirebaseFirestore _firestore;
@@ -145,14 +169,8 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     if (_userId == null) return;
     state = const AsyncValue.loading();
     try {
-      final batch = _firestore.batch();
-      batch.delete(
-        _firestore.collection('users').doc(_userId).collection('friends').doc(friendId),
-      );
-      batch.delete(
-        _firestore.collection('users').doc(friendId).collection('friends').doc(_userId),
-      );
-      await batch.commit();
+      final callable = _functions.httpsCallable('removeFriend');
+      await callable.call({'friendId': friendId});
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -251,6 +269,10 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
       });
       // Firebase Functions returns Map<Object?, Object?> — JSON round-trip converts to Map<String, dynamic>
       final data = jsonDecode(jsonEncode(result.data)) as Map<String, dynamic>;
+      if (data.containsKey('error')) {
+        debugPrint('❌ diagnoseCompatibility error from server: ${data['error']}');
+        return null;
+      }
       return CategoryDiagnosis.fromFunctionResult(data, category);
     } catch (e) {
       debugPrint('❌ runCategoryDiagnosis error: $e');
@@ -275,7 +297,50 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
       return null;
     }
   }
+
+  /// フレンドについてキャラクター会話形式で質問する
+  Future<FriendAskResult?> askAboutFriend({
+    required String friendId,
+    required String friendName,
+    required String question,
+  }) async {
+    if (_userId == null) return null;
+    try {
+      final callable = _functions.httpsCallable('askAboutFriend');
+      final result = await callable.call({
+        'userId': _userId,
+        'friendId': friendId,
+        'friendName': friendName,
+        'question': question,
+      });
+      final data = jsonDecode(jsonEncode(result.data)) as Map<String, dynamic>;
+      if (data.containsKey('error')) {
+        debugPrint('❌ askAboutFriend error: ${data['error']}');
+        return null;
+      }
+      return FriendAskResult.fromMap(data);
+    } catch (e) {
+      debugPrint('❌ askAboutFriend error: $e');
+      return null;
+    }
+  }
 }
+
+/// 「フレンドのことを聞く」履歴プロバイダー（全件・新しい順）
+final askHistoryProvider = StreamProvider<List<AskHistoryEntry>>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return Stream.value([]);
+
+  return ref
+      .watch(firestoreProvider)
+      .collection('users')
+      .doc(userId)
+      .collection('askHistory')
+      .orderBy('createdAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map((snap) => snap.docs.map(AskHistoryEntry.fromFirestore).toList());
+});
 
 /// フレンドコントローラープロバイダー
 final friendControllerProvider =
