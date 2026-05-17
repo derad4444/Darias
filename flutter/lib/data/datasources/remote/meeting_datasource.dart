@@ -126,12 +126,7 @@ class MeetingDatasource {
           MeetingErrorType.premiumRequired,
         );
       }
-      if (errorMessage.contains('今月の会議利用上限')) {
-        throw MeetingError(
-          '今月の会議利用上限（30回）に達しました。来月またご利用ください。',
-          MeetingErrorType.premiumRequired,
-        );
-      }
+
 
       throw MeetingError(
         '会議の生成に失敗しました: $e',

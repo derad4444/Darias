@@ -108,16 +108,7 @@ exports.generateOrReuseMeeting = onCall(
                 "無料ユーザーは1回のみ利用可能です。プレミアムにアップグレードしてください。",
             );
           }
-        } else {
-          // プレミアムユーザー: 月30回制限
-          const {count} = await checkMonthlyMeetingCount(userId);
-          if (count >= 30) {
-            throw new HttpsError(
-                "resource-exhausted",
-                "今月の会議利用上限（30回）に達しました。来月またご利用ください。",
-            );
-          }
-        }
+        } // プレミアムユーザーは無制限
 
         // 3. キャラクターのBIG5とpersonalityKeyを取得
         const characterData = await getCharacterData(userId, characterId);

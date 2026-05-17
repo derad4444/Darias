@@ -107,22 +107,33 @@ class _SectionTile extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
         ),
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        children: section.items
-            .map(
-              (item) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('• ', style: TextStyle(fontSize: 13)),
-                    Expanded(
-                      child: Text(item, style: const TextStyle(fontSize: 13, height: 1.5)),
-                    ),
-                  ],
-                ),
+        children: [
+          if (section.imageAsset != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                section.imageAsset!,
+                width: double.infinity,
+                fit: BoxFit.contain,
               ),
-            )
-            .toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...section.items.map(
+            (item) => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('• ', style: TextStyle(fontSize: 13)),
+                  Expanded(
+                    child: Text(item, style: const TextStyle(fontSize: 13, height: 1.5)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -132,7 +143,13 @@ class _HelpSection {
   final String title;
   final IconData icon;
   final List<String> items;
-  const _HelpSection({required this.title, required this.icon, required this.items});
+  final String? imageAsset;
+  const _HelpSection({
+    required this.title,
+    required this.icon,
+    required this.items,
+    this.imageAsset,
+  });
 }
 
 const _kSections = [
@@ -192,14 +209,15 @@ const _kSections = [
     ],
   ),
   _HelpSection(
-    title: '性格診断（BIG5）',
+    title: '性格解析',
     icon: Icons.psychology_outlined,
     items: [
-      'チャットで"性格診断して"と送ると100問の診断が始まります',
-      '1〜5の数字で答え、100問完了するとBIG5スコアが確定します',
-      'スコアがキャラクターの返答・日記・6人会議・相性診断に反映されます',
-      '詳細タブで診断結果（BIG5スコア・性格タイプ・強み・弱みなど）を確認できます',
-      '設定 → 性格診断をリセット でやり直せます',
+      'チャットを続けると自動的に性格が解析されていきます（質問への回答は不要です）',
+      '30回以上チャットすると性格タイプ（元素）が判定され、キャラクターが幼少期に成長します',
+      '100回以上チャットすると性格がより安定し、キャラクターが大人へと成長します',
+      'ホーム画面の成長ゲージで次のステージまでの進捗を確認できます',
+      'キャラクター詳細画面でも成長ゲージと性格タイプを確認できます',
+      '解析結果がキャラクターの返答・日記・6人会議・相性診断に反映されます',
     ],
   ),
   _HelpSection(
@@ -210,7 +228,7 @@ const _kSections = [
       'ホーム画面のメニューから「会議を開く」で利用できます',
       '悩みのカテゴリを選択 → 悩みを入力 → 6人が3ラウンドで議論 → 結論が表示されます',
       '「完了」ボタンでホームに戻ると次のチャット返答に会議の内容が自動で反映されます',
-      '無料ユーザーは生涯1回まで、プレミアムユーザーは月30回まで利用できます',
+      '無料ユーザーは生涯1回まで、プレミアムユーザーは無制限に利用できます',
     ],
   ),
   _HelpSection(
@@ -230,8 +248,36 @@ const _kSections = [
       'フレンドタブ → フレンド詳細 → 相性診断ボタンからアクセスできます',
       '友情・恋愛・仕事・信頼の4カテゴリをそれぞれ個別に診断できます',
       '無料ユーザーは各カテゴリを動画広告の視聴で解放できます。プレミアムユーザーは広告なしで診断できます',
-      '診断には自分とフレンド双方のBIG5診断完了が必要です',
-      '双方のBIG5スコアをもとに0〜100%でスコア化され、キャラクター会話・コメント・アドバイスが表示されます',
+      '診断には自分とフレンド双方の性格解析が必要です（30回以上チャットが目安）',
+      '双方の性格スコアをもとに0〜100%でスコア化され、キャラクター会話・コメント・アドバイスが表示されます',
+    ],
+  ),
+  _HelpSection(
+    title: '元素と性格について',
+    icon: Icons.hub_outlined,
+    items: [
+      '性格解析によって9種類の元素のいずれかが判定されます。30回以上チャットすると自分の元素が確定します。',
+      '炎属性 — 喜怒哀楽がそのまま言葉や行動に出る情熱型。感情が外に溢れやすく周囲を熱狂させるエネルギーがある。決断が速く行動力もある。',
+      '水属性 — 相手の気持ちを敏感に察する共感型。感情を内側でじっくり受け止め、優しさと穏やかさで場を包む。深いところで人と繋がれる。',
+      '風属性 — 枠にはまらない自由人型。好奇心旺盛でひらめきが得意。感情にも論理にも縛られず軽やかに動き、変化を楽しんで周囲を明るくする。',
+      '土属性 — 揺るがない芯を持つ安定型。じっくり考えてから動き、一度決めたことをやり遂げる粘り強さがある。周囲に安心感を与える存在。',
+      '氷属性 — 感情を表に出さず内側で研ぎ澄ます冷静型。独自の基準を持ち、近づくほど深みとこだわりが見えてくる。',
+      '雷属性 — 直感と行動力が爆発する瞬発型。エネルギッシュで存在感があり、場の空気を一瞬で変えるカリスマ性がある。',
+      '光属性 — 分析力と行動力を外に向けるリーダー型。計画的で明晰、情報を整理して周囲を導く推進力がある。',
+      '闇属性 — 物事の本質を内側で追求する思索型。独自の視点と分析力を持ち、深く語り合うほど豊かな世界が見えてくる。',
+      '無属性 — どんな状況にも自然に溶け込む適応型。強い主張より観察と受容を大切にし、すべての元素と一定の相性がある。',
+    ],
+  ),
+  _HelpSection(
+    title: '元素の相性について',
+    icon: Icons.favorite_border,
+    imageAsset: 'assets/images/element_chart.png',
+    items: [
+      '双方向矢印の元素同士は特に相性が良い対ペアです。無はすべての元素と一定の相性があります。',
+      '炎↔水: 感情で深く繋がる。時にぶつかるほどの熱量',
+      '雷↔氷: 同じ直感型。熱量の差が惹かれ合いを生む',
+      '光↔闇: 同じ分析型。外向きと内向きで視点が逆',
+      '風↔土: 完全対極。自由と安定が刺激し合う',
     ],
   ),
   _HelpSection(
@@ -241,7 +287,7 @@ const _kSections = [
       '設定画面の「プレミアムに登録」からApp Store / Google Playで月額課金できます',
       'プレミアムになるとキャラクター返答が高品質AIモデル（GPT-4o）になります',
       '日記生成も高品質AIモデルを使用します',
-      '6人会議が月30回まで利用できます（無料は生涯1回）',
+      '6人会議が無制限に利用できます（無料は生涯1回）',
       '相性診断が広告なしで利用できます',
       '解約はApp Store / Google Playのサブスクリプション設定から行えます',
     ],
