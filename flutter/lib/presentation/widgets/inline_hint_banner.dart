@@ -121,7 +121,7 @@ class _HomeHintBannerState extends State<HomeHintBanner>
     ),
     (
       icon: Icons.psychology_outlined,
-      text: '"性格診断して"と送ると100問のBIG5診断が始まります。スコアがキャラクターの返答や日記に反映されます',
+      text: 'チャットを続けるだけで自動的に性格が解析されます。30回以上チャットすると性格タイプが判定され、キャラクターの返答・日記・自分会議に反映されます',
     ),
   ];
 

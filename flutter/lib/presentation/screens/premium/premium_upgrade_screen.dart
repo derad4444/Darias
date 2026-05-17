@@ -8,33 +8,38 @@ import '../../providers/theme_provider.dart';
 /// プレミアム機能の種類
 enum PremiumFeature {
   adFree,
-  unlimitedHistory,
-  latestAIModel,
-  detailedAnalysis;
+  selfMeeting,
+  voice,
+  characterAnalysis,
+  unlimitedHistory;
 
   String get title {
     switch (this) {
       case PremiumFeature.adFree:
-        return '広告非表示';
+        return '広告完全ゼロ';
+      case PremiumFeature.selfMeeting:
+        return '自分会議';
+      case PremiumFeature.voice:
+        return 'キャラクターの声';
+      case PremiumFeature.characterAnalysis:
+        return 'キャラクター分析';
       case PremiumFeature.unlimitedHistory:
         return 'チャット履歴';
-      case PremiumFeature.latestAIModel:
-        return 'AIモデル';
-      case PremiumFeature.detailedAnalysis:
-        return 'キャラクター分析';
     }
   }
 
   String get description {
     switch (this) {
       case PremiumFeature.adFree:
-        return 'バナー広告とリワード広告（動画広告）が完全に非表示になり、快適にご利用いただけます。';
+        return 'チャット中のバナー広告、フレンドへの質問の動画広告、すべて消えます。フレンドへの質問も広告なしで何度でも。';
+      case PremiumFeature.selfMeeting:
+        return '6人の自分が集まって悩みを議論する「自分会議」が無制限に。無料は生涯1回のみ。';
+      case PremiumFeature.voice:
+        return 'キャラクターの返答を声で聞けます。プレミアム専用の没入感ある体験です。';
+      case PremiumFeature.characterAnalysis:
+        return '口癖・好きな場所・得意なことなどのキャラクター詳細が最高品質AIで生成され、より「自分らしい」キャラクターになります。';
       case PremiumFeature.unlimitedHistory:
         return '無料版では最新50メッセージまでですが、プレミアムなら全てのチャット履歴を無制限に保存・閲覧できます。';
-      case PremiumFeature.latestAIModel:
-        return '最新のAIモデルを使用してより自然で高品質な会話をお楽しみいただけます。';
-      case PremiumFeature.detailedAnalysis:
-        return '基本分析に加えて、より高度で詳細なキャラクター解析機能をご利用いただけます。';
     }
   }
 
@@ -42,38 +47,44 @@ enum PremiumFeature {
     switch (this) {
       case PremiumFeature.adFree:
         return Icons.block;
+      case PremiumFeature.selfMeeting:
+        return Icons.groups;
+      case PremiumFeature.voice:
+        return Icons.record_voice_over;
+      case PremiumFeature.characterAnalysis:
+        return Icons.person_search;
       case PremiumFeature.unlimitedHistory:
         return Icons.history;
-      case PremiumFeature.latestAIModel:
-        return Icons.auto_awesome;
-      case PremiumFeature.detailedAnalysis:
-        return Icons.person_add;
     }
   }
 
   String get freeValue {
     switch (this) {
       case PremiumFeature.adFree:
-        return 'バナー・リワード広告';
+        return 'バナー・動画広告あり';
+      case PremiumFeature.selfMeeting:
+        return '生涯1回';
+      case PremiumFeature.voice:
+        return 'なし';
+      case PremiumFeature.characterAnalysis:
+        return '標準AI';
       case PremiumFeature.unlimitedHistory:
-        return '50メッセージまで';
-      case PremiumFeature.latestAIModel:
-        return '標準モデル';
-      case PremiumFeature.detailedAnalysis:
-        return '基本分析';
+        return '50件まで';
     }
   }
 
   String get premiumValue {
     switch (this) {
       case PremiumFeature.adFree:
-        return '完全非表示';
+        return '完全ゼロ';
+      case PremiumFeature.selfMeeting:
+        return '無制限';
+      case PremiumFeature.voice:
+        return 'あり';
+      case PremiumFeature.characterAnalysis:
+        return '最高品質AI';
       case PremiumFeature.unlimitedHistory:
-        return '無制限保存';
-      case PremiumFeature.latestAIModel:
-        return '最新モデル';
-      case PremiumFeature.detailedAnalysis:
-        return 'より高度な解析';
+        return '無制限';
     }
   }
 }
@@ -184,7 +195,7 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
 
         // サブタイトル
         Text(
-          '広告なしで快適なキャラクター体験を',
+          'もっと深く、自分と向き合おう',
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: AppColors.textSecondary,
               ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/theme_provider.dart';
 
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
@@ -17,24 +18,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   static const _pages = [
     _OnboardingPage(
-      icon: Icons.auto_awesome,
-      title: 'DARIASへようこそ',
-      body: 'もう1人の自分と話しながら、\n予定・メモ・タスクを自然に管理できる\nAIパートナーアプリです。',
+      icon: Icons.psychology_outlined,
+      title: '話すだけで、自分がわかる',
+      body: 'DARIASは、キャラクターとチャットするだけで\nAIが自動的にあなたの性格を解析します。\n\nテストも質問もなし。\n普段の言葉から、あなたを読み取ります。',
+    ),
+    _OnboardingPage(
+      icon: Icons.local_fire_department,
+      title: '性格タイプが明らかに',
+      body: '30回チャットすると、あなたの性格タイプが\n判定されます。\n\n炎・水・風・土など9つの元素タイプで\n「自分ってこういう人間なんだ」\nという気づきが生まれます。\n\n性格が確定すると、キャラクターの返答・\n日記・自分会議にも反映されていきます。',
+    ),
+    _OnboardingPage(
+      icon: Icons.groups,
+      title: '6人の自分で悩みを解決',
+      body: '悩みを入力すると、あなたの性格を持った\n6人の分身が会議を開きます。\n\n「論理派の自分」「感情派の自分」が\nリアルに議論するから、\nどこか納得感がある答えが見つかります。',
+    ),
+    _OnboardingPage(
+      icon: Icons.edit_calendar_outlined,
+      title: 'チャットで予定・メモ・タスクも',
+      body: '"明日14時に会議"と送ると予定を自動登録。\n"メモして""タスクに追加して"も\n話すだけでOK。\n\nアプリのことがわからなければ\nチャットで質問するとキャラクターが答えます。',
     ),
     _OnboardingPage(
       icon: Icons.chat_bubble_outline,
-      title: 'チャットで何でもできる',
-      body: '"明日14時に会議"と送ると予定を自動登録。\n"メモして""タスクに追加して"も話すだけでOK。\n\nアプリの使い方がわからなければチャットで質問してください。\n設定 → 使い方ガイドからいつでも確認できます。',
-    ),
-    _OnboardingPage(
-      icon: Icons.psychology_outlined,
-      title: '3つのAI機能',
-      body: '📔 日記：1日の内容を毎晩自動生成\n\n👥 自分会議：6つの自分が悩みをディスカッション\n\n💞 相性診断：フレンドとBIG5で相性を診断',
-    ),
-    _OnboardingPage(
-      icon: Icons.star_outline,
-      title: 'まず性格診断から',
-      body: '"性格診断して"とチャットで話しかけると\n100問のBIG5診断が始まります。\n\nスコアがキャラクターの返答・日記・会議・\n相性診断に反映されます。\n\n設定 → 使い方ガイドからいつでも確認できます。',
+      title: 'さあ、話しかけてみよう',
+      body: 'まずはキャラクターにひと言\n送ってみてください。\n\n何気ない一言から、\nあなたの性格解析がはじまります。\n\n分析が進むほど、DARIASは\nあなたのことをもっとよく知っていきます。',
     ),
   ];
 
@@ -59,10 +65,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     final isLast = _currentPage == _pages.length - 1;
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
         child: Column(
           children: [
             // スキップ
@@ -127,7 +136,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ),
                   child: Text(
-                    isLast ? '始める！' : '次へ',
+                    isLast ? 'チャットを始める！' : '次へ',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -137,6 +146,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             const SizedBox(height: 32),
           ],
         ),
+      ),
       ),
     );
   }
