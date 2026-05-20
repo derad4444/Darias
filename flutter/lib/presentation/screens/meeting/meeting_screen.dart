@@ -966,8 +966,7 @@ $recommendations
 $nextSteps
 
 ---
-#DARIAS #自分会議 #セルフカウンセリング
-DARIASアプリで自分会議を体験しよう！
+#DARIAS #自分会議
 ''';
 
     final text = shareText.trim();

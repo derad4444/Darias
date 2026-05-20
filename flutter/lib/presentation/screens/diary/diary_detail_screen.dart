@@ -507,6 +507,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
       buffer.writeln('\n---\nひとこと: ${widget.diary.userComment}');
     }
 
+    buffer.writeln('\n#DARIAS #日記');
     final text = buffer.toString().trim();
     if (text.isEmpty) return;
 

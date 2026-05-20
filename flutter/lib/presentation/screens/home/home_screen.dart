@@ -1869,7 +1869,7 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
   Future<void> _captureAndShare() async {
     if (_isSharing) return;
     setState(() => _isSharing = true);
-    final shareText = 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #${widget.newElement}属性';
+    final shareText = 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #性格診断';
     try {
       final boundary = _offscreenCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) throw Exception('boundary not found');
@@ -1893,9 +1893,9 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
     } catch (e) {
       debugPrint('Image capture failed ($e), falling back to text share');
       try {
-        final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
-        final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
-        await Share.share(shareText, sharePositionOrigin: origin);
+        final box2 = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+        final origin2 = box2 != null ? box2.localToGlobal(Offset.zero) & box2.size : null;
+        await Share.share(shareText, sharePositionOrigin: origin2);
       } catch (_) {}
     } finally {
       if (mounted) setState(() => _isSharing = false);
