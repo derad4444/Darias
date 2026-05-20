@@ -286,23 +286,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 child: HomeHintBanner(userId: ref.watch(currentUserIdProvider) ?? ''),
               ),
 
-              // テスト用：進化ダイアログ確認ボタン（リリース前に削除）
-              Positioned(
-                right: 12,
-                top: 8,
-                child: GestureDetector(
-                  onTap: _showTestEvolutionDialog,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.science_outlined, color: Colors.white70, size: 18),
-                  ),
-                ),
-              ),
-
               // 下部UI（操作エリア）
               Positioned(
                 left: 0,
@@ -733,25 +716,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     return 3;
   }
 
-  /// テスト用：Firestoreに書き込まずダイアログを表示（リリース前に削除）
-  Future<void> _showTestEvolutionDialog() async {
-    if (_isShowingEvolutionDialog) return;
-    _isShowingEvolutionDialog = true;
-    final gender = ref.read(characterDetailsProvider).valueOrNull?.gender;
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-      pageBuilder: (ctx, anim, secAnim) => _TypeEvolutionDialog(
-        newElement: '炎',
-        newTypeName: '場を沸かす炎タイプ',
-        signalCount: 30,
-        gender: gender,
-        onConfirm: () async {},
-      ),
-    );
-    if (mounted) setState(() => _isShowingEvolutionDialog = false);
-  }
 
   Future<void> _showEvolutionDialog(TypeChangeData data) async {
     final signalCount = ref.read(signalCountProvider).valueOrNull ?? 30;
