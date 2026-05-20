@@ -1,16 +1,13 @@
 import 'dart:math';
-import 'dart:ui';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../data/services/firebase_image_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../providers/big5_provider.dart';
 import '../../../data/models/memo_model.dart';
 import '../../../data/models/schedule_model.dart';
 import '../../../data/models/todo_model.dart';
@@ -25,6 +22,7 @@ import '../../providers/character_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
+import '../../widgets/character/element_effect_widget.dart';
 import '../../widgets/inline_hint_banner.dart';
 import 'chat_opener.dart';
 
@@ -36,7 +34,7 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _chatController = TextEditingController();
   bool _isWaitingForReply = false;
   late String _displayedMessage;
@@ -46,13 +44,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
   bool _openerLoaded = false;
+  // オープナーをロードした日付（日付をまたいだ再ロード判定用）
+  String _openerLoadedDate = '';
 
 
   /// 初期メッセージリスト
   static const List<String> _initialMessages = [
     // 機能案内
-    '性格解析は全部で100問あるよ。好きなタイミングで「性格診断して」と話しかけてくれれば質問するから答えてね！',
-    '性格解析が終わったらキャラクター詳細画面でどんな性格か確認してみてね',
+    'チャットを続けると性格タイプが解析されてキャラクターが変わるよ！',
+    'キャラクター詳細画面でどんな性格か確認してみてね',
     '「〇月〇日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！',
     '「〇〇をメモしておいて」って話しかけるとノートにメモを残しておくよ！',
     '「〇〇をタスクに追加して」って言ってくれればタスクとして登録しておくね！',
@@ -73,6 +73,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // 暫定メッセージ（オープナーがロードされるまで表示）
     final hour = DateTime.now().hour;
     final useGreeting = Random().nextInt(3) == 0;
@@ -91,9 +92,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadChatOpener());
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    final now = DateTime.now();
+    final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    // 日付が変わっていたらオープナーを再ロード
+    if (_openerLoadedDate != today) {
+      _openerLoaded = false;
+      _loadChatOpener();
+    }
+  }
+
   Future<void> _loadChatOpener() async {
     if (!mounted || _openerLoaded) return;
     _openerLoaded = true;
+    final now = DateTime.now();
+    _openerLoadedDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final schedules = ref.read(allSchedulesProvider).valueOrNull ?? [];
     final todos = ref.read(todosProvider).valueOrNull ?? [];
     final opener = await computeChatOpener(allSchedules: schedules, allTodos: todos);
@@ -102,42 +117,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _displayedMessage = opener.text;
         _isCharacterReply = true;
       });
+      await _saveOpenerIfNeeded(opener.text);
+    }
+  }
+
+  Future<void> _saveOpenerIfNeeded(String openerText) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final savedDate = prefs.getString('chat_opener_saved_date') ?? '';
+      if (savedDate == today) return;
+
+      // userDocProvider がまだロード中の場合、最大3秒待つ
+      String characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+      if (characterId.isEmpty) {
+        for (int i = 0; i < 6 && mounted; i++) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+          if (characterId.isNotEmpty) break;
+        }
+      }
+      if (characterId.isEmpty) return;
+
+      await ref.read(chatControllerProvider.notifier).saveOpener(
+        characterId: characterId,
+        openerText: openerText,
+      );
+      await prefs.setString('chat_opener_saved_date', today);
+    } catch (e) {
+      debugPrint('⚠️ _saveOpenerIfNeeded error: $e');
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _chatController.dispose();
     super.dispose();
   }
 
-  void _showRoadmapResetConfirmDialog(String characterId) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('診断結果をリセット'),
-        content: const Text(
-          'これまでの診断結果・回答・キャラクター属性がすべて削除されます。\nリセット後は最初から診断をやり直せます。\n\nよろしいですか？',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('キャンセル'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(ctx).pop();
-              await ref.read(big5DiagnosisControllerProvider.notifier).resetDiagnosis(characterId);
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('リセットする'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 会議後フォローアップ: 結論をAIに送信してレスポンスを表示
+/// 会議後フォローアップ: 結論をAIに送信してレスポンスを表示
   void _triggerMeetingFollowup(String conclusion) async {
     if (!mounted) return;
     setState(() {
@@ -153,7 +173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         characterId: characterId,
         message: '【自分会議の結論】$conclusion',
       );
-      debugPrint('✅ _triggerMeetingFollowup: reply=${result?.reply?.substring(0, 20)}');
+      debugPrint('✅ _triggerMeetingFollowup: reply=${result?.reply.substring(0, 20)}');
       if (mounted) {
         setState(() {
           _displayedMessage = result?.reply ?? '会議お疲れ様！続きがあれば話しかけてね';
@@ -187,15 +207,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
     final characterId = userAsync.valueOrNull?.characterId ?? '';
-    final big5ProgressAsync = ref.watch(big5ProgressProvider(characterId));
     final characterDetailsAsync = ref.watch(characterDetailsProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
     final size = MediaQuery.of(context).size;
-
-    // デバッグ用: characterIdと進捗状況を確認
-    debugPrint('HomeScreen - characterId: $characterId');
-    debugPrint('HomeScreen - big5Progress: ${big5ProgressAsync.valueOrNull?.answeredCount ?? "loading/error"}');
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
@@ -228,19 +244,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                     }
                     return _CharacterDisplay(
-                      key: ValueKey(details.personalityImageFileName),
+                      key: ValueKey('$signalCount-${details.element}-${details.gender}'),
                       width: charW,
                       height: charH,
-                      characterGender: details.gender,
-                      personalityImageFileName: details.personalityImageFileName,
+                      signalCount: signalCount,
+                      element: details.element,
+                      gender: details.gender,
                     );
                   },
                   loading: () => SizedBox(width: charW, height: charH,
                     child: const Center(child: CircularProgressIndicator(strokeWidth: 2))),
-                  error: (_, __) => _CharacterDisplay(
+                  error: (err, stack) => _CharacterDisplay(
                     width: charW,
                     height: charH,
-                    characterGender: userAsync.valueOrNull?.characterGender,
+                    signalCount: 0,
+                    gender: userAsync.valueOrNull?.characterGender,
                   ),
                 ),
               ),
@@ -282,33 +300,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          // 自分会議ボタン
-                          big5ProgressAsync.when(
-                            data: (progress) {
-                              final isUnlocked = (progress?.answeredCount ?? 0) >= 20;
-                              return _ActionButton(
-                                icon: isUnlocked ? Icons.groups : Icons.lock,
-                                label: '自分会議',
-                                accentColor: accentColor,
-                                isEnabled: isUnlocked,
-                                showNewBadge: isUnlocked,
-                                onTap: () {
-                                  if (isUnlocked) {
-                                    context.push('/meeting');
-                                  } else {
-                                    _showMeetingLockedDialog(context, progress?.answeredCount ?? 0);
-                                  }
-                                },
-                              );
+                          // 自分会議ボタン（signalCount >= 30 で解放）
+                          _ActionButton(
+                            icon: signalCount >= 30 ? Icons.groups : Icons.lock,
+                            label: '自分会議',
+                            accentColor: accentColor,
+                            isEnabled: signalCount >= 30,
+                            showNewBadge: signalCount >= 30,
+                            onTap: () {
+                              if (signalCount >= 30) {
+                                context.push('/meeting');
+                              } else {
+                                _showMeetingLockedDialog(context, signalCount);
+                              }
                             },
-                            loading: () => _ActionButton(
-                              icon: Icons.lock,
-                              label: '自分会議',
-                              accentColor: accentColor,
-                              isEnabled: false,
-                              onTap: () {},
-                            ),
-                            error: (_, __) => const SizedBox.shrink(),
                           ),
                           const Spacer(),
                           // 履歴ボタン
@@ -323,22 +328,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                     ),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
-                    // BIG5進捗バー
-                    big5ProgressAsync.when(
-                      data: (progress) => _BIG5ProgressBar(
-                        answeredCount: progress?.answeredCount ?? 0,
-                        accentColor: accentColor,
-                        backgroundGradient: backgroundGradient,
-                        onDiagnose: () => context.push('/big5'),
-                        onReset: () => _showRoadmapResetConfirmDialog(characterId),
-                      ),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    ),
+                    // 成長ゲージ
+                    _GrowthGauge(signalCount: signalCount, accentColor: accentColor),
 
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 6),
 
                     // チャット入力
                     _ChatInputArea(
@@ -458,31 +453,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return;
     }
 
+    if (message.contains('性格診断') || message.contains('性格解析')) {
+      setState(() {
+        _displayedMessage = '性格解析はチャットを通じて自動的に行われるよ！普通に話しかけてくれれば少しずつ性格タイプが分析されていくから、いつも通り話しかけてね！';
+        _isCharacterReply = true;
+        _chatController.clear();
+      });
+      return;
+    }
+
+    ref.read(sessionChatCountProvider.notifier).state += 1;
+    final signalCount = ref.read(signalCountProvider).valueOrNull ?? 0;
+    final phase = _calcPhase(signalCount, ref.read(sessionChatCountProvider));
+
     setState(() {
       _isWaitingForReply = true;
       _showMeetingBanner = false;
       _chatController.clear();
     });
 
-    // 性格診断トリガー
-    if (message.contains('性格診断') || message.contains('性格解析')) {
-      context.push('/big5');
-      setState(() => _isWaitingForReply = false);
-      return;
-    }
-
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
       final result = await ref.read(chatControllerProvider.notifier).sendMessage(
         characterId: characterId,
         message: message,
+        phase: phase,
       );
       if (mounted) {
         setState(() {
-          _displayedMessage = result?.reply ?? 'お返事がありませんでした';
+          final reply = result?.reply ?? '';
+          _displayedMessage = reply.isNotEmpty ? reply : 'お返事がありませんでした';
           _isWaitingForReply = false;
           _isCharacterReply = true;
-          _showMeetingBanner = result?.meetingSuggested ?? false;
+          final isMeetingUnlocked = (ref.read(signalCountProvider).valueOrNull ?? 0) >= 30;
+          _showMeetingBanner = (result?.meetingSuggested ?? false) && isMeetingUnlocked;
         });
         if (result != null) saveLastQuestion(result.reply);
       }
@@ -610,14 +614,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Text('📺 動画を見て続けよう', textAlign: TextAlign.center),
         content: const Text(
-          '動画広告を視聴すると、チャットが続けられます。\nスキップして後で視聴することもできます。',
+          '動画広告を視聴すると、チャットが続けられます。',
           textAlign: TextAlign.center,
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('スキップ'),
-          ),
           ElevatedButton.icon(
             onPressed: () async {
               Navigator.of(dialogContext).pop();
@@ -689,28 +689,39 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  void _showMeetingLockedDialog(BuildContext context, int currentProgress) {
+  /// signalCount（元素確定: >=30）とセッション内ターン数からフェーズを算出
+  /// signalCount < 30: Phase 1固定（性格データ未確定）
+  /// signalCount >= 30: turn1=P1, turn2-4=P2, turn5+=P3
+  int _calcPhase(int signalCount, int sessionTurn) {
+    if (signalCount < 30) return 1;
+    if (sessionTurn <= 1) return 1;
+    if (sessionTurn <= 4) return 2;
+    return 3;
+  }
+
+  void _showMeetingLockedDialog(BuildContext context, int signalCount) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.lock, color: ref.read(accentColorProvider)),
             const SizedBox(width: 8),
-            const Text('機能がロックされています'),
+            const Flexible(child: Text('機能がロックされています')),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('「自分会議」機能を利用するには、性格診断を20問以上完了する必要があります。'),
+            const Text('「自分会議」機能を利用するには、チャットをもう少し続けて性格タイプを確定させる必要があります。'),
             const SizedBox(height: 16),
-            Text('現在の進捗: $currentProgress / 20問'),
+            Text('現在の進捗: $signalCount / 30'),
             const SizedBox(height: 8),
             LinearProgressIndicator(
-              value: currentProgress / 20,
+              value: signalCount / 30,
               backgroundColor: Colors.grey[200],
               valueColor: AlwaysStoppedAnimation(ref.read(accentColorProvider)),
             ),
@@ -721,176 +732,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             onPressed: () => Navigator.pop(context),
             child: const Text('閉じる'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/big5');
-            },
-            child: const Text('診断を続ける'),
-          ),
         ],
       ),
     );
   }
 }
 
-/// キャラクター表示
-class _CharacterDisplay extends StatefulWidget {
+/// キャラクター成長段階表示
+class _CharacterDisplay extends StatelessWidget {
   final double width;
   final double height;
-  final String? characterGender;
-  final String? personalityImageFileName;
+  final int signalCount;
+  final String? element;
+  final String? gender;
 
   const _CharacterDisplay({
     super.key,
     required this.width,
     required this.height,
-    this.characterGender,
-    this.personalityImageFileName,
+    required this.signalCount,
+    this.element,
+    this.gender,
   });
 
   @override
-  State<_CharacterDisplay> createState() => _CharacterDisplayState();
-}
-
-class _CharacterDisplayState extends State<_CharacterDisplay> {
-  String? _imageUrl;
-  bool _isLoading = true;
-  bool _hasError = false;
-
-  String get _fallbackImagePath {
-    if (widget.characterGender == '男性') {
-      return 'assets/images/android_male.png';
-    } else {
-      return 'assets/images/android_female.png';
-    }
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadImageUrl();
-  }
-
-  @override
-  void didUpdateWidget(covariant _CharacterDisplay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.personalityImageFileName != widget.personalityImageFileName ||
-        oldWidget.characterGender != widget.characterGender) {
-      _loadImageUrl();
-    }
-  }
-
-  Future<void> _loadImageUrl() async {
-    if (widget.characterGender == null) {
-      setState(() {
-        _isLoading = false;
-        _hasError = true;
-      });
-      return;
-    }
-
-    // 未診断（personalityImageFileName == null）の場合はローカルのデフォルト画像を表示（iOS版と同じ挙動）
-    if (widget.personalityImageFileName == null) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-    });
-
-    try {
-      final gender = widget.characterGender == '男性'
-          ? CharacterGender.male
-          : CharacterGender.female;
-
-      debugPrint('Loading image URL: ${widget.personalityImageFileName} for gender: ${gender.value}');
-
-      final url = await FirebaseImageService.shared.getImageUrl(
-        fileName: widget.personalityImageFileName!,
-        gender: gender,
-      );
-
-      debugPrint('Got image URL: $url');
-
-      if (mounted) {
-        setState(() {
-          _imageUrl = url;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to get image URL: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final assetPath = characterGrowthAssetPath(
+      signalCount: signalCount,
+      element: element,
+      gender: gender,
+    );
+    final elementType = signalCount >= 30 ? elementTypeFromString(element) : null;
+
     return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: _buildImage(),
-    );
-  }
-
-  Widget _buildImage() {
-    // URLが取得できた場合はCachedNetworkImageで表示（2回目以降はキャッシュから即時表示）
-    if (_imageUrl != null && !_hasError) {
-      return CachedNetworkImage(
-        imageUrl: _imageUrl!,
-        fit: BoxFit.contain,
-        placeholder: (context, url) => const Center(
-          child: CircularProgressIndicator(strokeWidth: 2),
-        ),
-        errorWidget: (context, url, error) => _buildFallbackImage(),
-      );
-    }
-
-    // ローディング中（性格画像のURLを取得中）
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
-    }
-
-    // エラー時はフォールバック画像
-    return _buildFallbackImage();
-  }
-
-  Widget _buildFallbackImage() {
-    return Image.asset(
-      _fallbackImagePath,
-      fit: BoxFit.contain,
-      errorBuilder: (context, error, stackTrace) => _buildPlaceholder(),
-    );
-  }
-
-  Widget _buildPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      width: width,
+      height: height,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Icon(
-            Icons.person_outline,
-            size: 100,
-            color: AppColors.textLight.withValues(alpha: 0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'キャラクター',
-            style: TextStyle(
-              fontSize: 16,
-              color: AppColors.textLight.withValues(alpha: 0.7),
+          if (elementType != null)
+            Positioned.fill(
+              child: ElementEffectWidget(
+                element: elementType,
+                pattern: elementType.defaultPattern,
+              ),
+            ),
+          Image.asset(
+            assetPath,
+            width: width * 1.5,
+            height: height * 1.5,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => Icon(
+              Icons.person_outline,
+              size: width * 0.3,
+              color: AppColors.textLight.withValues(alpha: 0.5),
             ),
           ),
         ],
@@ -1367,675 +1262,6 @@ class _SpeechBubble extends StatelessWidget {
   }
 }
 
-/// BIG5進捗バー（タップで性格解析ロードマップを表示）
-class _BIG5ProgressBar extends StatelessWidget {
-  final int answeredCount;
-  final Color accentColor;
-  final Gradient? backgroundGradient;
-  final VoidCallback? onDiagnose;
-  final VoidCallback? onReset;
-
-  const _BIG5ProgressBar({
-    required this.answeredCount,
-    required this.accentColor,
-    this.backgroundGradient,
-    this.onDiagnose,
-    this.onReset,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = answeredCount / 100;
-    final level = answeredCount >= 100
-        ? '完了'
-        : answeredCount >= 50
-            ? 'Lv.3'
-            : answeredCount >= 20
-                ? 'Lv.2'
-                : 'Lv.1';
-
-    return GestureDetector(
-      onTap: () => _showPersonalityRoadmap(context),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.85),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            // レベル表示
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: accentColor,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                level,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            // 進捗バー
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        '性格診断',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                      Text(
-                        '$answeredCount / 100問',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: Colors.white.withValues(alpha: 0.3),
-                      valueColor: AlwaysStoppedAnimation(accentColor),
-                      minHeight: 6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // タップヒント
-            const SizedBox(width: 8),
-            Icon(
-              Icons.info_outline,
-              size: 18,
-              color: AppColors.textSecondary,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 性格解析ロードマップを表示
-  void _showPersonalityRoadmap(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        fullscreenDialog: true,
-        builder: (_) => _PersonalityRoadmapPage(
-          answeredCount: answeredCount,
-          accentColor: accentColor,
-          backgroundGradient: backgroundGradient,
-          onDiagnose: onDiagnose,
-          onReset: onReset,
-        ),
-      ),
-    );
-  }
-}
-
-/// 性格解析ロードマップ ページ
-class _PersonalityRoadmapPage extends StatefulWidget {
-  final int answeredCount;
-  final Color accentColor;
-  final Gradient? backgroundGradient;
-  final VoidCallback? onDiagnose;
-  final VoidCallback? onReset;
-
-  const _PersonalityRoadmapPage({
-    required this.answeredCount,
-    required this.accentColor,
-    this.backgroundGradient,
-    this.onDiagnose,
-    this.onReset,
-  });
-
-  @override
-  State<_PersonalityRoadmapPage> createState() => _PersonalityRoadmapPageState();
-}
-
-class _PersonalityRoadmapPageState extends State<_PersonalityRoadmapPage> {
-  final _scrollController = ScrollController();
-  double _dragAccum = 0;
-  bool _dismissing = false;
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final answeredCount = widget.answeredCount;
-    final accentColor = widget.accentColor;
-    final backgroundGradient = widget.backgroundGradient;
-    final stages = [
-      _StageInfo(
-        number: 1,
-        title: '基本分析',
-        description: '基本的な性格特性を分析します',
-        questionRange: '1-20問',
-        totalQuestions: 20,
-        features: ['外向性の基本測定', '協調性の基本測定', '神経症傾向の基本測定'],
-      ),
-      _StageInfo(
-        number: 2,
-        title: '詳細分析',
-        description: 'より詳細な性格パターンを解析します',
-        questionRange: '21-50問',
-        totalQuestions: 30,
-        features: ['誠実性の詳細分析', '開放性の詳細分析', '複合的な性格傾向'],
-      ),
-      _StageInfo(
-        number: 3,
-        title: '総合分析',
-        description: '多角的にあなたの個性を理解します',
-        questionRange: '51-100問',
-        totalQuestions: 50,
-        features: ['全特性の統合分析', '詳細な性格レポート', '個性の深い理解'],
-      ),
-    ];
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: BoxDecoration(gradient: backgroundGradient),
-        child: SafeArea(
-          child: Listener(
-            onPointerMove: (event) {
-              if (_scrollController.hasClients &&
-                  _scrollController.offset <= 0 &&
-                  event.delta.dy > 0) {
-                _dragAccum += event.delta.dy;
-                if (_dragAccum > 80 && !_dismissing) {
-                  _dismissing = true;
-                  Navigator.pop(context);
-                }
-              } else {
-                _dragAccum = 0;
-              }
-            },
-            onPointerUp: (_) => _dragAccum = 0,
-            onPointerCancel: (_) => _dragAccum = 0,
-            child: SingleChildScrollView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                // タイトル行（スクロールと一体）
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const SizedBox(width: 48),
-                    Text(
-                      '性格解析ロードマップ',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '全100問の性格診断を3段階で進めて、\nあなたの個性を詳しく分析します',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-
-                // 現在の進捗
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        '現在の進捗',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            '$answeredCount',
-                            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  color: accentColor,
-                                ),
-                          ),
-                          Text(
-                            ' / 100 問完了',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: answeredCount / 100,
-                          minHeight: 8,
-                          backgroundColor: Colors.grey.shade200,
-                          valueColor: AlwaysStoppedAnimation(accentColor),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // 段階別情報
-                ...stages.map((stage) => _StageCard(
-                      stage: stage,
-                      answeredCount: answeredCount,
-                      accentColor: accentColor,
-                    )),
-
-                const SizedBox(height: 16),
-
-                // 診断の進め方
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.yellow.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.lightbulb, color: Colors.amber, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            '診断の進め方',
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'チャット画面でこのメッセージを送信すると質問が始まります：',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                      ),
-                      const SizedBox(height: 8),
-                      _HowToItem(text: '「性格診断して」', accentColor: accentColor),
-                      _HowToItem(text: '「性格解析して」', accentColor: accentColor),
-                      const SizedBox(height: 8),
-                      Text(
-                        '好きなタイミングで質問を受けられます。',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppColors.textSecondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // 性格診断するボタン
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      widget.onDiagnose?.call();
-                    },
-                    icon: const Icon(Icons.play_arrow),
-                    label: Text(
-                      answeredCount == 0
-                          ? '性格診断を開始する'
-                          : answeredCount >= 100
-                              ? '性格診断をもう一度する'
-                              : '性格診断を続ける',
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: accentColor,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
-
-                // リセットボタン（100問完了時のみ）
-                if (answeredCount >= 100) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        widget.onReset?.call();
-                      },
-                      icon: const Icon(Icons.refresh, color: Colors.red),
-                      label: const Text('診断結果をリセット'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.red,
-                        side: const BorderSide(color: Colors.red),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 16),
-              ],
-            ),
-          ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// ステージ情報
-class _StageInfo {
-  final int number;
-  final String title;
-  final String description;
-  final String questionRange;
-  final int totalQuestions;
-  final List<String> features;
-
-  const _StageInfo({
-    required this.number,
-    required this.title,
-    required this.description,
-    required this.questionRange,
-    required this.totalQuestions,
-    required this.features,
-  });
-}
-
-/// ステージカード（iOS版StageCardViewと同じ）
-class _StageCard extends StatelessWidget {
-  final _StageInfo stage;
-  final int answeredCount;
-  final Color accentColor;
-
-  const _StageCard({
-    required this.stage,
-    required this.answeredCount,
-    required this.accentColor,
-  });
-
-  _StageStatus get _status {
-    switch (stage.number) {
-      case 1:
-        if (answeredCount >= 20) return _StageStatus.completed;
-        if (answeredCount > 0) return _StageStatus.inProgress;
-        return _StageStatus.notStarted;
-      case 2:
-        if (answeredCount >= 50) return _StageStatus.completed;
-        if (answeredCount > 20) return _StageStatus.inProgress;
-        return _StageStatus.notStarted;
-      case 3:
-        if (answeredCount >= 100) return _StageStatus.completed;
-        if (answeredCount > 50) return _StageStatus.inProgress;
-        return _StageStatus.notStarted;
-      default:
-        return _StageStatus.notStarted;
-    }
-  }
-
-  double get _progressInStage {
-    switch (stage.number) {
-      case 1:
-        return (answeredCount / 20.0).clamp(0.0, 1.0);
-      case 2:
-        return answeredCount <= 20 ? 0 : ((answeredCount - 20) / 30.0).clamp(0.0, 1.0);
-      case 3:
-        return answeredCount <= 50 ? 0 : ((answeredCount - 50) / 50.0).clamp(0.0, 1.0);
-      default:
-        return 0;
-    }
-  }
-
-  Color get _stageColor {
-    switch (_status) {
-      case _StageStatus.completed:
-        return accentColor;
-      case _StageStatus.inProgress:
-        return accentColor.withValues(alpha: 0.7);
-      case _StageStatus.notStarted:
-        return Colors.grey.withValues(alpha: 0.5);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _status == _StageStatus.notStarted
-              ? Colors.grey.withValues(alpha: 0.2)
-              : accentColor.withValues(alpha: _status == _StageStatus.completed ? 0.5 : 0.3),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ヘッダー
-          Row(
-            children: [
-              // ステージ番号
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: _stageColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: _status == _StageStatus.completed
-                      ? const Icon(Icons.check, color: Colors.white, size: 24)
-                      : Text(
-                          '${stage.number}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          stage.title,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            stage.questionRange,
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textSecondary,
-                                ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      stage.description,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // 進捗バー（開始済みの場合）
-          if (_status != _StageStatus.notStarted) ...[
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '進捗',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppColors.textSecondary,
-                      ),
-                ),
-                Text(
-                  '${(_progressInStage * 100).toInt()}%',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: _progressInStage,
-                minHeight: 6,
-                backgroundColor: Colors.grey.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation(_stageColor),
-              ),
-            ),
-          ],
-
-          // 特徴リスト
-          const SizedBox(height: 16),
-          Text(
-            '分析内容',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-          ),
-          const SizedBox(height: 8),
-          ...stage.features.map((feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 14,
-                      color: _status == _StageStatus.completed
-                          ? accentColor
-                          : Colors.grey.withValues(alpha: 0.5),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      feature,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
-                    ),
-                  ],
-                ),
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-enum _StageStatus { notStarted, inProgress, completed }
-
-/// 診断の進め方アイテム
-class _HowToItem extends StatelessWidget {
-  final String text;
-  final Color accentColor;
-
-  const _HowToItem({required this.text, required this.accentColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        children: [
-          Icon(Icons.check_circle, size: 14, color: accentColor),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 /// アクションボタン（自分会議・履歴）
 class _ActionButton extends StatelessWidget {
   final IconData icon;
@@ -2208,7 +1434,7 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                               minLines: 1,
                               maxLength: 100,
                               decoration: InputDecoration(
-                                hintText: widget.isWaitingForReply ? '返答を待っています...' : '性格診断して',
+                                hintText: widget.isWaitingForReply ? '返答を待っています...' : 'メッセージを入力...',
                                 hintStyle: const TextStyle(color: Colors.grey),
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
@@ -2302,6 +1528,102 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
           ),
         );
       },
+    );
+  }
+}
+
+/// 成長ゲージ（参考画像スタイル: バッジ + ラベル + カウント + プログレスバー）
+class _GrowthGauge extends StatelessWidget {
+  final int signalCount;
+  final Color accentColor;
+
+  const _GrowthGauge({required this.signalCount, required this.accentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final String badge;
+    final String label;
+    final double progress;
+    final String countText;
+
+    if (signalCount >= 100) {
+      final cycle = signalCount % 10;
+      badge = '大人';
+      label = '性格解析';
+      progress = cycle / 10.0;
+      countText = '$cycle / 10';
+    } else if (signalCount >= 30) {
+      badge = '幼少期';
+      label = '大人まで';
+      progress = signalCount / 100.0;
+      countText = '$signalCount / 100';
+    } else {
+      badge = '赤ちゃん';
+      label = '幼少期まで';
+      progress = signalCount / 30.0;
+      countText = '$signalCount / 30';
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  countText,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF555555),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: accentColor.withValues(alpha: 0.18),
+                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                minHeight: 7,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

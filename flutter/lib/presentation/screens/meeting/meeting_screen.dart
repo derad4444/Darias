@@ -33,6 +33,7 @@ class MeetingScreen extends ConsumerStatefulWidget {
 class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   final _topicController = TextEditingController();
   final _scrollController = ScrollController();
+  final _shareButtonKey = GlobalKey();
   late final FocusNode _topicFocusNode;
 
   // API レスポンス
@@ -683,6 +684,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
         // 共有ボタン
         SizedBox(
+          key: _shareButtonKey,
           width: double.infinity,
           child: OutlinedButton.icon(
             onPressed: _shareMeeting,
@@ -935,7 +937,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   }
 
   /// 共有（iOS形式: ハッシュタグ付き動的テキスト）
-  void _shareMeeting() {
+  Future<void> _shareMeeting() async {
     final conclusion = _meetingResponse!.conversation.conclusion;
     final recommendations = conclusion.recommendations
         .asMap()
@@ -967,7 +969,20 @@ $nextSteps
 #DARIAS #自分会議 #セルフカウンセリング
 DARIASアプリで自分会議を体験しよう！
 ''';
-    Share.share(shareText.trim());
+
+    final text = shareText.trim();
+    if (text.isEmpty) return;
+
+    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
+    try {
+      await Share.share(text, sharePositionOrigin: origin);
+    } catch (e) {
+      debugPrint('Share failed: $e');
+    }
   }
 
   /// 案3: ネクストステップをタスクに追加

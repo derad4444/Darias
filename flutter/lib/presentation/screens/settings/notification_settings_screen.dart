@@ -2,6 +2,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -163,6 +164,11 @@ class _PermissionCard extends ConsumerWidget {
                 final service = ref.read(notificationServiceProvider);
                 await service.requestPermission();
                 ref.invalidate(notificationPermissionProvider);
+                // 許可付与後にFCMトークンをFirestoreへ再保存
+                final userId = ref.read(currentUserIdProvider);
+                if (userId != null) {
+                  await service.saveFcmToken(userId);
+                }
               },
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),

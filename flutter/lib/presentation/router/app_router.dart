@@ -20,7 +20,6 @@ import '../screens/premium/premium_upgrade_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/settings/notification_settings_screen.dart';
 import '../screens/settings/theme_settings_screen.dart';
-import '../screens/settings/data_export_screen.dart';
 import '../screens/character/character_detail_screen.dart';
 import '../screens/settings/feedback_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
@@ -32,6 +31,7 @@ import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
+import '../screens/character/character_animation_test_screen.dart';
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
@@ -226,13 +226,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PremiumUpgradeScreen(),
       ),
 
-      // データエクスポート
-      GoRoute(
-        path: '/data-export',
-        name: 'data-export',
-        builder: (context, state) => const DataExportScreen(),
-      ),
-
       // キャラクター詳細
       GoRoute(
         path: '/character/:id',
@@ -308,6 +301,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/help-guide',
         name: 'help-guide',
         builder: (context, state) => const HelpGuideScreen(),
+      ),
+
+      // キャラクターアニメーションテスト
+      GoRoute(
+        path: '/character-animation-test',
+        name: 'character-animation-test',
+        builder: (context, state) => const CharacterAnimationTestScreen(),
       ),
 
     ],

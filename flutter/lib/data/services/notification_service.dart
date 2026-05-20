@@ -84,6 +84,13 @@ class NotificationService {
     // 古いローカル日記通知を削除（FCMへ移行）
     await _localPlugin!.cancel(_diaryNotificationId);
 
+    // FCM通知許可リクエスト（未決定の場合のみOSダイアログが表示される）
+    await _messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     // iOS: フォアグラウンド時もバナー表示
     await _messaging.setForegroundNotificationPresentationOptions(
       alert: true,
@@ -153,10 +160,17 @@ class NotificationService {
       return await requestWebNotificationPermission();
     }
 
+    // FCM通知許可リクエスト（iOSではこれを呼ばないとgetToken()がnullになる）
+    final fcmSettings = await _messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
     final iosPlugin = _localPlugin
         ?.resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin>();
-    final iosGranted = await iosPlugin?.requestPermissions(
+    await iosPlugin?.requestPermissions(
       alert: true,
       badge: true,
       sound: true,
@@ -167,7 +181,8 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.requestNotificationsPermission();
 
-    return iosGranted ?? true;
+    return fcmSettings.authorizationStatus == AuthorizationStatus.authorized ||
+        fcmSettings.authorizationStatus == AuthorizationStatus.provisional;
   }
 
   // ────────────────────────────────────────

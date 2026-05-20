@@ -1,10 +1,7 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../data/services/firebase_image_service.dart';
+import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -77,7 +74,12 @@ class CharacterDetailData {
   final String? gender;
   final int analysisLevel;
   final Map<String, double>? confirmedBig5Scores;
+  final Map<String, double>? convertedBig5Scores;
+  final Map<String, double>? axisScores;
   final String? personalityKey;
+  final String? element;
+  final String? typeName;
+  final String? personalityNarrative;
 
   CharacterDetailData({
     this.favoriteColor,
@@ -93,7 +95,12 @@ class CharacterDetailData {
     this.gender,
     this.analysisLevel = 0,
     this.confirmedBig5Scores,
+    this.convertedBig5Scores,
+    this.axisScores,
     this.personalityKey,
+    this.element,
+    this.typeName,
+    this.personalityNarrative,
   });
 
   factory CharacterDetailData.fromMap(Map<String, dynamic> data) {
@@ -107,6 +114,24 @@ class CharacterDetailData {
         'agreeableness': (scoresMap['agreeableness'] as num?)?.toDouble() ?? 3.0,
         'neuroticism': (scoresMap['neuroticism'] as num?)?.toDouble() ?? 3.0,
       };
+    }
+
+    Map<String, double>? convertedScores;
+    final convertedScoresMap = data['convertedBig5Scores'] as Map<String, dynamic>?;
+    if (convertedScoresMap != null) {
+      convertedScores = {
+        'openness': (convertedScoresMap['openness'] as num?)?.toDouble() ?? 3.0,
+        'conscientiousness': (convertedScoresMap['conscientiousness'] as num?)?.toDouble() ?? 3.0,
+        'extraversion': (convertedScoresMap['extraversion'] as num?)?.toDouble() ?? 3.0,
+        'agreeableness': (convertedScoresMap['agreeableness'] as num?)?.toDouble() ?? 3.0,
+        'neuroticism': (convertedScoresMap['neuroticism'] as num?)?.toDouble() ?? 3.0,
+      };
+    }
+
+    Map<String, double>? axisScores;
+    final rawAxisScores = data['axisScores'] as Map<String, dynamic>?;
+    if (rawAxisScores != null) {
+      axisScores = rawAxisScores.map((k, v) => MapEntry(k, (v as num).toDouble()));
     }
 
     return CharacterDetailData(
@@ -123,27 +148,31 @@ class CharacterDetailData {
       gender: data['gender'] as String?,
       analysisLevel: (data['analysis_level'] as num?)?.toInt() ?? 0,
       confirmedBig5Scores: scores,
+      convertedBig5Scores: convertedScores,
+      axisScores: axisScores,
       personalityKey: data['personalityKey'] as String?,
+      element: data['element'] as String?,
+      typeName: data['typeName'] as String?,
+      personalityNarrative: data['personalityNarrative'] as String?,
     );
   }
 
-  /// スコアをL/M/Hに変換
   String _scoreToLevel(double score) {
     if (score <= 2.0) return 'L';
     if (score <= 3.0) return 'M';
     return 'H';
   }
 
-  /// 性格に基づいた画像ファイル名を生成
-  /// 未診断（analysisLevel == 0）の場合はnullを返す（iOS版と同じ挙動）
+  /// convertedBig5Scores（新システム）を優先し、なければ confirmedBig5Scores（旧システム）を使用
   String? get personalityImageFileName {
-    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
+    final s = convertedBig5Scores ?? (analysisLevel > 0 ? confirmedBig5Scores : null);
+    if (s == null) return null;
 
-    final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
-    final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
-    final e = _scoreToLevel(confirmedBig5Scores!['extraversion'] ?? 3.0);
-    final a = _scoreToLevel(confirmedBig5Scores!['agreeableness'] ?? 3.0);
-    final n = _scoreToLevel(confirmedBig5Scores!['neuroticism'] ?? 3.0);
+    final o = _scoreToLevel(s['openness'] ?? 3.0);
+    final c = _scoreToLevel(s['conscientiousness'] ?? 3.0);
+    final e = _scoreToLevel(s['extraversion'] ?? 3.0);
+    final a = _scoreToLevel(s['agreeableness'] ?? 3.0);
+    final n = _scoreToLevel(s['neuroticism'] ?? 3.0);
 
     final genderPrefix = gender == '男性' ? 'Male' : 'Female';
     return '${genderPrefix}_$o$c$e$a$n';
@@ -225,13 +254,17 @@ class CharacterDetailScreen extends ConsumerWidget {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => context.pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: Text('キャラ詳細', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.help_outline, color: textColor),
+            tooltip: '元素について',
+            onPressed: () => showElementGuideDialog(context),
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
@@ -284,6 +317,7 @@ class _CharacterDetailBody extends ConsumerWidget {
     final big5AnalysisAsync = detail.personalityKey != null
         ? ref.watch(big5AnalysisDataProvider(detail.personalityKey!))
         : const AsyncValue<Big5AnalysisData?>.data(null);
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -305,64 +339,49 @@ class _CharacterDetailBody extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
-              // キャラクター画像
+              // 性格タイプカード（常に表示。データ収集中/確定済みで切り替わる）
+              _PersonalityTypeCard(detail: detail, textColor: textColor),
+
+              const SizedBox(height: 16),
+
+              // キャラクター画像（成長段階）
               _CharacterImage(
-                imageFileName: detail.personalityImageFileName,
+                signalCount: signalCount,
+                element: detail.element,
                 gender: detail.gender,
+              ),
+
+              const SizedBox(height: 8),
+
+              // 成長ゲージ
+              _GrowthGaugeCard(
+                signalCount: signalCount,
+                textColor: textColor,
+                accentColor: accentColor,
               ),
 
               const SizedBox(height: 16),
 
-              // Big5解析セクション（analysisLevel >= 100の場合のみ）
-              if (detail.analysisLevel >= 100)
+              // Big5解析セクション（30シグナル到達後に表示）
+              if (signalCount >= 30 && detail.element != null)
                 big5AnalysisAsync.when(
                   data: (analysisData) => _Big5AnalysisSection(
                     textColor: textColor,
                     accentColor: accentColor,
-                    analysisLevel: detail.analysisLevel,
                     analysisData: analysisData,
-                    // データ未生成（null）の場合も生成中として表示
-                    isLoading: analysisData == null,
                   ),
                   loading: () => _Big5AnalysisSection(
                     textColor: textColor,
                     accentColor: accentColor,
-                    analysisLevel: detail.analysisLevel,
                     analysisData: null,
                     isLoading: true,
                   ),
-                  error: (_, __) => _Big5AnalysisSection(
+                  error: (_, _s) => _Big5AnalysisSection(
                     textColor: textColor,
                     accentColor: accentColor,
-                    analysisLevel: detail.analysisLevel,
                     analysisData: null,
                   ),
-                )
-              else if (detail.analysisLevel < 20)
-                _AnalysisNotAvailableSection(textColor: textColor),
-
-              // 性格診断ボタン（100問未完了の場合のみ）
-              if (detail.analysisLevel < 100) ...[
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: () => context.push('/big5'),
-                      icon: const Icon(Icons.psychology),
-                      label: Text(
-                        detail.analysisLevel == 0 ? '性格診断を開始する' : '性格診断を続ける',
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: accentColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
                 ),
-              ],
 
               // 情報エリア（値がある場合のみ表示）
               Padding(
@@ -403,110 +422,50 @@ class _CharacterDetailBody extends ConsumerWidget {
 }
 
 /// キャラクター画像ウィジェット
-class _CharacterImage extends StatefulWidget {
-  final String? imageFileName;
+/// キャラクター成長段階画像ウィジェット
+class _CharacterImage extends StatelessWidget {
+  final int signalCount;
+  final String? element;
   final String? gender;
 
   const _CharacterImage({
-    required this.imageFileName,
+    required this.signalCount,
+    required this.element,
     required this.gender,
   });
 
   @override
-  State<_CharacterImage> createState() => _CharacterImageState();
-}
-
-class _CharacterImageState extends State<_CharacterImage> {
-  MemoryImage? _imageProvider;
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadImage();
-  }
-
-  @override
-  void didUpdateWidget(_CharacterImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.imageFileName != widget.imageFileName) {
-      _loadImage();
-    }
-  }
-
-  String get _defaultImagePath {
-    return widget.gender == '男性'
-        ? 'assets/images/android_male.png'
-        : 'assets/images/android_female.png';  // genderがnullの場合も女性画像をデフォルト
-  }
-
-  Future<void> _loadImage() async {
-    // 未診断（imageFileName == null）の場合はローカルのデフォルト画像を表示（iOS版と同じ挙動）
-    if (widget.imageFileName == null) {
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      // ファイル名から性別を抽出
-      final isMale = widget.imageFileName!.startsWith('Male');
-      final gender = isMale
-          ? CharacterGender.male
-          : CharacterGender.female;
-
-      final imageData = await FirebaseImageService.shared.fetchImage(
-        fileName: widget.imageFileName!,
-        gender: gender,
-      );
-
-      if (mounted) {
-        setState(() {
-          _imageProvider = MemoryImage(imageData);
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to load character image: $e');
-      if (mounted) {
-        setState(() {
-          _imageProvider = null;
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const SizedBox(
-        width: 200,
-        height: 200,
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
+    final assetPath = characterGrowthAssetPath(
+      signalCount: signalCount,
+      element: element,
+      gender: gender,
+    );
+    final elementType = signalCount >= 30 ? elementTypeFromString(element) : null;
 
-    if (_imageProvider == null) {
-      // 未診断またはFirebase取得失敗時はデフォルト画像を表示（iOS版と同じ挙動）
-      return SizedBox(
-        width: 200,
-        height: 200,
-        child: Image.asset(
-          _defaultImagePath,
-          fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) =>
-              const Center(child: Icon(Icons.person, size: 80)),
-        ),
-      );
-    }
-
-    return Image(
-      image: _imageProvider!,
-      width: 200,
-      height: 200,
-      fit: BoxFit.contain,
+    return SizedBox(
+      width: 220,
+      height: 220,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          if (elementType != null)
+            Positioned.fill(
+              child: ElementEffectWidget(
+                element: elementType,
+                pattern: elementType.defaultPattern,
+              ),
+            ),
+          Image.asset(
+            assetPath,
+            width: 180,
+            height: 180,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) =>
+                const Center(child: Icon(Icons.person, size: 80)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -570,18 +529,16 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// Big5解析セクション（analysisLevel >= 100の場合）
+/// Big5解析セクション（element != null の場合）
 class _Big5AnalysisSection extends StatelessWidget {
   final Color textColor;
   final Color accentColor;
-  final int analysisLevel;
   final Big5AnalysisData? analysisData;
   final bool isLoading;
 
   const _Big5AnalysisSection({
     required this.textColor,
     required this.accentColor,
-    required this.analysisLevel,
     required this.analysisData,
     this.isLoading = false,
   });
@@ -605,25 +562,13 @@ class _Big5AnalysisSection extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.3),
               ),
             ),
-            child: Row(
-              children: [
-                Text(
-                  '✨ 人格解析',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  '($analysisLevel/100)',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: textColor.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
+            child: Text(
+              '✨ 人格解析',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
             ),
           ),
           // 解析カテゴリー一覧
@@ -633,7 +578,7 @@ class _Big5AnalysisSection extends StatelessWidget {
               analysis: analysisData?.analysis100?[category],
               textColor: textColor,
               accentColor: accentColor,
-              isLoading: isLoading,
+              isLoading: isLoading || analysisData?.analysis100?[category] == null,
               onTap: () => _showAnalysisDetail(context, category),
             ),
           const SizedBox(height: 8),
@@ -970,46 +915,92 @@ class _AnalysisDetailSheet extends ConsumerWidget {
   }
 }
 
-/// 解析レベルに達していない場合のセクション
-class _AnalysisNotAvailableSection extends StatelessWidget {
+/// 成長ゲージカード（0→30: 幼少期まで / 30→100: 大人まで / 100+: 10サイクル）
+class _GrowthGaugeCard extends StatelessWidget {
+  final int signalCount;
   final Color textColor;
+  final Color accentColor;
 
-  const _AnalysisNotAvailableSection({
+  const _GrowthGaugeCard({
+    required this.signalCount,
     required this.textColor,
+    required this.accentColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final String label;
+    final double progress;
+    final String countText;
+    final String description;
+
+    if (signalCount >= 100) {
+      final cycle = signalCount % 10;
+      progress = cycle / 10.0;
+      label = '性格解析';
+      countText = '$cycle / 10';
+      description = 'チャットを続けると性格解析が深まります';
+    } else if (signalCount >= 30) {
+      progress = signalCount / 100.0;
+      label = '大人まで';
+      countText = '$signalCount / 100';
+      description = 'チャットを続けるとキャラが大人へ成長します';
+    } else {
+      progress = signalCount / 30.0;
+      label = '幼少期まで';
+      countText = '$signalCount / 30';
+      description = 'チャットを続けると属性が決まり幼少期へ成長します';
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.3),
-          ),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '🤖 性格解析',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: textColor,
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: textColor,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  countText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor.withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress,
+                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                minHeight: 7,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              '性格解析を行うには、最低20問のBig5質問に回答してください。\nチャットでキャラクターと会話を続けると、時々性格質問が表示されます。',
+              description,
               style: TextStyle(
-                fontSize: 14,
-                color: textColor.withValues(alpha: 0.8),
+                fontSize: 11,
+                color: textColor.withValues(alpha: 0.7),
               ),
             ),
           ],
@@ -1018,3 +1009,206 @@ class _AnalysisNotAvailableSection extends StatelessWidget {
     );
   }
 }
+
+/// 性格タイプカード（signalCount >= 30 でタイプ表示、未満でプログレスバー）
+class _PersonalityTypeCard extends ConsumerWidget {
+  final CharacterDetailData detail;
+  final Color textColor;
+
+  const _PersonalityTypeCard({
+    required this.detail,
+    required this.textColor,
+  });
+
+  static const Map<String, Color> _elementColors = {
+    '炎': Color(0xFFE53935),
+    '水': Color(0xFF1E88E5),
+    '風': Color(0xFF43A047),
+    '土': Color(0xFF8D6E63),
+    '氷': Color(0xFF4FC3F7),
+    '雷': Color(0xFFFDD835),
+    '光': Color(0xFFFFB300),
+    '闇': Color(0xFF6A1B9A),
+    '無': Color(0xFF9E9E9E),
+  };
+
+  static String _generateDescription(Map<String, double> axisScores, String element) {
+    final phrases = <String>[];
+    final energy = axisScores['energy'] ?? 0;
+    final judgment = axisScores['judgment'] ?? 0;
+    final relationship = axisScores['relationship'] ?? 0;
+    final lifestyle = axisScores['lifestyle'] ?? 0;
+    final processing = axisScores['processing'] ?? 0;
+
+    if (energy > 0.3) {
+      phrases.add('外向的で');
+    } else if (energy < -0.3) {
+      phrases.add('内省的で');
+    }
+
+    if (judgment < -0.3) {
+      phrases.add('感情豊かな');
+    } else if (judgment > 0.3) {
+      phrases.add('論理的な');
+    }
+
+    if (relationship > 0.3) {
+      phrases.add('協調を大切にする');
+    } else if (relationship < -0.3) {
+      phrases.add('自分軸の強い');
+    }
+
+    if (lifestyle > 0.3) {
+      phrases.add('計画的な');
+    } else if (lifestyle < -0.3) {
+      phrases.add('自由奔放な');
+    }
+
+    if (processing > 0.3) {
+      phrases.add('分析的な');
+    } else if (processing < -0.3) {
+      phrases.add('直感的な');
+    }
+
+    final selected = phrases.take(3).toList();
+    if (selected.isEmpty) return '$elementタイプ';
+    return '${selected.join('')}$elementタイプ';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    final hasType = signalCount >= 30 && detail.element != null && detail.typeName != null;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: hasType ? _buildTypeCard() : _buildProgressCard(signalCount),
+    );
+  }
+
+  Widget _buildTypeCard() {
+    final element = detail.element!;
+    final typeName = detail.typeName!;
+    final elementColor = _elementColors[element] ?? const Color(0xFF9E9E9E);
+    final description = detail.axisScores != null
+        ? _generateDescription(detail.axisScores!, element)
+        : '$elementタイプ';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: elementColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      typeName,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: textColor.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    if (detail.personalityNarrative != null) ...[
+                      Divider(color: textColor.withValues(alpha: 0.2), height: 20),
+                      Text(
+                        detail.personalityNarrative!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: textColor),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressCard(int signalCount) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '🔍 性格タイプを解析中',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: signalCount / 30,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9E9E9E)),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '$signalCount / 30',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: textColor.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'チャットや会議を続けると、あなたの性格タイプが判定されます',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: textColor.withValues(alpha: 0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

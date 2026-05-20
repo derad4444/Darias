@@ -47,6 +47,7 @@ class DiaryDetailSheet extends ConsumerStatefulWidget {
 class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   late final TextEditingController _commentController;
   bool _isSaving = false;
+  final GlobalKey _shareButtonKey = GlobalKey();
 
   @override
   void initState() {
@@ -104,6 +105,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                     ),
                     const Spacer(),
                     IconButton(
+                      key: _shareButtonKey,
                       icon: const Icon(Icons.share),
                       onPressed: _shareDiary,
                     ),
@@ -481,7 +483,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
     }
   }
 
-  void _shareDiary() {
+  Future<void> _shareDiary() async {
     final buffer = StringBuffer();
     buffer.writeln('${widget.diary.dateString}の日記\n');
 
@@ -505,6 +507,22 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
       buffer.writeln('\n---\nひとこと: ${widget.diary.userComment}');
     }
 
-    Share.share(buffer.toString().trim(), subject: '${widget.diary.dateString}の日記');
+    final text = buffer.toString().trim();
+    if (text.isEmpty) return;
+
+    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+
+    try {
+      await Share.share(
+        text,
+        subject: '${widget.diary.dateString}の日記',
+        sharePositionOrigin: origin,
+      );
+    } catch (e) {
+      debugPrint('Share failed: $e');
+    }
   }
 }
