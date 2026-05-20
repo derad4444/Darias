@@ -1,9 +1,14 @@
+import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
@@ -279,6 +284,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                 right: 0,
                 top: 0,
                 child: HomeHintBanner(userId: ref.watch(currentUserIdProvider) ?? ''),
+              ),
+
+              // テスト用：進化ダイアログ確認ボタン（リリース前に削除）
+              Positioned(
+                right: 12,
+                top: 8,
+                child: GestureDetector(
+                  onTap: _showTestEvolutionDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.science_outlined, color: Colors.white70, size: 18),
+                  ),
+                ),
               ),
 
               // 下部UI（操作エリア）
@@ -709,6 +731,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     if (sessionTurn <= 1) return 1;
     if (sessionTurn <= 4) return 2;
     return 3;
+  }
+
+  /// テスト用：Firestoreに書き込まずダイアログを表示（リリース前に削除）
+  Future<void> _showTestEvolutionDialog() async {
+    if (_isShowingEvolutionDialog) return;
+    _isShowingEvolutionDialog = true;
+    final gender = ref.read(characterDetailsProvider).valueOrNull?.gender;
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      pageBuilder: (ctx, anim, secAnim) => _TypeEvolutionDialog(
+        newElement: '炎',
+        newTypeName: '場を沸かす炎タイプ',
+        signalCount: 30,
+        gender: gender,
+        onConfirm: () async {},
+      ),
+    );
+    if (mounted) setState(() => _isShowingEvolutionDialog = false);
   }
 
   Future<void> _showEvolutionDialog(TypeChangeData data) async {
@@ -1761,6 +1803,8 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
     with TickerProviderStateMixin {
   late final AnimationController _glowController;
   late final AnimationController _contentController;
+  final GlobalKey _shareButtonKey = GlobalKey();
+  final GlobalKey _cardKey = GlobalKey();
   late final Animation<double> _glowAnim;
   late final Animation<double> _fadeAnim;
   late final Animation<double> _scaleAnim;
@@ -1820,6 +1864,32 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
     super.dispose();
   }
 
+  Future<void> _captureAndShare() async {
+    try {
+      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/darias_evolution.png');
+      await file.writeAsBytes(byteData.buffer.asUint8List());
+
+      final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+      final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #${widget.newElement}属性',
+        sharePositionOrigin: origin,
+      );
+    } catch (e) {
+      debugPrint('Share failed: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final elementColor = _elementColors[widget.newElement] ?? const Color(0xFFB0BEC5);
@@ -1832,7 +1902,9 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
           opacity: _fadeAnim,
           child: ScaleTransition(
             scale: _scaleAnim,
-            child: Container(
+            child: RepaintBoundary(
+              key: _cardKey,
+              child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 32),
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -1923,6 +1995,24 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
                   ),
                   const SizedBox(height: 24),
                   SizedBox(
+                    key: _shareButtonKey,
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _captureAndShare,
+                      icon: const Icon(Icons.share, size: 18),
+                      label: const Text('シェアする'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: elementColor,
+                        side: BorderSide(color: elementColor.withValues(alpha: 0.6)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
@@ -1945,10 +2035,11 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
                   ),
                 ],
               ),
-            ),
-          ),
-        ),
-      ),
-    );
+            ),   // Container
+          ),     // RepaintBoundary
+        ),       // ScaleTransition
+      ),         // FadeTransition
+    ),           // Center
+  );             // Material
   }
 }
