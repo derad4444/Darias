@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../data/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -36,6 +37,7 @@ class _CompatibilityCategoryScreenState
   Timer? _messageTimer;
   int _messageIndex = 0;
   final ScrollController _scrollController = ScrollController();
+  final GlobalKey _shareButtonKey = GlobalKey();
 
   @override
   void initState() {
@@ -59,6 +61,29 @@ class _CompatibilityCategoryScreenState
     _messageTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _share() async {
+    final cat = widget.category;
+    final d = widget.diagnosis;
+    final friendName = widget.friend.name;
+
+    final buffer = StringBuffer();
+    buffer.writeln('${cat.icon} ${friendName}との${cat.label}の相性\n');
+    buffer.writeln('相性スコア: ${d.score}%\n');
+    buffer.writeln(d.comment);
+    if (d.advice.isNotEmpty) {
+      buffer.writeln('\n💡 ${d.advice}');
+    }
+    buffer.writeln('\n#DARIAS #相性診断');
+
+    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    try {
+      await Share.share(buffer.toString().trim(), sharePositionOrigin: origin);
+    } catch (e) {
+      debugPrint('Share failed: $e');
+    }
   }
 
   void _startMessageAnimation() {
@@ -129,6 +154,17 @@ class _CompatibilityCategoryScreenState
             ),
           ],
         ),
+        actions: [
+          if (_showResult)
+            SizedBox(
+              key: _shareButtonKey,
+              child: IconButton(
+                onPressed: _share,
+                icon: Icon(Icons.share, color: cat.color),
+                tooltip: 'シェア',
+              ),
+            ),
+        ],
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -250,7 +286,7 @@ class _CompatibilityCategoryScreenState
             ],
           ),
           const SizedBox(height: 12),
-          ..._displayedMessages.map((msg) => _ChatBubble(
+          ..._displayedMessages.map((msg) => CompatibilityChatBubble(
                 message: msg,
                 myUserId: myUserId,
                 friendUserId: widget.friend.id,
@@ -375,7 +411,7 @@ class _AnimatedScoreBarState extends State<_AnimatedScoreBar>
 // ─────────────────────────────────────────
 // チャット吹き出し
 // ─────────────────────────────────────────
-class _ChatBubble extends StatefulWidget {
+class CompatibilityChatBubble extends StatefulWidget {
   final CompatibilityMessage message;
   final String myUserId;
   final String friendUserId;
@@ -383,7 +419,7 @@ class _ChatBubble extends StatefulWidget {
   final String friendName;
   final Color accentColor;
 
-  const _ChatBubble({
+  const CompatibilityChatBubble({
     required this.message,
     required this.myUserId,
     required this.friendUserId,
@@ -393,10 +429,10 @@ class _ChatBubble extends StatefulWidget {
   });
 
   @override
-  State<_ChatBubble> createState() => _ChatBubbleState();
+  State<CompatibilityChatBubble> createState() => CompatibilityChatBubbleState();
 }
 
-class _ChatBubbleState extends State<_ChatBubble>
+class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
     with SingleTickerProviderStateMixin {
   late AnimationController _ctrl;
   late Animation<double> _fade;
