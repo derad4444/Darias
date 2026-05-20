@@ -1804,10 +1804,11 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
   late final AnimationController _glowController;
   late final AnimationController _contentController;
   final GlobalKey _shareButtonKey = GlobalKey();
-  final GlobalKey _cardKey = GlobalKey();
+  final GlobalKey _offscreenCardKey = GlobalKey();
   late final Animation<double> _glowAnim;
   late final Animation<double> _fadeAnim;
   late final Animation<double> _scaleAnim;
+  bool _isSharing = false;
 
   static const _elementColors = {
     '炎': Color(0xFFFF6B35),
@@ -1864,14 +1865,18 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
     super.dispose();
   }
 
+  /// アニメーション外の静的シェアカードをキャプチャして共有
   Future<void> _captureAndShare() async {
+    if (_isSharing) return;
+    setState(() => _isSharing = true);
+    final shareText = 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #${widget.newElement}属性';
     try {
-      final boundary = _cardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return;
+      final boundary = _offscreenCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('boundary not found');
 
       final image = await boundary.toImage(pixelRatio: 3.0);
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (byteData == null) return;
+      if (byteData == null) throw Exception('toByteData failed');
 
       final tempDir = await getTemporaryDirectory();
       final file = File('${tempDir.path}/darias_evolution.png');
@@ -1882,12 +1887,105 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
 
       await Share.shareXFiles(
         [XFile(file.path)],
-        text: 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #${widget.newElement}属性',
+        text: shareText,
         sharePositionOrigin: origin,
       );
     } catch (e) {
-      debugPrint('Share failed: $e');
+      debugPrint('Image capture failed ($e), falling back to text share');
+      try {
+        final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
+        final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+        await Share.share(shareText, sharePositionOrigin: origin);
+      } catch (_) {}
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
+  }
+
+  /// アニメーションなしのシェアカード（画面外キャプチャ用）
+  Widget _buildShareCard(Color elementColor, String elementEmoji) {
+    return Container(
+      width: 320,
+      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1A2E),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: elementColor, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: elementColor.withValues(alpha: 0.5),
+            blurRadius: 32,
+            spreadRadius: 8,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '性格タイプが変わりました',
+            style: TextStyle(
+              color: elementColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: elementColor.withValues(alpha: 0.7),
+                  blurRadius: 28,
+                  spreadRadius: 6,
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Container(
+                color: elementColor.withValues(alpha: 0.15),
+                child: Center(
+                  child: Text(elementEmoji, style: const TextStyle(fontSize: 48)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(elementEmoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(height: 8),
+          Text(
+            '${widget.newElement}属性',
+            style: TextStyle(color: elementColor, fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${widget.newTypeName} になりました！',
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'あなたの性格がより深く分析されました',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'DARIAS',
+            style: TextStyle(
+              color: elementColor.withValues(alpha: 0.5),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 2,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1897,149 +1995,153 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
 
     return Material(
       color: Colors.transparent,
-      child: Center(
-        child: FadeTransition(
-          opacity: _fadeAnim,
-          child: ScaleTransition(
-            scale: _scaleAnim,
+      child: Stack(
+        children: [
+          // 画面外に静的シェアカードを配置（アニメーションレイヤー外でキャプチャするため）
+          Positioned(
+            left: -9999,
+            top: 100,
             child: RepaintBoundary(
-              key: _cardKey,
-              child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 32),
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: elementColor, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: elementColor.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    '性格タイプが変わりました',
-                    style: TextStyle(
-                      color: elementColor,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  AnimatedBuilder(
-                    animation: _glowAnim,
-                    builder: (_, __) => Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: elementColor.withValues(alpha: _glowAnim.value * 0.8),
-                            blurRadius: 32 * _glowAnim.value,
-                            spreadRadius: 8 * _glowAnim.value,
-                          ),
-                        ],
+              key: _offscreenCardKey,
+              child: _buildShareCard(elementColor, elementEmoji),
+            ),
+          ),
+
+          // 表示用アニメーションダイアログ
+          Center(
+            child: FadeTransition(
+              opacity: _fadeAnim,
+              child: ScaleTransition(
+                scale: _scaleAnim,
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 32),
+                  padding: const EdgeInsets.all(28),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A2E),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: elementColor, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: elementColor.withValues(alpha: 0.3),
+                        blurRadius: 24,
+                        spreadRadius: 4,
                       ),
-                      child: ClipOval(
-                        child: Container(
-                          color: elementColor.withValues(alpha: 0.15),
-                          child: Center(
-                            child: Text(
-                              elementEmoji,
-                              style: const TextStyle(fontSize: 48),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '性格タイプが変わりました',
+                        style: TextStyle(
+                          color: elementColor,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      AnimatedBuilder(
+                        animation: _glowAnim,
+                        builder: (_, __) => Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: elementColor.withValues(alpha: _glowAnim.value * 0.8),
+                                blurRadius: 32 * _glowAnim.value,
+                                spreadRadius: 8 * _glowAnim.value,
+                              ),
+                            ],
+                          ),
+                          child: ClipOval(
+                            child: Container(
+                              color: elementColor.withValues(alpha: 0.15),
+                              child: Center(
+                                child: Text(elementEmoji, style: const TextStyle(fontSize: 48)),
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    elementEmoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '${widget.newElement}属性',
-                    style: TextStyle(
-                      color: elementColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${widget.newTypeName} になりました！',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'あなたの性格がより深く分析されました',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.6),
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    key: _shareButtonKey,
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _captureAndShare,
-                      icon: const Icon(Icons.share, size: 18),
-                      label: const Text('シェアする'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: elementColor,
-                        side: BorderSide(color: elementColor.withValues(alpha: 0.6)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 20),
+                      Text(elementEmoji, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${widget.newElement}属性',
+                        style: TextStyle(color: elementColor, fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${widget.newTypeName} になりました！',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'あなたの性格がより深く分析されました',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        key: _shareButtonKey,
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _isSharing ? null : _captureAndShare,
+                          icon: _isSharing
+                              ? SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: elementColor,
+                                  ),
+                                )
+                              : const Icon(Icons.share, size: 18),
+                          label: Text(_isSharing ? '準備中...' : 'シェアする'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: elementColor,
+                            side: BorderSide(color: elementColor.withValues(alpha: 0.6)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await widget.onConfirm();
-                        if (context.mounted) Navigator.of(context).pop();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: elementColor,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            await widget.onConfirm();
+                            if (context.mounted) Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: elementColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            '確認する',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                         ),
                       ),
-                      child: const Text(
-                        '確認する',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                      ),
-                    ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),   // Container
-          ),     // RepaintBoundary
-        ),       // ScaleTransition
-      ),         // FadeTransition
-    ),           // Center
-  );             // Material
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
