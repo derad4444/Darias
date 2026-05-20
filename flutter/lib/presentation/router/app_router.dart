@@ -10,7 +10,6 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
-import '../screens/big5/big5_diagnosis_screen.dart';
 import '../screens/todo/todo_detail_screen.dart';
 import '../screens/calendar/schedule_detail_screen.dart';
 import '../screens/diary/diary_list_screen.dart';
@@ -124,13 +123,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/character-select',
         name: 'character-select',
         builder: (context, state) => const CharacterSelectScreen(),
-      ),
-
-      // BIG5診断
-      GoRoute(
-        path: '/big5',
-        name: 'big5',
-        builder: (context, state) => const Big5DiagnosisScreen(),
       ),
 
       // Todo詳細

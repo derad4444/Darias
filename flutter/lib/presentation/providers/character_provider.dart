@@ -38,10 +38,9 @@ final currentCharacterProvider = StreamProvider<CharacterModel?>((ref) {
 
 /// キャラクター選択コントローラー
 class CharacterController extends StateNotifier<AsyncValue<void>> {
-  final CharacterDatasource _datasource;
   final Ref _ref;
 
-  CharacterController(this._datasource, this._ref) : super(const AsyncValue.data(null));
+  CharacterController(this._ref) : super(const AsyncValue.data(null));
 
   /// キャラクターを選択
   Future<void> selectCharacter(String characterId) async {
@@ -66,10 +65,7 @@ class CharacterController extends StateNotifier<AsyncValue<void>> {
 /// キャラクターコントローラーのプロバイダー
 final characterControllerProvider =
     StateNotifierProvider<CharacterController, AsyncValue<void>>((ref) {
-  return CharacterController(
-    ref.watch(characterDatasourceProvider),
-    ref,
-  );
+  return CharacterController(ref);
 });
 
 /// 現在のキャラクターIDのプロバイダー
@@ -82,16 +78,29 @@ final currentCharacterIdProvider = Provider<String?>((ref) {
 class CharacterDetails {
   final String gender;
   final Map<String, double>? confirmedBig5Scores;
+  final Map<String, double>? convertedBig5Scores;
+  final Map<String, double>? axisScores;
   final String? personalityKey;
   final int analysisLevel;
   final int points;
+  final String? element;
+  final String? typeName;
+  final String? personalityNarrative;
+  /// 成長ステージ: 0=赤ちゃん, 1=幼少期, 2=成人（users/{userId}.growthStage から取得）
+  final int growthStage;
 
   CharacterDetails({
     required this.gender,
     this.confirmedBig5Scores,
+    this.convertedBig5Scores,
+    this.axisScores,
     this.personalityKey,
     this.analysisLevel = 0,
     this.points = 0,
+    this.element,
+    this.typeName,
+    this.personalityNarrative,
+    this.growthStage = 0,
   });
 
   factory CharacterDetails.fromMap(Map<String, dynamic> data) {
@@ -107,47 +116,73 @@ class CharacterDetails {
       };
     }
 
+    Map<String, double>? convertedScores;
+    final convertedScoresMap = data['convertedBig5Scores'] as Map<String, dynamic>?;
+    if (convertedScoresMap != null) {
+      convertedScores = {
+        'openness': (convertedScoresMap['openness'] as num?)?.toDouble() ?? 3.0,
+        'conscientiousness': (convertedScoresMap['conscientiousness'] as num?)?.toDouble() ?? 3.0,
+        'extraversion': (convertedScoresMap['extraversion'] as num?)?.toDouble() ?? 3.0,
+        'agreeableness': (convertedScoresMap['agreeableness'] as num?)?.toDouble() ?? 3.0,
+        'neuroticism': (convertedScoresMap['neuroticism'] as num?)?.toDouble() ?? 3.0,
+      };
+    }
+
+    Map<String, double>? axisScores;
+    final rawAxisScores = data['axisScores'] as Map<String, dynamic>?;
+    if (rawAxisScores != null) {
+      axisScores = rawAxisScores.map((k, v) => MapEntry(k, (v as num).toDouble()));
+    }
+
     return CharacterDetails(
       gender: data['gender'] as String? ?? '女性',
       confirmedBig5Scores: scores,
+      convertedBig5Scores: convertedScores,
+      axisScores: axisScores,
       personalityKey: data['personalityKey'] as String?,
       analysisLevel: (data['analysis_level'] as num?)?.toInt() ?? 0,
       points: (data['points'] as num?)?.toInt() ?? 0,
+      element: data['element'] as String?,
+      typeName: data['typeName'] as String?,
+      personalityNarrative: data['personalityNarrative'] as String?,
+      // growthStage は users/{userId} ドキュメントから別途設定するため、ここではデフォルト0
     );
   }
 
-  /// スコアをL/M/Hに変換（iOS版PersonalityImageServiceと同じロジック）
   String _scoreToLevel(double score) {
     if (score <= 2.0) return 'L';
     if (score <= 3.0) return 'M';
     return 'H';
   }
 
-  /// 性格に基づいた画像ファイル名を生成（性別プレフィックス付き）
-  /// 未診断（analysisLevel == 0）の場合はnullを返す（iOS版と同じ挙動）
+  /// BIG5診断済み（analysisLevel > 0）は confirmedBig5Scores を優先。未診断は convertedBig5Scores を使用
   String? get personalityImageFileName {
-    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
+    final scores = (analysisLevel > 0 && confirmedBig5Scores != null)
+        ? confirmedBig5Scores
+        : convertedBig5Scores;
+    if (scores == null) return null;
 
-    final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
-    final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
-    final e = _scoreToLevel(confirmedBig5Scores!['extraversion'] ?? 3.0);
-    final a = _scoreToLevel(confirmedBig5Scores!['agreeableness'] ?? 3.0);
-    final n = _scoreToLevel(confirmedBig5Scores!['neuroticism'] ?? 3.0);
+    final o = _scoreToLevel(scores['openness'] ?? 3.0);
+    final c = _scoreToLevel(scores['conscientiousness'] ?? 3.0);
+    final e = _scoreToLevel(scores['extraversion'] ?? 3.0);
+    final a = _scoreToLevel(scores['agreeableness'] ?? 3.0);
+    final n = _scoreToLevel(scores['neuroticism'] ?? 3.0);
 
     final genderPrefix = gender == '男性' ? 'Male' : 'Female';
     return '${genderPrefix}_$o$c$e$a$n';
   }
 
-  /// FirebaseImageService用のファイル名を取得（OCAENパターンのみ）
-  /// 未診断の場合はnullを返す
   String? getPersonalityImageFileName() {
-    if (analysisLevel == 0 || confirmedBig5Scores == null) return null;
+    final scores = (analysisLevel > 0 && confirmedBig5Scores != null)
+        ? confirmedBig5Scores
+        : convertedBig5Scores;
+    if (scores == null) return null;
 
-    final o = _scoreToLevel(confirmedBig5Scores!['openness'] ?? 3.0);
-    final c = _scoreToLevel(confirmedBig5Scores!['conscientiousness'] ?? 3.0);
-    final e = _scoreToLevel(confirmedBig5Scores!['extraversion'] ?? 3.0);
-    final a = _scoreToLevel(confirmedBig5Scores!['agreeableness'] ?? 3.0);
-    final n = _scoreToLevel(confirmedBig5Scores!['neuroticism'] ?? 3.0);
+    final o = _scoreToLevel(scores['openness'] ?? 3.0);
+    final c = _scoreToLevel(scores['conscientiousness'] ?? 3.0);
+    final e = _scoreToLevel(scores['extraversion'] ?? 3.0);
+    final a = _scoreToLevel(scores['agreeableness'] ?? 3.0);
+    final n = _scoreToLevel(scores['neuroticism'] ?? 3.0);
 
     return '$o$c$e$a$n';
   }
@@ -217,19 +252,54 @@ final userCharacterDetailsProvider =
       debugPrint('🎭 userCharacterDetailsProvider: detailsDoc not found');
       return null;
     }
+    final growthStage = (userDoc.data()?['growthStage'] as num?)?.toInt() ?? 0;
     final details = CharacterDetails.fromMap(detailsDoc.data()!);
-    debugPrint('🎭 userCharacterDetailsProvider: analysisLevel=${details.analysisLevel}, fileName=${details.personalityImageFileName}');
-    return details;
+    final detailsWithStage = CharacterDetails(
+      gender: details.gender,
+      confirmedBig5Scores: details.confirmedBig5Scores,
+      convertedBig5Scores: details.convertedBig5Scores,
+      axisScores: details.axisScores,
+      personalityKey: details.personalityKey,
+      analysisLevel: details.analysisLevel,
+      points: details.points,
+      element: details.element,
+      typeName: details.typeName,
+      personalityNarrative: details.personalityNarrative,
+      growthStage: growthStage,
+    );
+    debugPrint('🎭 userCharacterDetailsProvider: growthStage=$growthStage element=${details.element}');
+    return detailsWithStage;
   } catch (e) {
     debugPrint('🎭 userCharacterDetailsProvider: error - $e');
     return null;
   }
 });
 
+/// リアルタイムsignalCountプロバイダー（性格解析の進捗表示用）
+final signalCountProvider = StreamProvider<int>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return Stream.value(0);
+
+  final firestore = ref.watch(firestoreProvider);
+  return firestore
+      .collection('users')
+      .doc(userId)
+      .collection('personalityMeta')
+      .doc('current')
+      .snapshots()
+      .map((doc) => (doc.data()?['signalCount'] as num?)?.toInt() ?? 0);
+});
+
 /// キャラクター画像URLのプロバイダー
 final characterImageProvider = FutureProvider<String?>((ref) async {
   final details = ref.watch(characterDetailsProvider).valueOrNull;
   if (details == null) return null;
+
+  // BIG5未診断かつシグナル30未満の場合は画像を変更しない
+  if (details.analysisLevel == 0) {
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    if (signalCount < 30) return null;
+  }
 
   // 性別を取得
   final gender = details.gender == '男性'
@@ -258,4 +328,35 @@ final characterImageProvider = FutureProvider<String?>((ref) async {
     debugPrint('❌ 画像URL取得失敗: $e');
     return null;
   }
+});
+
+/// 性格タイプ変化データ
+class TypeChangeData {
+  final String newElement;
+  final String newTypeName;
+  const TypeChangeData({required this.newElement, required this.newTypeName});
+}
+
+/// personalityMeta/current の pendingTypeChangeNotification を監視
+/// true になったら TypeChangeData を emit、false ならnull
+final pendingTypeChangeProvider = StreamProvider<TypeChangeData?>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  if (userId == null) return Stream.value(null);
+
+  return ref.watch(firestoreProvider)
+      .collection('users')
+      .doc(userId)
+      .collection('personalityMeta')
+      .doc('current')
+      .snapshots()
+      .map((doc) {
+        final data = doc.data();
+        if (data == null) return null;
+        final pending = data['pendingTypeChangeNotification'] as bool? ?? false;
+        if (!pending) return null;
+        final newElement = data['newElement'] as String?;
+        final newTypeName = data['newTypeName'] as String?;
+        if (newElement == null || newTypeName == null) return null;
+        return TypeChangeData(newElement: newElement, newTypeName: newTypeName);
+      });
 });

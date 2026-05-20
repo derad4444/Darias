@@ -40,6 +40,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   late String _displayedMessage;
   // ダイアログ表示中フラグ（多重表示防止）
   bool _isShowingDialog = false;
+  bool _isShowingEvolutionDialog = false;
   bool _isPlayingVoice = false;
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
@@ -200,6 +201,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (next != null) {
         ref.read(meetingFollowupConclusionProvider.notifier).state = null;
         _triggerMeetingFollowup(next);
+      }
+    });
+
+    // 性格タイプ変化の監視
+    ref.listen<AsyncValue<TypeChangeData?>>(pendingTypeChangeProvider, (prev, next) {
+      final data = next.valueOrNull;
+      if (data != null && !_isShowingEvolutionDialog) {
+        _isShowingEvolutionDialog = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showEvolutionDialog(data));
       }
     });
 
@@ -689,14 +699,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
   }
 
-  /// signalCount（元素確定: >=30）とセッション内ターン数からフェーズを算出
-  /// signalCount < 30: Phase 1固定（性格データ未確定）
+  /// signalCountとセッション内ターン数からフェーズを算出
+  /// signalCount <  10: Phase 1固定（性格データ未確定）
+  /// signalCount 10-29: Phase 2固定（初回解析済み・完全確定前）
   /// signalCount >= 30: turn1=P1, turn2-4=P2, turn5+=P3
   int _calcPhase(int signalCount, int sessionTurn) {
-    if (signalCount < 30) return 1;
+    if (signalCount < 10) return 1;
+    if (signalCount < 30) return 2;
     if (sessionTurn <= 1) return 1;
     if (sessionTurn <= 4) return 2;
     return 3;
+  }
+
+  Future<void> _showEvolutionDialog(TypeChangeData data) async {
+    final signalCount = ref.read(signalCountProvider).valueOrNull ?? 30;
+    final details = ref.read(characterDetailsProvider).valueOrNull;
+    final gender = details?.gender;
+    final userId = ref.read(currentUserIdProvider);
+
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      pageBuilder: (ctx, anim, secAnim) => _TypeEvolutionDialog(
+        newElement: data.newElement,
+        newTypeName: data.newTypeName,
+        signalCount: signalCount,
+        gender: gender,
+        onConfirm: () async {
+          if (userId != null) {
+            try {
+              await ref.read(firestoreProvider)
+                  .collection('users').doc(userId)
+                  .collection('personalityMeta').doc('current')
+                  .update({'pendingTypeChangeNotification': false});
+            } catch (_) {}
+          }
+        },
+      ),
+    );
+    if (mounted) setState(() => _isShowingEvolutionDialog = false);
   }
 
   void _showMeetingLockedDialog(BuildContext context, int signalCount) {
@@ -1690,6 +1732,222 @@ class _MeetingSuggestionBanner extends StatelessWidget {
             child: Icon(Icons.close, size: 18, color: accentColor.withValues(alpha: 0.6)),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 進化ダイアログ：元素/性格タイプが変化したときに表示
+class _TypeEvolutionDialog extends StatefulWidget {
+  final String newElement;
+  final String newTypeName;
+  final int signalCount;
+  final String? gender;
+  final Future<void> Function() onConfirm;
+
+  const _TypeEvolutionDialog({
+    required this.newElement,
+    required this.newTypeName,
+    required this.signalCount,
+    required this.gender,
+    required this.onConfirm,
+  });
+
+  @override
+  State<_TypeEvolutionDialog> createState() => _TypeEvolutionDialogState();
+}
+
+class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
+    with TickerProviderStateMixin {
+  late final AnimationController _glowController;
+  late final AnimationController _contentController;
+  late final Animation<double> _glowAnim;
+  late final Animation<double> _fadeAnim;
+  late final Animation<double> _scaleAnim;
+
+  static const _elementColors = {
+    '炎': Color(0xFFFF6B35),
+    '風': Color(0xFF64B5F6),
+    '雷': Color(0xFFFFD54F),
+    '光': Color(0xFFFFF9C4),
+    '水': Color(0xFF42A5F5),
+    '土': Color(0xFF8D6E63),
+    '氷': Color(0xFF80DEEA),
+    '闇': Color(0xFFCE93D8),
+    '無': Color(0xFFB0BEC5),
+  };
+
+  static const _elementEmojis = {
+    '炎': '🔥',
+    '風': '💨',
+    '雷': '⚡',
+    '光': '✨',
+    '水': '💧',
+    '土': '🌿',
+    '氷': '❄️',
+    '闇': '🌑',
+    '無': '⭐',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _contentController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+
+    _glowAnim = Tween<double>(begin: 0.4, end: 1.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+    _fadeAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.0, 0.6, curve: Curves.easeOut)),
+    );
+    _scaleAnim = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _contentController, curve: const Interval(0.0, 0.7, curve: Curves.elasticOut)),
+    );
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    _contentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final elementColor = _elementColors[widget.newElement] ?? const Color(0xFFB0BEC5);
+    final elementEmoji = _elementEmojis[widget.newElement] ?? '⭐';
+
+    return Material(
+      color: Colors.transparent,
+      child: Center(
+        child: FadeTransition(
+          opacity: _fadeAnim,
+          child: ScaleTransition(
+            scale: _scaleAnim,
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 32),
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: elementColor, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: elementColor.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    spreadRadius: 4,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    '性格タイプが変わりました',
+                    style: TextStyle(
+                      color: elementColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  AnimatedBuilder(
+                    animation: _glowAnim,
+                    builder: (_, __) => Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: elementColor.withValues(alpha: _glowAnim.value * 0.8),
+                            blurRadius: 32 * _glowAnim.value,
+                            spreadRadius: 8 * _glowAnim.value,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Container(
+                          color: elementColor.withValues(alpha: 0.15),
+                          child: Center(
+                            child: Text(
+                              elementEmoji,
+                              style: const TextStyle(fontSize: 48),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    elementEmoji,
+                    style: const TextStyle(fontSize: 20),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${widget.newElement}属性',
+                    style: TextStyle(
+                      color: elementColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${widget.newTypeName} になりました！',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'あなたの性格がより深く分析されました',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await widget.onConfirm();
+                        if (context.mounted) Navigator.of(context).pop();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: elementColor,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        '確認する',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
