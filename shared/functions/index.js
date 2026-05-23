@@ -125,6 +125,16 @@ Object.defineProperty(exports, "cancelFriendRequest", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "removeFriend", {
+  get: () => require("./const/friendRequest").removeFriend,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "askAboutFriend", {
+  get: () => require("./const/askAboutFriend").askAboutFriend,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "getFriendSchedules", {
   get: () => require("./const/getFriendSchedules").getFriendSchedules,
   enumerable: true,
@@ -132,6 +142,11 @@ Object.defineProperty(exports, "getFriendSchedules", {
 
 Object.defineProperty(exports, "extractFromImage", {
   get: () => require("./const/extractFromImage").extractFromImage,
+  enumerable: true,
+});
+
+Object.defineProperty(exports, "generatePersonalityNarrative", {
+  get: () => require("./const/generatePersonalityNarrative").generatePersonalityNarrative,
   enumerable: true,
 });
 

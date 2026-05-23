@@ -67,7 +67,10 @@ async function fetchCharacterInfo(userId) {
     const detail = detailDoc.data();
     if (!detail) return null;
 
-    const scores = detail["confirmedBig5Scores"];
+    // confirmedBig5Scores は analysis_level > 0 の場合のみ有効（signup時のデフォルト値と区別）
+    // convertedBig5Scores はチャットシグナル10件以上で生成される実測値
+    const analysisLevel = detail["analysis_level"] ?? 0;
+    const scores = (analysisLevel > 0 ? detail["confirmedBig5Scores"] : null) ?? detail["convertedBig5Scores"];
     if (!scores) return null;
 
     const gender = detail["gender"] ?? userData["characterGender"] ?? "女性";
@@ -169,21 +172,45 @@ function calcGenreScores(my, friend) {
 // ============================================================
 async function saveToUserDoc(userId, friendId, category, categoryData, scores) {
   try {
+    const catData = {
+      comment: categoryData.comment,
+      advice: categoryData.advice,
+      conversation: categoryData.conversation,
+      big5Key: categoryData.big5Key,
+      createdAt: categoryData.createdAt ?? new Date(),
+    };
+
+    // 自分のドキュメントに保存
     const docRef = db.collection("users").doc(userId)
         .collection("compatibilityResults").doc(friendId);
-
     await docRef.set(
+        {scores, [category]: catData, unlockedCategories: FieldValue.arrayUnion(category), isStale: false},
+        {merge: true},
+    );
+
+    // フレンドのドキュメントにもミラー保存（isMyCharacterを反転）
+    // → フレンドが自分のドキュメントから結果を閲覧できるようにする
+    const mirroredConversation = (categoryData.conversation ?? []).map((msg) => ({
+      ...msg,
+      isMyCharacter: !msg.isMyCharacter,
+    }));
+    const friendDocRef = db.collection("users").doc(friendId)
+        .collection("compatibilityResults").doc(userId);
+    await friendDocRef.set(
         {
           scores,
-          [category]: {
-            comment: categoryData.comment,
-            advice: categoryData.advice,
-            conversation: categoryData.conversation,
-            big5Key: categoryData.big5Key,
-            createdAt: categoryData.createdAt ?? new Date(),
-          },
+          [category]: {...catData, conversation: mirroredConversation},
           unlockedCategories: FieldValue.arrayUnion(category),
+          isStale: false,
         },
+        {merge: true},
+    );
+
+    // フレンド（friendId）に対して「自分（userId）が診断した」通知を書き込む
+    const notifRef = db.collection("users").doc(friendId)
+        .collection("friendNotifications").doc(userId);
+    await notifRef.set(
+        {type: "compatibility", isRead: false, updatedAt: new Date()},
         {merge: true},
     );
   } catch (e) {
@@ -301,12 +328,11 @@ ${friendSpeech}
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),
             {
-              model: "gpt-4.1-mini",
+              model: "gpt-4o-mini",
               messages: [
                 {role: "system", content: systemPrompt},
                 {role: "user", content: userPrompt},
               ],
-              temperature: 0.75,
               response_format: {type: "json_object"},
             },
         );

@@ -269,7 +269,6 @@ async function generateDiary(characterId, userId) {
   const response = await openai.chat.completions.create({
     model: model,
     messages: [{role: "user", content: prompt}],
-    temperature: 0.8,
     response_format: {type: "json_object"},
   });
 

@@ -28,17 +28,16 @@ class BGMPlayer {
       final isMuted = prefs.getBool('bgmMuted') ?? false;
 
       if (isMuted) {
-        // ミュート状態の場合は音量0
-        await _audioPlayer.setVolume(0);
+        // ミュート中はセッションを占有しないよう再生しない
+        _isInitialized = true;
+        _pendingAssetPath = null;
       } else {
-        // ミュート解除の場合は保存された音量を使用
         final savedVolume = prefs.getDouble('bgmVolume') ?? 0.5;
         await _audioPlayer.setVolume(savedVolume);
+        await _audioPlayer.play();
+        _isInitialized = true;
+        _pendingAssetPath = null;
       }
-
-      await _audioPlayer.play();
-      _isInitialized = true;
-      _pendingAssetPath = null;
       debugPrint('🎵 BGM再生開始: $assetPath');
     } catch (e) {
       // Web自動再生ポリシーによるブロックの場合、ユーザー操作後に再試行するためパスを保持
@@ -76,14 +75,13 @@ class BGMPlayer {
       final isMuted = prefs.getBool('bgmMuted') ?? false;
 
       if (isMuted) {
-        await _audioPlayer.setVolume(0);
+        _isInitialized = true;
       } else {
         final savedVolume = prefs.getDouble('bgmVolume') ?? 0.5;
         await _audioPlayer.setVolume(savedVolume);
+        await _audioPlayer.play();
+        _isInitialized = true;
       }
-
-      await _audioPlayer.play();
-      _isInitialized = true;
       debugPrint('🎵 BGM再生開始（URL）: $url');
     } catch (e) {
       debugPrint('❌ BGM再生失敗: $e');
@@ -102,10 +100,11 @@ class BGMPlayer {
     await prefs.setBool('bgmMuted', muted);
 
     if (muted) {
-      await _audioPlayer.setVolume(0);
+      await _audioPlayer.pause();
     } else {
       final savedVolume = prefs.getDouble('bgmVolume') ?? 0.5;
       await _audioPlayer.setVolume(savedVolume);
+      if (_isInitialized) await _audioPlayer.play();
     }
     debugPrint('🔇 BGMミュート: $muted');
   }

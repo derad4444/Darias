@@ -6,6 +6,40 @@ const {admin} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
+const {calculateAndSaveAxisScores} = require("../src/personality/axisCalculator");
+
+const VALID_TAGS = new Set([
+  'social_reference', 'solo_preference', 'group_activity', 'initiating',
+  'quiet_environment', 'planning_language', 'spontaneous_language', 'goal_oriented',
+  'emotional_expression', 'logical_reasoning', 'intuitive_decision', 'data_driven',
+  'cooperative_language', 'independent_stance', 'change_seeking', 'worry_anxiety',
+]);
+
+// タグ保存 + signalCountインクリメント（トランザクション）→ 新しいカウントを返す
+async function savePersonalitySignal(userId, tags, messageType) {
+  const db = admin.firestore();
+  const metaRef = db.collection('users').doc(userId).collection('personalityMeta').doc('current');
+  const signalRef = db.collection('users').doc(userId).collection('personalitySignals').doc();
+
+  let newCount;
+  await db.runTransaction(async (t) => {
+    const metaDoc = await t.get(metaRef);
+    newCount = ((metaDoc.data() || {}).signalCount || 0) + 1;
+
+    t.set(signalRef, {
+      tags,
+      messageType,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    t.set(metaRef, {
+      signalCount: newCount,
+      lastSignalAt: admin.firestore.FieldValue.serverTimestamp(),
+    }, {merge: true});
+  });
+
+  console.log(`✅ personalitySignal保存: [${tags.join(', ')}] count=${newCount} user=${userId}`);
+  return newCount;
+}
 
 exports.classifyAndExtract = onCall(
     {
@@ -53,7 +87,6 @@ exports.classifyAndExtract = onCall(
             {
               model: "gpt-4o-mini",
               messages: [{role: "user", content: prompt}],
-              temperature: 0,
             },
         );
 
@@ -72,6 +105,21 @@ exports.classifyAndExtract = onCall(
 
         const type = parsed.type;
         console.log("✅ Classified as:", type);
+
+        // 性格シグナルタグをFirestoreに保存（エラーが出てもメインフローに影響させない）
+        const rawTags = Array.isArray(parsed.tags) ? parsed.tags : [];
+        const validatedTags = rawTags.filter(t => VALID_TAGS.has(t)).slice(0, 3);
+        if (validatedTags.length > 0) {
+          try {
+            const newCount = await savePersonalitySignal(request.auth.uid, validatedTags, type);
+            if (newCount % 10 === 0) {
+              console.log(`🔄 軸スコア再計算トリガー: count=${newCount}`);
+              await calculateAndSaveAxisScores(request.auth.uid, newCount);
+            }
+          } catch (e) {
+            console.error('⚠️ personalitySignal処理エラー:', e);
+          }
+        }
 
         if (type === "schedule") {
           const rawSchedules = parsed.schedules;

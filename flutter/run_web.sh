@@ -11,4 +11,5 @@ mkdir -p "$CHROME_PROFILE_DIR"
 # Flutter Webを起動（固定プロファイル使用）
 flutter run -d chrome \
   --web-port=8080 \
-  --web-browser-flag="--user-data-dir=$CHROME_PROFILE_DIR"
+  --web-browser-flag="--user-data-dir=$CHROME_PROFILE_DIR" \
+  --dart-define=WEB_APP_CHECK_DEBUG_TOKEN=6c6674e4-dc43-4eb2-97a9-2dd004888428

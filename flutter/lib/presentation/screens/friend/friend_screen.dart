@@ -15,11 +15,22 @@ import 'friend_share_level_sheet.dart';
 class FriendScreen extends ConsumerWidget {
   const FriendScreen({super.key});
 
+  void _showElementChartSheet(BuildContext context, Color accentColor) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ElementChartSheet(accentColor: accentColor),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final gradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
+    final textColor = ref.watch(colorSettingsProvider).textColor;
     final friendsAsync = ref.watch(friendsProvider);
+    final pendingCount = ref.watch(pendingFriendRequestCountProvider);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -43,19 +54,53 @@ class FriendScreen extends ConsumerWidget {
                       ),
                     ),
                     const Spacer(),
-                    // フレンド検索・申請管理ボタン
+                    // 元素相性表ヘルプボタン
+                    IconButton(
+                      icon: Icon(Icons.help_outline, color: textColor),
+                      tooltip: '元素の相性について',
+                      onPressed: () => _showElementChartSheet(context, accentColor),
+                    ),
+                    const SizedBox(width: 8),
+                    // フレンド検索・申請管理ボタン（申請バッジ付き）
                     GestureDetector(
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const FriendSearchScreen()),
                       ),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: accentColor,
-                        ),
-                        child: const Icon(Icons.person_search, color: Colors.white, size: 22),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: accentColor,
+                            ),
+                            child: const Icon(Icons.person_search, color: Colors.white, size: 22),
+                          ),
+                          if (pendingCount > 0)
+                            Positioned(
+                              top: -4,
+                              right: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                                child: Text(
+                                  pendingCount > 99 ? '99+' : '$pendingCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -108,6 +153,30 @@ class _FriendCard extends ConsumerWidget {
 
   const _FriendCard({required this.friend, required this.accentColor});
 
+  Future<void> _confirmRemoveFriend(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('フレンドを削除'),
+        content: Text(
+          '${friend.name.isNotEmpty ? friend.name : 'このフレンド'}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(friendControllerProvider.notifier).removeFriend(friend.id);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
@@ -117,6 +186,7 @@ class _FriendCard extends ConsumerWidget {
           builder: (_) => CompatibilityScreen(friend: friend),
         ),
       ),
+      onLongPress: () => _confirmRemoveFriend(context, ref),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
@@ -544,6 +614,124 @@ class _RequestCard extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+// ============================================================
+// 元素相性表ボトムシート
+// ============================================================
+class _ElementChartSheet extends ConsumerWidget {
+  final Color accentColor;
+  const _ElementChartSheet({required this.accentColor});
+
+  static const _pairs = [
+    ('炎↔水', '感情で深く繋がる。時にぶつかるほどの熱量'),
+    ('雷↔氷', '同じ直感型。熱量の差が惹かれ合いを生む'),
+    ('光↔闇', '同じ分析型。外向きと内向きで視点が逆'),
+    ('風↔土', '完全対極。自由と安定が刺激し合う'),
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gradient = ref.watch(backgroundGradientProvider);
+    final textColor = ref.watch(colorSettingsProvider).textColor;
+
+    return DraggableScrollableSheet(
+      initialChildSize: 1.0,
+      minChildSize: 0.5,
+      maxChildSize: 1.0,
+      builder: (context, scrollController) => Container(
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          minimum: const EdgeInsets.only(top: 24),
+          child: Column(
+            children: [
+              // ハンドル
+              Container(
+                margin: const EdgeInsets.only(top: 12),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: textColor.withAlpha(60),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              // ヘッダー
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
+                child: Row(
+                  children: [
+                    Text(
+                      '元素と相性について',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: Icon(Icons.close, color: textColor.withAlpha(160)),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: textColor.withAlpha(40)),
+              // コンテンツ
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/element_chart.png',
+                        width: double.infinity,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '双方向矢印の元素同士は特に相性が良い対ペアです。無はすべての元素と一定の相性があります。',
+                      style: TextStyle(fontSize: 13, color: textColor.withAlpha(180), height: 1.5),
+                    ),
+                    const SizedBox(height: 12),
+                    ..._pairs.map((pair) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pair.$1,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: accentColor,
+                            ),
+                          ),
+                          Text(' : ', style: TextStyle(fontSize: 13, color: textColor)),
+                          Expanded(
+                            child: Text(
+                              pair.$2,
+                              style: TextStyle(fontSize: 13, color: textColor, height: 1.4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -6,7 +6,6 @@ import '../../../utils/memo_content_utils.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/calendar_provider.dart';
 import '../../widgets/draggable_fab.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
@@ -409,9 +408,6 @@ class MemoContentView extends ConsumerStatefulWidget {
 
 class MemoContentViewState extends ConsumerState<MemoContentView> {
   final TextEditingController _searchController = TextEditingController();
-
-  String get _selectedTag => ref.read(memoSelectedTagProvider);
-  set _selectedTag(String value) => ref.read(memoSelectedTagProvider.notifier).state = value;
 
   @override
   void dispose() {

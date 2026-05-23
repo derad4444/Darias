@@ -95,6 +95,40 @@ function formatBig5ShortWithTraits(scores) {
 }
 
 /**
+ * 5軸スコアから性格特性テキストを生成（新システム用）
+ * @param {Object} axisScores - 5軸スコア {energy, judgment, relationship, lifestyle, processing}
+ * @param {string|null} element - 元素タイプ（炎・水・風など）
+ * @param {string|null} typeName - タイプ名（場を沸かす炎タイプなど）
+ * @return {string} - 特性を説明した自然な文字列
+ */
+function buildPersonalityTraitsFromAxes(axisScores, element, typeName) {
+  const traits = [];
+  const energy = axisScores.energy ?? 0;
+  const judgment = axisScores.judgment ?? 0;
+  const relationship = axisScores.relationship ?? 0;
+  const lifestyle = axisScores.lifestyle ?? 0;
+  const processing = axisScores.processing ?? 0;
+
+  if (energy > 0.3) traits.push("外向的で人との交流から活力を得る");
+  else if (energy < -0.3) traits.push("内省的で一人の時間を大切にする");
+
+  if (judgment > 0.3) traits.push("論理を重視して物事を判断する");
+  else if (judgment < -0.3) traits.push("感情や直感を重視して判断する");
+
+  if (relationship > 0.3) traits.push("周囲と協力することを大切にする");
+  else if (relationship < -0.3) traits.push("自分の軸を持ち独立心が強い");
+
+  if (lifestyle > 0.3) traits.push("計画的に物事を進める");
+  else if (lifestyle < -0.3) traits.push("自由なペースで柔軟に動く");
+
+  if (processing > 0.3) traits.push("データと根拠をもとに分析的に思考する");
+  else if (processing < -0.3) traits.push("直感やひらめきを大切にする");
+
+  const base = traits.length > 0 ? traits.join("、") : "バランスの取れた柔軟な性格";
+  return typeName ? `${typeName}。${base}` : base;
+}
+
+/**
  * BIG5スコアから性格特性テキストを生成
  * @param {Object} big5 - Big5 scores object
  * @return {string} - 特性を説明した自然な文字列
@@ -142,15 +176,44 @@ const OPTIMIZED_PROMPTS = {
 
   /**
    * Character Reply Generation - GPT-4o-mini optimized
-   * Enhanced for better Japanese conversation flow with detailed Big5
+   * phase 1: 120文字, 受け止め+読み+質問（性格反映なし or 会話入口）
+   * phase 2: 150文字, 受け止め+性格仮説+質問（あたってるかも体験）
+   * phase 3: 220文字, 受け止め+性格言語化+質問任意（なるほど体験）
    */
-  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext) => {
-    const traits = buildPersonalityTraits(big5);
+  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1) => {
+    const traits = traitsOverride || buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
     const meeting = meetingContext
       ? `【過去の自分会議】${meetingContext}\n（会話に関連する場合はこの文脈を踏まえてください）`
       : "";
+
+    let instruction;
+    if (phase === 2) {
+      instruction = `以下の順序で150文字以内で返答してください：
+① ユーザーの言葉を1文で受け止める
+② 性格特性を踏まえた"仮説"を返す：「〜な面が出てる気がする」「あなたらしい選択だと思う」など（1〜2文）
+   ※正解ではなく仮説として提示する。ズレていれば訂正させてよい
+③ 仮説を確認するか深掘りする問いを1つ（任意：会話の流れ上ぎこちなくなるなら省いてよい）
+
+「あたってるかも？」と感じてもらえるような性格の洞察を心がける。質問することが目的ではなく、洞察を届けることが目的。`;
+    } else if (phase === 3) {
+      instruction = `以下の順序で220文字以内で返答してください：
+① ユーザーの言葉を受け止め、感じたことを1文で返す
+② 性格特性に基づく深い洞察を2〜3文で：「〜という傾向があるから〜と感じるのは自然」「〜タイプはこういう場面でこう動きやすい」など
+   ※性格タイプ名（炎タイプ等）を自然に使ってよい。ラベルを貼るのでなく"なぜそう感じるのか"を説明する
+③ 自己理解を深める問いを1つ（任意：洞察で会話が完結するなら省いてよい）
+
+"なるほど、自分ってそういう人間なんだ"と納得させることを目指す。質問することが目的ではなく、気づきを届けることが目的。`;
+    } else {
+      instruction = `以下の順序で120文字以内で返答してください：
+① ユーザーの言葉を1文で受け止める（共感・肯定）
+② あなたが読み取ったことを返す：「〜ってことかな」「〜が気になってるのかも」など（1文）
+   ※答えを教えるのではなく、あなたの"読み"を提示する。ズレていれば訂正させてよい
+③ 本音を引き出す問いを1つ（任意：会話の流れ上ぎこちなくなるなら省いてよい）
+
+質問することが目的ではなく、ユーザー自身が気づくよう促すことが目的。`;
+    }
 
     return `あなたはユーザーの「もう一人の自分」として、自己探求をサポートします。
 性格特性: ${traits}
@@ -158,13 +221,11 @@ const OPTIMIZED_PROMPTS = {
 ${dream}
 ${meeting}
 
-以下の順序で120文字以内で返答してください：
-① ユーザーの言葉を1文で受け止める（共感・肯定）
-② あなたが読み取ったことを返す：「〜ってことかな」「〜が気になってるのかも」など（1文）
-   ※答えを教えるのではなく、あなたの"読み"を提示する。ズレていれば訂正させてよい
-③ そこから本音を引き出す問いを1つだけ投げる
+【最優先ルール】
+- ユーザーが「〜ってこと？」「〜なの？」「なんで？」「どういうこと？」など疑問形で返してきた場合は、まずその質問に直接答える。下記の①②③の構造より質問への応答を最優先する。
+- ユーザーがすでに答えた内容（「〜です」「〜かな」「〜だと思う」と明言したこと）を改めて同じ質問で聞き返さない。
 
-質問は1つ。答えを与えず、ユーザー自身が気づくよう促す。`;
+${instruction}`;
   },
 
   /**
@@ -303,25 +364,37 @@ JSONのみ出力。`;
 ## 出力形式（JSONのみ。説明不要）
 
 scheduleの場合:
-{"type":"schedule","schedules":[{"title":"行動内容","isAllDay":bool,"startDate":"ISO+09:00","endDate":"ISO+09:00","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}]}
+{"type":"schedule","tags":[],"schedules":[{"title":"行動内容","isAllDay":bool,"startDate":"ISO+09:00","endDate":"ISO+09:00","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}]}
 
 時間なし→00:00-23:59,isAllDay:true / 時間あり→1h継続,isAllDay:false
 startDate/endDateは必ずタイムゾーン+09:00を付けること(例:2025-04-10T00:00:00+09:00)
-予定が0件の場合: {"type":"chat","schedules":[]}
+予定が0件の場合: {"type":"chat","tags":[],"schedules":[]}
 
 memoの場合（複数可）:
-{"type":"memo","items":["メモ内容1","メモ内容2"]}
+{"type":"memo","tags":[],"items":["メモ内容1","メモ内容2"]}
 キーワード（メモして等）は除去してコンテンツのみ抽出
 
 taskの場合（複数可）:
-{"type":"task","items":["タスク内容1","タスク内容2"]}
+{"type":"task","tags":[],"items":["タスク内容1","タスク内容2"]}
 キーワード（タスクに追加等）は除去してコンテンツのみ抽出
 
 app_qaの場合:
-{"type":"app_qa"}
+{"type":"app_qa","tags":[]}
 
 chatの場合:
-{"type":"chat"}
+{"type":"chat","tags":["該当タグ"]}
+
+## 性格シグナルタグ
+上記分類に加え、発言から読み取れる性格の傾向を0〜3個のタグで付与すること。
+
+使用可能なタグ:
+social_reference/solo_preference/group_activity/initiating/quiet_environment/
+planning_language/spontaneous_language/goal_oriented/emotional_expression/
+logical_reasoning/intuitive_decision/data_driven/cooperative_language/
+independent_stance/change_seeking/worry_anxiety
+
+タグなし例:{"type":"chat","tags":[]}
+タグあり例:{"type":"chat","tags":["emotional_expression","social_reference"]}
 
 JSONのみ出力。`;
   },
@@ -346,4 +419,5 @@ module.exports = {
   formatBig5ShortWithTraits,
   getGenderCode,
   buildPersonalityTraits,
+  buildPersonalityTraitsFromAxes,
 };

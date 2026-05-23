@@ -190,7 +190,7 @@ class NotificationService {
   // ────────────────────────────────────────
 
   Future<void> scheduleForSchedule(ScheduleModel schedule) async {
-    if (schedule.remindValue <= 0 || schedule.remindUnit.isEmpty) return;
+    if (schedule.remindUnit.isEmpty) return;
 
     final notifyAt = _calcNotifyTime(schedule);
     if (notifyAt == null || notifyAt.isBefore(DateTime.now())) return;
@@ -286,6 +286,7 @@ class NotificationService {
   }
 
   String _remindLabel(int value, String unit) {
+    if (value == 0) return '時間通り';
     switch (unit) {
       case 'minutes':
         return '$value分前';

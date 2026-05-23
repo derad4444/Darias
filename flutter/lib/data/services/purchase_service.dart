@@ -20,6 +20,7 @@ class PurchaseService {
 
   // 状態
   bool _isAvailable = false;
+  bool _isRestoring = false;
   List<ProductDetails> _products = [];
   List<PurchaseDetails> _purchases = [];
   StreamSubscription<List<PurchaseDetails>>? _subscription;
@@ -171,9 +172,11 @@ class PurchaseService {
     }
 
     try {
+      _isRestoring = true;
       await _inAppPurchase.restorePurchases();
       print('✅ PurchaseService: Restore initiated');
     } catch (e) {
+      _isRestoring = false;
       print('❌ PurchaseService: Restore failed - $e');
       onError?.call('購入の復元に失敗しました');
     }
@@ -192,9 +195,20 @@ class PurchaseService {
           break;
 
         case PurchaseStatus.purchased:
-        case PurchaseStatus.restored:
-          print('✅ PurchaseService: Purchase successful or restored');
+          print('✅ PurchaseService: Purchase successful');
           await _handleSuccessfulPurchase(purchase);
+          break;
+
+        case PurchaseStatus.restored:
+          if (_isRestoring) {
+            print('✅ PurchaseService: Purchase restored (user-initiated)');
+            await _handleSuccessfulPurchase(purchase);
+          } else {
+            // アプリ起動時にiOSが自動配信するトランザクション
+            // 別アカウントへのプレミアム引き継ぎを防ぐためFirestore更新はしない
+            print('⚠️ PurchaseService: Auto-restored transaction on startup, skipping Firestore update');
+          }
+          _isRestoring = false;
           break;
 
         case PurchaseStatus.error:
@@ -225,56 +239,49 @@ class PurchaseService {
     print('🛒 PurchaseService: Processing successful purchase...');
 
     try {
-      // 支払い方法を判定
       final paymentMethod = Platform.isIOS
           ? PaymentMethod.appStore
           : PaymentMethod.googlePlay;
 
-      // Firestoreを更新
-      await _datasource.updateSubscription(
-        isPremium: true,
-        paymentMethod: paymentMethod,
-        autoRenewal: true,
-      );
+      // レシート検証を先に実行（Cloud FunctionがFirestoreをend_date含め正確に更新）
+      bool receiptValidated = false;
+      try {
+        print('🛒 PurchaseService: Validating receipt...');
+        final functionName = Platform.isIOS
+            ? 'validateAppStoreReceipt'
+            : 'validateGooglePlayReceipt';
+        final callable = _functions.httpsCallable(functionName);
+        final result = await callable.call({
+          'receiptData': purchase.verificationData.serverVerificationData,
+          'transactionId': purchase.purchaseID,
+          'productId': purchase.productID,
+        });
+        final data = result.data as Map<String, dynamic>?;
+        if (data?['success'] == true) {
+          print('✅ PurchaseService: Receipt validated');
+          receiptValidated = true;
+        } else {
+          print('⚠️ PurchaseService: Receipt validation returned: $data');
+        }
+      } catch (e) {
+        print('⚠️ PurchaseService: Receipt validation failed - $e');
+      }
 
-      // レシート検証（Firebase Functions）
-      await _validateReceipt(purchase);
+      // レシート検証が失敗した場合のみローカルでFirestoreをフォールバック更新
+      // （end_dateなしのため、checkSubscriptionStatusによる自動期限切れ処理は機能しない）
+      if (!receiptValidated) {
+        await _datasource.updateSubscription(
+          isPremium: true,
+          paymentMethod: paymentMethod,
+          autoRenewal: true,
+        );
+      }
 
-      // コールバック
       onPurchaseSuccess?.call();
-
       print('✅ PurchaseService: Purchase processed successfully');
     } catch (e) {
       print('❌ PurchaseService: Failed to process purchase - $e');
       onError?.call('購入の処理に失敗しました');
-    }
-  }
-
-  /// レシート検証
-  Future<void> _validateReceipt(PurchaseDetails purchase) async {
-    print('🛒 PurchaseService: Validating receipt...');
-
-    try {
-      final functionName = Platform.isIOS
-          ? 'validateAppStoreReceipt'
-          : 'validateGooglePlayReceipt';
-
-      final callable = _functions.httpsCallable(functionName);
-      final result = await callable.call({
-        'receiptData': purchase.verificationData.serverVerificationData,
-        'transactionId': purchase.purchaseID,
-        'productId': purchase.productID,
-      });
-
-      final data = result.data as Map<String, dynamic>?;
-      if (data?['success'] == true) {
-        print('✅ PurchaseService: Receipt validated');
-      } else {
-        print('⚠️ PurchaseService: Receipt validation returned: $data');
-      }
-    } catch (e) {
-      print('⚠️ PurchaseService: Receipt validation failed - $e');
-      // レシート検証の失敗は購入自体には影響させない
     }
   }
 

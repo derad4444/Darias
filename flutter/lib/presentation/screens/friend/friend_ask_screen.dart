@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../data/models/friend_model.dart';
 import '../../../data/services/ask_friend_limit_manager.dart';
 import '../../providers/auth_provider.dart';
@@ -58,6 +59,14 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
 
     // プレミアム判定と無料利用制限チェック
     final isPremium = ref.read(effectiveIsPremiumProvider);
+
+    // Web版の無料ユーザーは利用不可（広告非対応）
+    if (kIsWeb && !isPremium) {
+      _showWebFreeDialog();
+      return;
+    }
+
+    // アプリ版（iOS/Android）の無料ユーザーは1日1回制限
     if (!isPremium && !kIsWeb) {
       final canFree = await _limitManager.canUseFree();
       if (!canFree) {
@@ -107,6 +116,44 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
     });
 
     _startMessageAnimation(result.conversation);
+  }
+
+  /// Web版無料ユーザー向けブロックダイアログ
+  void _showWebFreeDialog() {
+    if (!mounted) return;
+    final accentColor = ref.read(accentColorProvider);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('📱 アプリ版限定機能', textAlign: TextAlign.center),
+        content: const Text(
+          'この機能はアプリ版の無料プランではご利用いただけません。\n\n'
+          'iOSアプリをダウンロードして使うか、プレミアムプランに\n'
+          'アップグレードしてご利用ください。',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 13, height: 1.6),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('閉じる'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              // プレミアム画面へ遷移
+              context.push('/premium');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+            child: const Text(
+              'プレミアムへ',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// リワード広告ダイアログを表示し、視聴成功なら true を返す

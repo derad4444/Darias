@@ -291,7 +291,6 @@ exports.answerAppQuestion = onCall(
                 {role: "system", content: systemPrompt},
                 {role: "user", content: trimmedMessage},
               ],
-              temperature: 0.7,
             },
         );
 

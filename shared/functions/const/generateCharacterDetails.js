@@ -26,7 +26,8 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
     }
 
     const data = charSnap.data();
-    const big5Scores = data.confirmedBig5Scores || data.big5Scores;
+    // convertedBig5Scores（新軸スコアから変換）を優先、なければ旧システムのスコアを使用
+    const big5Scores = data.convertedBig5Scores || data.confirmedBig5Scores || data.big5Scores;
     const gender = data.gender || "neutral";
 
     // ユーザーのサブスクリプション状態を取得
@@ -57,7 +58,6 @@ async function generateCharacterDetails(characterId, userId, apiKey) {
     const res = await openai.chat.completions.create({
       model: model,
       messages: [{role: "user", content: prompt}],
-      temperature: 0.7,
     });
 
     // もしマークダウン記法が付いていたら除去する

@@ -70,7 +70,6 @@ JSON形式で出力してください。各項目は簡潔に。
           content: prompt,
         },
       ],
-      temperature: 0.7,
       response_format: {type: "json_object"},
     });
 

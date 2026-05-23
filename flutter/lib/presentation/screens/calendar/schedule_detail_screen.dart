@@ -17,7 +17,6 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../widgets/image_scan_button.dart';
 import '../../../data/services/ad_service.dart';
 import '../settings/tag_management_screen.dart';
-import 'repeat_settings_screen.dart';
 
 /// 繰り返し予定の編集モード
 enum RecurringEditMode { single, all }
@@ -893,9 +892,8 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
   }
 
   String _getNotificationLabel() {
-    if (_remindValue <= 0 || _remindUnit.isEmpty) {
-      return 'なし';
-    }
+    if (_remindUnit.isEmpty) return 'なし';
+    if (_remindValue == 0) return '時間通り';
     switch (_remindUnit) {
       case 'minutes':
         return '$_remindValue分前';
@@ -1374,22 +1372,30 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
   late int _value;
   late String _unit;
   late bool _isEnabled;
-  late TextEditingController _valueController;
 
-  static const int _maxValue = 999;
+  int _sliderMaxFor(String unit) {
+    switch (unit) {
+      case 'minutes': return 120;
+      case 'hours': return 24;
+      case 'days': return 30;
+      default: return 120;
+    }
+  }
+
+  int get _sliderMax => _sliderMaxFor(_unit);
 
   @override
   void initState() {
     super.initState();
-    _value = widget.remindValue > 0 ? widget.remindValue : 10;
     _unit = widget.remindUnit.isNotEmpty ? widget.remindUnit : 'minutes';
-    _isEnabled = widget.remindValue > 0 && widget.remindUnit.isNotEmpty;
-    _valueController = TextEditingController(text: '$_value');
+    _isEnabled = widget.remindUnit.isNotEmpty;
+    _value = widget.remindUnit.isNotEmpty
+        ? widget.remindValue.clamp(0, _sliderMaxFor(widget.remindUnit.isNotEmpty ? widget.remindUnit : 'minutes'))
+        : 10;
   }
 
   @override
   void dispose() {
-    _valueController.dispose();
     super.dispose();
   }
 
@@ -1473,97 +1479,36 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
           ),
 
           if (_isEnabled) ...[
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          // -/値/+ コントロール
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // マイナスボタン
-                _buildStepperButton(
-                  icon: Icons.remove,
-                  onTap: _value > 1
-                      ? () => setState(() {
-                          _value--;
-                          _valueController.text = '$_value';
-                        })
-                      : null,
-                  accentColor: widget.accentColor,
+          // ドラムロール式ホイールピッカー
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _TimeWheelPicker(
+                value: _value,
+                maxValue: _sliderMax,
+                textColor: widget.textColor,
+                accentColor: widget.accentColor,
+                onChanged: (v) => setState(() => _value = v),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _value == 0
+                    ? '時間通り'
+                    : _unit == 'minutes' ? '分前'
+                    : _unit == 'hours' ? '時間前'
+                    : '日前',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                  color: widget.textColor,
                 ),
-                // 値入力（自由入力 + +/-ボタン）
-                Container(
-                  width: 80,
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: TextField(
-                    controller: _valueController,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: widget.textColor,
-                    ),
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                      counterText: '',
-                    ),
-                    maxLength: 3,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                    ],
-                    onChanged: (text) {
-                      final parsed = int.tryParse(text);
-                      if (parsed != null && parsed >= 1 && parsed <= _maxValue) {
-                        setState(() => _value = parsed);
-                      } else if (text.isEmpty) {
-                        // 空の場合はそのまま（フォーカスアウト時に補正）
-                      } else if (parsed != null && parsed > _maxValue) {
-                        setState(() {
-                          _value = _maxValue;
-                          _valueController.text = '$_maxValue';
-                          _valueController.selection = TextSelection.collapsed(offset: '$_maxValue'.length);
-                        });
-                      }
-                    },
-                    onSubmitted: (_) {
-                      if (_valueController.text.isEmpty || int.tryParse(_valueController.text) == null) {
-                        setState(() {
-                          _valueController.text = '$_value';
-                        });
-                      }
-                    },
-                    onTapOutside: (_) {
-                      if (_valueController.text.isEmpty || int.tryParse(_valueController.text) == null) {
-                        setState(() {
-                          _valueController.text = '$_value';
-                        });
-                      }
-                    },
-                  ),
-                ),
-                // プラスボタン
-                _buildStepperButton(
-                  icon: Icons.add,
-                  onTap: _value < _maxValue
-                      ? () => setState(() {
-                          _value++;
-                          _valueController.text = '$_value';
-                        })
-                      : null,
-                  accentColor: widget.accentColor,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
           // 分・時間・日のピルボタン
           Padding(
@@ -1579,33 +1524,38 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
             ),
           ),
 
+          const SizedBox(height: 12),
+
+          // 時間通りショートカットボタン
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: GestureDetector(
+              onTap: () => setState(() => _value = 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: _value == 0
+                      ? widget.accentColor
+                      : Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  '時間通りに通知',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: _value == 0 ? Colors.white : widget.textColor,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
           const SizedBox(height: 30),
           ], // if (_isEnabled)
         ],
-      ),
-    );
-  }
-
-  Widget _buildStepperButton({
-    required IconData icon,
-    required VoidCallback? onTap,
-    required Color accentColor,
-  }) {
-    final isDisabled = onTap == null;
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: isDisabled ? Colors.white.withOpacity(0.2) : accentColor.withOpacity(0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          icon,
-          color: isDisabled ? Colors.grey[400] : accentColor,
-          size: 24,
-        ),
       ),
     );
   }
@@ -1617,6 +1567,7 @@ class _NotificationPickerSheetState extends State<_NotificationPickerSheet> {
         onTap: () {
           setState(() {
             _unit = unitValue;
+            _value = _value.clamp(0, _sliderMaxFor(unitValue));
           });
         },
         child: Container(
@@ -1773,7 +1724,11 @@ class _TimeWheelPickerState extends State<_TimeWheelPicker> {
               diameterRatio: 1.5,
               perspective: 0.003,
               onSelectedItemChanged: (index) {
-                widget.onChanged(index);
+                if (index != widget.value) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    widget.onChanged(index);
+                  });
+                }
               },
               childDelegate: ListWheelChildBuilderDelegate(
                 childCount: widget.maxValue + 1,

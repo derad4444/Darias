@@ -9,6 +9,9 @@ import 'subscription_provider.dart';
 /// 会議後フォローアップの結論を一時保持するプロバイダー（案1）
 final meetingFollowupConclusionProvider = StateProvider<String?>((ref) => null);
 
+/// セッション内チャットターン数（アプリ起動ごとにリセット、性格リセット時も0に戻す）
+final sessionChatCountProvider = StateProvider<int>((ref) => 0);
+
 /// ChatDatasourceのプロバイダー
 final chatDatasourceProvider = Provider<ChatDatasource>((ref) {
   return ChatDatasource(
@@ -37,10 +40,25 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
 
   ChatController(this._datasource, this._ref) : super(const AsyncValue.data(null));
 
+  /// 起動時オープナーをFirestoreに保存
+  Future<void> saveOpener({
+    required String characterId,
+    required String openerText,
+  }) async {
+    final userId = _ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    await _datasource.saveOpenerPost(
+      userId: userId,
+      characterId: characterId,
+      openerText: openerText,
+    );
+  }
+
   /// メッセージを送信し、検出結果を返す（保存は呼び出し元が確認後に行う）
   Future<SendMessageResult?> sendMessage({
     required String characterId,
     required String message,
+    int phase = 1,
   }) async {
     final userId = _ref.read(currentUserIdProvider);
     if (userId == null) return null;
@@ -53,6 +71,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
         characterId: characterId,
         message: message,
         isPremium: _ref.read(effectiveIsPremiumProvider),
+        phase: phase,
       );
 
       state = const AsyncValue.data(null);

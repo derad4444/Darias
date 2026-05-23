@@ -69,7 +69,36 @@ exports.deleteUserAccount = onCall(
     console.error(`deleteUserAccount: Error processing subscription for userId=${userId}:`, subscriptionError.message);
   }
 
-  // 3. Firestore の全データを再帰削除（サブコレクションを含む）
+  // 3. フレンドリストから自分のエントリーを削除（フレンドの一覧に残り続けないよう）
+  try {
+    const userRef = db.collection('users').doc(userId);
+
+    // 承認済みフレンド: 各フレンドの friends/{userId} を削除
+    const friendsSnap = await userRef.collection('friends').get();
+    const friendCleanupOps = friendsSnap.docs.map((doc) =>
+      db.collection('users').doc(doc.id).collection('friends').doc(userId).delete(),
+    );
+
+    // 送信済み申請: 相手の incomingRequests/{userId} を削除
+    const outgoingSnap = await userRef.collection('outgoingRequests').get();
+    const outgoingCleanupOps = outgoingSnap.docs.map((doc) =>
+      db.collection('users').doc(doc.id).collection('incomingRequests').doc(userId).delete(),
+    );
+
+    // 受信済み申請: 相手の outgoingRequests/{userId} を削除
+    const incomingSnap = await userRef.collection('incomingRequests').get();
+    const incomingCleanupOps = incomingSnap.docs.map((doc) =>
+      db.collection('users').doc(doc.id).collection('outgoingRequests').doc(userId).delete(),
+    );
+
+    await Promise.all([...friendCleanupOps, ...outgoingCleanupOps, ...incomingCleanupOps]);
+    console.log(`deleteUserAccount: friend references cleaned up for userId=${userId} (friends=${friendsSnap.size}, outgoing=${outgoingSnap.size}, incoming=${incomingSnap.size})`);
+  } catch (friendCleanupError) {
+    // クリーンアップ失敗はログに記録するがアカウント削除は続行
+    console.error(`deleteUserAccount: Failed to clean up friend references for userId=${userId}:`, friendCleanupError.message);
+  }
+
+  // 4. Firestore の全データを再帰削除（サブコレクションを含む）
   try {
     const userRef = db.collection('users').doc(userId);
     await db.recursiveDelete(userRef);

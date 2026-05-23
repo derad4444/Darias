@@ -153,12 +153,11 @@ ${friendSpeech}
         const completion = await safeOpenAICall(
             openai.chat.completions.create.bind(openai.chat.completions),
             {
-              model: "gpt-4.1-mini",
+              model: "gpt-4o-mini",
               messages: [
                 {role: "system", content: systemPrompt},
                 {role: "user", content: userPrompt},
               ],
-              temperature: 0.8,
               response_format: {type: "json_object"},
             },
         );

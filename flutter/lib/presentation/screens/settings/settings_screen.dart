@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
@@ -248,7 +247,7 @@ class SettingsScreen extends ConsumerWidget {
 
       try {
         await ref
-            .read(big5DiagnosisControllerProvider.notifier)
+            .read(diagnosisResetControllerProvider.notifier)
             .resetDiagnosis(characterId);
 
         if (context.mounted) {
@@ -672,14 +671,12 @@ class _SettingsCard extends StatelessWidget {
   final String subtitle;
   final VoidCallback onTap;
   final IconData? icon;
-  final Color? iconColor;
 
   const _SettingsCard({
     required this.title,
     required this.subtitle,
     required this.onTap,
     this.icon,
-    this.iconColor,
   });
 
   @override
@@ -700,7 +697,7 @@ class _SettingsCard extends StatelessWidget {
           child: Row(
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 20, color: iconColor ?? AppColors.textSecondary),
+                Icon(icon, size: 20, color: AppColors.textSecondary),
                 const SizedBox(width: 12),
               ],
               Expanded(

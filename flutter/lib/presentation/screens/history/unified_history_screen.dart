@@ -228,14 +228,14 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
                 );
               }
 
-              // 日付でグループ化
+              // 日付でグループ化（キーはISO形式 YYYY-MM-DD でソート可能に）
               final groupedMessages = <String, List<PostModel>>{};
               for (final message in filteredMessages) {
                 final dateKey = _formatDateKey(message.timestamp);
                 groupedMessages.putIfAbsent(dateKey, () => []).add(message);
               }
 
-              // 日付を新しい順にソート（reverse表示のため）
+              // 日付を新しい順にソート（ISO形式なので文字列比較が正しく機能する）
               final sortedKeys = groupedMessages.keys.toList()..sort((a, b) => b.compareTo(a));
 
               return ListView.builder(
@@ -257,12 +257,13 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
                       ),
                       // メッセージバブル（古い順 → Column下部が最新 = 画面下部に最新）
                       ...dateMessages.expand((message) => [
-                        _ChatBubble(
-                          content: message.content,
-                          isUser: true,
-                          timestamp: message.timestamp,
-                          accentColor: widget.accentColor,
-                        ),
+                        if (message.content.isNotEmpty)
+                          _ChatBubble(
+                            content: message.content,
+                            isUser: true,
+                            timestamp: message.timestamp,
+                            accentColor: widget.accentColor,
+                          ),
                         if (message.analysisResult.isNotEmpty)
                           _ChatBubble(
                             content: message.analysisResult,
@@ -287,16 +288,26 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
     );
   }
 
+  // ソート可能なISO形式（YYYY-MM-DD）で返す
   String _formatDateKey(DateTime date) {
-    return '${date.year}年${date.month}月${date.day}日';
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$m-$d';
   }
 }
 
 /// チャット日付ヘッダー（iOS版DateHeaderViewと同じデザイン）
 class _ChatDateHeader extends StatelessWidget {
+  /// ISO形式（YYYY-MM-DD）のソートキーを受け取り、日本語で表示する
   final String dateKey;
 
   const _ChatDateHeader({required this.dateKey});
+
+  String get _displayText {
+    final parts = dateKey.split('-');
+    if (parts.length != 3) return dateKey;
+    return '${parts[0]}年${int.parse(parts[1])}月${int.parse(parts[2])}日';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -317,7 +328,7 @@ class _ChatDateHeader extends StatelessWidget {
             border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
           ),
           child: Text(
-            dateKey,
+            _displayText,
             style: const TextStyle(
               fontSize: 12,
               color: Colors.grey,

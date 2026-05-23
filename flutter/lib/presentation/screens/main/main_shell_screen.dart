@@ -115,7 +115,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final selectedTab = ref.watch(selectedTabProvider);
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
-    final pendingFriendCount = ref.watch(pendingFriendRequestCountProvider);
+    final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
     final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
 
     // アプリアイコンバッジ更新（iOS only）

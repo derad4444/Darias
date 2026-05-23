@@ -117,7 +117,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     _openerLoadedDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final schedules = ref.read(allSchedulesProvider).valueOrNull ?? [];
     final todos = ref.read(todosProvider).valueOrNull ?? [];
-    final opener = await computeChatOpener(allSchedules: schedules, allTodos: todos);
+    final userId = ref.read(currentUserIdProvider) ?? '';
+    final opener = await computeChatOpener(allSchedules: schedules, allTodos: todos, userId: userId);
     if (mounted) {
       setState(() {
         _displayedMessage = opener.text;
@@ -186,7 +187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _isWaitingForReply = false;
           _isCharacterReply = true;
         });
-        if (result != null) saveLastQuestion(result.reply);
+        if (result != null) saveLastQuestion(result.reply, ref.read(currentUserIdProvider) ?? '');
       }
     } catch (e, st) {
       debugPrint('❌ _triggerMeetingFollowup error: $e\n$st');
@@ -503,7 +504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           final isMeetingUnlocked = (ref.read(signalCountProvider).valueOrNull ?? 0) >= 30;
           _showMeetingBanner = (result?.meetingSuggested ?? false) && isMeetingUnlocked;
         });
-        if (result != null) saveLastQuestion(result.reply);
+        if (result != null) saveLastQuestion(result.reply, ref.read(currentUserIdProvider) ?? '');
       }
       if (mounted && result != null && !_isShowingDialog) {
         if (result.scheduleDetected || result.memoDetected || result.todoDetected) {

@@ -1,12 +1,11 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/services/firebase_image_service.dart' as firebase_image;
+import '../providers/auth_provider.dart';
 import '../providers/character_provider.dart';
+import 'character/element_effect_widget.dart' show characterGrowthAssetPath;
 
-/// キャラクター画像の上半分を丸く切り抜いて表示するアバターウィジェット
+/// キャラクターの成長段階画像を丸く切り抜いて表示するアバターウィジェット
 class CharacterAvatarWidget extends ConsumerWidget {
   final String userId;
   final double size;
@@ -25,8 +24,38 @@ class CharacterAvatarWidget extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final detailsAsync = ref.watch(userCharacterDetailsProvider(userId));
+    final currentUserId = ref.watch(currentUserIdProvider);
 
+    // 自分のアバター: signalCount をリアルタイム取得
+    if (userId == currentUserId) {
+      final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+      final detailsAsync = ref.watch(characterDetailsProvider);
+      return detailsAsync.when(
+        loading: () => _FallbackAvatar(
+          size: size,
+          text: fallbackText,
+          backgroundColor: fallbackBackgroundColor,
+          textColor: fallbackTextColor,
+        ),
+        error: (_, __) => _FallbackAvatar(
+          size: size,
+          text: fallbackText,
+          backgroundColor: fallbackBackgroundColor,
+          textColor: fallbackTextColor,
+        ),
+        data: (details) {
+          final assetPath = characterGrowthAssetPath(
+            signalCount: signalCount,
+            element: details?.element,
+            gender: details?.gender,
+          );
+          return _GrowthAvatarClip(assetPath: assetPath, size: size);
+        },
+      );
+    }
+
+    // フレンドなど他ユーザーのアバター: element の有無で赤ちゃん or 幼少期
+    final detailsAsync = ref.watch(userCharacterDetailsProvider(userId));
     return detailsAsync.when(
       loading: () => _FallbackAvatar(
         size: size,
@@ -34,145 +63,57 @@ class CharacterAvatarWidget extends ConsumerWidget {
         backgroundColor: fallbackBackgroundColor,
         textColor: fallbackTextColor,
       ),
-      error: (e, st) => _FallbackAvatar(
+      error: (_, __) => _FallbackAvatar(
         size: size,
         text: fallbackText,
         backgroundColor: fallbackBackgroundColor,
         textColor: fallbackTextColor,
       ),
       data: (details) {
-        // キャラクター未設定 or 診断未完了: デフォルト画像を表示
-        if (details == null || details.personalityImageFileName == null) {
-          final defaultPath = (details?.gender == '男性')
-              ? 'assets/images/android_male.png'
-              : 'assets/images/android_female.png';
-          return ClipOval(
-            child: SizedBox(
-              width: size,
-              height: size,
-              child: OverflowBox(
-                maxHeight: size * 2,
-                alignment: Alignment.topCenter,
-                child: Image.asset(
-                  defaultPath,
-                  width: size,
-                  height: size * 2,
-                  fit: BoxFit.fitWidth,
-                  alignment: Alignment.topCenter,
-                ),
-              ),
-            ),
-          );
-        }
-
-        final gender = details.gender == '男性'
-            ? firebase_image.CharacterGender.male
-            : firebase_image.CharacterGender.female;
-
-        return _CharacterImageAvatar(
-          fileName: details.personalityImageFileName!,
-          gender: gender,
-          size: size,
-          fallbackText: fallbackText,
-          fallbackBackgroundColor: fallbackBackgroundColor,
-          fallbackTextColor: fallbackTextColor,
+        // growthStage が未設定(0)でも element があれば幼少期以上として扱う
+        int stage = details?.growthStage ?? 0;
+        if (stage == 0 && details?.element != null) stage = 1;
+        final stageSignalCount = stage >= 2 ? 100 : stage >= 1 ? 30 : 0;
+        final assetPath = characterGrowthAssetPath(
+          signalCount: stageSignalCount,
+          element: details?.element,
+          gender: details?.gender,
         );
+        return _GrowthAvatarClip(assetPath: assetPath, size: size);
       },
     );
   }
 }
 
-/// Firebaseから画像を取得して上半分を丸く表示
-class _CharacterImageAvatar extends StatefulWidget {
-  final String fileName;
-  final firebase_image.CharacterGender gender;
+/// 成長ステージ画像を顔中心で円形クリップして表示
+/// 1.8倍ズーム＋上部中心で顔〜胸付近を表示
+class _GrowthAvatarClip extends StatelessWidget {
+  final String assetPath;
   final double size;
-  final String fallbackText;
-  final Color fallbackBackgroundColor;
-  final Color fallbackTextColor;
 
-  const _CharacterImageAvatar({
-    required this.fileName,
-    required this.gender,
-    required this.size,
-    required this.fallbackText,
-    required this.fallbackBackgroundColor,
-    required this.fallbackTextColor,
-  });
-
-  @override
-  State<_CharacterImageAvatar> createState() => _CharacterImageAvatarState();
-}
-
-class _CharacterImageAvatarState extends State<_CharacterImageAvatar> {
-  Uint8List? _imageData;
-  bool _loading = true;
-  bool _failed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadImage();
-  }
-
-  Future<void> _loadImage() async {
-    try {
-      final data = await firebase_image.FirebaseImageService.shared.fetchImage(
-        fileName: widget.fileName,
-        gender: widget.gender,
-      );
-      if (mounted) {
-        setState(() {
-          _imageData = data;
-          _loading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _failed = true;
-          _loading = false;
-        });
-      }
-    }
-  }
+  const _GrowthAvatarClip({required this.assetPath, required this.size});
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return SizedBox(
-        width: widget.size,
-        height: widget.size,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: widget.fallbackBackgroundColor,
-        ),
-      );
-    }
-
-    if (_failed || _imageData == null) {
-      return _FallbackAvatar(
-        size: widget.size,
-        text: widget.fallbackText,
-        backgroundColor: widget.fallbackBackgroundColor,
-        textColor: widget.fallbackTextColor,
-      );
-    }
-
-    // 上半分を丸く切り抜く: ClipOval + OverflowBox で縦2倍にしてトップ基準で表示
+    final zoomed = size * 1.8;
     return ClipOval(
       child: SizedBox(
-        width: widget.size,
-        height: widget.size,
+        width: size,
+        height: size,
         child: OverflowBox(
-          maxHeight: widget.size * 2,
+          maxWidth: zoomed,
+          maxHeight: zoomed,
           alignment: Alignment.topCenter,
-          child: Image.memory(
-            _imageData!,
-            width: widget.size,
-            height: widget.size * 2,
-            fit: BoxFit.fitWidth,
-            alignment: Alignment.topCenter,
+          child: Image.asset(
+            assetPath,
+            width: zoomed,
+            height: zoomed,
+            fit: BoxFit.contain,
+            errorBuilder: (_, __, ___) => CircleAvatar(
+              radius: size / 2,
+              backgroundColor: const Color(0xFFE0E0E0),
+              child: Icon(Icons.person, size: size * 0.55, color: const Color(0xFF757575)),
+            ),
           ),
         ),
       ),

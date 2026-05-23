@@ -217,3 +217,32 @@ exports.cancelFriendRequest = onCall(
       return {result: "cancelled"};
     },
 );
+
+// ============================================================
+// フレンド削除（管理者権限で双方のfriendsサブコレクションを削除）
+// ============================================================
+exports.removeFriend = onCall(
+    {region: "asia-northeast1", memory: "256MiB", timeoutSeconds: 30, enforceAppCheck: true},
+    async (request) => {
+      const {auth} = request;
+      if (!auth) return {error: "Unauthorized"};
+
+      const {friendId} = request.data;
+      const userId = auth.uid;
+
+      if (!friendId) return {error: "Missing friendId"};
+
+      const batch = db.batch();
+      batch.delete(
+          db.collection("users").doc(userId)
+              .collection("friends").doc(friendId),
+      );
+      batch.delete(
+          db.collection("users").doc(friendId)
+              .collection("friends").doc(userId),
+      );
+      await batch.commit();
+      return {result: "removed"};
+    },
+);
+

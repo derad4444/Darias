@@ -98,22 +98,6 @@ class WidgetTodo {
       };
 }
 
-/// ウィジェット用のBIG5進捗データ
-class WidgetBig5Progress {
-  final int answered;
-  final int total;
-
-  WidgetBig5Progress({
-    required this.answered,
-    this.total = 100,
-  });
-
-  Map<String, dynamic> toJson() => {
-        'answered': answered,
-        'total': total,
-      };
-}
-
 /// ウィジェットデータサービス
 /// メインアプリとホーム画面ウィジェット間でデータを共有
 class WidgetDataService {
@@ -131,14 +115,11 @@ class WidgetDataService {
   static const String _memoWidgetIosName = 'MemoWidget';
   static const String _todoWidgetAndroidName = 'TodoWidgetProvider';
   static const String _todoWidgetIosName = 'TodoWidget';
-  static const String _big5WidgetName = 'Big5ProgressWidget';
-
   // キャッシュキー
   static const String _schedulesKey = 'widget_schedules_cache';
   static const String _memosKey = 'widget_memos_cache';
   static const String _memosTotalCountKey = 'widget_memos_total_count';
   static const String _todosKey = 'widget_todos_cache';
-  static const String _big5ProgressKey = 'widget_big5_progress';
   static const String _lastUpdateKey = 'widget_last_update';
 
   WidgetDataService._();
@@ -296,32 +277,6 @@ class WidgetDataService {
     }
   }
 
-  // MARK: - Big5 Progress Caching
-
-  /// Big5進捗をウィジェット用にキャッシュ
-  Future<void> cacheBig5Progress({
-    required int answeredCount,
-    int totalCount = 100,
-  }) async {
-    if (kIsWeb) return;
-    final progress = WidgetBig5Progress(
-      answered: answeredCount,
-      total: totalCount,
-    );
-
-    final encoded = jsonEncode(progress.toJson());
-    await HomeWidget.saveWidgetData<String>(_big5ProgressKey, encoded);
-
-    // Big5進捗ウィジェットを更新
-    await HomeWidget.updateWidget(
-      name: _big5WidgetName,
-      iOSName: _big5WidgetName,
-      androidName: _big5WidgetName,
-    );
-
-    debugPrint('🧠 [WidgetDataService] Successfully cached Big5 progress: $answeredCount/$totalCount');
-  }
-
   // MARK: - Reload All Widgets
 
   /// 全てのウィジェットをリロード
@@ -337,10 +292,6 @@ class WidgetDataService {
     await HomeWidget.updateWidget(
       iOSName: _todoWidgetIosName,
       androidName: _todoWidgetAndroidName,
-    );
-    await HomeWidget.updateWidget(
-      iOSName: _big5WidgetName,
-      androidName: _big5WidgetName,
     );
     await HomeWidget.updateWidget(
       iOSName: _calendarGridWidgetIosName,

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../data/models/character_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../../core/theme/app_colors.dart';
 
 class CharacterSelectScreen extends ConsumerStatefulWidget {
   const CharacterSelectScreen({super.key});

@@ -14,6 +14,7 @@ import '../../widgets/character_avatar_widget.dart';
 import '../../widgets/inline_hint_banner.dart';
 import '../../../data/services/hint_service.dart';
 import 'compatibility_category_screen.dart';
+import 'friend_ask_screen.dart';
 import '../../providers/calendar_provider.dart';
 
 /// カテゴリ定義
@@ -82,6 +83,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   bool _isInitialLoading = true;
   String? _processingCategoryKey;
   String? _errorMessage;
+  bool _isStale = false;
 
   /// Firestoreリロードを待たず即時反映するローカルステート
   final Set<String> _localUnlocked = {};
@@ -93,15 +95,61 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   void initState() {
     super.initState();
     _loadDocument();
+    _markCompatibilityNotificationRead();
     if (!kIsWeb) {
       _rewardedAdManager.loadAd();
     }
+  }
+
+  Future<void> _markCompatibilityNotificationRead() async {
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null) return;
+    try {
+      final notifRef = ref.read(firestoreProvider)
+          .collection('users')
+          .doc(userId)
+          .collection('friendNotifications')
+          .doc(widget.friend.id);
+      final snap = await notifRef.get();
+      if (snap.exists && snap.data()?['isRead'] == false) {
+        await notifRef.update({'isRead': true});
+      }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
     _rewardedAdManager.dispose();
     super.dispose();
+  }
+
+  // ─────────────────────────────────────────
+  // フレンド削除確認ダイアログ
+  // ─────────────────────────────────────────
+  Future<void> _confirmRemoveFriend(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('フレンドを削除'),
+        content: Text(
+          '${widget.friend.name.isNotEmpty ? widget.friend.name : 'このフレンド'}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('削除', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await ref.read(friendControllerProvider.notifier).removeFriend(widget.friend.id);
+    if (!context.mounted) return;
+    Navigator.pop(context);
   }
 
   // ─────────────────────────────────────────
@@ -124,9 +172,44 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
             if (catDiag != null) _localCategories[cat.key] = catDiag;
           }
         }
+        // stale状態を反映（毎回画面を開くたびにポップアップを表示）
+        _isStale = doc.isStale;
       }
       _isInitialLoading = false;
     });
+
+    // staleの場合はフレーム描画後にポップアップを表示
+    if (_isStale) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showStaleDialog();
+      });
+    }
+  }
+
+  void _showStaleDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.refresh, color: Colors.blue),
+            SizedBox(width: 8),
+            Text('診断内容が古くなっています'),
+          ],
+        ),
+        content: const Text(
+          'あなたまたはフレンドの性格が更新されたため、この相性診断の内容が最新ではありません。\n\n再診断ボタンから最新の診断を実行してください。\n\n最新の診断を実行するまで、このお知らせは毎回表示されます。',
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('閉じる'),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _isUnlocked(String key) => _localUnlocked.contains(key);
@@ -138,21 +221,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   Future<void> _onCategoryTap(CompatibilityCategoryMeta cat) async {
     if (_processingCategoryKey != null) return;
 
-    final isPremium = ref.read(effectiveIsPremiumProvider);
-
-    // Web版: 無料ユーザーはブロック
-    if (kIsWeb && !isPremium) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Web版の相性診断は有料プランのみご利用いただけます'),
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-
     final existingDiagnosis = _getDiagnosis(cat.key);
 
+    // 既存結果がある場合はWeb・無料ユーザーでも閲覧可能
     if (existingDiagnosis != null) {
       // 解放済み → 広告なしで詳細画面へ
       await Navigator.push(
@@ -171,6 +242,17 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
       return;
     }
 
+    // 未解放 → Web版は新規診断不可（プレミアム含む）
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('相性診断はアプリ版でご利用いただけます'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
     // 未解放 → AI診断 + 広告
     setState(() {
       _processingCategoryKey = cat.key;
@@ -179,35 +261,25 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
     CategoryDiagnosis? diagnosis;
 
-    if (!kIsWeb) {
-      final diagnosisFuture = ref
-          .read(friendControllerProvider.notifier)
-          .runCategoryDiagnosis(
-            friendId: widget.friend.id,
-            category: cat.key,
-          );
+    final diagnosisFuture = ref
+        .read(friendControllerProvider.notifier)
+        .runCategoryDiagnosis(
+          friendId: widget.friend.id,
+          category: cat.key,
+        );
 
-      final adCompleter = Completer<void>();
-      _rewardedAdManager.onAdDismissed = () {
-        if (!adCompleter.isCompleted) adCompleter.complete();
-      };
-      final showed = await _rewardedAdManager.showAd();
-      if (!showed) adCompleter.complete();
+    final adCompleter = Completer<void>();
+    _rewardedAdManager.onAdDismissed = () {
+      if (!adCompleter.isCompleted) adCompleter.complete();
+    };
+    final showed = await _rewardedAdManager.showAd();
+    if (!showed) adCompleter.complete();
 
-      await Future.wait([
-        adCompleter.future,
-        diagnosisFuture.then((r) => diagnosis = r),
-      ]);
-      _rewardedAdManager.loadAd();
-    } else {
-      // Web版プレミアム: 広告なしで診断
-      diagnosis = await ref
-          .read(friendControllerProvider.notifier)
-          .runCategoryDiagnosis(
-            friendId: widget.friend.id,
-            category: cat.key,
-          );
-    }
+    await Future.wait([
+      adCompleter.future,
+      diagnosisFuture.then((r) => diagnosis = r),
+    ]);
+    _rewardedAdManager.loadAd();
 
     if (!mounted) return;
     setState(() => _processingCategoryKey = null);
@@ -221,6 +293,8 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     setState(() {
       _localUnlocked.add(cat.key);
       _localCategories[cat.key] = diagnosis!;
+      // 再診断完了でstaleフラグをローカルでクリア（_loadDocumentで最終確定）
+      _isStale = false;
     });
 
     // カテゴリ詳細画面へ（初回なのでアニメーションあり）
@@ -237,6 +311,75 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     );
 
     // 戻ってきたらFirestoreを再読み込み（スコア等の更新のため）
+    await _loadDocument();
+  }
+
+  /// stale時の強制再診断（既存結果を無視してAI診断を走らせる）
+  Future<void> _onRediagnoseTap(CompatibilityCategoryMeta cat) async {
+    if (_processingCategoryKey != null) return;
+
+    // Web版は再診断不可（プレミアム含む）
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('相性診断はアプリ版でご利用いただけます'),
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _processingCategoryKey = cat.key;
+      _errorMessage = null;
+    });
+
+    CategoryDiagnosis? diagnosis;
+
+    final diagnosisFuture = ref
+        .read(friendControllerProvider.notifier)
+        .runCategoryDiagnosis(
+          friendId: widget.friend.id,
+          category: cat.key,
+        );
+    final adCompleter = Completer<void>();
+    _rewardedAdManager.onAdDismissed = () {
+      if (!adCompleter.isCompleted) adCompleter.complete();
+    };
+    final showed = await _rewardedAdManager.showAd();
+    if (!showed) adCompleter.complete();
+    await Future.wait([
+      adCompleter.future,
+      diagnosisFuture.then((r) => diagnosis = r),
+    ]);
+    _rewardedAdManager.loadAd();
+
+    if (!mounted) return;
+    setState(() => _processingCategoryKey = null);
+
+    if (diagnosis == null) {
+      setState(() => _errorMessage = '再診断に失敗しました。もう一度お試しください。');
+      return;
+    }
+
+    setState(() {
+      _localCategories[cat.key] = diagnosis!;
+      _localUnlocked.add(cat.key);
+      _isStale = false;
+    });
+
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CompatibilityCategoryScreen(
+          friend: widget.friend,
+          category: cat,
+          diagnosis: diagnosis!,
+          animateOnEntry: true,
+        ),
+      ),
+    );
     await _loadDocument();
   }
 
@@ -263,8 +406,14 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final myDetails = ref.watch(characterDetailsProvider).valueOrNull;
     final friendDetailsAsync = ref.watch(userCharacterDetailsProvider(widget.friend.id));
 
-    final myBig5Done = (myDetails?.confirmedBig5Scores?.isNotEmpty ?? false);
-    final friendBig5Done = friendDetailsAsync.valueOrNull?.confirmedBig5Scores?.isNotEmpty ?? false;
+    // confirmedBig5Scores は analysis_level > 0 の場合のみ有効（signup時のデフォルト値と区別）
+    // convertedBig5Scores はチャットシグナル10件以上で生成される
+    final myBig5Done = ((myDetails?.analysisLevel ?? 0) > 0 && (myDetails?.confirmedBig5Scores?.isNotEmpty ?? false)) ||
+        (myDetails?.convertedBig5Scores?.isNotEmpty ?? false);
+    final friendDetails = friendDetailsAsync.valueOrNull;
+    final friendBig5Done =
+        ((friendDetails?.analysisLevel ?? 0) > 0 && (friendDetails?.confirmedBig5Scores?.isNotEmpty ?? false)) ||
+        (friendDetails?.convertedBig5Scores?.isNotEmpty ?? false);
     // どちらかまだロード中の場合はボタンを活性にしておく（false alertを避ける）
     final big5DataLoaded = !ref.watch(characterDetailsProvider).isLoading &&
         !friendDetailsAsync.isLoading;
@@ -287,6 +436,12 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.red),
+            onPressed: () => _confirmRemoveFriend(context, ref),
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
@@ -309,7 +464,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                     InlineHintBanner(
                       userId: myUserId,
                       feature: HintService.kCompatibility,
-                      message: '無料ユーザーは各カテゴリを動画広告視聴で解放できます。診断には自分とフレンド双方のBIG5診断完了が必要です。',
+                      message: '無料ユーザーは各カテゴリを動画広告視聴で解放できます。診断には自分とフレンド双方の性格解析（30回以上チャット）が必要です。',
                       icon: Icons.favorite_border,
                     ),
                     const SizedBox(height: 12),
@@ -347,10 +502,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                             Expanded(
                               child: Text(
                                 (!myBig5Done && !friendBig5Done)
-                                    ? '診断には自分と${widget.friend.name}さん双方のBIG5診断完了が必要です'
+                                    ? '診断には自分と${widget.friend.name}さん双方の性格解析が必要です。チャットを30回以上続けてください'
                                     : !myBig5Done
-                                        ? '診断にはあなたのBIG5診断完了が必要です。チャットで"性格診断して"と送ってください'
-                                        : '診断には${widget.friend.name}さんのBIG5診断完了が必要です',
+                                        ? '診断にはあなたの性格解析が必要です。チャットを30回以上続けてください'
+                                        : '診断には${widget.friend.name}さんの性格解析完了が必要です',
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
@@ -360,7 +515,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                     ],
 
                     // Web無料ユーザー向け案内
-                    if (kIsWeb && !isPremium) ...[
+                    if (kIsWeb) ...[
                       Container(
                         margin: const EdgeInsets.only(bottom: 16),
                         padding: const EdgeInsets.all(12),
@@ -377,8 +532,33 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                             const SizedBox(width: 8),
                             const Expanded(
                               child: Text(
-                                'Web版の相性診断は有料プランのみご利用いただけます',
+                                '相性診断はアプリ版でご利用いただけます。フレンドが診断済みの結果は閲覧できます',
                                 style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // 性格更新によるstaleバナー
+                    if (_isStale) ...[
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.withValues(alpha: 0.4)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.refresh, color: Colors.blue, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                '性格が更新されました。再診断で最新の結果に更新できます',
+                                style: TextStyle(fontSize: 12, color: Colors.blue),
                               ),
                             ),
                           ],
@@ -410,6 +590,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                       const SizedBox(height: 20),
                       _buildOverallCard(accentColor),
                     ],
+
+                    // フレンドに聞くボタン
+                    const SizedBox(height: 20),
+                    _buildAskButton(accentColor),
                   ],
                 ),
         ),
@@ -419,6 +603,32 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
   bool get _isAllUnlocked =>
       kCompatibilityCategories.every((c) => _isUnlocked(c.key));
+
+  // ─────────────────────────────────────────
+  // フレンドに聞くボタン
+  // ─────────────────────────────────────────
+  Widget _buildAskButton(Color accentColor) {
+    final friendName = widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
+    return OutlinedButton.icon(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => FriendAskScreen(friend: widget.friend),
+        ),
+      ),
+      icon: const Text('💬', style: TextStyle(fontSize: 16)),
+      label: Text(
+        '$friendNameのことを聞いてみる',
+        style: TextStyle(fontSize: 14, color: accentColor),
+      ),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, 48),
+        side: BorderSide(color: accentColor.withValues(alpha: 0.5)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        backgroundColor: Colors.white.withValues(alpha: 0.7),
+      ),
+    );
+  }
 
   // ─────────────────────────────────────────
   // 予定の共有設定セクション
@@ -631,86 +841,121 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
               ),
             )
           : isUnlocked
-              ? _buildUnlockedTile(cat)
+              ? _buildUnlockedTile(cat, accentColor, isPremium, anyProcessing, big5Ready)
               : _buildLockedTile(cat, accentColor, isPremium, anyProcessing, big5Ready),
     );
   }
 
-  /// 解放済みカード（スコアバッジ + 「結果を見る」）
-  Widget _buildUnlockedTile(CompatibilityCategoryMeta cat) {
+  /// 解放済みカード（スコアバッジ + 「結果を見る」 / stale時は「再診断」ボタン追加）
+  Widget _buildUnlockedTile(CompatibilityCategoryMeta cat, Color accentColor,
+      bool isPremium, bool anyProcessing, bool big5Ready) {
     final score = _document?.scores?.scoreFor(cat.key) ??
         _getDiagnosis(cat.key)?.score ??
         0;
     final hasScore = score > 0;
 
-    return InkWell(
-      onTap: () => _onCategoryTap(cat),
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Text(cat.icon, style: const TextStyle(fontSize: 22)),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => _onCategoryTap(cat),
+          borderRadius: _isStale
+              ? const BorderRadius.vertical(top: Radius.circular(14))
+              : BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Text(cat.icon, style: const TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        cat.label,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: cat.color,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      if (hasScore) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(3),
+                          child: LinearProgressIndicator(
+                            value: score / 100,
+                            backgroundColor: cat.color.withValues(alpha: 0.12),
+                            valueColor: AlwaysStoppedAnimation<Color>(cat.color),
+                            minHeight: 5,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          '結果を見る',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: cat.color.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                if (hasScore) ...[
                   Text(
-                    cat.label,
+                    '$score%',
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: cat.color,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  if (hasScore) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(3),
-                      child: LinearProgressIndicator(
-                        value: score / 100,
-                        backgroundColor: cat.color.withValues(alpha: 0.12),
-                        valueColor: AlwaysStoppedAnimation<Color>(cat.color),
-                        minHeight: 5,
-                      ),
+                  const SizedBox(width: 4),
+                ],
+                Icon(Icons.chevron_right,
+                    color: cat.color.withValues(alpha: 0.6), size: 20),
+              ],
+            ),
+          ),
+        ),
+        // stale時: 再診断ボタン
+        if (_isStale) ...[
+          const Divider(height: 1),
+          InkWell(
+            onTap: anyProcessing || !big5Ready
+                ? null
+                : () => _onRediagnoseTap(cat),
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.refresh, size: 15, color: cat.color.withValues(alpha: 0.8)),
+                  const SizedBox(width: 6),
+                  Text(
+                    '再診断する',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: cat.color.withValues(alpha: 0.8),
                     ),
-                  ] else ...[
-                    Text(
-                      '結果を見る',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: cat.color.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            if (hasScore) ...[
-              Text(
-                '$score%',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: cat.color,
-                ),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Icon(Icons.chevron_right,
-                color: cat.color.withValues(alpha: 0.6), size: 20),
-          ],
-        ),
-      ),
+          ),
+        ],
+      ],
     );
   }
 
   /// 未解放カード（診断するボタン）
   Widget _buildLockedTile(CompatibilityCategoryMeta cat, Color accentColor,
       bool isPremium, bool anyProcessing, bool big5Ready) {
-    final isWebFree = kIsWeb && !isPremium;
+    final isWebFree = kIsWeb;
     final isDisabled = !big5Ready || anyProcessing;
 
     return Padding(
@@ -758,7 +1003,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                       color: Colors.grey.withValues(alpha: 0.6)),
                   const SizedBox(width: 4),
                   Text(
-                    '有料のみ',
+                    'アプリ版で',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.grey.withValues(alpha: 0.7),

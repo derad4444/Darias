@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +17,7 @@ import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/diary_provider.dart';
+import '../../widgets/character/element_effect_widget.dart' show characterGrowthAssetPath;
 import '../../widgets/draggable_fab.dart';
 import '../../widgets/character_avatar_widget.dart';
 import 'bulk_schedule_confirmation_screen.dart';
@@ -30,6 +30,7 @@ import '../diary/diary_detail_screen.dart';
 import '../../widgets/inline_hint_banner.dart';
 import '../../providers/auth_provider.dart';
 import '../../../data/services/hint_service.dart';
+import '../../../data/services/notification_service.dart';
 
 /// 繰り返し予定の編集モード選択ダイアログ
 Future<RecurringEditMode?> _showRecurringEditChoiceDialog(BuildContext context) {
@@ -1349,7 +1350,6 @@ class _CalendarGrid extends ConsumerWidget {
 
   Widget _buildDaysGrid(List<TagItem> tags, List<ScheduleModel> allSchedules, [Map<String, Color> friendColorMap = const {}]) {
     final firstDay = DateTime(month.year, month.month, 1);
-    final lastDay = DateTime(month.year, month.month + 1, 0);
     final firstWeekday = firstDay.weekday % 7; // 0=日曜始まり
     final today = DateTime.now();
 
@@ -1766,51 +1766,25 @@ class _CharacterWithComment extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final characterImageAsync = ref.watch(characterImageProvider);
     final characterDetails = ref.watch(characterDetailsProvider).valueOrNull;
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
 
-    // 性別に基づいたデフォルト画像を選択
-    final defaultImage = characterDetails?.gender == '男性'
-        ? 'assets/images/android_male.png'
-        : 'assets/images/android_female.png';
+    final assetPath = characterGrowthAssetPath(
+      signalCount: signalCount,
+      element: characterDetails?.element,
+      gender: characterDetails?.gender,
+    );
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // キャラクター画像
-        characterImageAsync.when(
-          data: (imageUrl) => imageUrl != null
-              ? CachedNetworkImage(
-                  imageUrl: imageUrl,
-                  width: 150,
-                  height: 150,
-                  fit: BoxFit.contain,
-                  errorWidget: (context, url, error) =>
-                      Image.asset(
-                        defaultImage,
-                        width: 150,
-                        height: 150,
-                        fit: BoxFit.contain,
-                      ),
-                )
-              : Image.asset(
-                  defaultImage,
-                  width: 150,
-                  height: 150,
-                  fit: BoxFit.contain,
-                ),
-          loading: () => Image.asset(
-            defaultImage,
-            width: 150,
-            height: 150,
-            fit: BoxFit.contain,
-          ),
-          error: (e, st) => Image.asset(
-            defaultImage,
-            width: 150,
-            height: 150,
-            fit: BoxFit.contain,
-          ),
+        // キャラクター画像（成長段階・エフェクトなし）
+        Image.asset(
+          assetPath,
+          width: 120,
+          height: 120,
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person, size: 60),
         ),
 
         // 吹き出し
@@ -1878,110 +1852,6 @@ class _CharacterWithComment extends ConsumerWidget {
 
 }
 
-/// スケジュールリスト
-class _ScheduleList extends ConsumerWidget {
-  final DateTime day;
-  final Color accentColor;
-  final Color textColor;
-
-  const _ScheduleList({
-    required this.day,
-    required this.accentColor,
-    required this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final schedules = ref.watch(daySchedulesProvider(day));
-    final holiday = ref.watch(holidayForDateProvider(day));
-    final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
-
-    final allDaySchedules = schedules.where((s) => s.isAllDay).toList();
-    final timedSchedules = schedules.where((s) => !s.isAllDay).toList()
-      ..sort((a, b) => a.startDate.compareTo(b.startDate));
-    final showHeaders = allDaySchedules.isNotEmpty && timedSchedules.isNotEmpty;
-
-    return Column(
-      children: [
-        // 祝日表示
-        if (holiday != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.celebration, color: Colors.red, size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  holiday.name,
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-        // スケジュール一覧
-        Expanded(
-          child: schedules.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.event_available,
-                        size: 48,
-                        color: textColor.withValues(alpha: 0.4),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '予定がありません',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: textColor.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              : ListView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (allDaySchedules.isNotEmpty) ...[
-                      if (showHeaders) _SectionHeader(label: '終日', textColor: textColor),
-                      ...allDaySchedules.map((s) => _ScheduleItem(
-                        schedule: s,
-                        accentColor: accentColor,
-                        textColor: textColor,
-                      )),
-                    ],
-                    if (timedSchedules.isNotEmpty) ...[
-                      if (showHeaders) _SectionHeader(label: '時間指定', textColor: textColor),
-                      ...timedSchedules.map((s) => _ScheduleItem(
-                        schedule: s,
-                        accentColor: accentColor,
-                        textColor: textColor,
-                      )),
-                    ],
-                  ],
-                ),
-        ),
-
-        // バナー広告（無料ユーザーのみ）
-        if (shouldShowBannerAd) BannerAdContainer(adUnitId: AdConfig.calendarScreenBannerAdUnitId),
-      ],
-    );
-  }
-}
-
 /// セクションヘッダー（終日 / 時間指定）
 class _SectionHeader extends StatelessWidget {
   final String label;
@@ -2003,195 +1873,6 @@ class _SectionHeader extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// スケジュールアイテム
-class _ScheduleItem extends ConsumerWidget {
-  final ScheduleModel schedule;
-  final Color accentColor;
-  final Color textColor;
-
-  const _ScheduleItem({
-    required this.schedule,
-    required this.accentColor,
-    required this.textColor,
-  });
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final tags = ref.watch(tagsProvider);
-    final scheduleColor = _resolveTagColor(schedule.tag, tags, accentColor);
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.1),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _showEditDialog(context),
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                // カラーバー
-                Container(
-                  width: 4,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: scheduleColor,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // 時間表示
-                SizedBox(
-                  width: 50,
-                  child: Text(
-                    schedule.isAllDay
-                        ? '終日'
-                        : '${schedule.startDate.hour.toString().padLeft(2, '0')}:${schedule.startDate.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.black54,
-                    ),
-                  ),
-                ),
-
-                // コンテンツ
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        schedule.title,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.black87,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (schedule.location.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 14,
-                              color: Colors.black54,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                schedule.location,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.black54,
-                                ),
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-
-                // 削除ボタン
-                IconButton(
-                  icon: Icon(
-                    Icons.delete_outline,
-                    size: 20,
-                    color: Colors.black38,
-                  ),
-                  onPressed: () => _confirmDelete(context, ref),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showEditDialog(BuildContext context) async {
-    var editMode = RecurringEditMode.single;
-    if (schedule.recurringGroupId != null) {
-      final choice = await _showRecurringEditChoiceDialog(context);
-      if (choice == null) return;
-      editMode = choice;
-    }
-    if (context.mounted) {
-      context.push('/calendar/detail', extra: {
-        'schedule': schedule,
-        'initialDate': null,
-        'recurringEditMode': editMode,
-      });
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    // 繰り返し予定は「すべて / この予定のみ / キャンセル」を選択して即削除
-    // 通常予定は確認なしで即削除
-    bool deleteAll = false;
-    if (schedule.recurringGroupId != null) {
-      final choice = await showDialog<bool>(
-        context: context,
-        builder: (context) => SimpleDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('繰り返し予定の削除'),
-          children: [
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('すべての繰り返し予定', style: TextStyle(color: Colors.red)),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('この予定のみ', style: TextStyle(color: Colors.red)),
-            ),
-            SimpleDialogOption(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('キャンセル'),
-            ),
-          ],
-        ),
-      );
-      if (choice == null) return;
-      deleteAll = choice;
-    }
-
-    try {
-      if (deleteAll) {
-        await ref.read(calendarControllerProvider.notifier)
-            .deleteAllRecurringSchedules(schedule.recurringGroupId!);
-      } else {
-        await ref.read(calendarControllerProvider.notifier).deleteSchedule(schedule.id);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('エラー: $e')),
-        );
-      }
-    }
   }
 }
 
@@ -2468,6 +2149,7 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
         }
         widget.onNavigateToDetail(schedule, null, editMode);
       },
+      onLongPress: () => _handleScheduleDelete(schedule),
     );
 
     Widget buildFriendRow(SharedScheduleModel ss) => _FriendBottomSheetScheduleRow(
@@ -2492,6 +2174,77 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
         ],
       ],
     );
+  }
+
+  Future<void> _handleScheduleDelete(ScheduleModel schedule) async {
+    final recurringGroupId = schedule.recurringGroupId;
+
+    bool deleteAll = false;
+    if (recurringGroupId != null) {
+      final choice = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('繰り返し予定の削除'),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('すべての繰り返し予定', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('この予定のみ', style: TextStyle(color: Colors.red)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        ),
+      );
+      if (choice == null) return;
+      deleteAll = choice;
+    } else {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('予定を削除'),
+          content: Text('「${schedule.title}」を削除しますか？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('削除'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    try {
+      await NotificationService().cancelScheduleNotification(schedule.id);
+      if (deleteAll && recurringGroupId != null) {
+        await ref
+            .read(calendarControllerProvider.notifier)
+            .deleteAllRecurringSchedules(recurringGroupId);
+      } else {
+        await ref
+            .read(calendarControllerProvider.notifier)
+            .deleteSchedule(schedule.id);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('削除に失敗しました: $e')),
+        );
+      }
+    }
   }
 
   void _showFriendScheduleDetail(BuildContext context, SharedScheduleModel ss) {
@@ -2521,12 +2274,14 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
   final Color accentColor;
   final Color textColor;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _BottomSheetScheduleRow({
     required this.schedule,
     required this.accentColor,
     required this.textColor,
     required this.onTap,
+    this.onLongPress,
   });
 
   @override
@@ -2535,6 +2290,7 @@ class _BottomSheetScheduleRow extends ConsumerWidget {
     final scheduleColor = _resolveTagColor(schedule.tag, tags, accentColor);
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),

@@ -158,6 +158,7 @@ class ChatDatasource {
     required String characterId,
     required String message,
     required bool isPremium,
+    int phase = 1,
   }) async {
     final trimmed = message.trim();
 
@@ -274,6 +275,7 @@ class ChatDatasource {
       'userId': userId,
       'isPremium': isPremium,
       'chatHistory': chatHistory,
+      'phase': phase,
     };
     if (meetingContext != null) {
       params['meetingContext'] = meetingContext;
@@ -379,6 +381,25 @@ class ChatDatasource {
       'content': content,
       'timestamp': Timestamp.now(),
       'analysis_result': reply,
+    });
+  }
+
+  /// 起動時オープナーをFirestoreに保存（キャラクター発話・ユーザー入力なし）
+  Future<void> saveOpenerPost({
+    required String userId,
+    required String characterId,
+    required String openerText,
+  }) async {
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('posts')
+        .add({
+      'content': '',
+      'timestamp': Timestamp.now(),
+      'analysis_result': openerText,
     });
   }
 

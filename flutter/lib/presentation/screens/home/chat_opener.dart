@@ -10,8 +10,8 @@ class ChatOpener {
   const ChatOpener({required this.text, required this.type});
 }
 
-const _sharedPrefKeyQuestion = 'chat_last_question';
-const _sharedPrefKeyUsed = 'chat_question_used';
+String _sharedPrefKeyQuestion(String userId) => 'chat_last_question_$userId';
+String _sharedPrefKeyUsed(String userId) => 'chat_question_used_$userId';
 
 // バリエーション豊富なデイリープロンプト（日付ハッシュで毎日1つ選ぶ）
 const List<String> dailyPrompts = [
@@ -76,6 +76,7 @@ const List<String> dailyPrompts = [
 Future<ChatOpener> computeChatOpener({
   required List<ScheduleModel> allSchedules,
   required List<TodoModel> allTodos,
+  required String userId,
 }) async {
   // G: 今日の予定 or 期限が今日以前の未完了タスクがある
   final today = DateTime.now();
@@ -98,11 +99,11 @@ Future<ChatOpener> computeChatOpener({
 
   // F: 使用済みでない前回の問いがある
   final prefs = await SharedPreferences.getInstance();
-  final lastQuestion = prefs.getString(_sharedPrefKeyQuestion);
-  final questionUsed = prefs.getBool(_sharedPrefKeyUsed) ?? true;
+  final lastQuestion = prefs.getString(_sharedPrefKeyQuestion(userId));
+  final questionUsed = prefs.getBool(_sharedPrefKeyUsed(userId)) ?? true;
 
   if (lastQuestion != null && lastQuestion.isNotEmpty && !questionUsed) {
-    await prefs.setBool(_sharedPrefKeyUsed, true);
+    await prefs.setBool(_sharedPrefKeyUsed(userId), true);
     return ChatOpener(
       type: OpenerType.previousQuestion,
       text: '前回の問い、その後どうなった？\n「$lastQuestion」',
@@ -150,7 +151,8 @@ ChatOpener _buildScheduleOpener(
 }
 
 /// AI返答の末尾から問いかけ文を抽出してSharedPreferencesに保存する
-Future<void> saveLastQuestion(String aiReply) async {
+Future<void> saveLastQuestion(String aiReply, String userId) async {
+  if (userId.isEmpty) return;
   // 読点・改行で文を分割し、？で終わる最後の文を探す
   final sentences = aiReply.split(RegExp(r'[。！\n]'));
   final question = sentences
@@ -163,6 +165,6 @@ Future<void> saveLastQuestion(String aiReply) async {
   if (question.isEmpty) return;
 
   final prefs = await SharedPreferences.getInstance();
-  await prefs.setString(_sharedPrefKeyQuestion, question);
-  await prefs.setBool(_sharedPrefKeyUsed, false);
+  await prefs.setString(_sharedPrefKeyQuestion(userId), question);
+  await prefs.setBool(_sharedPrefKeyUsed(userId), false);
 }

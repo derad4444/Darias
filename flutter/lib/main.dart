@@ -17,7 +17,6 @@ import 'data/services/notification_service.dart';
 import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/auth_provider.dart';
-import 'presentation/providers/character_provider.dart';
 import 'presentation/providers/notification_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/router/app_router.dart';
@@ -33,12 +32,32 @@ void main() async {
   // App Check初期化（不正なCloud Functions呼び出しを防止）
   await FirebaseAppCheck.instance.activate(
     providerApple: kDebugMode
-        ? const AppleDebugProvider()
+        ? const AppleDebugProvider(debugToken: '41A8B019-00F7-4E17-9816-994CDAC7B61B')
         : const AppleAppAttestWithDeviceCheckFallbackProvider(),
     providerWeb: kDebugMode
-        ? WebDebugProvider()
+        ? WebDebugProvider(
+            debugToken: const String.fromEnvironment('WEB_APP_CHECK_DEBUG_TOKEN'),
+          )
         : ReCaptchaV3Provider('6Lfsb9UsAAAAAIVWwRXMfZbzaILBvB8F7exqsYBT'),
   );
+
+  // デバッグビルド（iOS）では activate() 直後にトークンを強制取得してキャッシュに乗せる。
+  // シミュレーターでは起動直後の DeviceCheck バックグラウンド交換が進行中の場合があり、
+  // forceRefresh=true でも既存 promise を再利用する（TODO#42）ため、失敗したらリトライする。
+  if (kDebugMode && !kIsWeb) {
+    for (int attempt = 0; attempt < 3; attempt++) {
+      try {
+        await FirebaseAppCheck.instance.getToken(true);
+        debugPrint('🔐 App Check token pre-warmed (attempt ${attempt + 1})');
+        break;
+      } catch (e) {
+        debugPrint('⚠️ App Check pre-warm attempt ${attempt + 1} failed: $e');
+        if (attempt < 2) {
+          await Future.delayed(const Duration(milliseconds: 200));
+        }
+      }
+    }
+  }
 
   // Web版ではログイン状態をローカルストレージに永続化
   if (kIsWeb) {
@@ -83,9 +102,6 @@ class DariasApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
     final colorSeed = ref.watch(colorSeedProvider);
-
-    // キャラクター画像URLをアプリ起動直後からプリロード（各画面表示前にキャッシュしておく）
-    ref.listen(characterImageProvider, (_, __) {});
 
     // ログイン状態変化時にFCMトークンをFirestoreへ同期
     ref.watch(fcmTokenSyncProvider);

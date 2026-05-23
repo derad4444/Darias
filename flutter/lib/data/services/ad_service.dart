@@ -11,8 +11,8 @@ class AdConfig {
   static const String _testRewardedAndroid = 'ca-app-pub-3940256099942544/5224354917';
   static const String _testRewardedIos = 'ca-app-pub-3940256099942544/1712485313';
 
-  // テストモードかどうか（リリース時は false に変更）
-  static const bool isTestMode = false;
+  // デバッグビルドはテスト広告、リリースビルドは本番広告を自動使用
+  static const bool isTestMode = kDebugMode;
 
   // ─── 内部ヘルパー ─────────────────────────────────────────
   /// iOS本番IDを返す。テストモード時はGoogle提供のテストIDを返す。

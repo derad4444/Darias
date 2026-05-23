@@ -101,6 +101,16 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "details",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "element",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": []

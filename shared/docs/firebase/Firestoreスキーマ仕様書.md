@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-05-10
+**最終更新日**: 2026-05-16
 **トップレベルコレクション**: 9
 
 ---
@@ -40,10 +40,13 @@
 - **hasCompletedOnboarding**: `boolean` - キャラクター作成完了フラグ（アカウント登録時の初期セットアップ完了を示す。オンボーディングスライドの表示制御には使用しない）
 - **hasSeenOnboardingSlides**: `boolean` - オンボーディングスライド視聴済みフラグ。`false` またはフィールドなしの場合、次回ログイン時にスライドを表示する。スキップ or 「始める！」ボタン押下時に `true` へ更新
 - **characterGender**: `string` - キャラクター性別
+- **growthStage**: `number` - キャラクター成長ステージ（0=赤ちゃん/1=幼少期/2=大人）。`calculateAndSaveAxisScores` が10シグナルごとに書き込む。フレンドアバター表示に使用
 - **usage_tracking**: `map` - 会議機能の利用回数追跡（プレミアムユーザーのみ書き込み）
   - **meeting_count_this_month**: `number` - 今月の会議利用回数
   - **last_meeting_month**: `string` - 最後に会議を利用した月（YYYY-MM形式）。現在月と異なる場合はカウントをリセット
 - **lastLoginAt**: `timestamp` - 最終ログイン日時。アプリ起動時に Flutter クライアント（`lastLoginAtSyncProvider`）が `FieldValue.serverTimestamp()` で書き込む。`scheduledDiaryGeneration` が7日以上未更新のユーザーの日記生成をスキップする際に参照。フィールドなしの既存ユーザーはスキップ対象外
+- **fcmToken**: `string` - Firebase Cloud Messaging デバイストークン。ログイン後・通知許可付与後に `notification_service.dart` の `saveFcmToken()` が書き込む。`scheduledDiaryGeneration` が日記生成後にFCMプッシュ通知を送信する際に参照。トークンはデバイス再インストールや OS の更新で変わるため `onTokenRefresh` で自動更新。フィールドなしの場合は通知を送信しない
+- **diaryNotificationsEnabled**: `boolean` - 日記通知のON/OFF設定。通知設定画面のトグルで書き込み（デフォルト: フィールドなし = 通知ON扱い）。`scheduledDiaryGeneration` が `false` の場合はFCM通知をスキップ
 
 **アクセス権限**: ユーザー自身のデータのみ読み書き可
 
@@ -883,7 +886,8 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
+**最終更新**: 2026-05-16（キャラクター成長システム追加: `signalCount` をもとにした3段階成長（赤ちゃん→幼少期→大人）をローカルアセット表示に変更。Firebase Storage の性格画像は非使用に。成長閾値: 0-29=赤ちゃん, 30-99=幼少期（元素別）, 100+=大人（元素×性別別））
+**前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
 **前回更新**: 2026-05-02（`users/{userId}.lastLoginAt` フィールド追加；`posts.analysis_result` の max_tokens 記述を削除）  
 **前回更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  
 **前々回更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
