@@ -31,6 +31,7 @@ import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 import '../screens/character/character_animation_test_screen.dart';
+import '../screens/character/personality_history_screen.dart';
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
@@ -225,6 +226,16 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final characterId = state.pathParameters['id']!;
           return CharacterDetailScreen(characterId: characterId);
+        },
+      ),
+
+      // 性格変動履歴
+      GoRoute(
+        path: '/character/:id/personality-history',
+        name: 'personality-history',
+        builder: (context, state) {
+          final characterId = state.pathParameters['id']!;
+          return PersonalityHistoryScreen(characterId: characterId);
         },
       ),
 

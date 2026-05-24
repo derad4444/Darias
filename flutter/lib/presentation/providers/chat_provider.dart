@@ -59,6 +59,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
     required String characterId,
     required String message,
     int phase = 1,
+    String? openerContext,
   }) async {
     final userId = _ref.read(currentUserIdProvider);
     if (userId == null) return null;
@@ -72,6 +73,7 @@ class ChatController extends StateNotifier<AsyncValue<void>> {
         message: message,
         isPremium: _ref.read(effectiveIsPremiumProvider),
         phase: phase,
+        openerContext: openerContext,
       );
 
       state = const AsyncValue.data(null);

@@ -161,6 +161,7 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
   const prevSnap = await detailsRef.get();
   const prevElement = prevSnap.data()?.element;
   const prevTypeName = prevSnap.data()?.typeName;
+  const gender = prevSnap.data()?.gender || 'neutral';
   const typeChanged = prevElement !== element || prevTypeName !== typeName;
 
   // details/current を更新
@@ -178,6 +179,22 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
   await db.collection('users').doc(userId).set({growthStage}, {merge: true});
 
   console.log(`✅ 軸スコア保存完了 charId=${charId} user=${userId} growthStage=${growthStage}`);
+
+  // 初回元素決定時（元素が初めてセットされた瞬間）の履歴記録
+  if (prevElement === undefined && signalCount >= 30) {
+    await db
+        .collection('users').doc(userId)
+        .collection('characters').doc(charId)
+        .collection('personalityHistory')
+        .add({
+          element,
+          typeName,
+          gender,
+          signalCount,
+          recordedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    console.log(`📖 初回性格履歴記録: ${typeName} signalCount=${signalCount}`);
+  }
 
   // 30シグナル到達時に初回キャラクター詳細を生成（axisGeneratedAt がなければ1回だけ実行）
   if (signalCount >= 30) {
@@ -209,6 +226,20 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
           typeChangedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
     console.log(`🔔 タイプ変化検知: ${prevTypeName} → ${typeName}`);
+
+    // 性格変動履歴に記録
+    await db
+        .collection('users').doc(userId)
+        .collection('characters').doc(charId)
+        .collection('personalityHistory')
+        .add({
+          element,
+          typeName,
+          gender,
+          signalCount,
+          recordedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+    console.log(`📖 性格履歴記録: ${typeName} signalCount=${signalCount}`);
 
     // フレンドの相性診断をstale化
     await markCompatibilityStale(db, userId);

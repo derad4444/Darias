@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
@@ -255,6 +256,11 @@ class CharacterDetailScreen extends ConsumerWidget {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: Icon(Icons.history, color: textColor),
+          tooltip: '性格変動履歴',
+          onPressed: () => context.push('/character/$characterId/personality-history'),
+        ),
         title: Text('キャラ詳細', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,
         elevation: 0,

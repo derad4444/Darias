@@ -159,6 +159,7 @@ class ChatDatasource {
     required String message,
     required bool isPremium,
     int phase = 1,
+    String? openerContext,
   }) async {
     final trimmed = message.trim();
 
@@ -279,6 +280,9 @@ class ChatDatasource {
     };
     if (meetingContext != null) {
       params['meetingContext'] = meetingContext;
+    }
+    if (openerContext != null) {
+      params['openerContext'] = openerContext;
     }
     final result = await callable.call<Map<String, dynamic>>(params);
 

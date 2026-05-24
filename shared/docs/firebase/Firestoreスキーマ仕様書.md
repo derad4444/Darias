@@ -122,6 +122,28 @@
 - **axisUpdatedAt**: `timestamp` - 軸スコア最終更新日時
 - **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、再実行を防ぐガードとして機能する
 
+#### `users/{userId}/characters/{characterId}/personalityHistory`
+
+**用途**: 性格タイプの変動履歴。初回元素決定時、およびタイプ変化のたびに `calculateAndSaveAxisScores` が追記する。Flutter の `PersonalityHistoryScreen` で表示される
+
+**フィールド（各ドキュメント）:**
+
+- **element**: `string` - 変化後の元素タイプ（"炎"/"風" など）
+- **typeName**: `string` - 変化後のタイプ名（例: "場を沸かす炎タイプ"）
+- **signalCount**: `number` - 記録時のシグナル数（成長段階判定に使用）
+- **recordedAt**: `timestamp` - 記録日時（UIでは `recordedAt` 降順で表示）
+
+**記録タイミング:**
+1. 初回元素決定時（`prevElement === undefined` かつ `signalCount >= 30`）
+2. element または typeName が変化したとき（`typeChanged && prevElement !== undefined`）
+
+**成長段階の判定（`signalCount` から）:**
+- `signalCount < 30` → 赤ちゃん期（`assets/images/character_growth/赤ちゃん.png`）
+- `30 ≤ signalCount < 100` → 幼少期（`assets/images/character_growth/幼少期_{element}.png`）
+- `signalCount >= 100` → 成人（`assets/images/character_growth/成人_{gender}_{element}.png`）
+
+---
+
 #### `users/{userId}/personalitySignals`
 
 **用途**: チャットメッセージから抽出したパーソナリティタグを蓄積。`classifyAndExtract` がタグを含むメッセージを処理するたびに追記される

@@ -180,13 +180,14 @@ const OPTIMIZED_PROMPTS = {
    * phase 2: 150文字, 受け止め+性格仮説+質問（あたってるかも体験）
    * phase 3: 220文字, 受け止め+性格言語化+質問任意（なるほど体験）
    */
-  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1) => {
+  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null) => {
     const traits = traitsOverride || buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
     const meeting = meetingContext
       ? `【過去の自分会議】${meetingContext}\n（会話に関連する場合はこの文脈を踏まえてください）`
       : "";
+    const opener = openerContext ? `会話のきっかけ: ${openerContext}` : "";
 
     let instruction;
     if (phase === 2) {
@@ -220,6 +221,7 @@ const OPTIMIZED_PROMPTS = {
 性別: ${genderText}
 ${dream}
 ${meeting}
+${opener}
 
 【最優先ルール】
 - ユーザーが「〜ってこと？」「〜なの？」「なんで？」「どういうこと？」など疑問形で返してきた場合は、まずその質問に直接答える。下記の①②③の構造より質問への応答を最優先する。

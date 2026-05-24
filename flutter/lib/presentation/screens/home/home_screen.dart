@@ -52,6 +52,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   bool _openerLoaded = false;
   // オープナーをロードした日付（日付をまたいだ再ロード判定用）
   String _openerLoadedDate = '';
+  // 会話のきっかけテキスト（AIに文脈として渡す）
+  String? _openerContext;
 
 
   /// 初期メッセージリスト
@@ -123,6 +125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       setState(() {
         _displayedMessage = opener.text;
         _isCharacterReply = true;
+        _openerContext = opener.text;
       });
       await _saveOpenerIfNeeded(opener.text);
     }
@@ -494,6 +497,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         characterId: characterId,
         message: message,
         phase: phase,
+        openerContext: _openerContext,
       );
       if (mounted) {
         setState(() {

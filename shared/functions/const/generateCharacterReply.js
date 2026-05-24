@@ -62,7 +62,7 @@ function getMaxTokensForPhase(phase) {
 }
 
 // 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
-function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1) {
+function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null) {
   // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -88,7 +88,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingConte
   }
 
   // BIG5詳細形式を使用した新しいプロンプト（5軸スコアがある場合はtraitsOverrideを優先）
-  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase);
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext);
 }
 
 // 無意味な入力を検出する関数
@@ -149,7 +149,7 @@ exports.generateCharacterReply = onCall(
         throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
       }
       try {
-        const {characterId, userMessage, userId, isPremium, chatHistory, meetingContext, phase = 1} = data;
+        const {characterId, userMessage, userId, isPremium, chatHistory, meetingContext, openerContext, phase = 1} = data;
         console.log(`🔍 generateCharacterReply called: userId=${userId} characterId=${characterId} phase=${phase} msg="${userMessage?.substring(0,30)}"`);
         if (!characterId || !userMessage || !userId) {
           console.error(`❌ Missing params: characterId=${characterId} userId=${userId} userMessage=${userMessage}`);
@@ -308,7 +308,7 @@ exports.generateCharacterReply = onCall(
 
         // Android度を計算し、プロンプトを生成（5軸スコアがある場合は5軸特性を優先）
         const prompt = buildCharacterPrompt(
-            big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase);
+            big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase, openerContext);
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 

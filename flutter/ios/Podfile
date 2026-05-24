@@ -45,6 +45,7 @@ post_install do |installer|
     end
   end
 
+
   # Patch FirebaseFunctions FunctionsContext.swift to fix iOS 16 Swift Concurrency crash.
   # Root cause: async let + throwing exits scope early, causing swift_task_dealloc fatalError
   # in the iOS 16 Swift runtime (SR-15609). Fixed in iOS 17+ runtime only.
