@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../data/datasources/remote/image_extraction_datasource.dart';
-import '../../data/services/rewarded_ad_service.dart';
+import '../providers/ad_provider.dart';
 import '../providers/subscription_provider.dart';
 
 /// AIで画像を読み取り、データを抽出するボタン
@@ -35,14 +35,8 @@ class _ImageScanButtonState extends ConsumerState<ImageScanButton> {
 
     // 無料ユーザーはリワード広告を表示
     if (!isPremium) {
-      final adService = RewardedAdService();
-
-      _setProcessing(true);
-      await adService.load();
-      _setProcessing(false);
-
       if (!mounted) return;
-      final rewarded = await adService.showAndAwaitReward();
+      final rewarded = await ref.read(rewardedAdManagerProvider).showAndAwaitReward();
 
       if (!rewarded) {
         if (mounted) {

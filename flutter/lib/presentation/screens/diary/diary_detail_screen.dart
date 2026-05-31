@@ -4,6 +4,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../data/models/diary_model.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/daily_mission_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
@@ -53,6 +54,20 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   void initState() {
     super.initState();
     _commentController = TextEditingController(text: widget.diary.userComment);
+    _checkDiaryMission();
+  }
+
+  void _checkDiaryMission() {
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final diaryDate = DateTime(
+      widget.diary.date.year,
+      widget.diary.date.month,
+      widget.diary.date.day,
+    );
+    if (diaryDate == yesterday) {
+      ref.read(dailyMissionProvider.notifier).markDiaryRead();
+    }
   }
 
   @override

@@ -136,24 +136,4 @@ class SubscriptionDatasource {
       return false;
     }
   }
-
-  /// 広告インプレッションを記録（分析用）
-  Future<void> trackAdImpression({
-    required String type,
-    required String screen,
-  }) async {
-    final userId = _userId;
-    if (userId == null) return;
-
-    try {
-      await _firestore.collection('ad_analytics').add({
-        'type': type,
-        'timestamp': Timestamp.now(),
-        'user_id': userId,
-        'screen': screen,
-      });
-    } catch (e) {
-      print('⚠️ SubscriptionDatasource: Failed to track ad impression - $e');
-    }
-  }
 }

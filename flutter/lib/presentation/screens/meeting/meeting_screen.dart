@@ -285,7 +285,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: bannerColor.withValues(alpha: 0.1),
+        color: bannerColor.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: bannerColor, width: 1),
       ),
@@ -295,7 +295,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
             children: [
               Icon(
                 limitReached ? Icons.warning_amber_rounded : Icons.info_outline,
-                color: bannerColor,
+                color: Colors.white,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -305,18 +305,20 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                   children: [
                     Text(
                       limitReached ? '利用制限に達しました' : '無料プランでは1回のみ利用可能',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       limitReached
                           ? '無料プランでは1回のみ利用可能です'
                           : 'プレミアムなら無制限に利用できます',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppColors.textSecondary,
-                          ),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),

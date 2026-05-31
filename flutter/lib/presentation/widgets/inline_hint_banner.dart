@@ -72,24 +72,24 @@ class _InlineHintBannerState extends State<InlineHintBanner>
         margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
+          color: color.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.2)),
+          border: Border.all(color: color),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(widget.icon, size: 18, color: color),
+            Icon(widget.icon, size: 18, color: Colors.white),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
                 widget.message,
-                style: TextStyle(fontSize: 13, color: color, height: 1.45),
+                style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.45),
               ),
             ),
             GestureDetector(
               onTap: _dismiss,
-              child: Icon(Icons.close, size: 18, color: color.withValues(alpha: 0.6)),
+              child: const Icon(Icons.close, size: 18, color: Colors.white70),
             ),
           ],
         ),
@@ -192,27 +192,27 @@ class _HomeHintBannerState extends State<HomeHintBanner>
           margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.08),
+            color: color.withValues(alpha: 0.85),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+            border: Border.all(color: color),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(current.icon, size: 18, color: color),
+              Icon(current.icon, size: 18, color: Colors.white),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   current.text,
-                  style: TextStyle(fontSize: 13, color: color, height: 1.45),
+                  style: const TextStyle(fontSize: 13, color: Colors.white, height: 1.45),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 '${_step + 1}/$total ›',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 12,
-                  color: color.withValues(alpha: 0.7),
+                  color: Colors.white70,
                   fontWeight: FontWeight.w600,
                 ),
               ),

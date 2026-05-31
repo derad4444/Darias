@@ -10,7 +10,6 @@ import '../../../data/models/schedule_model.dart';
 import '../../../data/models/shared_schedule_model.dart';
 import '../../../data/models/holiday_model.dart';
 import '../../../data/models/diary_model.dart';
-import '../../../data/services/rewarded_ad_service.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/subscription_provider.dart';
@@ -31,6 +30,8 @@ import '../../widgets/inline_hint_banner.dart';
 import '../../providers/auth_provider.dart';
 import '../../../data/services/hint_service.dart';
 import '../../../data/services/notification_service.dart';
+import '../../providers/daily_mission_provider.dart';
+import '../../widgets/daily_mission_sheet.dart' show dailyMissionBottomSheetTriggerProvider;
 
 /// 繰り返し予定の編集モード選択ダイアログ
 Future<RecurringEditMode?> _showRecurringEditChoiceDialog(BuildContext context) {
@@ -172,10 +173,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
 
     // 無料ユーザーはリワード広告
     if (!isPremium) {
-      final adService = RewardedAdService();
-      await adService.load();
       if (!context.mounted) return;
-      final rewarded = await adService.showAndAwaitReward();
+      final rewarded = await ref.read(rewardedAdManagerProvider).showAndAwaitReward();
       if (!rewarded) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -287,6 +286,11 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
   ) {
     // ボトムシートを開くタイミングでフレンド予定を即時リフレッシュ
     ref.read(friendScheduleRefreshProvider.notifier).state++;
+    // 今日のスケジュールを開いたらデイリーミッション「日記を読む」を達成
+    final now = DateTime.now();
+    if (day.year == now.year && day.month == now.month && day.day == now.day) {
+      ref.read(dailyMissionProvider.notifier).markDiaryViewed();
+    }
     final backgroundGradient = ref.read(backgroundGradientProvider);
 
     showModalBottomSheet(
@@ -345,6 +349,18 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
     // フレンドの月別スケジュール（選択中フレンドのみ）
     final friendSchedulesAsync = ref.watch(selectedFriendSchedulesForMonthProvider(selectedMonth));
     final friendSchedules = friendSchedulesAsync.valueOrNull ?? [];
+
+    // デイリーミッションからのボトムシート開封トリガー
+    ref.listen<DateTime?>(dailyMissionBottomSheetTriggerProvider, (prev, next) {
+      if (next != null) {
+        ref.read(dailyMissionBottomSheetTriggerProvider.notifier).state = null;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            _showScheduleBottomSheet(context, ref, next, accentColor, textColor);
+          }
+        });
+      }
+    });
 
     return Scaffold(
       body: DraggableFabStack(
@@ -1298,6 +1314,7 @@ class _CalendarGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tags = ref.watch(tagsProvider);
+    final missionCompletedDates = ref.watch(missionCompletedDatesProvider).valueOrNull ?? const <String>{};
     // 自分の予定 + フレンドの予定を統合（グリッド表示用）
     final allSchedules = [
       ...schedules,
@@ -1315,7 +1332,7 @@ class _CalendarGrid extends ConsumerWidget {
         const SizedBox(height: 4),
         // 日付グリッド
         Expanded(
-          child: _buildDaysGrid(tags, allSchedules, friendColorMap),
+          child: _buildDaysGrid(tags, allSchedules, friendColorMap, missionCompletedDates),
         ),
       ],
     );
@@ -1348,7 +1365,7 @@ class _CalendarGrid extends ConsumerWidget {
     );
   }
 
-  Widget _buildDaysGrid(List<TagItem> tags, List<ScheduleModel> allSchedules, [Map<String, Color> friendColorMap = const {}]) {
+  Widget _buildDaysGrid(List<TagItem> tags, List<ScheduleModel> allSchedules, [Map<String, Color> friendColorMap = const {}, Set<String> missionCompletedDates = const {}]) {
     final firstDay = DateTime(month.year, month.month, 1);
     final firstWeekday = firstDay.weekday % 7; // 0=日曜始まり
     final today = DateTime.now();
@@ -1407,6 +1424,7 @@ class _CalendarGrid extends ConsumerWidget {
                 ..sort((a, b) => a.startDate.compareTo(b.startDate));
               final holiday = holidays.where((h) => h.isOnDate(date)).firstOrNull;
 
+              final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
               cells.add(Expanded(
                 child: _CalendarDayCell(
                   date: date,
@@ -1428,6 +1446,7 @@ class _CalendarGrid extends ConsumerWidget {
                   dateCircleSize: dateCircleSize,
                   itemFontSize: itemFontSize,
                   scheduleAreaHeight: scheduleAreaHeight,
+                  missionCompleted: missionCompletedDates.contains(dateStr),
                   onTap: () => onDaySelected(date),
                 ),
               ));
@@ -1526,6 +1545,7 @@ class _CalendarDayCell extends StatelessWidget {
   final double dateCircleSize;
   final double itemFontSize;
   final double scheduleAreaHeight;
+  final bool missionCompleted;
   final VoidCallback onTap;
 
   const _CalendarDayCell({
@@ -1543,6 +1563,7 @@ class _CalendarDayCell extends StatelessWidget {
     required this.dateCircleSize,
     required this.itemFontSize,
     required this.scheduleAreaHeight,
+    this.missionCompleted = false,
     required this.onTap,
   });
 
@@ -1580,27 +1601,41 @@ class _CalendarDayCell extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // 日付（円形）
-            Container(
-              width: dateCircleSize,
-              height: dateCircleSize,
-              decoration: BoxDecoration(
-                color: isSelected ? accentColor : Colors.transparent,
-                shape: BoxShape.circle,
-                border: isToday && !isSelected
-                    ? Border.all(color: accentColor, width: 1.5)
-                    : null,
-              ),
-              child: Center(
-                child: Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    fontSize: dateCircleSize * 0.5,
-                    fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
-                    color: dateColor,
+            // 日付（円形）+ ⭐オーバーレイ
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: dateCircleSize,
+                  height: dateCircleSize,
+                  decoration: BoxDecoration(
+                    color: isSelected ? accentColor : Colors.transparent,
+                    shape: BoxShape.circle,
+                    border: isToday && !isSelected
+                        ? Border.all(color: accentColor, width: 1.5)
+                        : null,
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${date.day}',
+                      style: TextStyle(
+                        fontSize: dateCircleSize * 0.5,
+                        fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+                        color: dateColor,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (missionCompleted && !isOutsideMonth)
+                  Positioned(
+                    right: -6,
+                    bottom: -6,
+                    child: Text(
+                      '⭐',
+                      style: TextStyle(fontSize: dateCircleSize * 0.55),
+                    ),
+                  ),
+              ],
             ),
 
             // 予定・祝日表示エリア（高さを明示的に固定してoverflow防止）

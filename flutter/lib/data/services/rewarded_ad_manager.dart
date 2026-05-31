@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -120,6 +122,59 @@ class RewardedAdManager {
       print('❌ RewardedAdManager: Error showing ad - $e');
       return false;
     }
+  }
+
+  /// 広告を表示し、リワード獲得またはアンフィル時にtrueを返す
+  /// ユーザーが広告をスキップした場合のみfalseを返す
+  Future<bool> showAndAwaitReward() async {
+    if (kIsWeb) return true;
+
+    // ロード済みでなければ読み込む（既にloading中なら待たずアンフィル扱い）
+    if (!isReady && _state != RewardedAdState.loading) {
+      await loadAd();
+    }
+
+    // アンフィル → 通す
+    if (_rewardedAd == null) return true;
+
+    final completer = Completer<bool>();
+    bool rewarded = false;
+
+    _rewardedAd!.fullScreenContentCallback = FullScreenContentCallback(
+      onAdShowedFullScreenContent: (ad) {
+        _state = RewardedAdState.showing;
+        onAdShowed?.call();
+      },
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _rewardedAd = null;
+        _state = RewardedAdState.loading;
+        onAdDismissed?.call();
+        loadAd();
+        if (!completer.isCompleted) completer.complete(rewarded);
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _rewardedAd = null;
+        _state = RewardedAdState.error;
+        loadAd();
+        if (!completer.isCompleted) completer.complete(true);
+      },
+    );
+
+    try {
+      await _rewardedAd!.show(
+        onUserEarnedReward: (ad, reward) {
+          rewarded = true;
+          onUserEarnedReward?.call(reward);
+        },
+      );
+    } catch (e) {
+      print('❌ RewardedAdManager: Error in showAndAwaitReward - $e');
+      return true;
+    }
+
+    return completer.future;
   }
 
   /// リソースを解放

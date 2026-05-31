@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
@@ -29,6 +30,10 @@ import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
 import '../../widgets/character/element_effect_widget.dart';
 import '../../widgets/inline_hint_banner.dart';
+import '../../providers/daily_mission_provider.dart';
+import '../../widgets/daily_mission_sheet.dart';
+import '../../../data/models/daily_mission_model.dart';
+import '../main/main_shell_screen.dart';
 import 'chat_opener.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
@@ -43,6 +48,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   final TextEditingController _chatController = TextEditingController();
   bool _isWaitingForReply = false;
   late String _displayedMessage;
+  Timer? _loadingDotsTimer;
+  int _loadingDotsCount = 1;
   // ダイアログ表示中フラグ（多重表示防止）
   bool _isShowingDialog = false;
   bool _isShowingEvolutionDialog = false;
@@ -97,7 +104,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       _displayedMessage = _initialMessages[Random().nextInt(_initialMessages.length)];
     }
     // スマートオープナーをポストフレームで非同期ロード
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadChatOpener());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _loadChatOpener();
+      await _checkAndShowDailyMission();
+    });
   }
 
   @override
@@ -128,6 +138,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         _openerContext = opener.text;
       });
       await _saveOpenerIfNeeded(opener.text);
+    }
+  }
+
+  Future<void> _checkAndShowDailyMission() async {
+    if (!mounted) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime.now();
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      final lastShown = prefs.getString('daily_mission_last_shown') ?? '';
+      if (lastShown == today) return;
+      await prefs.setString('daily_mission_last_shown', today);
+
+      // ログイン達成
+      await ref.read(dailyMissionProvider.notifier).markLogin();
+
+      if (mounted) {
+        showDailyMissionSheet(context);
+      }
+    } catch (e) {
+      debugPrint('⚠️ _checkAndShowDailyMission error: $e');
     }
   }
 
@@ -162,19 +193,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   void dispose() {
+    _loadingDotsTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _chatController.dispose();
     super.dispose();
+  }
+
+  void _startLoadingDots() {
+    _loadingDotsTimer?.cancel();
+    _loadingDotsCount = 1;
+    _loadingDotsTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingDotsCount = (_loadingDotsCount % 3) + 1;
+        _displayedMessage = '・' * _loadingDotsCount;
+      });
+    });
+  }
+
+  void _stopLoadingDots() {
+    _loadingDotsTimer?.cancel();
+    _loadingDotsTimer = null;
   }
 
 /// 会議後フォローアップ: 結論をAIに送信してレスポンスを表示
   void _triggerMeetingFollowup(String conclusion) async {
     if (!mounted) return;
     setState(() {
-      _displayedMessage = '会議お疲れ様！結論を受け取ったよ…';
+      _displayedMessage = '・';
       _isCharacterReply = false;
       _isWaitingForReply = true;
     });
+    _startLoadingDots();
 
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
@@ -184,6 +234,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         message: '【自分会議の結論】$conclusion',
       );
       debugPrint('✅ _triggerMeetingFollowup: reply=${result?.reply.substring(0, 20)}');
+      _stopLoadingDots();
       if (mounted) {
         setState(() {
           _displayedMessage = result?.reply ?? '会議お疲れ様！続きがあれば話しかけてね';
@@ -205,6 +256,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
   @override
   Widget build(BuildContext context) {
+    // デイリーミッション: カレンダータブへの遷移要求を監視
+    ref.listen<DailyMissionNavigation>(dailyMissionNavigationProvider, (prev, next) {
+      if (next == DailyMissionNavigation.goToCalendar) {
+        ref.read(dailyMissionNavigationProvider.notifier).state = DailyMissionNavigation.none;
+        final now = DateTime.now();
+        ref.read(selectedDayProvider.notifier).state = now;
+        ref.read(selectedTabProvider.notifier).state = 1;
+      } else if (next == DailyMissionNavigation.goToTodaySheet) {
+        ref.read(dailyMissionNavigationProvider.notifier).state = DailyMissionNavigation.none;
+        final now = DateTime.now();
+        ref.read(selectedDayProvider.notifier).state = now;
+        ref.read(selectedTabProvider.notifier).state = 1;
+        ref.read(dailyMissionBottomSheetTriggerProvider.notifier).state = now;
+      } else if (next == DailyMissionNavigation.goToYesterdaySheet) {
+        ref.read(dailyMissionNavigationProvider.notifier).state = DailyMissionNavigation.none;
+        final yesterday = DateTime.now().subtract(const Duration(days: 1));
+        ref.read(selectedDayProvider.notifier).state = yesterday;
+        ref.read(selectedTabProvider.notifier).state = 1;
+        ref.read(dailyMissionBottomSheetTriggerProvider.notifier).state = yesterday;
+      }
+    });
+
     // 会議後フォローアップの監視
     ref.listen<String?>(meetingFollowupConclusionProvider, (prev, next) {
       if (next != null) {
@@ -314,7 +387,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                           : const SizedBox.shrink(),
                     ),
 
-                    // 自分会議ボタンと履歴ボタン
+                    // アクションボタン行
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
@@ -335,6 +408,45 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             },
                           ),
                           const Spacer(),
+                          // デイリーミッションボタン
+                          ref.watch(dailyMissionProvider).maybeWhen(
+                            data: (mission) => GestureDetector(
+                              onTap: () => showDailyMissionSheet(context),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: mission.allCompleted
+                                      ? Colors.amber
+                                      : Colors.amber.shade400,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.amber.withValues(alpha: 0.4),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.star_rounded, size: 16, color: Colors.white),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${mission.completedCount}/${DailyMission.total}',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            orElse: () => const SizedBox.shrink(),
+                          ),
+                          const SizedBox(width: 8),
                           // 履歴ボタン
                           _ActionButton(
                             icon: Icons.history,
@@ -382,39 +494,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   left: 20,
                   right: 20,
                   top: size.height * 0.08,
-                  child: Column(
-                    children: [
-                      _SpeechBubble(
-                        message: _displayedMessage,
-                        maxWidth: size.width * 0.8,
-                      ),
-                      if (_isCharacterReply) ...[
-                        const SizedBox(height: 6),
-                        GestureDetector(
-                          onTap: _isPlayingVoice ? null : () {
-                            if (isPremium) {
-                              _playVoice();
-                            } else {
-                              context.push('/premium');
-                            }
-                          },
-                          child: _isPlayingVoice
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
+                  child: Dismissible(
+                    key: ValueKey(_displayedMessage),
+                    direction: DismissDirection.up,
+                    onDismissed: (_) => setState(() => _displayedMessage = ''),
+                    child: Column(
+                      children: [
+                        _SpeechBubble(
+                          message: _displayedMessage,
+                          maxWidth: size.width * 0.8,
+                        ),
+                        if (_isCharacterReply) ...[
+                          const SizedBox(height: 6),
+                          GestureDetector(
+                            onTap: _isPlayingVoice ? null : () {
+                              if (isPremium) {
+                                _playVoice();
+                              } else {
+                                context.push('/premium');
+                              }
+                            },
+                            child: _isPlayingVoice
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white70,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.volume_up_outlined,
+                                    size: 22,
                                     color: Colors.white70,
                                   ),
-                                )
-                              : const Icon(
-                                  Icons.volume_up_outlined,
-                                  size: 22,
-                                  color: Colors.white70,
-                                ),
-                        ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
             ],
@@ -489,7 +606,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       _isWaitingForReply = true;
       _showMeetingBanner = false;
       _chatController.clear();
+      _displayedMessage = '・';
+      _isCharacterReply = false;
     });
+    _startLoadingDots();
 
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
@@ -500,6 +620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         openerContext: _openerContext,
       );
       if (mounted) {
+        _stopLoadingDots();
         setState(() {
           final reply = result?.reply ?? '';
           _displayedMessage = reply.isNotEmpty ? reply : 'お返事がありませんでした';
@@ -509,6 +630,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           _showMeetingBanner = (result?.meetingSuggested ?? false) && isMeetingUnlocked;
         });
         if (result != null) saveLastQuestion(result.reply, ref.read(currentUserIdProvider) ?? '');
+        // チャットミッション進捗を更新
+        if (result != null) {
+          await ref.read(dailyMissionProvider.notifier).incrementChat();
+        }
       }
       if (mounted && result != null && !_isShowingDialog) {
         if (result.scheduleDetected || result.memoDetected || result.todoDetected) {
@@ -521,6 +646,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         _showRewardedAdDialog();
       }
     } catch (e) {
+      _stopLoadingDots();
       if (mounted) {
         setState(() {
           _displayedMessage = 'エラーが発生しました。もう一度試してください。';

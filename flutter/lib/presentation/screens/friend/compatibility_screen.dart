@@ -196,7 +196,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
           children: [
             Icon(Icons.refresh, color: Colors.blue),
             SizedBox(width: 8),
-            Text('診断内容が古くなっています'),
+            Expanded(
+              child: Text('診断内容が古くなっています'),
+            ),
           ],
         ),
         content: const Text(

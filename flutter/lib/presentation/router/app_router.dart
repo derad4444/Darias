@@ -32,6 +32,8 @@ import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 import '../screens/character/character_animation_test_screen.dart';
 import '../screens/character/personality_history_screen.dart';
+import '../screens/game/game_lobby_screen.dart';
+import '../screens/game/game_screen.dart';
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
@@ -311,6 +313,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/character-animation-test',
         name: 'character-animation-test',
         builder: (context, state) => const CharacterAnimationTestScreen(),
+      ),
+
+      // ゲーム（元素陣取り）
+      GoRoute(
+        path: '/game',
+        name: 'game-lobby',
+        builder: (context, state) => const GameLobbyScreen(),
+      ),
+      GoRoute(
+        path: '/game/battle',
+        name: 'game-battle',
+        builder: (context, state) => const GameScreen(),
       ),
 
     ],
