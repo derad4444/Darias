@@ -212,27 +212,47 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
 
           const Divider(height: 1, indent: 20, endIndent: 20),
 
-          // 今日やったこと
-          if (facts.isNotEmpty) ...[
+          // 活動なし
+          if (facts.isEmpty && aiComment.isEmpty) ...[
             const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text(
-                '今日やったこと',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
-                  letterSpacing: 0.5,
-                ),
+              padding: EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: Column(
+                children: [
+                  Icon(Icons.nights_stay_outlined, size: 36, color: Colors.grey),
+                  SizedBox(height: 8),
+                  Text(
+                    '今日は活動がありませんでした',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
               ),
             ),
-            ...facts.map((fact) => _buildFactItem(fact)),
-            const SizedBox(height: 8),
-          ],
+          ] else ...[
+            // 今日やったこと
+            if (facts.isNotEmpty) ...[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(
+                  '今日やったこと',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+              ...facts.map((fact) => _buildFactItem(fact)),
+              const SizedBox(height: 8),
+            ],
 
-          // AIコメント吹き出し
-          if (aiComment.isNotEmpty)
-            _buildAiCommentBubble(aiComment),
+            // AIコメント吹き出し
+            if (aiComment.isNotEmpty)
+              _buildAiCommentBubble(aiComment),
+          ],
 
           const SizedBox(height: 20),
         ],

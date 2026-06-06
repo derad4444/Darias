@@ -728,7 +728,7 @@ class TodoContentView extends ConsumerStatefulWidget {
 }
 
 class TodoContentViewState extends ConsumerState<TodoContentView> {
-  String _selectedFilter = 'すべて';
+  String _selectedFilter = '未完了';
   final TextEditingController _searchController = TextEditingController();
 
   @override
@@ -835,7 +835,7 @@ class TodoContentViewState extends ConsumerState<TodoContentView> {
                 ),
                 padding: const EdgeInsets.all(2),
                 child: Row(
-                  children: ['すべて', '未完了', '完了済み'].map((filter) {
+                  children: ['未完了', '完了済み', 'すべて'].map((filter) {
                     final isSelected = _selectedFilter == filter;
                     return Expanded(
                       child: GestureDetector(

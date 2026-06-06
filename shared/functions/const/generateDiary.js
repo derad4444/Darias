@@ -239,6 +239,35 @@ async function generateDiary(characterId, userId) {
     diaryStyle = "logic+emotion view,tech+feeling mix,session→chat learning,logical→emotional";
   }
 
+  // 活動がない場合はAI呼び出しをスキップして空データで保存
+  if (parts.length === 0) {
+    const diaryRef = db.collection("users").doc(userId)
+        .collection("characters").doc(characterId)
+        .collection("diary").doc();
+
+    const now2 = new Date();
+    const jstDate2 = new Date(now2.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+    const yyyy2 = jstDate2.getFullYear();
+    const mm2 = String(jstDate2.getMonth() + 1).padStart(2, "0");
+    const dd2 = String(jstDate2.getDate()).padStart(2, "0");
+
+    const diaryDoc = {
+      id: diaryRef.id,
+      date: admin.firestore.Timestamp.now(),
+      content: "",
+      diary_type: "activity",
+      facts: [],
+      ai_comment: "",
+      user_comment: "",
+      created_at: admin.firestore.Timestamp.now(),
+      created_date: `${yyyy2}-${mm2}-${dd2}`,
+    };
+
+    await diaryRef.set(diaryDoc);
+    console.log(`📅 Diary saved (no activity) for ${characterId}`);
+    return diaryDoc;
+  }
+
   // アクティビティベースのプロンプト作成
   const prompt = OPTIMIZED_PROMPTS.activityDiary(
       characterType,

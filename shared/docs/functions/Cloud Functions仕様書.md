@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-05-10
+**最終更新日**: 2026-05-30
 **ランタイム**: Node.js 22
-**関数数**: 30
+**関数数**: 31
 
 ---
 
@@ -273,7 +273,7 @@
 - **secrets**: `OPENAI_API_KEY`
 - **モデル**: `gpt-4o-2024-11-20`（無料・有料ユーザー共通。2026-04-04 変更）
 - **temperature**: `1.0`（`response_format: json_object` で JSON 崩れを防止。2026-04-04 変更）
-- **キャッシュ**: `personalityKey`（例: `O3_C4_E2_A5_N1_male`）で Firestore にキャッシュ。最大 6,250 通り（5^5 × 性別2）
+- **キャッシュ**: `personalityKey`（例: `O3_C4_E2_A5_N1_男性`）で Firestore にキャッシュ。最大 6,250 通り（5^5 × 性別2）。各スコアは `Math.round()` で整数化してからキーを生成するため、同じ性格タイプのユーザー間でキャッシュが共有される
 - **生成レベル**: 3 レベルを並列生成（20問・50問・100問）
   - 20問: career / romance / stress（3カテゴリ、200-300文字）
   - 50問: 上記 + learning / decision（5カテゴリ、300-400文字）
@@ -364,7 +364,7 @@
 - **secrets**: `OPENAI_API_KEY`
 - **その他**: `minInstances: 0`, `enforceAppCheck: false`
 - **モデル**: `gpt-4.1-mini` / temperature `0.75`
-- **キャッシュ**: `compatibilityCache/{big5Key}_{category}` でカテゴリ別に Firestore にキャッシュ
+- **キャッシュ**: `compatibilityCache/{big5Key}_{category}` でカテゴリ別に Firestore にキャッシュ。`big5Key` は両者の BIG5スコアを `Math.round()` で整数化した `o{O}c{C}e{E}a{A}n{N}` 形式をソート順で `|` 連結したもの（例: `o3c4e2a5n1|o4c3e5a2n4_friendship`）。整数化により同じ性格タイプのユーザーペアでキャッシュが共有される
 
 **入力パラメータ:**
 
@@ -381,7 +381,7 @@
 | `comment` | `string` | カテゴリ相性の現状コメント（30文字以内） |
 | `advice` | `string` | 相性を活かすためのアドバイス（60文字以内） |
 | `conversation` | `array<map>` | キャラクター会話（4〜5ターン）。`{isMyCharacter: bool, text: string}` の配列 |
-| `big5Key` | `string` | BIG5キャッシュキー（`fp1\|fp2` のソート済み連結） |
+| `big5Key` | `string` | BIG5キャッシュキー（両者の `o{O}c{C}e{E}a{A}n{N}` をソート順で `\|` 連結。スコアは `Math.round()` で整数化済み） |
 | `scores` | `map` | 全カテゴリのスコア（決定論的算出）`{friendship, romance, work, trust, overall}` |
 
 **スコア取得ロジック:**
@@ -708,6 +708,7 @@ Cloud Scheduler による定期実行バッチ。
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `dream`(夢) / `strength`(強み) を取得してプロンプトに反映
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
+- **活動なし時の挙動**: 当日のスケジュール・チャット・Todo・メモ・会議・性格診断が全て空の場合、OpenAI API を呼び出さずに `facts: []`, `ai_comment: ""` で Firestore に保存する（API コスト削減 + 架空活動の生成防止）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
 
@@ -765,7 +766,7 @@ Firestore ドキュメント作成時に自動実行。
 
 ---
 
-### HTTP Endpoints (`onRequest`) - 3 関数
+### HTTP Endpoints (`onRequest`) - 4 関数
 
 REST API として直接アクセス可能。
 
@@ -804,6 +805,52 @@ REST API として直接アクセス可能。
 - **リソース**: memory `128MiB` / timeout `60秒`
 - **リージョン**: `asia-northeast1`
 - **その他**: `minInstances: 0`, `maxInstances: 1`
+
+#### 29. `recalculatePersonalityStats`
+- **ソース**: `const/recalculatePersonalityStats.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。Google Spreadsheet の Apps Script から呼び出される
+- **リソース**: memory `1GiB` / timeout `300秒`
+- **リージョン**: `asia-northeast1`
+- **認証**: なし（集計データのみ・機密情報なし）
+
+**クエリパラメータ:**
+
+| パラメータ | 値 | 説明 |
+|-----------|-----|------|
+| `dryRun` | `true` / `false`（省略時は `false`） | `true` の場合は Firestore への書き込みをスキップし、集計結果のみ返す |
+
+**返却値:**
+
+```json
+{
+  "success": true,
+  "dryRun": false,
+  "debug": { "details_count": 113 },
+  "stats": {
+    "total_completed_users": 113,
+    "unique_personality_types": 57,
+    "gender_distribution": { "female": 77, "male": 32, "neutral": 4 },
+    "element_counts": { "炎": 12, "風": 8, ... },
+    "type_name_counts": { "場を沸かす炎タイプ": 7, "独り燃える炎タイプ": 5, ... },
+    "personality_details": {
+      "O3_C4_E2_A5_N1_女性": { "element": "炎", "typeName": "場を沸かす炎タイプ", "count": 3 },
+      ...
+    }
+  }
+}
+```
+
+**集計ロジック:**
+- `collectionGroup("details")` で全ユーザーの `details/current` を一括取得
+- パスが `/characters/` を含み、ドキュメントIDが `current` のもののみ対象
+- `personalityKey` が未設定のドキュメントはスキップ
+- `element` / `typeName` が Firestore に保存されていない場合は `axisScores` から計算して補完（`axisCalculator.js` と同一ロジック）
+
+**`total_completed_users` について**: 性格診断完了（`personalityKey` 設定済み）の性格数を示す。Firebase Authentication の全ユーザー数とは異なる。
+
+**副作用（`dryRun=false` 時）:**
+- `PersonalityStatsMetadata/summary` に集計結果を上書き保存
 
 ---
 
@@ -958,4 +1005,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-05-10（`askAboutFriend` 関数追加；`removeFriend` をクライアント処理→Cloud Function に変更；関数数 28→30 に更新）*
+*最終更新: 2026-05-30（`recalculatePersonalityStats` 関数追加；`diagnoseCompatibility` の `big5Key` 生成に `Math.round()` 適用；関数数 30→31 に更新）*

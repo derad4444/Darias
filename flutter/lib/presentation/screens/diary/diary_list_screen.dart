@@ -356,16 +356,34 @@ class _DiaryCard extends StatelessWidget {
                 const SizedBox(height: 12),
 
                 // 内容プレビュー
-                Text(
-                  diary.content,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black.withValues(alpha: 0.8),
-                    height: 1.5,
-                  ),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Builder(builder: (context) {
+                  String preview;
+                  Color previewColor = Colors.black.withValues(alpha: 0.8);
+                  if (diary.isActivityType) {
+                    final facts = diary.facts ?? [];
+                    final aiComment = diary.aiComment ?? '';
+                    if (facts.isEmpty && aiComment.isEmpty) {
+                      preview = '今日は活動がありませんでした';
+                      previewColor = Colors.grey;
+                    } else if (aiComment.isNotEmpty) {
+                      preview = aiComment;
+                    } else {
+                      preview = facts.first;
+                    }
+                  } else {
+                    preview = diary.content;
+                  }
+                  return Text(
+                    preview,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: previewColor,
+                      height: 1.5,
+                    ),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                  );
+                }),
 
                 // ユーザーコメント（あれば）
                 if (diary.userComment.isNotEmpty) ...[
