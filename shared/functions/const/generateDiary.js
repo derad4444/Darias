@@ -240,7 +240,9 @@ async function generateDiary(characterId, userId) {
   }
 
   // 活動がない場合はAI呼び出しをスキップして空データで保存
-  if (parts.length === 0) {
+  const hasActivity = scheduleSummary || chatSummary || completedTodoSummary ||
+      createdTodoSummary || memoSummary || meetingSummary || big5ProgressSummary;
+  if (!hasActivity) {
     const diaryRef = db.collection("users").doc(userId)
         .collection("characters").doc(characterId)
         .collection("diary").doc();

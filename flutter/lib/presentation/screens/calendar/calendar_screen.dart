@@ -322,8 +322,8 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen>
               accentColor: accentColor,
             );
           } else {
-            // 日記がない場合は日記リスト画面へ
-            context.push('/diary');
+            // 日記がない場合は履歴画面の日記タブへ
+            context.push('/history', extra: {'initialTab': 2});
           }
         },
       ),

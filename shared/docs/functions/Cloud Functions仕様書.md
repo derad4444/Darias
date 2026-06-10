@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-05-30
+**最終更新日**: 2026-06-10
 **ランタイム**: Node.js 22
 **関数数**: 31
 
@@ -708,7 +708,7 @@ Cloud Scheduler による定期実行バッチ。
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `dream`(夢) / `strength`(強み) を取得してプロンプトに反映
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
-- **活動なし時の挙動**: 当日のスケジュール・チャット・Todo・メモ・会議・性格診断が全て空の場合、OpenAI API を呼び出さずに `facts: []`, `ai_comment: ""` で Firestore に保存する（API コスト削減 + 架空活動の生成防止）
+- **活動なし時の挙動**: 当日のスケジュール・チャット・Todo・メモ・会議・性格診断が全て空の場合（`hasActivity` フラグで判定）、OpenAI API を呼び出さずに `facts: []`, `ai_comment: ""` で Firestore に保存する（API コスト削減 + 架空活動の生成防止）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
 
@@ -1005,4 +1005,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-05-30（`recalculatePersonalityStats` 関数追加；`diagnoseCompatibility` の `big5Key` 生成に `Math.round()` 適用；関数数 30→31 に更新）*
+*最終更新: 2026-06-10（`generateDiary.js` の活動なし判定バグ修正：`parts.length === 0`（未定義変数参照で ReferenceError）→ `!hasActivity`（各サマリー変数の OR 判定）に変更）*

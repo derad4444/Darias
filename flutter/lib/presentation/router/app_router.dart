@@ -12,7 +12,6 @@ import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/todo/todo_detail_screen.dart';
 import '../screens/calendar/schedule_detail_screen.dart';
-import '../screens/diary/diary_list_screen.dart';
 import '../screens/memo/memo_detail_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
@@ -162,13 +161,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // 日記
-      GoRoute(
-        path: '/diary',
-        name: 'diary',
-        builder: (context, state) => const DiaryListScreen(),
-      ),
-
       // メモ詳細
       GoRoute(
         path: '/memo/detail',
@@ -268,8 +260,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/history',
         name: 'history',
         builder: (context, state) {
-          final characterId = state.extra as String?;
-          return UnifiedHistoryScreen(characterId: characterId);
+          final extra = state.extra;
+          final String? characterId;
+          final int initialTab;
+          if (extra is Map<String, dynamic>) {
+            characterId = extra['characterId'] as String?;
+            initialTab = extra['initialTab'] as int? ?? 0;
+          } else {
+            characterId = extra as String?;
+            initialTab = 0;
+          }
+          return UnifiedHistoryScreen(characterId: characterId, initialTab: initialTab);
         },
       ),
 

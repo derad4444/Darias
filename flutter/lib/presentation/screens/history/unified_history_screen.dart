@@ -24,10 +24,12 @@ enum HistoryTab { chat, meeting, diary }
 /// 統合履歴画面
 class UnifiedHistoryScreen extends ConsumerStatefulWidget {
   final String? characterId;
+  final int initialTab;
 
   const UnifiedHistoryScreen({
     super.key,
     this.characterId,
+    this.initialTab = 0,
   });
 
   @override
@@ -42,7 +44,7 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
     // 日記タブが選択されたらバッジをクリア
     _tabController.addListener(_onTabChanged);
   }
