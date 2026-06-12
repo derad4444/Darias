@@ -56,7 +56,11 @@ const scheduledDiaryGeneration = onSchedule(
           logger.info("Diary generated successfully", {userId, characterId});
 
           // FCMプッシュ通知を送信（トークンあり、かつ通知が有効な場合）
-          if (fcmToken && diaryNotificationsEnabled !== false) {
+          if (!fcmToken) {
+            logger.warn("Diary notification skipped: no FCM token", {userId});
+          } else if (diaryNotificationsEnabled === false) {
+            logger.info("Diary notification skipped: disabled by user", {userId});
+          } else {
             try {
               await admin.messaging().send({
                 token: fcmToken,
@@ -82,9 +86,13 @@ const scheduledDiaryGeneration = onSchedule(
               if (notifError.code === "messaging/registration-token-not-registered") {
                 await db.collection("users").doc(userId)
                     .update({fcmToken: admin.firestore.FieldValue.delete()});
-                logger.info("Cleaned up invalid FCM token", {userId});
+                logger.warn("Diary notification skipped: invalid FCM token (cleaned up)", {userId});
               } else {
-                logger.error("Failed to send diary notification", notifError, {userId});
+                logger.error("Diary notification failed", {
+                  userId,
+                  errorCode: notifError.code,
+                  errorMessage: notifError.message,
+                });
               }
             }
           }

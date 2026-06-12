@@ -1017,7 +1017,11 @@ class _TodoTimeWheelPickerState extends State<_TodoTimeWheelPicker> {
             ListWheelScrollView.useDelegate(
               controller: _scrollController,
               itemExtent: 36,
-              physics: const FixedExtentScrollPhysics(),
+              physics: const FixedExtentScrollPhysics(
+                parent: BouncingScrollPhysics(
+                  decelerationRate: ScrollDecelerationRate.fast,
+                ),
+              ),
               diameterRatio: 1.5,
               perspective: 0.003,
               onSelectedItemChanged: widget.onChanged,

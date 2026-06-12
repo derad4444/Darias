@@ -1261,7 +1261,11 @@ class _CalendarYearMonthSelectorState extends State<_CalendarYearMonthSelector> 
         ListWheelScrollView.useDelegate(
           controller: controller,
           itemExtent: 36,
-          physics: const FixedExtentScrollPhysics(),
+          physics: const FixedExtentScrollPhysics(
+            parent: BouncingScrollPhysics(
+              decelerationRate: ScrollDecelerationRate.fast,
+            ),
+          ),
           diameterRatio: 1.5,
           perspective: 0.003,
           onSelectedItemChanged: onChanged,

@@ -711,6 +711,12 @@ Cloud Scheduler による定期実行バッチ。
 - **活動なし時の挙動**: 当日のスケジュール・チャット・Todo・メモ・会議・性格診断が全て空の場合（`hasActivity` フラグで判定）、OpenAI API を呼び出さずに `facts: []`, `ai_comment: ""` で Firestore に保存する（API コスト削減 + 架空活動の生成防止）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
+- **FCM通知ログ出力**: 通知の送信結果は以下のレベルで Functions ログに記録される（Firebase Console > Functions ログで確認可能）
+  - `INFO "Diary notification sent"` — 送信成功
+  - `WARN "Diary notification skipped: no FCM token"` — fcmToken が Firestore に未登録
+  - `INFO "Diary notification skipped: disabled by user"` — `diaryNotificationsEnabled === false`
+  - `WARN "Diary notification skipped: invalid FCM token (cleaned up)"` — トークン無効（Firestore から削除済み）
+  - `ERROR "Diary notification failed"` — その他のエラー（`errorCode` / `errorMessage` を含む）
 
 #### 11. `generateMonthlyReview`
 - **ソース**: `src/functions/generateMonthlyReview.js`

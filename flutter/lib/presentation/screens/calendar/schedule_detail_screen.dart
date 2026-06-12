@@ -1720,7 +1720,11 @@ class _TimeWheelPickerState extends State<_TimeWheelPicker> {
             ListWheelScrollView.useDelegate(
               controller: _scrollController,
               itemExtent: 36,
-              physics: const FixedExtentScrollPhysics(),
+              physics: const FixedExtentScrollPhysics(
+                parent: BouncingScrollPhysics(
+                  decelerationRate: ScrollDecelerationRate.fast,
+                ),
+              ),
               diameterRatio: 1.5,
               perspective: 0.003,
               onSelectedItemChanged: (index) {
@@ -2470,7 +2474,9 @@ class _YearMonthSelectorState extends State<_YearMonthSelector> {
         ListWheelScrollView.useDelegate(
           controller: controller,
           itemExtent: 36,
-          physics: const FixedExtentScrollPhysics(),
+          physics: const FixedExtentScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
           diameterRatio: 1.5,
           perspective: 0.003,
           onSelectedItemChanged: onChanged,
