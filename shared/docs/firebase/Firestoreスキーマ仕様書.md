@@ -2,8 +2,9 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-05-16
+**最終更新日**: 2026-05-30
 **トップレベルコレクション**: 9
+**主な更新**: `users/{userId}/dailyMissions` チャットミッションを2回・6回の2段階に変更、全5ミッション構成
 
 ---
 
@@ -14,8 +15,7 @@
 3. [PersonalityStatsMetadata](#personalitystatsmetadata) - 性格統計メタデータ
 4. [shared_meetings](#shared_meetings) - 6人会議キャッシュ
 5. [contacts](#contacts) - お問い合わせデータ
-6. [ad_analytics](#ad_analytics) - 広告分析データ
-7. [holidays](#holidays) - 祝日データ
+6. [holidays](#holidays) - 祝日データ
 8. [system](#system) - システム設定
 9. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
 
@@ -519,6 +519,43 @@
 
 ---
 
+### `users/{userId}/dailyMissions`
+
+**用途**: デイリーミッションの進捗・達成状況を管理
+**ドキュメントID**: `YYYY-MM-DD`（当日の日付文字列）
+
+**フィールド:**
+
+- **loginDone**: `boolean` - ログインミッション達成フラグ
+- **chatCount**: `number` - 当日のチャット送信回数（上限6でカウント停止）
+- **diaryViewed**: `boolean` - 今日のスケジュールシートを開いたフラグ
+- **diaryRead**: `boolean` - カレンダーの日記アイコンをタップしたフラグ
+- **allCompleted**: `boolean` - 全5ミッション達成フラグ。達成時にカレンダーに⭐が表示される。読み込み時は `loginDone && chatCount >= 6 && diaryViewed && diaryRead` から再計算する（Firestoreの保存値は参照しない）
+- **completedAt**: `timestamp?` - 全達成した日時
+
+**書き込みタイミング:**
+- `loginDone`: アプリ初回起動時（`_checkAndShowDailyMission`）
+- `chatCount`: チャット送信成功後（`incrementChat()`）。chat6Done（chatCount >= 6）達成後はカウント停止
+- `diaryViewed`: カレンダー画面で今日の日付セルをタップしてスケジュールボトムシートを開いた時
+- `diaryRead`: カレンダー画面のスケジュールシートで日記アイコンをタップした時（`markDiaryRead()`）
+
+**ミッション定義:**
+| キー | 説明 | 達成条件 |
+|------|------|--------|
+| login | ログイン | 当日初回アプリ起動時に自動達成 |
+| chat2 | チャットを2回する | chatCount >= 2 |
+| chat6 | チャットを6回する | chatCount >= 6 |
+| schedule | 今日のスケジュールを確認する | 当日日付のカレンダーシートを開く |
+| diary | 日記を確認する | カレンダーのスケジュールシートで日記アイコンをタップ |
+
+**関連ファイル:**
+- `flutter/lib/data/models/daily_mission_model.dart`
+- `flutter/lib/data/datasources/remote/daily_mission_datasource.dart`
+- `flutter/lib/presentation/providers/daily_mission_provider.dart`
+- `flutter/lib/presentation/widgets/daily_mission_sheet.dart`
+
+---
+
 ### `users/{userId}/friendNotifications`
 
 **用途**: フレンドが自分との相性診断を実行したことを通知するドキュメントを保管。フレンドタブの未読バッジ表示に使用
@@ -578,6 +615,7 @@
 
 **用途**: BIG5性格診断の解析結果を保存（共有・キャッシュ用）
 **ドキュメントID**: `O{openness}_C{conscientiousness}_E{extraversion}_A{agreeableness}_N{neuroticism}_{gender}`
+（各スコアは `Math.round()` で整数化した値。`{gender}` は `"男性"` / `"女性"` / `"neutral"`。例: `O3_C4_E2_A5_N1_女性`）
 
 **フィールド:**
 
@@ -621,14 +659,25 @@
 
 **フィールド:**
 
-- **total_completed_users**: `number` - 100問完了したユーザー数
+- **total_completed_users**: `number` - 性格診断完了（`personalityKey` 設定済み）の性格数。Firebase Authentication の全ユーザー数とは異なる（スプレッドシート表示名: 「総性格数（診断完了）」）
 - **unique_personality_types**: `number` - ユニークな性格タイプ数
 - **gender_distribution**: `map` - 性別分布
-  - **male**: `number` - 男性ユーザー数
-  - **female**: `number` - 女性ユーザー数
+  - **female**: `number` - 女性（`personalityKey` が `_女性` 末尾）
+  - **male**: `number` - 男性（`personalityKey` が `_男性` 末尾）
+  - **neutral**: `number` - 未設定
 - **personality_counts**: `map` - 各性格タイプの人数
-  - **{personalityKey}**: `number` - 各性格タイプのユーザー数
-- **last_updated**: `timestamp` - 統計更新日時
+  - **{personalityKey}**: `number` - 各性格タイプの人数（例: `"O3_C4_E2_A5_N1_女性": 3`）
+- **element_counts**: `map` - 元素ごとの人数
+  - **{element}**: `number` - 元素名（炎/風/雷/光/水/土/氷/闇/無）ごとの人数
+- **type_name_counts**: `map` - タイプ名ごとの人数
+  - **{typeName}**: `number` - タイプ名（例: `"場を沸かす炎タイプ"`, `"独り燃える炎タイプ"`）ごとの人数
+- **personality_details**: `map` - `personalityKey` ごとの詳細情報
+  - **{personalityKey}**: `map`
+    - **element**: `string` - 元素（例: `"炎"`）
+    - **typeName**: `string` - タイプ名（例: `"場を沸かす炎タイプ"`）
+    - **count**: `number` - 人数
+
+**データソース**: `recalculatePersonalityStats` Cloud Function が `collectionGroup("details")` で全ユーザーの `details/current` を走査して集計。`element`/`typeName` が Firestore 未保存の場合は `axisScores` から計算して補完。
 
 **アクセス権限**: 認証ユーザー読み取り可、書き込みは不可（Cloud Functionのみ）
 
@@ -702,24 +751,6 @@
 - **userEmailId**: `string` - ユーザー宛メールID
 - **adminEmailId**: `string` - 管理者宛メールID
 - **emailSentAt**: `timestamp` - メール送信日時
-
-**アクセス権限**: 認証済みユーザーは作成可、読み取り・更新・削除は不可
-
----
-
-## `ad_analytics`
-
-**用途**: 広告表示・クリックのトラッキング
-**ドキュメントID**: 自動生成UUID
-
-**フィールド:**
-
-- **userId**: `string` - ユーザーID
-- **timestamp**: `timestamp` - イベント発生日時
-- **type**: `string` - イベントタイプ（例: "banner_impression", "interstitial_shown", "rewarded_earned"）
-- **screen**: `string` - 広告表示場所（例: "home", "settings"）
-- **user_tier**: `string` - ユーザー階層（"free", "premium"）
-- **metadata**: `map` - イベント固有のメタデータ（オプション）
 
 **アクセス権限**: 認証済みユーザーは作成可、読み取り・更新・削除は不可
 
@@ -901,14 +932,13 @@ Big5Analysis/{personalityKey}
 | `PersonalityStatsMetadata` | 認証ユーザー | Cloud Functionのみ |
 | `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
-| `ad_analytics` | 不可 | 認証ユーザー（作成のみ） |
 | `holidays` | 全員 | 管理者のみ |
 | `system` | 全員 | 不可 |
 | `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
 
 ---
 
-**最終更新**: 2026-05-16（キャラクター成長システム追加: `signalCount` をもとにした3段階成長（赤ちゃん→幼少期→大人）をローカルアセット表示に変更。Firebase Storage の性格画像は非使用に。成長閾値: 0-29=赤ちゃん, 30-99=幼少期（元素別）, 100+=大人（元素×性別別））
+**最終更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
 **前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
 **前回更新**: 2026-05-02（`users/{userId}.lastLoginAt` フィールド追加；`posts.analysis_result` の max_tokens 記述を削除）  
 **前回更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  

@@ -150,6 +150,11 @@ Object.defineProperty(exports, "generatePersonalityNarrative", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "recalculatePersonalityStats", {
+  get: () => require("./const/recalculatePersonalityStats").recalculatePersonalityStats,
+  enumerable: true,
+});
+
 // ヘルスチェック関数は直接エクスポート（軽量）
 const {health} = require("./health");
 exports.health = health;

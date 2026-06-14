@@ -43,7 +43,8 @@ const CATEGORY_CONFIGS = {
 // BIG5指紋・キャッシュキー生成
 // ============================================================
 function toFingerprint(info) {
-  return `o${info.openness}c${info.conscientiousness}e${info.extraversion}a${info.agreeableness}n${info.neuroticism}`;
+  const r = Math.round;
+  return `o${r(info.openness)}c${r(info.conscientiousness)}e${r(info.extraversion)}a${r(info.agreeableness)}n${r(info.neuroticism)}`;
 }
 
 // ============================================================

@@ -6,7 +6,7 @@ const db = admin.firestore();
 
 /**
  * PersonalityStatsMetadata統計を更新する内部関数
- * @param {string} personalityKey - 性格キー (例: "O3_C4_E3_A4_N2_female")
+ * @param {string} personalityKey - 性格キー (例: "O3_C4_E3_A4_N2_女性")
  * @param {string} userId - ユーザーID (ログ用)
  * @return {Promise<Object>} - 更新結果
  */
@@ -93,10 +93,12 @@ async function updateStatsTransaction(personalityKey) {
 /**
  * personalityKey から性別を抽出
  * @param {string} personalityKey - 性格キー
- * @return {string} - "female" or "male"
+ * @return {string} - "female" or "male" or "neutral"
  */
 function extractGender(personalityKey) {
-  return personalityKey.endsWith('_female') ? 'female' : 'male';
+  if (personalityKey.endsWith('_female') || personalityKey.endsWith('_女性')) return 'female';
+  if (personalityKey.endsWith('_male') || personalityKey.endsWith('_男性')) return 'male';
+  return 'neutral';
 }
 
 module.exports = { updatePersonalityStats };

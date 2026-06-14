@@ -16,6 +16,7 @@ const TAG_AXIS_MAP = {
   data_driven:          { judgment: +1, processing: +1 },
   cooperative_language: { relationship: +1 },
   independent_stance:   { relationship: -1 },
+  self_paced:           { relationship: -1 },
   change_seeking:       { lifestyle: -1, processing: -1 },
   worry_anxiety:        { judgment: -1 },
 };

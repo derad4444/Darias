@@ -12,7 +12,7 @@ const VALID_TAGS = new Set([
   'social_reference', 'solo_preference', 'group_activity', 'initiating',
   'quiet_environment', 'planning_language', 'spontaneous_language', 'goal_oriented',
   'emotional_expression', 'logical_reasoning', 'intuitive_decision', 'data_driven',
-  'cooperative_language', 'independent_stance', 'change_seeking', 'worry_anxiety',
+  'cooperative_language', 'independent_stance', 'self_paced', 'change_seeking', 'worry_anxiety',
 ]);
 
 // タグ保存 + signalCountインクリメント（トランザクション）→ 新しいカウントを返す

@@ -8,8 +8,9 @@
  */
 function generatePersonalityKey(big5, gender) {
   const baseKey = (
-    `O${big5.openness}_C${big5.conscientiousness}_E${big5.extraversion}_` +
-    `A${big5.agreeableness}_N${big5.neuroticism}`
+    `O${Math.round(big5.openness)}_C${Math.round(big5.conscientiousness)}_` +
+    `E${Math.round(big5.extraversion)}_A${Math.round(big5.agreeableness)}_` +
+    `N${Math.round(big5.neuroticism)}`
   );
 
   // genderが指定されている場合は末尾に追加

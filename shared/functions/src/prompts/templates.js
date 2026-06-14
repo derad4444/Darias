@@ -393,7 +393,10 @@ chatの場合:
 social_reference/solo_preference/group_activity/initiating/quiet_environment/
 planning_language/spontaneous_language/goal_oriented/emotional_expression/
 logical_reasoning/intuitive_decision/data_driven/cooperative_language/
-independent_stance/change_seeking/worry_anxiety
+independent_stance/self_paced/change_seeking/worry_anxiety
+
+タグの判定基準（抜粋）:
+- self_paced: 自分のペースや方法を優先する発言（「自分でやった方が早い」「合わせるのが苦手」「マイペースに」「人に頼まずに」）
 
 タグなし例:{"type":"chat","tags":[]}
 タグあり例:{"type":"chat","tags":["emotional_expression","social_reference"]}

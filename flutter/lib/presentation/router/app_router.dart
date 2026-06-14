@@ -31,8 +31,10 @@ import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 import '../screens/character/character_animation_test_screen.dart';
 import '../screens/character/personality_history_screen.dart';
-import '../screens/game/game_lobby_screen.dart';
-import '../screens/game/game_screen.dart';
+// [ローグライク試作] 削除時はこのimport3行とルート3行を消す
+import '../../features/roguelike/screens/roguelike_home_screen.dart';
+import '../../features/roguelike/screens/roguelike_game_screen.dart';
+import '../../features/roguelike/screens/roguelike_result_screen.dart';
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
@@ -316,16 +318,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CharacterAnimationTestScreen(),
       ),
 
-      // ゲーム（元素陣取り）
+      // [ローグライク試作] 削除時はこのGoRoute3つを消す
       GoRoute(
-        path: '/game',
-        name: 'game-lobby',
-        builder: (context, state) => const GameLobbyScreen(),
+        path: '/roguelike',
+        name: 'roguelike',
+        builder: (context, state) => const RoguelikeHomeScreen(),
       ),
       GoRoute(
-        path: '/game/battle',
-        name: 'game-battle',
-        builder: (context, state) => const GameScreen(),
+        path: '/roguelike/game',
+        name: 'roguelike-game',
+        builder: (context, state) => const RoguelikeGameScreen(),
+      ),
+      GoRoute(
+        path: '/roguelike/result',
+        name: 'roguelike-result',
+        builder: (context, state) => const RoguelikeResultScreen(),
       ),
 
     ],

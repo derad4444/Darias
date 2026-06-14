@@ -9,6 +9,7 @@ function createEnvSecret(name) {
 const OPENAI_API_KEY = createEnvSecret("OPENAI_API_KEY");
 const GMAIL_USER = createEnvSecret("GMAIL_USER");
 const GMAIL_APP_PASSWORD = createEnvSecret("GMAIL_APP_PASSWORD");
+const ADMIN_SECRET = createEnvSecret("ADMIN_SECRET");
 
 // アプリケーション設定
 const CONFIG = {
@@ -50,4 +51,5 @@ module.exports = {
   OPENAI_API_KEY,
   GMAIL_USER,
   GMAIL_APP_PASSWORD,
+  ADMIN_SECRET,
 };

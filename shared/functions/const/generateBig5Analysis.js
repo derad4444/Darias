@@ -195,7 +195,7 @@ ${categories.map((cat) => `- ${categoryDescriptions[cat]}`).join("\n")}
 
 /**
  * personalityKeyから Big5Scores と gender を解析
- * @param {string} personalityKey - "O3_C4_E2_A5_N1_male" 形式
+ * @param {string} personalityKey - "O3_C4_E2_A5_N1_女性" 形式
  * @return {Object} - {big5Scores, gender}
  */
 function parsePersonalityKey(personalityKey) {

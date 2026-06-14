@@ -455,6 +455,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             isOutlined: true,
                             onTap: () => context.push('/history', extra: characterId),
                           ),
+                          // [ローグライク試作] 非表示中（リリース時に復活予定）
+                          // const SizedBox(width: 8),
+                          // _ActionButton(
+                          //   icon: Icons.explore,
+                          //   label: '冒険',
+                          //   accentColor: accentColor,
+                          //   isOutlined: true,
+                          //   onTap: () => context.push('/roguelike'),
+                          // ),
                         ],
                       ),
                     ),
