@@ -195,23 +195,55 @@ class NotificationService {
     final notifyAt = _calcNotifyTime(schedule);
     if (notifyAt == null || notifyAt.isBefore(DateTime.now())) return;
 
-    final title = '予定: ${schedule.title}';
-    final body = _remindLabel(schedule.remindValue, schedule.remindUnit);
-
     if (kIsWeb) {
       _cancelWebTimer(schedule.id);
       final delay = notifyAt.difference(DateTime.now());
       _webTimers[schedule.id] = Timer(delay, () {
-        showWebNotification(title, body: body);
+        showWebNotification('予定: ${schedule.title}',
+            body: _remindLabel(schedule.remindValue, schedule.remindUnit));
       });
       return;
     }
 
     await _localPlugin?.cancel(schedule.id.hashCode);
-    await _localPlugin?.zonedSchedule(
+    await _scheduleLocalNotification(schedule, notifyAt);
+  }
+
+  /// アプリ起動時に呼び出す: 今後の予定通知を近い順に最大60件再登録
+  /// iOSの上限(64件)を超えないよう、全キャンセル後に再登録する
+  Future<void> rescheduleUpcomingNotifications(List<ScheduleModel> schedules) async {
+    if (kIsWeb || _localPlugin == null) return;
+
+    final now = DateTime.now();
+
+    final targets = schedules
+        .where((s) => s.remindUnit.isNotEmpty)
+        .map((s) {
+          final notifyAt = _calcNotifyTime(s);
+          return notifyAt != null && notifyAt.isAfter(now)
+              ? (schedule: s, notifyAt: notifyAt)
+              : null;
+        })
+        .whereType<({ScheduleModel schedule, DateTime notifyAt})>()
+        .toList()
+      ..sort((a, b) => a.notifyAt.compareTo(b.notifyAt));
+
+    // 既存のローカル通知を全クリア（日記通知はFCMのためローカル通知なし）
+    await _localPlugin!.cancelAll();
+
+    // 近い予定から順に最大60件登録
+    for (final item in targets.take(60)) {
+      await _scheduleLocalNotification(item.schedule, item.notifyAt);
+    }
+  }
+
+  Future<void> _scheduleLocalNotification(ScheduleModel schedule, DateTime notifyAt) async {
+    final plugin = _localPlugin;
+    if (plugin == null) return;
+    await plugin.zonedSchedule(
       schedule.id.hashCode,
-      title,
-      body,
+      '予定: ${schedule.title}',
+      _remindLabel(schedule.remindValue, schedule.remindUnit),
       tz.TZDateTime.from(notifyAt, tz.local),
       NotificationDetails(
         android: AndroidNotificationDetails(

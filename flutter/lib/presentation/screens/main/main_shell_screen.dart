@@ -25,6 +25,8 @@ import '../friend/friend_screen.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
+import '../../providers/notification_provider.dart';
+import '../../../data/services/notification_service.dart';
 
 /// 現在選択されているタブのインデックス
 final selectedTabProvider = StateProvider<int>((ref) => 0);
@@ -39,6 +41,7 @@ class MainShellScreen extends ConsumerStatefulWidget {
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   StreamSubscription<Uri?>? _widgetClickSub;
+  bool _hasRescheduledNotifications = false;
 
   @override
   void initState() {
@@ -52,6 +55,15 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       // コールドスタート（ウィジェットタップによるアプリ起動）の処理
       HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
         if (uri != null) _handleWidgetUri(uri);
+      });
+      // 起動時に今後の予定通知を再登録（iOSの64件上限対応）
+      ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
+        if (_hasRescheduledNotifications || !mounted) return;
+        next.whenData((schedules) {
+          if (!ref.read(notificationSettingsProvider).scheduleNotifications) return;
+          _hasRescheduledNotifications = true;
+          NotificationService().rescheduleUpcomingNotifications(schedules);
+        });
       });
       // 初回表示時にすでにデータが揃っている場合も確実にキャッシュ
       // （ref.listenは初期値では発火しないため、ポストフレームで補完）

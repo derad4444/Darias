@@ -1232,6 +1232,10 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     });
 
     try {
+      // iOSのローカル通知上限(64件)を考慮し、繰り返し通知は最初の30件のみ登録
+      const maxRecurringNotifications = 30;
+      int notificationCount = 0;
+
       for (final date in recurringDates) {
         final schedule = ScheduleModel(
           id: const Uuid().v4(),
@@ -1251,8 +1255,10 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
 
         await ref.read(calendarControllerProvider.notifier).addSchedule(schedule);
 
-        if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+        if (ref.read(notificationSettingsProvider).scheduleNotifications &&
+            notificationCount < maxRecurringNotifications) {
           await NotificationService().scheduleForSchedule(schedule);
+          notificationCount++;
         }
 
         if (mounted) {
