@@ -327,13 +327,9 @@ class _CharacterDetailBody extends ConsumerWidget {
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: MediaQuery.of(context).size.height,
-        ),
-        child: IntrinsicHeight(
-          child: Column(
-            children: [
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
               SizedBox(height: MediaQuery.of(context).padding.top),
 
               // 1つ目のバナー広告（キャラクター画像の上）
@@ -408,9 +404,6 @@ class _CharacterDetailBody extends ConsumerWidget {
                 ),
               ),
 
-              // コンテンツが少ない場合にバナーを画面下部に押し下げる
-              const Spacer(),
-
               // 2つ目のバナー広告（性格表示の一番下）
               if (shouldShowBannerAd)
                 Padding(
@@ -420,8 +413,6 @@ class _CharacterDetailBody extends ConsumerWidget {
 
               const SizedBox(height: 16),
             ],
-          ),
-        ),
       ),
     );
   }

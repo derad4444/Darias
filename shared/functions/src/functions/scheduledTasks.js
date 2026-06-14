@@ -88,7 +88,7 @@ const scheduledDiaryGeneration = onSchedule(
                     .update({fcmToken: admin.firestore.FieldValue.delete()});
                 logger.warn("Diary notification skipped: invalid FCM token (cleaned up)", {userId});
               } else {
-                logger.error("Diary notification failed", {
+                logger.error("Diary notification failed", notifError, {
                   userId,
                   errorCode: notifError.code,
                   errorMessage: notifError.message,

@@ -88,6 +88,57 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     FlutterAppBadger.updateBadgeCount(count + (hasNewDiary ? 1 : 0));
   }
 
+  void _showPlanSegmentMenu(BuildContext context, WidgetRef ref) {
+    final size = MediaQuery.of(context).size;
+    final padding = MediaQuery.of(context).padding;
+    final tabWidth = size.width / 5;
+    final tabCenter = tabWidth * 1.5;
+
+    showMenu<PlanSegment>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        tabCenter - 80,
+        size.height - padding.bottom - 170,
+        size.width - tabCenter - 80,
+        padding.bottom + 80,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      items: [
+        PopupMenuItem(
+          value: PlanSegment.schedule,
+          child: Row(children: [
+            const Icon(Icons.calendar_today, size: 18),
+            const SizedBox(width: 10),
+            const Text('予定'),
+          ]),
+        ),
+        PopupMenuItem(
+          value: PlanSegment.memo,
+          child: Row(children: [
+            const Icon(Icons.edit_note, size: 18),
+            const SizedBox(width: 10),
+            const Text('メモ'),
+          ]),
+        ),
+        PopupMenuItem(
+          value: PlanSegment.todo,
+          child: Row(children: [
+            const Icon(Icons.check_circle_outline, size: 18),
+            const SizedBox(width: 10),
+            const Text('タスク'),
+          ]),
+        ),
+      ],
+    ).then((segment) {
+      if (segment == null) return;
+      ref.read(selectedTabProvider.notifier).state = 1;
+      ref.read(planSegmentProvider.notifier).state = segment;
+      clearDiaryBadge(ref).then((_) {
+        if (!kIsWeb) _updateAppBadge(ref);
+      });
+    });
+  }
+
   void _handleWidgetUri(Uri? uri) {
     if (uri == null) return;
     // darias://open/?page=todo  → queryParameters['page'] = 'todo'
@@ -239,6 +290,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                           if (!kIsWeb) _updateAppBadge(ref);
                         });
                       },
+                      onLongPress: () => _showPlanSegmentMenu(context, ref),
                     ),
                     _TabItem(
                       icon: Icons.person_outline,
@@ -284,6 +336,7 @@ class _TabItem extends StatelessWidget {
   final bool isSelected;
   final Color accentColor;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final int badgeCount;
   final bool showBadge;
 
@@ -296,6 +349,7 @@ class _TabItem extends StatelessWidget {
     required this.onTap,
     this.badgeCount = 0,
     this.showBadge = false,
+    this.onLongPress,
   });
 
   @override
@@ -303,45 +357,60 @@ class _TabItem extends StatelessWidget {
     final hasBadge = badgeCount > 0 || showBadge;
     return GestureDetector(
       onTap: onTap,
+      onLongPress: onLongPress,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(
-                  isSelected ? selectedIcon : icon,
-                  color: isSelected ? accentColor : AppColors.textLight,
-                  size: 24,
-                ),
-                if (hasBadge)
-                  Positioned(
-                    top: -4,
-                    right: -6,
-                    child: Container(
-                      constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                      child: badgeCount > 0
-                          ? Text(
-                              badgeCount > 99 ? '99+' : '$badgeCount',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                height: 1.6,
-                              ),
-                              textAlign: TextAlign.center,
-                            )
-                          : const SizedBox(width: 8, height: 8),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      isSelected ? selectedIcon : icon,
+                      color: isSelected ? accentColor : AppColors.textLight,
+                      size: 24,
                     ),
+                    if (hasBadge)
+                      Positioned(
+                        top: -4,
+                        right: -6,
+                        child: Container(
+                          constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: badgeCount > 0
+                              ? Text(
+                                  badgeCount > 99 ? '99+' : '$badgeCount',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.6,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                )
+                              : const SizedBox(width: 8, height: 8),
+                        ),
+                      ),
+                  ],
+                ),
+                if (onLongPress != null) ...[
+                  const SizedBox(width: 3),
+                  Icon(
+                    Icons.unfold_more,
+                    size: 15,
+                    color: isSelected ? accentColor : AppColors.textLight,
                   ),
+                ],
               ],
             ),
             const SizedBox(height: 2),
