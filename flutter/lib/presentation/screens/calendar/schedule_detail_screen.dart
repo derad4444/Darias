@@ -1328,7 +1328,12 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
     if (widget.schedule == null) return;
 
     try {
-      await NotificationService().cancelScheduleNotification(widget.schedule!.id);
+      // 削除後に残るスケジュールを計算（通知再同期用）
+      final currentSchedules = ref.read(allSchedulesProvider).valueOrNull ?? [];
+      final schedulesAfterDelete = deleteAll && widget.schedule!.recurringGroupId != null
+          ? currentSchedules.where((s) => s.recurringGroupId != widget.schedule!.recurringGroupId).toList()
+          : currentSchedules.where((s) => s.id != widget.schedule!.id).toList();
+
       if (deleteAll && widget.schedule!.recurringGroupId != null) {
         await ref
             .read(calendarControllerProvider.notifier)
@@ -1338,6 +1343,12 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
             .read(calendarControllerProvider.notifier)
             .deleteSchedule(widget.schedule!.id);
       }
+
+      // 削除したスケジュールの通知を確実にキャンセルするため全通知を再同期
+      if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+        await NotificationService().rescheduleUpcomingNotifications(schedulesAfterDelete);
+      }
+
       if (mounted) {
         context.pop();
       }

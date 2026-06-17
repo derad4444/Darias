@@ -32,6 +32,7 @@ import '../../../data/services/hint_service.dart';
 import '../../../data/services/notification_service.dart';
 import '../../providers/daily_mission_provider.dart';
 import '../../widgets/daily_mission_sheet.dart' show dailyMissionBottomSheetTriggerProvider;
+import '../../providers/notification_provider.dart' show notificationSettingsProvider;
 
 /// 繰り返し予定の編集モード選択ダイアログ
 Future<RecurringEditMode?> _showRecurringEditChoiceDialog(BuildContext context) {
@@ -2267,7 +2268,12 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
     }
 
     try {
-      await NotificationService().cancelScheduleNotification(schedule.id);
+      // 削除後に残るスケジュールを計算（通知再同期用）
+      final currentSchedules = ref.read(allSchedulesProvider).valueOrNull ?? [];
+      final schedulesAfterDelete = deleteAll && recurringGroupId != null
+          ? currentSchedules.where((s) => s.recurringGroupId != recurringGroupId).toList()
+          : currentSchedules.where((s) => s.id != schedule.id).toList();
+
       if (deleteAll && recurringGroupId != null) {
         await ref
             .read(calendarControllerProvider.notifier)
@@ -2276,6 +2282,11 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
         await ref
             .read(calendarControllerProvider.notifier)
             .deleteSchedule(schedule.id);
+      }
+
+      // 削除したスケジュールの通知を確実にキャンセルするため全通知を再同期
+      if (ref.read(notificationSettingsProvider).scheduleNotifications) {
+        await NotificationService().rescheduleUpcomingNotifications(schedulesAfterDelete);
       }
     } catch (e) {
       if (mounted) {
