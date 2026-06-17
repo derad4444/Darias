@@ -71,7 +71,7 @@ async function generateDiary(characterId, userId) {
   "終日" :
   new Date(data.startDate.toDate()).toLocaleTimeString(
       "ja-JP",
-      {hour: "2-digit", minute: "2-digit"},
+      {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo"},
   );
     return `・${time} ${data.title}`;
   }).join("\n");
@@ -94,7 +94,7 @@ async function generateDiary(characterId, userId) {
   "終日" :
   new Date(data.startDate.toDate()).toLocaleTimeString(
       "ja-JP",
-      {hour: "2-digit", minute: "2-digit"},
+      {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo"},
   );
     return `・${time} ${data.title}`;
   }).join("\n");

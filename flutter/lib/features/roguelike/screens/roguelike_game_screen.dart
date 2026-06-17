@@ -9,6 +9,8 @@ import '../models/enemy.dart';
 import '../providers/roguelike_provider.dart';
 import '../widgets/map_grid_widget.dart';
 import '../widgets/resource_bar_widget.dart';
+import '../../../presentation/providers/character_provider.dart';
+import '../../../presentation/widgets/character/element_effect_widget.dart' show characterGrowthAssetPath;
 
 class RoguelikeGameScreen extends ConsumerWidget {
   const RoguelikeGameScreen({super.key});
@@ -28,6 +30,15 @@ class RoguelikeGameScreen extends ConsumerWidget {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
+    // ホーム画面と同じキャラクター画像パスを取得
+    final details = ref.watch(characterDetailsProvider).valueOrNull;
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    final characterAssetPath = characterGrowthAssetPath(
+      signalCount: signalCount,
+      element: details?.element,
+      gender: details?.gender,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: Text('${gameState.characterName}の冒険'),
@@ -42,7 +53,7 @@ class RoguelikeGameScreen extends ConsumerWidget {
           ResourceBarWidget(state: gameState),
           Expanded(
             child: switch (gameState.phase) {
-              GamePhase.exploring => _ExploringView(state: gameState, ref: ref),
+              GamePhase.exploring => _ExploringView(state: gameState, ref: ref, characterAssetPath: characterAssetPath),
               GamePhase.event     => _EventView(state: gameState, ref: ref),
               GamePhase.battle    => _BattleView(state: gameState, ref: ref),
               _                   => const SizedBox.shrink(),
@@ -78,7 +89,8 @@ class RoguelikeGameScreen extends ConsumerWidget {
 class _ExploringView extends StatelessWidget {
   final GameState state;
   final WidgetRef ref;
-  const _ExploringView({required this.state, required this.ref});
+  final String characterAssetPath;
+  const _ExploringView({required this.state, required this.ref, required this.characterAssetPath});
 
   @override
   Widget build(BuildContext context) {
@@ -114,6 +126,7 @@ class _ExploringView extends StatelessWidget {
             child: MapGridWidget(
               state: state,
               onCellTap: (row, col) => ref.read(roguelikeProvider.notifier).moveToCell(row, col),
+              characterAssetPath: characterAssetPath,
             ),
           ),
         ],

@@ -56,15 +56,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
         if (uri != null) _handleWidgetUri(uri);
       });
-      // 起動時に今後の予定通知を再登録（iOSの64件上限対応）
-      ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
-        if (_hasRescheduledNotifications || !mounted) return;
-        next.whenData((schedules) {
-          if (!ref.read(notificationSettingsProvider).scheduleNotifications) return;
-          _hasRescheduledNotifications = true;
-          NotificationService().rescheduleUpcomingNotifications(schedules);
-        });
-      });
       // 初回表示時にすでにデータが揃っている場合も確実にキャッシュ
       // （ref.listenは初期値では発火しないため、ポストフレームで補完）
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -185,6 +176,15 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     if (!kIsWeb) {
       ref.listen<int>(pendingFriendRequestCountProvider, (_, __) => _updateAppBadge(ref));
       ref.listen<AsyncValue<bool>>(hasNewDiaryProvider, (_, __) => _updateAppBadge(ref));
+      // 起動時に今後の予定通知を再登録（iOSの64件上限対応）
+      ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
+        if (_hasRescheduledNotifications || !mounted) return;
+        next.whenData((schedules) {
+          if (!ref.read(notificationSettingsProvider).scheduleNotifications) return;
+          _hasRescheduledNotifications = true;
+          NotificationService().rescheduleUpcomingNotifications(schedules);
+        });
+      });
     }
 
     if (!kIsWeb) {

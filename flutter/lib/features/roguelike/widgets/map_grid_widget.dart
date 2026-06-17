@@ -7,8 +7,14 @@ import '../models/game_state.dart';
 class MapGridWidget extends StatelessWidget {
   final GameState state;
   final void Function(int row, int col) onCellTap;
+  final String? characterAssetPath;
 
-  const MapGridWidget({super.key, required this.state, required this.onCellTap});
+  const MapGridWidget({
+    super.key,
+    required this.state,
+    required this.onCellTap,
+    this.characterAssetPath,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +36,7 @@ class MapGridWidget extends StatelessWidget {
             cell: cell,
             isReachable: cell.isAdjacentTo(state.playerRow, state.playerCol) && state.phase == GamePhase.exploring,
             onTap: () => onCellTap(row, col),
+            characterAssetPath: cell.isCurrentPosition ? characterAssetPath : null,
           );
         },
       ),
@@ -41,8 +48,14 @@ class _CellWidget extends StatelessWidget {
   final MapCell cell;
   final bool isReachable;
   final VoidCallback onTap;
+  final String? characterAssetPath;
 
-  const _CellWidget({required this.cell, required this.isReachable, required this.onTap});
+  const _CellWidget({
+    required this.cell,
+    required this.isReachable,
+    required this.onTap,
+    this.characterAssetPath,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -75,17 +88,20 @@ class _CellWidget extends StatelessWidget {
             width: cell.isCurrentPosition ? 2 : 1,
           ),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              cell.isVisited || isReachable ? cell.type.emoji : '🌫️',
-              style: const TextStyle(fontSize: 20),
-            ),
-            if (cell.isCurrentPosition)
-              const Text('▲', style: TextStyle(fontSize: 8, color: Colors.blue)),
-          ],
-        ),
+        child: cell.isCurrentPosition && characterAssetPath != null
+            ? Padding(
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  characterAssetPath!,
+                  fit: BoxFit.contain,
+                ),
+              )
+            : Center(
+                child: Text(
+                  cell.isVisited || isReachable ? cell.type.emoji : '🌫️',
+                  style: const TextStyle(fontSize: 20),
+                ),
+              ),
       ),
     );
   }
