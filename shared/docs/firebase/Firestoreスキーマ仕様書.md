@@ -2,9 +2,9 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-05-30
-**トップレベルコレクション**: 9
-**主な更新**: `users/{userId}/dailyMissions` チャットミッションを2回・6回の2段階に変更、全5ミッション構成
+**最終更新日**: 2026-07-10
+**トップレベルコレクション**: 10
+**主な更新**: `techou_survey_responses`（手帳タブ廃止アンケートの匿名回答）を追加
 
 ---
 
@@ -15,7 +15,8 @@
 3. [PersonalityStatsMetadata](#personalitystatsmetadata) - 性格統計メタデータ
 4. [shared_meetings](#shared_meetings) - 6人会議キャッシュ
 5. [contacts](#contacts) - お問い合わせデータ
-6. [holidays](#holidays) - 祝日データ
+6. [techou_survey_responses](#techou_survey_responses) - 手帳タブ廃止アンケート（匿名回答）
+7. [holidays](#holidays) - 祝日データ
 8. [system](#system) - システム設定
 9. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
 
@@ -611,6 +612,67 @@
 
 ---
 
+### `users/{userId}/roguelike_runs`
+
+**用途**: ローグライク冒険ゲーム「心の迷宮」の冒険履歴（試作機能）
+**ドキュメントID**: 自動採番（`add`）
+**書き込み**: 冒険終了時に結果画面で1件保存（`RoguelikeDatasource.saveRun`）
+**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
+
+**フィールド:**
+
+- **characterName**: `string` - 冒険したキャラクター名
+- **element**: `string` - 本編での元素タイプ
+- **inferredElement**: `string` - 冒険中の行動から推定した元素（「無」あり）
+- **result**: `string` - 終了種別（`clear` / `retreat` / `timeUp` / `failed`、中断時は `retreat`）
+- **title**: `string` - 獲得した称号
+- **topTrait**: `string` - 最も高かった行動特性名
+- **traits**: `map<string,int>` - 10特性のスコア
+- **growthStage**: `string` - 成長段階（`baby` / `young` / `adult`）
+- **dungeonId**: `string` - 挑戦したダンジョン（悩み）のID
+- **worry**: `string` - 挑戦した悩みの名前
+- **enemiesDefeated**: `int` - 倒した敵の数
+- **visitedCount**: `int` - 到達（探索）したマス数
+- **finalHp / finalFood / finalMoney / finalItems / finalBond**: `int` - 終了時の各リソース（`finalItems` は回復薬の所持数。`finalBond` は相棒がいた時のみ意味を持つ。相棒不在時は0）
+- **hadCompanion**: `bool` - 冒険終了時点で相棒（仲間）がいたか
+- **companionName**: `string` - 相棒の名前（不在時は空文字）
+- **createdAt**: `timestamp` - 保存時刻（サーバ時刻）
+
+> 詳細なゲーム仕様は `shared/docs/game/ローグライク冒険ゲーム仕様書.md` を参照。
+
+---
+
+### `users/{userId}/roguelike_clears`
+
+**用途**: ローグライク「心の迷宮」で**克服した悩み（ダンジョン）の記録（心の図鑑）**
+**ドキュメントID**: `dungeonId`（悩みのID。1悩み1ドキュメントで冪等）
+**書き込み**: ボス撃破でダンジョンをクリアした時に結果画面で記録（`RoguelikeDatasource.recordClear`、`set(merge:true)`）
+**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
+
+**フィールド:**
+
+- **worry**: `string` - 克服した悩みの名前
+- **clearedAt**: `timestamp` - 克服した時刻（サーバ時刻）
+
+> 用途: タイトルのダンジョン選択画面で「克服済み」表示・最終ダンジョン解禁判定に使う。
+
+---
+
+### `users/{userId}/roguelike_meta/codex`
+
+**用途**: ローグライク「心の迷宮」の**図鑑（出会ったイベント・敵・獲得した称号の累積）**。結果画面の「冒険で解放したもの」表示に使う。
+**ドキュメントID**: 固定 `codex`（ユーザーごとに1件）
+**書き込み**: 冒険終了時に結果画面で `arrayUnion` 追記（`RoguelikeDatasource.recordCodex`、`set(merge:true)`）
+**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
+
+**フィールド:**
+
+- **events**: `array<string>` - 出会ったイベントIDの累積
+- **enemies**: `array<string>` - 出会った敵IDの累積
+- **titles**: `array<string>` - 獲得した称号の累積
+
+---
+
 ## `Big5Analysis`
 
 **用途**: BIG5性格診断の解析結果を保存（共有・キャッシュ用）
@@ -753,6 +815,31 @@
 - **emailSentAt**: `timestamp` - メール送信日時
 
 **アクセス権限**: 認証済みユーザーは作成可、読み取り・更新・削除は不可
+
+---
+
+## `techou_survey_responses`
+
+**用途**: 手帳タブの廃止を検討するにあたり、ユーザーの意見を収集する匿名アンケートの回答を保存。手帳タブを開くと内容の上にポップアップ（`TechouSurveyPopup`）が**必須**で表示され、回答するまで手帳内容を操作できない。誰の回答かは保持しない（匿名）。
+**ドキュメントID**: 自動採番（`add`）
+
+**フィールド:**
+
+- **choice**: `string` - 選択された選択肢のキー（`keepAll` / `keepSchedule` / `keepTodo` / `keepMemo` / `removeAll` / `unsure`）。集計キー
+- **choiceLabel**: `string` - 選択肢の表示ラベル（例: "手帳タブは全部残してほしい"）
+- **comment**: `string` - 自由コメント（任意・最大500文字）
+- **appVersion**: `string` - アプリバージョン（例: "3.3.5 (23)"）
+- **platform**: `string` - プラットフォーム（"ios" / "android" / "web" / "other"）
+- **answeredAt**: `timestamp` - 回答日時（サーバー時刻）
+
+**アクセス権限**: 認証済みユーザーは作成のみ可、読み取り・更新・削除は不可（集計はコンソール/管理SDK）
+
+**関連実装:**
+- Flutter: `lib/data/datasources/remote/survey_datasource.dart`（送信）、`lib/presentation/providers/survey_provider.dart`（選択肢定義・回答済みフラグ）、`lib/presentation/screens/plan/techou_survey_screen.dart`（`TechouSurveyPopup` UI）、`lib/presentation/screens/plan/plan_screen.dart`（手帳内容にStackで重ねて表示）
+- **必須**: スキップ不可。回答（送信）して初めてポップアップが閉じ、手帳内容が使える。
+- 回答済みの再表示抑止は端末ローカル（SharedPreferences `techou_survey_answered_v1`）で管理。**同一端末では回答後に二度と表示されない**が、匿名コレクションのため再インストール・別端末をまたいだ重複防止はしていない（許容）。
+- 配色は他画面と同じテーマ（`accentColorProvider` / `colorSettingsProvider.textColor` / `backgroundGradientProvider`）に合わせている。
+- **施策終了後の後片付け**: このコレクションを削除し、`firestore.rules` の該当ブロックと上記Flutterのポップアップ表示を除去する
 
 ---
 

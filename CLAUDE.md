@@ -93,8 +93,51 @@
 
 - `git push` はユーザーから明示的に依頼があるまで絶対に行わない
 - 動作確認前にプッシュしない
-- コード変更後は毎回アプリを再起動する（Flutter Web: Chromeプロセスをosascriptで終了 → flutter run）
-- ChromeはSIGKILL(-9)で終了しない（SharedPreferences/Firebase Authデータが消える）
+- コード変更後は毎回アプリを再起動する
+- **アプリ起動は iOSシミュレータで行う（既定）。** ユーザーから明示的にWebを指定された場合のみ Flutter Web を使う
+
+#### iOSシミュレータ起動手順（既定・重要）
+
+**今後アプリを起動・再起動するときは、特に指定がなければ iOSシミュレータで開くこと。**
+
+iOS debug の App Check は `lib/main.dart` で `AppleDebugProvider`（デバッグトークンをコードに直接記載）を使うため、Webのような `--dart-define=WEB_APP_CHECK_DEBUG_TOKEN=...` は不要。
+
+正しい手順:
+1. シミュレータを起動（未起動なら）:
+   ```
+   open -a Simulator
+   xcrun simctl boot "iPhone 16 Pro"   # 起動済みなら無視してよい
+   ```
+2. 既存の `flutter run`（iOS）プロセスがあれば停止してから起動する。`flutter run` でシミュレータ上に起動:
+   ```
+   flutter run -d "iPhone 16 Pro"
+   ```
+   - 接続先デバイスIDが不明なときは `flutter devices` で確認する。
+   - pubspec.yaml に新パッケージを追加した場合は起動前に `cd ios && pod install` を実行する。
+3. コード変更後の反映はプロセスを再起動する（`flutter run` を停止 → 再実行）。ホットリスタート（`R`）でも可だが、確実を期すなら再起動する。
+
+#### Flutter Web 再ビルド手順（ユーザーがWebを指定した場合のみ）
+
+**`flutter run -d chrome` を使わない。** これを使うと再ビルドのたびに新しいChromeタブ／ウィンドウが開かれてしまう（既存Chromeがプロファイルをロックしていると起動失敗もする）。Chrome自体はSIGKILL(-9)で終了しない（SharedPreferences/Firebase Authデータが消える）。
+
+正しい手順:
+1. 既存のFlutterプロセスを停止: `lsof -ti:8080 | xargs kill -9`
+2. **`web-server` モードで起動**（ブラウザを自動で開かない）:
+   ```
+   flutter run -d web-server --web-port=8080 --dart-define=WEB_APP_CHECK_DEBUG_TOKEN=6c6674e4-dc43-4eb2-97a9-2dd004888428
+   ```
+3. **既存のChromeウィンドウのタブをリロードして反映**（新しいタブは開かない）:
+   ```
+   osascript -e 'tell application "Google Chrome"
+     repeat with w in windows
+       repeat with t in tabs of w
+         if (URL of t) contains "localhost:8080" then tell t to reload
+       end repeat
+     end repeat
+   end tell'
+   ```
+
+※ web-serverモードはブラウザを開かないため、再起動後は必ず上記osascriptで既存タブをリロードすること（F5リロードでも可だが手動誘導より自動リロードが確実）。Chrome自体は終了させない。
 
 ### ユーザーが自分で行う手順の案内
 
@@ -115,7 +158,7 @@
 
 ## プロジェクト情報
 
-- Flutter: `/Users/onoderaryousuke/Desktop/development-D/DARIAS/flutter`
-- Cloud Functions: `/Users/onoderaryousuke/Desktop/development-D/DARIAS/shared/functions`
+- Flutter: `/Users/onoderaryousuke/dev/DARIAS/flutter`
+- Cloud Functions: `/Users/onoderaryousuke/dev/DARIAS/shared/functions`
 - Firebase project: `my-character-app`
 - State management: Riverpod / Router: GoRouter / DB: Firestore

@@ -22,6 +22,8 @@ import '../plan/plan_screen.dart';
 import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
+import '../../../features/roguelike/screens/roguelike_home_screen.dart';
+import '../../../features/roguelike/screens/game_development_popup.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
@@ -94,7 +96,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   void _showPlanSegmentMenu(BuildContext context, WidgetRef ref) {
     final size = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
-    final tabWidth = size.width / 5;
+    final tabWidth = size.width / 6;
     final tabCenter = tabWidth * 1.5;
 
     showMenu<PlanSegment>(
@@ -255,7 +257,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ),
           // タブ3: フレンド
           const FriendScreen(),
-          // タブ4: 設定
+          // タブ4: 冒険（ローグライク）※開発中のため、上にポップアップを重ねてプレイ不可にする
+          const Stack(
+            children: [
+              RoguelikeHomeScreen(),
+              GameDevelopmentPopup(),
+            ],
+          ),
+          // タブ5: 設定
           const SettingsScreen(),
         ],
       ),
@@ -322,12 +331,21 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
                     ),
                     _TabItem(
-                      icon: Icons.settings_outlined,
-                      selectedIcon: Icons.settings,
-                      label: '設定',
+                      // 開発中を示す工事中アイコン
+                      icon: Icons.construction_outlined,
+                      selectedIcon: Icons.construction,
+                      label: '冒険',
                       isSelected: selectedTab == 4,
                       accentColor: accentColor,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
+                    ),
+                    _TabItem(
+                      icon: Icons.settings_outlined,
+                      selectedIcon: Icons.settings,
+                      label: '設定',
+                      isSelected: selectedTab == 5,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 5,
                     ),
                   ],
                 ),

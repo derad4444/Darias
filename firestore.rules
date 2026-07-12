@@ -60,6 +60,13 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // 手帳タブ廃止アンケート（匿名回答）- 認証済みユーザーは作成のみ可能
+    // 読み取り・更新・削除はコンソール/管理SDKのみ
+    match /techou_survey_responses/{responseId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false;
+    }
+
     // 全ての他のドキュメントはアクセス拒否
     match /{document=**} {
       allow read, write: if false;
