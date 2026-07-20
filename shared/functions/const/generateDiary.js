@@ -56,6 +56,8 @@ async function generateDiary(characterId, userId) {
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
+  // 手帳（予定）機能の廃止に伴い、予定の取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
+  /*
   // 今日のスケジュール取得 (ユーザー固有のスケジュール)
   const scheduleSnap = await db.collection("users").doc(userId)
       .collection("schedules")
@@ -98,6 +100,7 @@ async function generateDiary(characterId, userId) {
   );
     return `・${time} ${data.title}`;
   }).join("\n");
+  */
 
   // 今日のチャット(Post)取得
   const postSnap = await db.collection("users").doc(userId)
@@ -114,6 +117,8 @@ async function generateDiary(characterId, userId) {
     return `・「${data.content}」`;
   }).join("\n");
 
+  // 手帳（タスク・メモ）機能の廃止に伴い、タスク・メモの取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
+  /*
   // 今日完了したToDo取得（上位3件）
   const completedTodoSnap = await db.collection("users").doc(userId)
       .collection("todos")
@@ -160,6 +165,31 @@ async function generateDiary(characterId, userId) {
     const data = doc.data();
     return `・${data.title}`;
   }).join("\n");
+  */
+
+  // 今日の冒険（心の迷宮＝ローグライク）のプレイ記録（上位3件）
+  let roguelikeSummary = "";
+  try {
+    const runSnap = await db.collection("users").doc(userId)
+        .collection("roguelike_runs")
+        .where("createdAt", ">=", today)
+        .where("createdAt", "<", tomorrow)
+        .orderBy("createdAt", "desc")
+        .limit(3)
+        .get();
+    roguelikeSummary = runSnap.docs.map((doc) => {
+      const d = doc.data();
+      const worry = d.worry || "悩み";
+      const resultText = d.result === "clear" ? `「${worry}」を克服した` :
+        d.result === "retreat" ? `「${worry}」から撤退した` :
+        d.result === "failed" ? `「${worry}」に挑んで力尽きた` :
+        `「${worry}」に挑戦した`;
+      const defeated = d.enemiesDefeated ? `（敵${d.enemiesDefeated}体撃破）` : "";
+      return `・${resultText}${defeated}`;
+    }).join("\n");
+  } catch (e) {
+    // roguelike_runs が無い/未整備の場合はスキップ
+  }
 
   // 今日の性格診断進捗取得（BIG5回答セッション）
   let big5ProgressSummary = "";
@@ -240,8 +270,11 @@ async function generateDiary(characterId, userId) {
   }
 
   // 活動がない場合はAI呼び出しをスキップして空データで保存
-  const hasActivity = scheduleSummary || chatSummary || completedTodoSummary ||
-      createdTodoSummary || memoSummary || meetingSummary || big5ProgressSummary;
+  // 手帳廃止に伴い、予定/タスク/メモを除外し冒険を追加（旧はコメントで残置・復活時に戻す）:
+  // const hasActivity = scheduleSummary || chatSummary || completedTodoSummary ||
+  //     createdTodoSummary || memoSummary || meetingSummary || big5ProgressSummary;
+  const hasActivity = chatSummary || meetingSummary ||
+      big5ProgressSummary || roguelikeSummary;
   if (!hasActivity) {
     const diaryRef = db.collection("users").doc(userId)
         .collection("characters").doc(characterId)
@@ -271,18 +304,23 @@ async function generateDiary(characterId, userId) {
   }
 
   // アクティビティベースのプロンプト作成
+  // 手帳廃止に伴い、引数から予定/タスク/メモ/明日の予定を外し roguelikeSummary を追加（旧はコメントで残置・復活時に戻す）:
+  /*
+  const prompt = OPTIMIZED_PROMPTS.activityDiary(
+      characterType, big5, gender,
+      scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary,
+      meetingSummary, big5ProgressSummary, tomorrowScheduleSummary,
+      favoriteWord, wordTendency, dream, strength,
+  );
+  */
   const prompt = OPTIMIZED_PROMPTS.activityDiary(
       characterType,
       big5,
       gender,
-      scheduleSummary,
       chatSummary,
-      completedTodoSummary,
-      createdTodoSummary,
-      memoSummary,
       meetingSummary,
       big5ProgressSummary,
-      tomorrowScheduleSummary,
+      roguelikeSummary,
       favoriteWord,
       wordTendency,
       dream,

@@ -23,6 +23,11 @@ Object.defineProperty(exports, "generateBig5Analysis", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "generateAdventureDiagnosis", {
+  get: () => require("./const/generateAdventureDiagnosis").generateAdventureDiagnosis,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "scheduledHolidays", {
   get: () => require("./src/functions/scheduledTasks").scheduledHolidays,
   enumerable: true,

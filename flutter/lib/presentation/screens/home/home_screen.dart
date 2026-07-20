@@ -29,7 +29,6 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
 import '../../widgets/character/element_effect_widget.dart';
-import '../../widgets/inline_hint_banner.dart';
 import '../../providers/daily_mission_provider.dart';
 import '../../widgets/daily_mission_sheet.dart';
 import '../../../data/models/daily_mission_model.dart';
@@ -68,9 +67,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     // 機能案内
     'チャットを続けると性格タイプが解析されてキャラクターが変わるよ！',
     'キャラクター詳細画面でどんな性格か確認してみてね',
-    '「〇月〇日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！',
-    '「〇〇をメモしておいて」って話しかけるとノートにメモを残しておくよ！',
-    '「〇〇をタスクに追加して」って言ってくれればタスクとして登録しておくね！',
+    // 手帳廃止に伴い差し替え（旧文はコメントで残置・復活時に戻す）:
+    // '「〇月〇日に〇〇の予定あるよ」と教えてくれれば予定追加しておくね！',
+    // '「〇〇をメモしておいて」って話しかけるとノートにメモを残しておくよ！',
+    // '「〇〇をタスクに追加して」って言ってくれればタスクとして登録しておくね！',
+    '「冒険」タブの「心の迷宮」に挑戦すると、選択の傾向からあなたの心を診断できるよ！',
     'アプリの使い方がわからないことがあったら何でも話しかけてみて！できる限り答えるよ',
     '日記は毎日自動で書かれるよ。履歴ボタンから確認してみてね！',
     '自分会議では6人の私があなたの悩みを多角的に議論するよ。悩みがあったら試してみてね！',
@@ -353,14 +354,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                     gender: userAsync.valueOrNull?.characterGender,
                   ),
                 ),
-              ),
-
-              // ホームヒントバナー（初回のみ・上部）
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                child: HomeHintBanner(userId: ref.watch(currentUserIdProvider) ?? ''),
               ),
 
               // 下部UI（操作エリア）

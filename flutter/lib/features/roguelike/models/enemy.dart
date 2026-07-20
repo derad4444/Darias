@@ -2,25 +2,64 @@
 
 import 'game_state.dart';
 import 'action_log.dart';
+import 'outcome.dart';
 
-class BattleChoice {
+/// 敵（悩み）ごとの性質。HP以外の個性を表す。
+enum EnemyTrait {
+  interpersonal, // 対人関係の悩み: 反撃で絆を削る
+  futureAnxiety, // 将来不安: 反撃で食料/金を奪い、長引くほど強くなる
+  selfDenial,    // 自己否定: 反撃で選択肢を封じる。逃げると悪化
+  boss,          // 最終ダンジョンの守護者: 強烈な反撃＋長期戦で強化
+  generic,       // ザコ（もやもや等）: 個性の薄い小さな障害
+}
+
+class BattleChoice with WeightedChoice {
   final String label;
-  final String resultText;
-  final int damageToEnemy;
-  final int damageToPlayer;
-  final Map<String, int> resourceChanges;
-  final ActionLog traitDelta;
+
+  /// 選ぶ前に表示する短いヒント。
+  final String riskHint;
+
+  /// 選んだ瞬間に確定で支払うコスト（例: {'items': -1}）。
+  final Map<String, int> upfrontCost;
+
+  /// この選択を「選んだ」こと自体が示す判断傾向。成功/失敗・逃走可否に関わらず加算される。
+  final ActionLog selectTrait;
+
+  /// 重み付きで抽選される結果。damageToEnemy / damageToPlayer / resourceChanges を持つ。
+  @override
+  final List<Outcome> outcomes;
+
+  /// 逃走アクションか（成功で戦闘離脱、敵によっては悪化）。
+  final bool isFlee;
+
   final GrowthStage minStage;
+
+  /// この選択肢は相棒（仲間）がいる時だけ出す。不在時は非表示。
+  final bool requiresCompanion;
+
+  /// この選択肢は回復薬を消費する。所持0の時は非表示。
+  final bool requiresItem;
+
+  /// この選択肢は1回の戦闘で1度だけ使える（使うとその戦闘中は非表示）。
+  /// ボス特効のような強力な一手向け。
+  final bool oncePerBattle;
 
   const BattleChoice({
     required this.label,
-    required this.resultText,
-    this.damageToEnemy = 0,
-    this.damageToPlayer = 0,
-    this.resourceChanges = const {},
-    this.traitDelta = const ActionLog(),
+    this.riskHint = '',
+    this.upfrontCost = const {},
+    this.selectTrait = const ActionLog(),
+    this.outcomes = const [],
+    this.isFlee = false,
     this.minStage = GrowthStage.baby,
+    this.requiresCompanion = false,
+    this.requiresItem = false,
+    this.oncePerBattle = false,
   });
+
+  /// この選択肢が与えうる最大ダメージ（封じ対象を選ぶのに使う）。
+  int get maxDamage =>
+      outcomes.fold(0, (m, o) => o.damageToEnemy > m ? o.damageToEnemy : m);
 }
 
 class Enemy {
@@ -31,6 +70,33 @@ class Enemy {
   final int maxHp;
   final int currentHp;
   final List<BattleChoice> choices;
+  final EnemyTrait trait;
+
+  /// 敵の元素（単漢字。'炎''水''風''土''氷''雷''光''闇''無'）。
+  /// プレイヤー（本編キャラ）の元素との相性で戦闘の有利/不利が決まる。
+  final String element;
+
+  /// ダンジョンのボス（悩み本体）か。撃破＝そのダンジョンのクリア（悩みの克服）。
+  final bool isBoss;
+
+  /// 反撃の基礎HPダメージ。
+  final int counterBaseDamage;
+
+  /// 反撃時に削るリソース（例: {'bond': -1} / {'food': -1, 'money': -1}）。
+  final Map<String, int> counterDrain;
+
+  /// 長引くほど反撃が強くなるか（経過ターン分ダメージ加算）。
+  final bool escalates;
+
+  /// 逃げると悪化するか（敵が回復し戦闘継続）。
+  final bool fleeWorsens;
+
+  /// 撃破時に得られる報酬（悩みを乗り越えた見返り）。
+  /// 例: {'money': 3, 'items': 1} / {'maxHp': 3}（maxHp はその分回復もする）。
+  final Map<String, int> defeatReward;
+
+  /// 撃破時に表示する一言（テーマに沿った描写）。
+  final String defeatRewardText;
 
   const Enemy({
     required this.id,
@@ -40,6 +106,15 @@ class Enemy {
     required this.maxHp,
     required this.currentHp,
     required this.choices,
+    this.trait = EnemyTrait.generic,
+    this.element = '無',
+    this.isBoss = false,
+    this.counterBaseDamage = 3,
+    this.counterDrain = const {},
+    this.escalates = false,
+    this.fleeWorsens = false,
+    this.defeatReward = const {},
+    this.defeatRewardText = '',
   });
 
   Enemy copyWith({int? currentHp}) => Enemy(
@@ -50,216 +125,126 @@ class Enemy {
     maxHp: maxHp,
     currentHp: currentHp ?? this.currentHp,
     choices: choices,
+    trait: trait,
+    element: element,
+    isBoss: isBoss,
+    counterBaseDamage: counterBaseDamage,
+    counterDrain: counterDrain,
+    escalates: escalates,
+    fleeWorsens: fleeWorsens,
+    defeatReward: defeatReward,
+    defeatRewardText: defeatRewardText,
   );
 
   bool get isDefeated => currentHp <= 0;
+
+  /// 経過ターンを踏まえた反撃ダメージ。
+  int counterDamage(int battleTurns) =>
+      counterBaseDamage + (escalates ? battleTurns : 0);
 }
 
 class Enemies {
   static List<BattleChoice> forStage(List<BattleChoice> all, GrowthStage stage) =>
       all.where((c) => c.minStage.index <= stage.index).toList();
 
-  static final List<Enemy> all = [
-    Enemy(
-      id: 'interpersonal',
-      name: '対人関係の悩み',
-      description: '人との関わりから生まれた複雑な感情のかたまり。\n次のターン、不安を増幅させようとしている。',
-      nextAction: '「どうせ嫌われている」と囁く',
-      maxHp: 20,
-      currentHp: 20,
-      choices: [
-        BattleChoice(
-          label: '正面から向き合う',
-          resultText: '真剣に向き合うことで、悩みの核心が見えてきた。ダメージを与えた。',
-          damageToEnemy: 8,
-          damageToPlayer: 5,
-          traitDelta: ActionLog(challenge: 2, persistence: 1),
-        ),
-        BattleChoice(
-          label: '逃げる',
-          resultText: '今は無理と判断して距離を置いた。',
-          damageToEnemy: 0,
-          damageToPlayer: 0,
-          resourceChanges: {'food': -1},
-          traitDelta: ActionLog(flexibility: 1),
-        ),
-        BattleChoice(
-          label: '観察する',
-          resultText: '悩みのパターンを観察した。次の行動に活かせそうだ。ダメージを与えた。',
-          damageToEnemy: 6,
-          damageToPlayer: 2,
-          traitDelta: ActionLog(logic: 2, caution: 1),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: 'アイテムを使う',
-          resultText: 'アイテムを使い、気持ちを整理した。大きなダメージを与えた。',
-          damageToEnemy: 12,
-          damageToPlayer: 0,
-          resourceChanges: {'items': -1},
-          traitDelta: ActionLog(planning: 2),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: '仲間に相談する',
-          resultText: '仲間の視点でアドバイスをもらった。一緒に解決策を見つけた。',
-          damageToEnemy: 10,
-          damageToPlayer: 0,
-          resourceChanges: {'bond': -1},
-          traitDelta: ActionLog(cooperation: 3, altruism: 1),
-          minStage: GrowthStage.adult,
-        ),
-        BattleChoice(
-          label: '交渉して距離を縮める',
-          resultText: '相手の立場を理解しようとした。悩みが少し和らいだ。',
-          damageToEnemy: 15,
-          damageToPlayer: 0,
-          resourceChanges: {'money': -2},
-          traitDelta: ActionLog(flexibility: 2, cooperation: 2),
-          minStage: GrowthStage.adult,
-        ),
-      ],
-    ),
+  // --- 共通の選択肢部品（ボス・ザコで再利用） ---
 
-    Enemy(
-      id: 'future_anxiety',
-      name: '将来不安',
-      description: '見えない未来への漠然とした恐れ。\n次のターン、行動力を奪おうとしている。',
-      nextAction: '「先が見えない」と霧を広げる',
-      maxHp: 18,
-      currentHp: 18,
-      choices: [
-        BattleChoice(
-          label: '正面から向き合う',
-          resultText: '不安を直視した。怖かったが、少し楽になった。',
-          damageToEnemy: 7,
-          damageToPlayer: 6,
-          traitDelta: ActionLog(challenge: 3, persistence: 1),
-        ),
-        BattleChoice(
-          label: '逃げる',
-          resultText: '今は考えるのをやめた。',
-          damageToEnemy: 0,
-          damageToPlayer: 0,
-          resourceChanges: {'food': -1},
-          traitDelta: ActionLog(flexibility: 1),
-        ),
-        BattleChoice(
-          label: '小さな目標を立てる',
-          resultText: '遠い未来ではなく、今できることに集中した。不安が薄れた。',
-          damageToEnemy: 10,
-          damageToPlayer: 0,
-          traitDelta: ActionLog(planning: 3, logic: 1),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: '仲間に話す',
-          resultText: '話すと気持ちが整理された。仲間も同じ不安を持っていた。',
-          damageToEnemy: 8,
-          damageToPlayer: 0,
-          resourceChanges: {'bond': 1},
-          traitDelta: ActionLog(cooperation: 2, altruism: 1),
-          minStage: GrowthStage.adult,
-        ),
-      ],
-    ),
+  /// 回復薬を使う（全戦闘共通・所持時のみ表示）。
+  static BattleChoice get healChoice => const BattleChoice(
+        label: '回復薬を使う',
+        riskHint: '確定・HP回復',
+        upfrontCost: {'items': -1},
+        requiresItem: true,
+        selectTrait: ActionLog(caution: 1, planning: 1),
+        outcomes: [
+          Outcome(
+            tier: OutcomeTier.success,
+            weight: 1,
+            resultText: '回復薬を飲み、傷を癒した。落ち着いて立て直せた。',
+            resourceChanges: {'hp': 12},
+          ),
+        ],
+      );
 
-    Enemy(
-      id: 'self_denial',
-      name: '自己否定',
-      description: '自分の中から湧き上がる否定の声。\n次のターン、自信を削ろうとしている。',
-      nextAction: '「お前には無理だ」と囁く',
-      maxHp: 22,
-      currentHp: 22,
-      choices: [
-        BattleChoice(
-          label: '自分を信じて攻撃する',
-          resultText: '「できる」と自分に言い聞かせて立ち向かった。',
-          damageToEnemy: 9,
-          damageToPlayer: 7,
-          traitDelta: ActionLog(challenge: 3, persistence: 2),
-        ),
-        BattleChoice(
-          label: '逃げる',
-          resultText: '今日は引く日と決めた。',
-          damageToEnemy: 0,
-          damageToPlayer: 0,
-          resourceChanges: {'food': -1},
-          traitDelta: ActionLog(flexibility: 1, caution: 1),
-        ),
-        BattleChoice(
-          label: '客観的に分析する',
-          resultText: '感情から離れて事実を見た。否定の声が少し静かになった。',
-          damageToEnemy: 11,
-          damageToPlayer: 2,
-          traitDelta: ActionLog(logic: 3, caution: 1),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: '過去の成功を思い出す',
-          resultText: 'できたことを振り返ると、否定の声が弱まった。',
-          damageToEnemy: 14,
-          damageToPlayer: 0,
-          traitDelta: ActionLog(persistence: 2, planning: 1),
-          minStage: GrowthStage.adult,
-        ),
-      ],
-    ),
+  /// 逃げる。
+  static BattleChoice get fleeChoice => const BattleChoice(
+        label: '逃げる',
+        riskHint: '離脱を試みる',
+        isFlee: true,
+        selectTrait: ActionLog(flexibility: 1),
+      );
 
-    // ボス専用
+  /// ザコ（もやもや・断片）共通の選択肢。dmg で強さを調整。
+  static List<BattleChoice> mobChoices({int dmg = 6}) => [
+        BattleChoice(
+          label: '立ち向かう',
+          riskHint: '当たり外れあり',
+          selectTrait: const ActionLog(challenge: 2),
+          outcomes: [
+            Outcome(
+              tier: OutcomeTier.success, weight: 70,
+              resultText: '正面から向き合い、振り払った。',
+              damageToEnemy: dmg, damageToPlayer: 3,
+            ),
+            Outcome(
+              tier: OutcomeTier.failure, weight: 30,
+              resultText: 'うまく振り払えず、少し消耗した。',
+              damageToEnemy: (dmg / 2).round(), damageToPlayer: 5,
+              traitDelta: const ActionLog(caution: 1),
+            ),
+          ],
+        ),
+        fleeChoice,
+        BattleChoice(
+          label: '観察していなす',
+          riskHint: '安定・低リスク（幼少〜）',
+          minStage: GrowthStage.young,
+          selectTrait: const ActionLog(logic: 2, caution: 1),
+          outcomes: [
+            Outcome(
+              tier: OutcomeTier.success, weight: 1,
+              resultText: '落ち着いて見極め、うまくいなした。',
+              damageToEnemy: dmg - 3, damageToPlayer: 2,
+            ),
+          ],
+        ),
+        healChoice,
+      ];
+
+  /// 全ダンジョン共通の「もやもや／雑念」ザコ。
+  static final List<Enemy> commonMobs = [
     Enemy(
-      id: 'inner_labyrinth',
-      name: '心の迷宮の守護者',
-      description: 'この迷宮の最奥に住む存在。あなたの全ての迷いと恐れが結晶化した姿。\n次のターン、全力で攻撃してくる。',
-      nextAction: '「ここから出ることはできない」と告げる',
-      maxHp: 35,
-      currentHp: 35,
-      choices: [
-        BattleChoice(
-          label: '全力で立ち向かう',
-          resultText: '全てをぶつけた。大きなダメージを与えたが、反撃も受けた。',
-          damageToEnemy: 12,
-          damageToPlayer: 10,
-          traitDelta: ActionLog(challenge: 3, persistence: 2),
-        ),
-        BattleChoice(
-          label: '逃げる',
-          resultText: '迷宮から逃げ出した。冒険は終わった。',
-          damageToEnemy: 0,
-          damageToPlayer: 0,
-          resourceChanges: {'food': -2},
-          traitDelta: ActionLog(flexibility: 2),
-        ),
-        BattleChoice(
-          label: '観察して弱点を探す',
-          resultText: '冷静に観察すると、守護者の動きにパターンを見つけた。',
-          damageToEnemy: 10,
-          damageToPlayer: 5,
-          traitDelta: ActionLog(logic: 3, caution: 2),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: 'アイテムで一気に攻める',
-          resultText: '持てる全てのアイテムを使って大ダメージを与えた。',
-          damageToEnemy: 18,
-          damageToPlayer: 3,
-          resourceChanges: {'items': -2},
-          traitDelta: ActionLog(planning: 2, challenge: 1),
-          minStage: GrowthStage.young,
-        ),
-        BattleChoice(
-          label: '仲間と力を合わせる',
-          resultText: '仲間と力を合わせ、守護者を追い詰めた。絆の力は強い。',
-          damageToEnemy: 20,
-          damageToPlayer: 0,
-          resourceChanges: {'bond': -2},
-          traitDelta: ActionLog(cooperation: 3, altruism: 2),
-          minStage: GrowthStage.adult,
-        ),
-      ],
+      id: 'haze',
+      name: 'もやもや',
+      description: '名前のつかない、とりとめのない心のざわつき。',
+      nextAction: 'まとわりついて気を散らす',
+      maxHp: 9, currentHp: 9,
+      counterBaseDamage: 2,
+      choices: mobChoices(dmg: 6),
+      defeatReward: {'money': 1},
+      defeatRewardText: 'もやもやが晴れ、少し頭が軽くなった。',
+    ),
+    Enemy(
+      id: 'small_unease',
+      name: 'ささいな不安',
+      description: '気にするほどではないのに、ふと胸をよぎる小さな不安。',
+      nextAction: 'ちくちくと胸を刺す',
+      maxHp: 8, currentHp: 8,
+      counterBaseDamage: 2,
+      choices: mobChoices(dmg: 6),
+      defeatReward: {'money': 1},
+      defeatRewardText: '小さな不安をやり過ごせた。',
+    ),
+    Enemy(
+      id: 'idle_thoughts',
+      name: 'とりとめのない雑念',
+      description: '次から次へと湧いては消える、まとまらない考えの群れ。',
+      nextAction: '思考をかき乱す',
+      maxHp: 10, currentHp: 10,
+      counterBaseDamage: 2,
+      choices: mobChoices(dmg: 7),
+      defeatReward: {'items': 1},
+      defeatRewardText: '雑念が静まり、頭の中が整理された。',
     ),
   ];
-
-  static Enemy get boss => all.firstWhere((e) => e.id == 'inner_labyrinth');
-  static List<Enemy> get regular => all.where((e) => e.id != 'inner_labyrinth').toList();
 }

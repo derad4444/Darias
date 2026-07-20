@@ -1,6 +1,33 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-729161349"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', 'AW-729161349');
+    </script>
+    <!-- Event snippet for 購入 conversion (ダウンロードボタンのクリックで発火) -->
+    <script>
+    function gtag_report_conversion(url) {
+      var callback = function () {
+        if (typeof(url) != 'undefined') {
+          window.location = url;
+        }
+      };
+      gtag('event', 'conversion', {
+          'send_to': 'AW-729161349/M8plCKqv4dIcEIW92NsC',
+          'value': 1.0,
+          'currency': 'JPY',
+          'transaction_id': '',
+          'event_callback': callback
+      });
+      return false;
+    }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DARIAS〜もう1人の自分と向き合う、思考整理AI〜</title>
@@ -208,9 +235,16 @@
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
         }
 
-        .character-float {
+        .hero-image img.character-float {
             position: absolute;
-            width: 120px;
+            width: 128px;
+            height: 128px;
+            border-radius: 50%;
+            object-fit: cover;
+            object-position: center 22%;
+            background: linear-gradient(160deg, #F3EEFB 0%, #E7DEF5 100%);
+            border: 4px solid var(--white);
+            box-shadow: 0 8px 22px rgba(80, 50, 110, 0.22);
             animation: float 3s ease-in-out infinite;
         }
 
@@ -560,9 +594,14 @@
         }
 
         .character-icon {
-            width: 80px;
-            height: auto;
-            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.1));
+            width: 92px;
+            height: 92px;
+            border-radius: 50%;
+            object-fit: cover;
+            object-position: center 20%;
+            background: linear-gradient(160deg, #F3EEFB 0%, #E7DEF5 100%);
+            border: 3px solid var(--white);
+            box-shadow: 0 6px 16px rgba(80, 50, 110, 0.18);
             transition: transform 0.3s ease;
         }
 
@@ -1324,6 +1363,143 @@
                 font-size: 12px;
             }
         }
+
+        /* ===== 心の迷宮（ダンジョン）セクション ===== */
+        .dungeon {
+            background: linear-gradient(180deg, #2A1E42 0%, #4B2E63 55%, #7A4C7E 100%);
+            color: var(--white);
+            position: relative;
+            overflow: hidden;
+        }
+        .dungeon .section-title {
+            color: var(--white);
+        }
+        .dungeon-badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.15);
+            color: #FFE1F0;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            padding: 6px 18px;
+            border-radius: 999px;
+            margin-bottom: 20px;
+        }
+        .dungeon-lead {
+            text-align: center;
+            font-size: 17px;
+            line-height: 2;
+            color: rgba(255, 255, 255, 0.9);
+            max-width: 640px;
+            margin: 0 auto 44px;
+        }
+        .dungeon-lead strong {
+            color: #FFD1E8;
+        }
+        .dungeon-steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            max-width: 820px;
+            margin: 0 auto 8px;
+        }
+        .dungeon-step {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 18px;
+            padding: 26px 18px;
+            text-align: center;
+            backdrop-filter: blur(4px);
+        }
+        .dungeon-step .enemy {
+            width: 84px;
+            height: 84px;
+            object-fit: contain;
+            margin-bottom: 12px;
+            filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+        }
+        .dungeon-step h3 {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--white);
+        }
+        .dungeon-step p {
+            font-size: 13px;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .dungeon-enemies {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 8px;
+            margin-top: 40px;
+        }
+        .dungeon-enemies img {
+            width: 76px;
+            height: 76px;
+            object-fit: contain;
+            filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.3));
+            transition: transform 0.25s ease;
+        }
+        .dungeon-enemies img:nth-child(even) {
+            transform: translateY(-12px);
+        }
+        .dungeon-enemies img:hover {
+            transform: translateY(-6px) scale(1.08);
+        }
+        .dungeon-note {
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-top: 24px;
+        }
+
+        /* ===== 画面イメージ（スクリーンショット）セクション ===== */
+        .screens {
+            background: linear-gradient(180deg, var(--white) 0%, var(--bg-gradient-start) 100%);
+        }
+        .screens-scroll {
+            display: flex;
+            gap: 20px;
+            overflow-x: auto;
+            padding: 12px 4px 24px;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .screen-shot {
+            flex: 0 0 auto;
+            width: 240px;
+            scroll-snap-align: center;
+            border-radius: 22px;
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(80, 50, 110, 0.18);
+        }
+        .screen-shot img {
+            width: 100%;
+            display: block;
+        }
+        .screens-hint {
+            text-align: center;
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+        @media (max-width: 600px) {
+            .dungeon-steps {
+                grid-template-columns: 1fr;
+                max-width: 340px;
+            }
+            .dungeon-enemies img {
+                width: 58px;
+                height: 58px;
+            }
+            .screen-shot {
+                width: 200px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1351,18 +1527,18 @@
                     </p>
 
                     <p class="hero-features">
-                        📱 日記・メモ・ToDo・スケジュール・性格分析<br>
-                        全部が「考えるため」に繋がっています。
+                        💬 AIチャット・🧠 自分会議・🗺️ 心の迷宮・🧬 性格分析<br>
+                        全部が「自分を知るため」に繋がっています。
                     </p>
 
-                    <a href="https://apps.apple.com/jp/app/darias-%E3%82%82%E3%81%861%E4%BA%BA%E3%81%AE%E8%87%AA%E5%88%86%E3%81%A8%E5%90%91%E3%81%8D%E5%90%88%E3%81%86-%E6%80%9D%E8%80%83%E6%95%B4%E7%90%86ai/id6753144594" class="cta-button" target="_blank" rel="noopener noreferrer">
+                    <a href="https://apps.apple.com/jp/app/darias-%E3%82%82%E3%81%861%E4%BA%BA%E3%81%AE%E8%87%AA%E5%88%86%E3%81%A8%E5%90%91%E3%81%8D%E5%90%88%E3%81%86-%E6%80%9D%E8%80%83%E6%95%B4%E7%90%86ai/id6753144594" class="cta-button" target="_blank" rel="noopener noreferrer" onclick="gtag_report_conversion();">
                          iOSの方は今すぐ試す →
                     </a>
                 </div>
                 <div class="hero-image">
-                    <img src="images/ipad2.png" alt="DARIASアプリ画面">
-                    <img src="images/character_female.png" alt="" class="character-float left">
-                    <img src="images/character_male.png" alt="" class="character-float right">
+                    <img src="images/screen_intro.png" alt="DARIASアプリ画面">
+                    <img src="images/chars/f_water.png" alt="" class="character-float left">
+                    <img src="images/chars/m_fire.png" alt="" class="character-float right">
                 </div>
             </div>
         </div>
@@ -1384,7 +1560,7 @@
                 </div>
                 <div class="problem-item">
                     <div class="problem-icon"></div>
-                    <p class="problem-text">日記もToDoも、続いた試しがない</p>
+                    <p class="problem-text">考えがまとまらないまま、時間だけが過ぎていく</p>
                 </div>
                 <div class="problem-item">
                     <div class="problem-icon"></div>
@@ -1402,9 +1578,9 @@
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/male_HLHLH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_MHMLH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_LMHML.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_fire.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_water.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_wind.png" alt="キャラクター" class="character-icon">
             </div>
         </div>
     </section>
@@ -1463,19 +1639,64 @@
                 </div>
 
                 <div class="usage-card">
-                    <div class="usage-icon">📓</div>
-                    <h3>日常の記録</h3>
-                    <p>日記・メモ・ToDo・スケジュールは<br>すべて"思考の延長"として管理。</p>
-                    <p>「書いたら終わり」ではなく、<br>AIが文脈として覚えてくれるのがDARIASです。</p>
+                    <div class="usage-icon">🗺️</div>
+                    <h3>自分の心を知りたい時</h3>
+                    <p>「心の迷宮」に挑戦。<br>ダンジョンでの選択の傾向から、<br>あなたの心のクセを診断します。</p>
+                    <p>遊びながら、<br>自分でも気づかなかった一面が見えてきます。</p>
                 </div>
             </div>
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/female_HLMHL.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_HMLHM.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_LHMHL.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_thunder.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_ice.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_earth.png" alt="キャラクター" class="character-icon">
             </div>
+        </div>
+    </section>
+
+    <!-- Dungeon Section -->
+    <section class="dungeon" id="dungeon">
+        <div class="container">
+            <div style="text-align:center;">
+                <span class="dungeon-badge">NEW ✦ 心の迷宮</span>
+            </div>
+            <h2 class="section-title">遊びながら、<br>あなたの"心のクセ"を診断する</h2>
+            <p class="dungeon-lead">
+                「心の迷宮」は、<strong>あなたの悩みがモンスターになった</strong>ダンジョンを冒険するミニゲーム。<br>
+                分かれ道でどう進み、どう戦うか——その<strong>選択の傾向</strong>から、
+                あなたでも気づかなかった心のパターンをAIが読み解きます。
+            </p>
+
+            <div class="dungeon-steps">
+                <div class="dungeon-step">
+                    <img class="enemy" src="images/enemies/two_paths.png" alt="">
+                    <h3>1. 選んで進む</h3>
+                    <p>分かれ道の先を選びながら、<br>ボスのいる最深部を目指す。</p>
+                </div>
+                <div class="dungeon-step">
+                    <img class="enemy" src="images/enemies/interpersonal.png" alt="">
+                    <h3>2. 悩みと向き合う</h3>
+                    <p>対人関係・完璧主義・将来不安…<br>悩みが姿を変えた敵と対峙する。</p>
+                </div>
+                <div class="dungeon-step">
+                    <img class="enemy" src="images/enemies/inner_labyrinth.png" alt="">
+                    <h3>3. 心を診断</h3>
+                    <p>踏破後、選択の傾向から<br>あなたの心をAIが総合診断。</p>
+                </div>
+            </div>
+
+            <div class="dungeon-enemies">
+                <img src="images/enemies/loneliness.png" alt="">
+                <img src="images/enemies/perfectionism.png" alt="">
+                <img src="images/enemies/fear_of_judgment.png" alt="">
+                <img src="images/enemies/future_anxiety.png" alt="">
+                <img src="images/enemies/procrastination.png" alt="">
+                <img src="images/enemies/self_denial.png" alt="">
+                <img src="images/enemies/emptiness.png" alt="">
+                <img src="images/enemies/interpersonal.png" alt="">
+            </div>
+            <p class="dungeon-note">※ 登場する悩みモンスターの一部</p>
         </div>
     </section>
 
@@ -1489,38 +1710,54 @@
                 <div class="feature-card">
                     <div class="feature-emoji">💬</div>
                     <h4>AIチャット</h4>
-                    <p>思考整理・相談</p>
+                    <p>もう1人の自分と対話</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-emoji">🧠</div>
                     <h4>自分会議</h4>
-                    <p>迷い・意思決定の整理</p>
+                    <p>6人の自分が多角的に議論</p>
                 </div>
                 <div class="feature-card">
-                    <div class="feature-emoji">📓</div>
-                    <h4>日記 / メモ</h4>
-                    <p>日々の記録</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-emoji">📅</div>
-                    <h4>スケジュール</h4>
-                    <p>カレンダー管理</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-emoji">🧾</div>
-                    <h4>ToDoリスト</h4>
-                    <p>タスク管理</p>
+                    <div class="feature-emoji">🗺️</div>
+                    <h4>心の迷宮</h4>
+                    <p>選択の傾向から心を診断</p>
                 </div>
                 <div class="feature-card">
                     <div class="feature-emoji">🧬</div>
                     <h4>性格診断</h4>
-                    <p>BIG5ベース</p>
+                    <p>BIG5ベースで言語化</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">🌱</div>
+                    <h4>キャラ育成</h4>
+                    <p>話すほどキャラが成長</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-emoji">👥</div>
+                    <h4>フレンド</h4>
+                    <p>友だちとの相性診断</p>
                 </div>
             </div>
 
             <div class="features-note">
                 <p>機能は多く見えるかもしれません。<br>でも、やることはいつも同じ。<strong>「考えを外に出す」</strong>だけ。</p>
             </div>
+        </div>
+    </section>
+
+    <!-- Screens Section -->
+    <section class="screens">
+        <div class="container">
+            <h2 class="section-title">アプリの画面イメージ</h2>
+            <p class="section-subtitle">実際の画面をのぞいてみてください。</p>
+            <div class="screens-scroll">
+                <div class="screen-shot"><img src="images/screen_intro.png" alt="もう1人の自分と整理する"></div>
+                <div class="screen-shot"><img src="images/screen_chat.png" alt="AIチャット画面"></div>
+                <div class="screen-shot"><img src="images/screen_meeting.png" alt="自分会議画面"></div>
+                <div class="screen-shot"><img src="images/screen_personality.png" alt="性格診断画面"></div>
+                <div class="screen-shot"><img src="images/screen_friend.png" alt="フレンド相性診断画面"></div>
+            </div>
+            <p class="screens-hint">← 横にスクロールできます →</p>
         </div>
     </section>
 
@@ -1557,9 +1794,9 @@
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/male_MLHMH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_HMLHM.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_LHLHL.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_light.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_dark.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_none.png" alt="キャラクター" class="character-icon">
             </div>
         </div>
     </section>
@@ -1594,9 +1831,9 @@
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/female_HHHHH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_MMMMM.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_LLLLL.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_fire.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_water.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_wind.png" alt="キャラクター" class="character-icon">
             </div>
         </div>
     </section>
@@ -1623,9 +1860,9 @@
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/female_MLHMH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_MHMLH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_LHLHL.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_thunder.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_ice.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_earth.png" alt="キャラクター" class="character-icon">
             </div>
         </div>
     </section>
@@ -1640,140 +1877,15 @@
                 あなたが考えるための「余白」を作る場所です。
             </p>
 
-            <a href="https://apps.apple.com/jp/app/darias-%E3%82%82%E3%81%861%E4%BA%BA%E3%81%AE%E8%87%AA%E5%88%86%E3%81%A8%E5%90%91%E3%81%8D%E5%90%88%E3%81%86-%E6%80%9D%E8%80%83%E6%95%B4%E7%90%86ai/id6753144594" class="cta-button-white" target="_blank" rel="noopener noreferrer">
+            <a href="https://apps.apple.com/jp/app/darias-%E3%82%82%E3%81%861%E4%BA%BA%E3%81%AE%E8%87%AA%E5%88%86%E3%81%A8%E5%90%91%E3%81%8D%E5%90%88%E3%81%86-%E6%80%9D%E8%80%83%E6%95%B4%E7%90%86ai/id6753144594" class="cta-button-white" target="_blank" rel="noopener noreferrer" onclick="gtag_report_conversion();">
                  iOSの方は今すぐ試す
             </a>
 
             <!-- キャラクターギャラリー -->
             <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                <img src="images/faces/male_HHHHH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/female_HLHLH.png" alt="キャラクター" class="character-icon">
-                <img src="images/faces/male_LLLLL.png" alt="キャラクター" class="character-icon">
-            </div>
-        </div>
-    </section>
-
-    <!-- Crowdfunding Section -->
-    <section class="crowdfunding">
-        <div class="container">
-            <div class="cf-header">
-                <p class="cf-label">CROWDFUNDING</p>
-                <h2 class="cf-title">DARIASは、まだ完成していません。</h2>
-                <p class="cf-intro">
-                    そして、それを<br>
-                    「完成してから出す」のではなく、<br>
-                    <strong>一緒に育てていきたい</strong>と思っています。
-                </p>
-            </div>
-
-            <div class="cf-vision">
-                <p class="cf-vision-text">
-                    DARIASは現在、<br>
-                    iOSアプリに加えて <strong>Web版の開発</strong> を進めています。
-                </p>
-
-                <div class="cf-vision-list">
-                    <div class="cf-vision-item">
-                        <span class="cf-vision-icon">🌐</span>
-                        <p>どこからでも使える</p>
-                    </div>
-                    <div class="cf-vision-item">
-                        <span class="cf-vision-icon">📚</span>
-                        <p>思考のログが積み重なる</p>
-                    </div>
-                    <div class="cf-vision-item">
-                        <span class="cf-vision-icon">🌱</span>
-                        <p>"もう1人の自分"が育っていく</p>
-                    </div>
-                </div>
-
-                <p class="cf-vision-conclusion">
-                    そんな体験を、<br>
-                    ちゃんと長く続く形にしたい。
-                </p>
-            </div>
-
-            <div class="cf-appeal">
-                <h3>応援という形で、DARIASに参加してください</h3>
-                <p>
-                    この想いと開発を続けていくために、<br>
-                    <strong>CAMPFIREでクラウドファンディング</strong>に挑戦しています。
-                </p>
-                <p class="cf-appeal-note">
-                    これは「お金を集めたい」よりも、
-                </p>
-                <ul class="cf-appeal-reasons">
-                    <li>思想に共感してくれる人と繋がりたい</li>
-                    <li>一緒に作っていく仲間が欲しい</li>
-                </ul>
-                <p class="cf-appeal-note">
-                    という気持ちから始めました。
-                </p>
-            </div>
-
-            <div class="cf-impact">
-                <h3>あなたの応援でできること</h3>
-                <div class="cf-impact-grid">
-                    <div class="cf-impact-item">
-                        <span class="cf-impact-icon">💻</span>
-                        <p>Web版DARIASの<br>開発加速</p>
-                    </div>
-                    <div class="cf-impact-item">
-                        <span class="cf-impact-icon">🔧</span>
-                        <p>サーバー・AI運用の<br>安定化</p>
-                    </div>
-                    <div class="cf-impact-item">
-                        <span class="cf-impact-icon">⚡</span>
-                        <p>機能追加・改善<br>スピードの向上</p>
-                    </div>
-                    <div class="cf-impact-item">
-                        <span class="cf-impact-icon">🏠</span>
-                        <p>"考える人が安心して<br>使える場所"を残すこと</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="cf-message">
-                <h3>開発者より</h3>
-                <div class="cf-message-content">
-                    <p>
-                        正直に言うと、<br>
-                        このアプリは「万人受け」はしません。
-                    </p>
-                    <p>
-                        でも、<br>
-                        <strong>考えすぎる人・立ち止まる人・自分と向き合いたい人</strong><br>
-                        には、確実に意味があると信じています。
-                    </p>
-                    <p>
-                        まだ未完成だからこそ、<br>
-                        応援してくれる人の声を、<br>
-                        そのまま形にしていきたい。
-                    </p>
-                    <p class="cf-message-closing">
-                        もし少しでも<br>
-                        「この場所、残ってほしいな」<br>
-                        と思ってもらえたら。
-                    </p>
-                    <p class="cf-message-final">
-                        それだけで、十分です。
-                    </p>
-                </div>
-            </div>
-
-            <div class="cf-cta">
-                <a href="https://camp-fire.jp/projects/926230/view?utm_campaign=cp_po_share_c_msg_projects_show" class="cf-button" target="_blank" rel="noopener noreferrer">
-                    <span class="cf-button-icon">🔥</span>
-                    CAMPFIREで応援する
-                </a>
-                <p class="cf-cta-note">※CAMPFIREのプロジェクトページへ移動します</p>
-
-                <!-- キャラクターギャラリー -->
-                <div class="character-gallery" style="margin-top: 48px; margin-bottom: 0;">
-                    <img src="images/faces/female_LMHML.png" alt="キャラクター" class="character-icon">
-                    <img src="images/faces/male_HLMHL.png" alt="キャラクター" class="character-icon">
-                    <img src="images/faces/female_MMMMM.png" alt="キャラクター" class="character-icon">
-                </div>
+                <img src="images/chars/m_light.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/f_dark.png" alt="キャラクター" class="character-icon">
+                <img src="images/chars/m_none.png" alt="キャラクター" class="character-icon">
             </div>
         </div>
     </section>

@@ -372,7 +372,10 @@ class _CategoryDropdown extends StatelessWidget {
             Expanded(
               child: ListView(
                 controller: scrollController,
-                children: ContactCategory.values.map((category) => ListTile(
+                // 手帳（カレンダー・予定）廃止に伴い calendar カテゴリを一覧から除外（enum 定義は残置・復活時に .where を外す）。
+                children: ContactCategory.values
+                    .where((c) => c != ContactCategory.calendar)
+                    .map((category) => ListTile(
                       title: Text(category.displayName),
                       trailing: selectedCategory == category
                           ? const Icon(Icons.check, color: Colors.blue)

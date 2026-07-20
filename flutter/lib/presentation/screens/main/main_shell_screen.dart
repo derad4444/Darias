@@ -1,10 +1,10 @@
-import 'dart:async';
+// import 'dart:async'; // 手帳ウィジェット購読廃止に伴いコメントアウト（不使用・復活時に戻す）
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:home_widget/home_widget.dart';
+// import 'package:home_widget/home_widget.dart'; // 手帳ウィジェット廃止に伴いコメントアウト（不使用・復活時に戻す）
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/bgm_player.dart';
 import '../../../data/services/widget_data_service.dart';
@@ -23,7 +23,7 @@ import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
 import '../../../features/roguelike/screens/roguelike_home_screen.dart';
-import '../../../features/roguelike/screens/game_development_popup.dart';
+import '../../../features/roguelike/widgets/adventure_door_transition.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
@@ -42,7 +42,8 @@ class MainShellScreen extends ConsumerStatefulWidget {
 }
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
-  StreamSubscription<Uri?>? _widgetClickSub;
+  // 手帳タブ廃止に伴いコメントアウト（不使用・復活時に戻す）。ウィジェットタップ購読。
+  // StreamSubscription<Uri?>? _widgetClickSub;
   bool _hasRescheduledNotifications = false;
 
   @override
@@ -53,11 +54,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     // 音量設定プロバイダーを早期初期化してミュート状態をロードしておく
     ref.read(volumeSettingsProvider);
     if (!kIsWeb) {
-      _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
+      // 手帳タブ廃止に伴い、ウィジェットのディープリンク導線をコメントアウト（不使用・復活時に戻す）。
+      /* _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
       // コールドスタート（ウィジェットタップによるアプリ起動）の処理
       HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
         if (uri != null) _handleWidgetUri(uri);
-      });
+      }); */
       // 初回表示時にすでにデータが揃っている場合も確実にキャッシュ
       // （ref.listenは初期値では発火しないため、ポストフレームで補完）
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -93,7 +95,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     FlutterAppBadger.updateBadgeCount(count + (hasNewDiary ? 1 : 0));
   }
 
-  void _showPlanSegmentMenu(BuildContext context, WidgetRef ref) {
+  // 手帳タブ廃止に伴いコメントアウト（削除せず残置。復活時に戻す）。
+  /* void _showPlanSegmentMenu(BuildContext context, WidgetRef ref) {
     final size = MediaQuery.of(context).size;
     final padding = MediaQuery.of(context).padding;
     final tabWidth = size.width / 6;
@@ -142,9 +145,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         if (!kIsWeb) _updateAppBadge(ref);
       });
     });
-  }
+  } */
 
-  void _handleWidgetUri(Uri? uri) {
+  // 手帳タブ廃止に伴いコメントアウト（不使用・復活時に戻す）。ウィジェットのディープリンクで手帳へ遷移していた。
+  /* void _handleWidgetUri(Uri? uri) {
     if (uri == null) return;
     // darias://open/?page=todo  → queryParameters['page'] = 'todo'
     final page = uri.queryParameters['page'];
@@ -158,11 +162,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       ref.read(selectedTabProvider.notifier).state = 1;
       ref.read(planSegmentProvider.notifier).state = PlanSegment.memo;
     }
-  }
+  } */
 
   @override
   void dispose() {
-    _widgetClickSub?.cancel();
+    // _widgetClickSub?.cancel(); // 手帳タブ廃止に伴いコメントアウト（不使用）
+
     super.dispose();
   }
 
@@ -172,7 +177,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final accentColor = ref.watch(accentColorProvider);
     final userAsync = ref.watch(userDocProvider);
     final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
-    final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
+    // 手帳タブ廃止に伴いコメントアウト（復活時に戻す）。手帳バッジ用。
+    // final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
 
     // アプリアイコンバッジ更新（iOS only）
     if (!kIsWeb) {
@@ -245,7 +251,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
         children: [
           // タブ0: ホーム
           const HomeScreen(),
-          // タブ1: 予定・タスク・メモ（統合）
+          // タブ1: 予定・タスク・メモ（統合）＝手帳。ナビの手帳ボタンは廃止（コメントアウト）
+          // したが、他タブの index を維持するため IndexedStack の子はここに残す（非表示・到達不可）。
           const PlanScreen(),
           // タブ2: 詳細（キャラクター詳細）
           userAsync.when(
@@ -257,12 +264,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ),
           // タブ3: フレンド
           const FriendScreen(),
-          // タブ4: 冒険（ローグライク）※開発中のため、上にポップアップを重ねてプレイ不可にする
-          const Stack(
-            children: [
-              RoguelikeHomeScreen(),
-              GameDevelopmentPopup(),
-            ],
+          // タブ4: 冒険（ローグライク）※タブを開くと扉が開く演出を重ねる
+          const AdventureDoorTransition(
+            adventureTabIndex: 4,
+            child: RoguelikeHomeScreen(),
           ),
           // タブ5: 設定
           const SettingsScreen(),
@@ -298,7 +303,10 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       accentColor: accentColor,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
                     ),
-                    _TabItem(
+                    // 手帳タブは廃止（削除ではなくコメントアウトで残置）。
+                    // 復活時はこの _TabItem と、hasNewDiary の宣言・_showPlanSegmentMenu の
+                    // コメントアウトを外す。タブ index は他タブ維持のため IndexedStack 側は残す。
+                    /* _TabItem(
                       icon: Icons.menu_book_outlined,
                       selectedIcon: Icons.menu_book,
                       label: '手帳',
@@ -312,6 +320,15 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                         });
                       },
                       onLongPress: () => _showPlanSegmentMenu(context, ref),
+                    ), */
+                    // 並び順: ホーム→冒険→詳細→フレンド→設定（index は維持し表示順のみ変更）。
+                    _TabItem(
+                      icon: Icons.explore_outlined,
+                      selectedIcon: Icons.explore,
+                      label: '冒険',
+                      isSelected: selectedTab == 4,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
                     ),
                     _TabItem(
                       icon: Icons.person_outline,
@@ -329,15 +346,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       accentColor: accentColor,
                       badgeCount: pendingFriendCount,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
-                    ),
-                    _TabItem(
-                      // 開発中を示す工事中アイコン
-                      icon: Icons.construction_outlined,
-                      selectedIcon: Icons.construction,
-                      label: '冒険',
-                      isSelected: selectedTab == 4,
-                      accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
                     ),
                     _TabItem(
                       icon: Icons.settings_outlined,
@@ -378,7 +386,10 @@ class _TabItem extends StatelessWidget {
     required this.accentColor,
     required this.onTap,
     this.badgeCount = 0,
+    // 手帳タブ廃止で現在は未使用（復活時に再利用するため残置）。
+    // ignore: unused_element_parameter
     this.showBadge = false,
+    // ignore: unused_element_parameter
     this.onLongPress,
   });
 

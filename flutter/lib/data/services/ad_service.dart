@@ -33,6 +33,13 @@ class AdConfig {
   static String get homeScreenBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/8287132245');
 
+  // ─── ローグライク（冒険）画面バナー ─────────────────────────
+  // 予定追加画面（今後非表示になる予定）のバナーユニットを流用する。
+  // 上/下で別ユニット（同一画面で上下が同時表示されるため）。5画面で共有。
+  // Android本番は _banner のプレースホルダのまま（当面Androidは対象外）。
+  static String get roguelikeTopBannerAdUnitId => scheduleAddTopBannerAdUnitId;
+  static String get roguelikeBottomBannerAdUnitId => scheduleAddBottomBannerAdUnitId;
+
   /// 設定画面上部バナー
   static String get settingsTopBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/5497209577');
@@ -132,6 +139,18 @@ class AdConfig {
   /// 日記履歴画面バナー
   static String get diaryHistoryBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/6680293379');
+
+  // ─── フレンド・相性診断・冒険の性格 画面バナー ─────────────
+  // 手帳（メモ／タスク）機能の廃止で空いたバナーユニットを流用する。
+  // 各画面で上/下は別ユニット（同一画面で上下が同時表示されるため）。
+  static String get adventurePersonalityTopBannerAdUnitId => memoTopBannerAdUnitId;
+  static String get adventurePersonalityBottomBannerAdUnitId => memoBottomBannerAdUnitId;
+  static String get friendScreenTopBannerAdUnitId => taskTopBannerAdUnitId;
+  static String get friendScreenBottomBannerAdUnitId => taskBottomBannerAdUnitId;
+  static String get friendDetailTopBannerAdUnitId => memoAddTopBannerAdUnitId;
+  static String get friendDetailBottomBannerAdUnitId => memoAddBottomBannerAdUnitId;
+  static String get compatibilityTopBannerAdUnitId => taskAddTopBannerAdUnitId;
+  static String get compatibilityBottomBannerAdUnitId => taskAddBottomBannerAdUnitId;
 
   // ─── リワード広告ユニットID ───────────────────────────────
   /// リワード動画広告

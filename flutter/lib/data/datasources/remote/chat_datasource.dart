@@ -177,8 +177,15 @@ class ChatDatasource {
       classified = {'type': 'chat'};
     }
 
-    final type = classified['type'] as String? ?? 'chat';
+    var type = classified['type'] as String? ?? 'chat';
     debugPrint('✅ 分類結果: $type');
+
+    // 手帳（予定・メモ・タスク）機能の廃止に伴い、抽出・登録は行わない。
+    // classifyAndExtract は性格シグナル収集のため呼び続けるが、予定/メモ/タスクと
+    // 判定されても通常チャットとして返信する（復活時はこの remap を外す）。
+    if (type == 'memo' || type == 'task' || type == 'schedule') {
+      type = 'chat';
+    }
 
     // ① メモ
     if (type == 'memo') {

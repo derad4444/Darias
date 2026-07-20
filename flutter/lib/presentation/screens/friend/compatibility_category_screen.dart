@@ -6,6 +6,8 @@ import '../../../data/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
+import '../../widgets/ads/screen_banner.dart';
+import '../../../data/services/ad_service.dart';
 import 'compatibility_screen.dart' show CompatibilityCategoryMeta;
 
 /// カテゴリ別相性診断 詳細画面
@@ -171,7 +173,11 @@ class _CompatibilityCategoryScreenState
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
         child: SafeArea(
-          child: ListView(
+          child: Column(
+            children: [
+              ScreenBanner(adUnitId: AdConfig.compatibilityTopBannerAdUnitId),
+              Expanded(
+                child: ListView(
             controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
@@ -196,6 +202,10 @@ class _CompatibilityCategoryScreenState
                 const SizedBox(height: 16),
                 _buildResultDetail(cat),
               ],
+            ],
+                ),
+              ),
+              ScreenBanner(adUnitId: AdConfig.compatibilityBottomBannerAdUnitId),
             ],
           ),
         ),

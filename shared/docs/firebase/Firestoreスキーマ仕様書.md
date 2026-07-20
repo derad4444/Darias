@@ -632,7 +632,7 @@
 - **dungeonId**: `string` - 挑戦したダンジョン（悩み）のID
 - **worry**: `string` - 挑戦した悩みの名前
 - **enemiesDefeated**: `int` - 倒した敵の数
-- **visitedCount**: `int` - 到達（探索）したマス数
+- **visitedCount**: `int` - 訪れたノード数（枝道式マップで通過したノードの数）
 - **finalHp / finalFood / finalMoney / finalItems / finalBond**: `int` - 終了時の各リソース（`finalItems` は回復薬の所持数。`finalBond` は相棒がいた時のみ意味を持つ。相棒不在時は0）
 - **hadCompanion**: `bool` - 冒険終了時点で相棒（仲間）がいたか
 - **companionName**: `string` - 相棒の名前（不在時は空文字）
@@ -670,6 +670,34 @@
 - **events**: `array<string>` - 出会ったイベントIDの累積
 - **enemies**: `array<string>` - 出会った敵IDの累積
 - **titles**: `array<string>` - 獲得した称号の累積
+
+### `users/{userId}/roguelike_meta/diagnosis`
+
+**用途**: 全踏破後の**冒険の総合診断（AI生成）**。詳細画面「冒険の性格」タブに表示。
+**ドキュメントID**: 固定 `diagnosis`（ユーザーごとに1件）
+**書き込み**: 「冒険の性格」タブの生成/更新ボタンで、`generateAdventureDiagnosis`（Cloud Function）の結果を保存（`RoguelikeDatasource.saveDiagnosis`、`set(merge:true)`）
+**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
+
+**フィールド:**
+
+- **summary**: `string` - 「あなたはこういう選択を多く取る」診断文
+- **advice**: `string` - 「この傾向をこう活かす」助言文
+- **element**: `string` - 生成時の総合推定元素
+- **topTrait**: `string` - 生成時の最上位の行動特性
+- **updatedAt**: `timestamp` - 生成/更新日時
+
+### `users/{userId}/roguelike_meta/stamina`
+
+**用途**: ダンジョン挑戦の**スタミナ**（無料は基本1回＋広告で+1回＝最大2回／プレミアムは無制限）。
+**ドキュメントID**: 固定 `stamina`（ユーザーごとに1件）
+**書き込み**: 「出発する」時に記録（`RoguelikeDatasource.setStamina`）。回復判定は `basePlayAt` から**24時間経過**でクライアントが行う。広告+1回は同サイクル内で有効。
+**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加不要）
+
+**フィールド:**
+
+- **basePlayAt**: `timestamp` - 基本1回を使った時刻。ここから24時間で回復（未使用/回復済みは未設定）
+- **adPlayUsed**: `bool` - 現在のサイクル（基本プレイ後24時間）で広告+1回を使ったか
+- **updatedAt**: `timestamp` - 更新日時
 
 ---
 

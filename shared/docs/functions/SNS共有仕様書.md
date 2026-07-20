@@ -1,6 +1,6 @@
 # DARIAS SNS共有仕様書
 
-**最終更新日**: 2026-05-21
+**最終更新日**: 2026-06-27
 
 ---
 
@@ -192,6 +192,48 @@ RepaintBoundary (key: _offscreenCardKey)
 
 ---
 
+### 5. ローグライク冒険結果（RoguelikeResultScreen）
+
+**ソース**: `lib/features/roguelike/screens/roguelike_result_screen.dart`
+**ボタン**: 結果画面ヘッダー右上の「シェア」ボタン（`Icons.ios_share`、`_shareButtonKey` 付き）
+**メソッド**: `_captureAndShare()`
+**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
+
+#### 画像生成の仕組み
+
+結果画面ルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを `RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（進化ダイアログと同方式）。
+
+```
+Stack
+ ├── SingleChildScrollView（結果本体）
+ └── Positioned(left: -9999) → RepaintBoundary(key: _shareCardKey) → _ShareCard
+```
+
+キャプチャ後は `getTemporaryDirectory()` に `darias_roguelike.png` として保存し `XFile` として渡す。
+
+#### シェアカードデザイン（`_ShareCard`・width 360）
+
+```
+┌──────────────────────────────┐
+│      心の迷宮 — Inner Quest      │
+│        「◯◯」を克服！  (リボン)   │
+│            🧑 (アバター丸)         │
+│      🏅 称号 / ◯◯              │
+│        🔥 炎タイプ              │
+│   ⚔️挑戦性86  💗利他性72  🔍好奇心64 │
+│            DARIAS              │
+└──────────────────────────────┘
+背景: パステル縦グラデ(#FFF1F6→#F1F7FF)
+```
+
+- 共有中は `_isSharing = true` → スピナー表示＋ボタン無効化（多重タップ防止）
+- iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
+
+**共有テキスト**: `DARIAS 心の迷宮 — 「{worry}」を克服しました！\n称号「{title}」／際立った傾向: {topTrait}／元素:{element}\n#DARIAS #心の迷宮`
+**ハッシュタグ**: `#DARIAS #心の迷宮`
+
+---
+
 ## ハッシュタグ一覧
 
 | 機能 | ハッシュタグ |
@@ -200,6 +242,7 @@ RepaintBoundary (key: _offscreenCardKey)
 | 自分会議 | `#DARIAS #自分会議` |
 | 性格診断（進化ダイアログ） | `#DARIAS #性格診断` |
 | 相性診断 | `#DARIAS #相性診断` |
+| ローグライク（心の迷宮） | `#DARIAS #心の迷宮` |
 
 ---
 
@@ -211,3 +254,4 @@ RepaintBoundary (key: _offscreenCardKey)
 | `presentation/screens/meeting/meeting_screen.dart` | 自分会議シェア（`_shareMeeting`） |
 | `presentation/screens/home/home_screen.dart` | 進化ダイアログシェア（`_captureAndShare`、`_buildShareCard`） |
 | `presentation/screens/friend/compatibility_category_screen.dart` | 相性診断シェア（`_share`） |
+| `features/roguelike/screens/roguelike_result_screen.dart` | ローグライク結果シェア（`_captureAndShare`、`_ShareCard`・画像+テキスト） |

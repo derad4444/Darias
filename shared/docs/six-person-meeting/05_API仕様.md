@@ -1,6 +1,6 @@
-# API仕様（Cloud Functions - キャッシュ優先版）
+# API仕様（Cloud Functions）
 
-> **最終更新**: 2026-03-13（TypeScript擬似コードから実装済みJSコードに全面更新）
+> **最終更新**: 2026-07-20
 
 ---
 
@@ -15,7 +15,9 @@ shared/functions/
 
 ---
 
-## 📡 1. generateOrReuseMeeting（メイン関数 - キャッシュ優先）
+## 📡 1. generateOrReuseMeeting（メイン関数）
+
+会議はリクエストごとに、そのユーザーの悩み（concern）に沿って毎回新規にAI生成される。
 
 ### エンドポイント
 
@@ -25,6 +27,7 @@ exports.generateOrReuseMeeting = onCall(
     region: "asia-northeast1",
     memory: "1GiB",
     timeoutSeconds: 300,
+    enforceAppCheck: true,
   },
   async (request) => { ... }
 );
@@ -47,11 +50,11 @@ exports.generateOrReuseMeeting = onCall(
 ```javascript
 {
   success: true,
-  meetingId: string,    // shared_meetings のID
+  meetingId: string,    // 生成した shared_meetings のID
   conversation: Conversation,
   statsData: StatsData,
-  cacheHit: boolean,
-  usageCount: number,   // 会議の総利用回数（+1済み）
+  cacheHit: boolean,    // 常に false（毎回新規生成のため）
+  usageCount: number,   // 生成した会議の利用回数（保存時は 1）
   duration: number,     // 処理時間(ms)
 }
 ```
@@ -59,27 +62,31 @@ exports.generateOrReuseMeeting = onCall(
 ### 処理フロー
 
 ```
-1. 認証チェック (request.auth)
+1. 認証チェック (request.auth / uid 一致確認)
 2. プレミアムステータス確認（subscription/current ドキュメント）
 3. 利用制限チェック
-   - 無料ユーザー: meeting_history の件数 >= 1 → エラー
-   - プレミアムユーザー: usage_tracking.meeting_count_this_month >= 30 → エラー
+   - 無料ユーザー: meeting_history の件数 >= 1 → エラー（生涯1回）
+   - プレミアムユーザー: 無制限
 4. キャラクターデータ取得（details/current: big5, gender, personalityKey, sixPersonalities）
 5. カテゴリ判定（concernCategory が未指定の場合 gpt-4o-mini で AI判定）
-6. 閲覧履歴取得（meeting_history から sharedMeetingId のリスト）
-7. キャッシュ検索（personalityKey のみで検索、閲覧済みを除外）
-8a. キャッシュヒット → 既存会議データを取得、usageCount をインクリメント
-8b. キャッシュミス → AI生成（gpt-4o-2024-11-20）、shared_meetings に保存
-9. meeting_history にユーザー別履歴を保存
-10. プレミアムユーザーの月間カウントをインクリメント
-11. レスポンス返却
+6. 会議を新規生成（gpt-4o-2024-11-20）
+   - 統計データ計算（PersonalityStatsMetadata から決定論的に算出）
+   - 悩み（concern）とカテゴリをプロンプトに含めて会話生成
+7. shared_meetings に生成結果を保存（.add）
+8. meeting_history にユーザー別履歴を保存
+9. プレミアムユーザーの月間カウントをインクリメント
+10. レスポンス返却（cacheHit: false）
 ```
+
+**設計方針:**
+- 会議は毎回その悩みに沿って新規生成される。過去に生成した共有会議の読み出し・再利用は行わない。
+- `cacheHit` は常に `false` を返す（レスポンス互換のために残しているフィールド）。
 
 ---
 
 ## 🤖 2. detectConcernCategoryWithAI（カテゴリ自動判定）
 
-キャッシュミス時に `concernCategory` が未指定の場合のみ呼ばれる。
+`concernCategory` が未指定の場合のみ呼ばれる。
 
 ```javascript
 const VALID_CATEGORIES = [
@@ -94,7 +101,6 @@ async function detectConcernCategoryWithAI(concern, openai) {
       role: "user",
       content: `次の悩みを最も適切なカテゴリ1つに分類してください。\n悩み: "${concern}"\n...`
     }],
-    max_tokens: 20,
     temperature: 0,
   });
   const result = completion.choices[0].message.content.trim().toLowerCase();
@@ -104,41 +110,13 @@ async function detectConcernCategoryWithAI(concern, openai) {
 
 **特徴:**
 - temperature=0 で安定した判定
-- max_tokens=20 でコスト最小化（カテゴリIDのみ出力）
+- カテゴリIDのみを出力させることで出力トークンを最小化
 - エラー時は "other" にフォールバック
-- カテゴリはキャッシュには影響しない（記録用のみ）
+- カテゴリは生成プロンプトのカテゴリ別結論指示に使われ、shared_meetings にも記録される
 
 ---
 
-## 🗄️ 3. キャッシュ検索ロジック
-
-```javascript
-async function searchMeetingCache(personalityKey, excludeIds = []) {
-  const cacheQuery = await db
-    .collection("shared_meetings")
-    .where("personalityKey", "==", personalityKey)
-    .orderBy("usageCount", "desc")
-    .get();
-
-  // 除外リスト（閲覧済み）に含まれていない最初のドキュメントを返す
-  for (const doc of cacheQuery.docs) {
-    if (!excludeIds.includes(doc.id)) {
-      return { id: doc.id, ...doc.data() };
-    }
-  }
-  return null; // 全部除外済みならnull（新規生成）
-}
-```
-
-**重要な設計:**
-- `personalityKey` **のみ**でキャッシュ検索（カテゴリ非依存）
-- 同じ性格タイプなら悩みのカテゴリが異なっても再利用
-- 利用回数（`usageCount`）が多い会議を優先
-- 閲覧済みIDは除外して毎回新鮮なコンテンツを提供
-
----
-
-## 💬 4. 会議生成（AI 100%生成）
+## 💬 3. 会議生成（AI 100%生成）
 
 ```javascript
 async function generateConversationWithAI(concern, category, personalities, statsData) {
@@ -157,7 +135,6 @@ async function generateConversationWithAI(concern, category, personalities, stat
         { role: "user", content: prompt },
       ],
       temperature: 0.8,
-      max_tokens: 3000,
       response_format: { type: "json_object" },  // JSON強制
     },
   );
@@ -168,9 +145,34 @@ async function generateConversationWithAI(concern, category, personalities, stat
 ```
 
 **特徴:**
+- ユーザーの悩み（concern）をプロンプトに直接埋め込み、毎回その悩みに沿った会話を生成する
 - `response_format: { type: "json_object" }` でJSON出力を強制（AI がテキストで返すバグ防止）
 - systemプロンプトでJSON専用アシスタントとして定義
 - マークダウン記法（```json）除去ロジックも実装済み
+
+---
+
+## 🗄️ 4. shared_meetings への保存
+
+生成した会議は `shared_meetings` コレクションに保存される。保存は履歴・分析・評価のために残っているが、後続リクエストでの再利用（読み出し）は行われない。
+
+```javascript
+const sharedMeetingRef = await db.collection("shared_meetings").add({
+  personalityKey,
+  concernCategory: category,
+  conversation,
+  statsData,
+  usageCount: 1,
+  ratings: { avgRating: 0, totalRatings: 0, ratingSum: 0 },
+  createdAt: new Date(),
+  lastUsedAt: new Date(),
+});
+```
+
+**重要な設計:**
+- 会議はリクエストごとに新規生成し、そのまま新しいドキュメントとして保存する
+- 既存ドキュメントの検索・再利用は行わない
+- `usageCount` は保存時に 1 で固定（インクリメントされない）
 
 ---
 
@@ -189,7 +191,7 @@ if (usageCount >= 1) {
 ### プレミアムユーザー（無制限）
 
 ```javascript
-// users/{userId}.usage_tracking で月間カウント管理
+// users/{userId}.usage_tracking で月間カウントを記録（制限ではなく記録用）
 async function checkMonthlyMeetingCount(userId) {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const userDoc = await db.collection("users").doc(userId).get();
@@ -214,12 +216,12 @@ async function incrementMonthlyMeetingCount(userId) {
 
 ## 📊 6. Firestore 書き込みパターン
 
-### キャッシュミス時（新規生成）
+各リクエストで以下の書き込みが行われる。
 
 ```
-shared_meetings/{id}
+shared_meetings/{id}（add）
 ├── personalityKey: "O3_C3_E3_A4_N3_男性"
-├── concernCategory: "career"  // 記録用（キャッシュマッチには使わない）
+├── concernCategory: "career"
 ├── conversation: { rounds, conclusion }
 ├── statsData: { similarCount, totalUsers, ... }
 ├── usageCount: 1
@@ -227,8 +229,8 @@ shared_meetings/{id}
 ├── createdAt: Timestamp
 └── lastUsedAt: Timestamp
 
-users/{userId}/characters/{characterId}/meeting_history/{id}
-├── sharedMeetingId: "..."
+users/{userId}/characters/{characterId}/meeting_history/{id}（add）
+├── sharedMeetingId: "..."（上で生成したドキュメントID）
 ├── userConcern: "転職どうしよう"
 ├── concernCategory: "career"
 ├── userBIG5: { openness: 3, ... }
@@ -236,27 +238,16 @@ users/{userId}/characters/{characterId}/meeting_history/{id}
 └── createdAt: Timestamp
 ```
 
-### キャッシュヒット時
-
-```
-shared_meetings/{id}（update）
-├── usageCount: +1
-└── lastUsedAt: Timestamp（更新）
-
-users/{userId}/characters/{characterId}/meeting_history/{id}（add）
-└── （上記と同じ、cacheHit: true）
-```
-
 ---
 
-## 📈 7. キャッシュ効果の測定
+## 📈 7. 生成状況の測定
 
 Cloud Functions ログから確認可能:
 
 ```javascript
 logger.info("Meeting generation completed", {
   duration,
-  cacheHit,       // true/false
+  cacheHit,       // 常に false
   sharedMeetingId,
 });
 ```
@@ -265,24 +256,15 @@ logger.info("Meeting generation completed", {
 
 ## 📝 まとめ
 
-### キャッシュ優先ロジックの利点
-
-```
-✅ 1. コスト削減: キャッシュヒットで1.63円→0円
-✅ 2. 高速化: AI生成(30-60秒) → キャッシュ返却(数秒)
-✅ 3. カテゴリ非依存: 同性格タイプなら悩みに関わらず再利用
-✅ 4. 閲覧除外: 同じユーザーに同じ会議を見せない
-✅ 5. 品質管理: ratings で評価を追跡
-```
-
 ### 実装済み機能
 
 ```
-✅ personalityKey のみでキャッシュ（カテゴリ非依存）
-✅ 閲覧済み会議の除外（meeting_history で管理）
+✅ 毎回その悩み（concern）に沿って新規AI生成
 ✅ gpt-4o-2024-11-20 で会議生成
 ✅ gpt-4o-mini でカテゴリ自動判定
 ✅ response_format: json_object でJSON強制出力
+✅ 生成結果は shared_meetings に保存（履歴・分析用、再利用はしない）
+✅ meeting_history にユーザー別履歴を保存
 ✅ 無料ユーザー: 生涯1回制限
 ✅ プレミアムユーザー: 無制限
 ✅ 毎日3時のバックフィルスケジューラ（sixPersonalities補完）

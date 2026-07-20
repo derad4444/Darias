@@ -26,9 +26,8 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../diary/diary_detail_screen.dart';
-import '../../widgets/inline_hint_banner.dart';
-import '../../providers/auth_provider.dart';
-import '../../../data/services/hint_service.dart';
+// 説明ヒントバナー廃止に伴い不使用:
+// import '../../providers/auth_provider.dart';
 import '../../../data/services/notification_service.dart';
 import '../../providers/daily_mission_provider.dart';
 import '../../widgets/daily_mission_sheet.dart' show dailyMissionBottomSheetTriggerProvider;
@@ -2036,14 +2035,6 @@ class _ScheduleBottomSheetState extends ConsumerState<_ScheduleBottomSheet> {
                   ),
                 ],
               ),
-            ),
-
-            // カレンダー日記ヒントバナー（初回のみ）
-            InlineHintBanner(
-              userId: ref.watch(currentUserIdProvider) ?? '',
-              feature: HintService.kCalendarDiary,
-              message: '左の本アイコンをタップするとその日の日記を確認できます。日記は毎晩23:50頃に自動生成されます。',
-              icon: Icons.auto_stories_outlined,
             ),
 
             // コンテンツ（iOS版と同様に左に日記アイコン、右に予定リスト）

@@ -86,7 +86,8 @@ class SettingsScreen extends ConsumerWidget {
                     // 通知設定
                     _SettingsCard(
                       title: '通知設定',
-                      subtitle: '予定・日記の通知を管理',
+                      // 手帳（予定）廃止に伴い差し替え（旧: '予定・日記の通知を管理'）
+                      subtitle: '日記の通知を管理',
                       icon: Icons.notifications_outlined,
                       onTap: () => context.push('/notification-settings'),
                     ),
@@ -110,7 +111,8 @@ class SettingsScreen extends ConsumerWidget {
                     // タグ管理
                     _SettingsCard(
                       title: 'タグ管理',
-                      subtitle: '予定のタグを作成・編集',
+                      // 手帳（予定）廃止に伴い差し替え（旧: '予定のタグを作成・編集'）
+                      subtitle: 'タグを作成・編集',
                       icon: Icons.label_outlined,
                       onTap: () => context.push('/tag-management'),
                     ),

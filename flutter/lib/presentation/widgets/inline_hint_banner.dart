@@ -112,8 +112,10 @@ class _HomeHintBannerState extends State<HomeHintBanner>
     with SingleTickerProviderStateMixin {
   static const _steps = [
     (
-      icon: Icons.chat_bubble_outline,
-      text: '"明日14時に会議"と送ると予定を自動登録。"メモして"でメモ、"タスクに追加"でタスクにも登録できます',
+      icon: Icons.explore_outlined,
+      // 手帳廃止に伴い差し替え（旧文はコメントで残置・復活時に戻す）:
+      // text: '"明日14時に会議"と送ると予定を自動登録。"メモして"でメモ、"タスクに追加"でタスクにも登録できます',
+      text: '「冒険」タブのダンジョン「心の迷宮」に挑戦。悩みを乗り越えると、あなたの選び方から心の傾向を診断します',
     ),
     (
       icon: Icons.help_outline,

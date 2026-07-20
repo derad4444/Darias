@@ -3,14 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
-import '../../providers/auth_provider.dart';
+// 説明ヒントバナー廃止に伴い不使用:
+// import '../../providers/auth_provider.dart';
 import '../../../data/models/friend_model.dart';
-import '../../../data/services/hint_service.dart';
 import '../../widgets/character_avatar_widget.dart';
-import '../../widgets/inline_hint_banner.dart';
+import '../../widgets/ads/screen_banner.dart';
+import '../../../data/services/ad_service.dart';
 import 'friend_search_screen.dart';
 import 'compatibility_screen.dart';
-import 'friend_share_level_sheet.dart';
+// 予定共有機能（手帳／予定廃止に伴い非表示）:
+// import 'friend_share_level_sheet.dart';
 
 class FriendScreen extends ConsumerWidget {
   const FriendScreen({super.key});
@@ -40,6 +42,8 @@ class FriendScreen extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 上部バナー広告
+              ScreenBanner(adUnitId: AdConfig.friendScreenTopBannerAdUnitId),
               // ヘッダー
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 16, 8, 8),
@@ -107,14 +111,6 @@ class FriendScreen extends ConsumerWidget {
                 ),
               ),
 
-              // フレンドヒントバナー（初回のみ）
-              InlineHintBanner(
-                userId: ref.watch(currentUserIdProvider) ?? '',
-                feature: HintService.kFriend,
-                message: 'フレンドごとに予定の共有レベルを設定できます：非公開・公開（公開設定の予定のみ）・全公開（すべて）。フレンドカードの設定ボタンから変更できます。',
-                icon: Icons.people_outline,
-              ),
-
               // フレンド一覧
               Expanded(
                 child: friendsAsync.when(
@@ -137,6 +133,8 @@ class FriendScreen extends ConsumerWidget {
                   },
                 ),
               ),
+              // 下部バナー広告
+              ScreenBanner(adUnitId: AdConfig.friendScreenBottomBannerAdUnitId),
             ],
           ),
         ),
@@ -234,8 +232,9 @@ class _FriendCard extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _ShareLevelChip(friend: friend, accentColor: accentColor),
-                  const SizedBox(width: 8),
+                  // 予定共有チップ（手帳／予定機能の廃止に伴いコメントアウトで残置）
+                  // _ShareLevelChip(friend: friend, accentColor: accentColor),
+                  // const SizedBox(width: 8),
                   Icon(Icons.chevron_right,
                       color: accentColor.withValues(alpha: 0.5), size: 20),
                 ],
@@ -248,7 +247,8 @@ class _FriendCard extends ConsumerWidget {
   }
 }
 
-/// 共有レベルチップ
+/// 共有レベルチップ（手帳／予定機能の廃止に伴いコメントアウトで残置）
+/*
 class _ShareLevelChip extends ConsumerWidget {
   final FriendModel friend;
   final Color accentColor;
@@ -291,6 +291,7 @@ class _ShareLevelChip extends ConsumerWidget {
     }
   }
 }
+*/
 
 /// フレンドがいない時の表示
 class _EmptyFriendView extends StatelessWidget {

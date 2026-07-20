@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../providers/survey_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/draggable_fab.dart';
 import '../calendar/calendar_screen.dart';
 import '../note/note_screen.dart';
-import 'techou_survey_screen.dart';
 
 enum PlanSegment { schedule, memo, todo }
 
@@ -22,11 +20,6 @@ class PlanScreen extends ConsumerWidget {
     final segment = ref.watch(planSegmentProvider);
     final accentColor = ref.watch(accentColorProvider);
     final backgroundGradient = ref.watch(backgroundGradientProvider);
-
-    // 手帳タブ廃止アンケート（必須）。回答するまで、手帳の内容の上に
-    // ポップアップ（モーダルウィンドウ）として重ねて表示し続ける。
-    final surveyAnswered = ref.watch(techouSurveyAnsweredProvider);
-    final showSurveyPopup = surveyAnswered == false;
 
     void onFabTap() {
       switch (segment) {
@@ -84,13 +77,7 @@ class PlanScreen extends ConsumerWidget {
       ),
     );
 
-    // 手帳内容の上にアンケートポップアップを重ねる（未回答かつ未スキップのとき）
-    return Stack(
-      children: [
-        content,
-        if (showSurveyPopup) Positioned.fill(child: const TechouSurveyPopup()),
-      ],
-    );
+    return content;
   }
 }
 

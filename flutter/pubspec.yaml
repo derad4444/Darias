@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 3.3.6+24
+version: 3.4.0+25
 
 environment:
   sdk: ^3.10.7
@@ -98,6 +98,9 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
 
+  # Charts (ローグライク結果画面のレーダーチャート等)
+  fl_chart: ^0.69.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -114,6 +117,12 @@ dev_dependencies:
   freezed: ^2.5.8
   json_serializable: ^6.9.4
 
+# path_provider_foundation 2.6.0 は objective_c(native assets) を使い、iOSシミュレータで
+# objective_c.framework の dlopen に失敗する（just_audio の setAsset が path_provider を
+# 呼ぶため BGM・効果音が鳴らなくなる）。native assets を使わない安定版に固定して回避する。
+dependency_overrides:
+  path_provider_foundation: 2.4.1
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
@@ -128,8 +137,8 @@ flutter:
   # Assets
   assets:
     - assets/images/
-    - assets/images/characters/no_element_baby/
     - assets/images/character_growth/
+    - assets/images/roguelike_enemies/
     - assets/audio/
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -32,10 +32,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: '6人の自分で悩みを解決',
       body: '悩みを入力すると、あなたの性格を持った\n6人の分身が会議を開きます。\n\n「論理派の自分」「感情派の自分」が\nリアルに議論するから、\nどこか納得感がある答えが見つかります。',
     ),
+    // 手帳（予定・メモ・タスク）機能の廃止に伴い、冒険（心の迷宮）の紹介に差し替え。
+    // 旧ページはコメントで残置（復活時に戻す）:
+    // _OnboardingPage(
+    //   icon: Icons.edit_calendar_outlined,
+    //   title: 'チャットで予定・メモ・タスクも',
+    //   body: '"明日14時に会議"と送ると予定を自動登録。\n"メモして""タスクに追加して"も\n話すだけでOK。\n\nアプリのことがわからなければ\nチャットで質問するとキャラクターが答えます。',
+    // ),
     _OnboardingPage(
-      icon: Icons.edit_calendar_outlined,
-      title: 'チャットで予定・メモ・タスクも',
-      body: '"明日14時に会議"と送ると予定を自動登録。\n"メモして""タスクに追加して"も\n話すだけでOK。\n\nアプリのことがわからなければ\nチャットで質問するとキャラクターが答えます。',
+      icon: Icons.explore_outlined,
+      title: 'ゲームで、自分を知る',
+      body: '「冒険」タブでは、悩みをテーマにした\nダンジョン「心の迷宮」に挑戦できます。\n\n枝道を選んで進み、敵（悩み）を乗り越えると、\nあなたの選び方から心の傾向を診断。\n\nすべて踏破すると、冒険の総合診断も\n受け取れます。',
     ),
     _OnboardingPage(
       icon: Icons.chat_bubble_outline,

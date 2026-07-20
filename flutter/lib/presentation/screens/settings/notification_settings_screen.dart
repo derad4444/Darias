@@ -53,6 +53,8 @@ class NotificationSettingsScreen extends ConsumerWidget {
 
               const SizedBox(height: 16),
 
+              // 手帳（予定）機能の廃止に伴い、予定の通知トグルをコメントアウト（復活時に戻す）。
+              /*
               // 予定の通知
               _NotificationToggle(
                 icon: Icons.calendar_month_outlined,
@@ -67,6 +69,7 @@ class NotificationSettingsScreen extends ConsumerWidget {
               ),
 
               const SizedBox(height: 12),
+              */
 
               // 日記の通知
               _NotificationToggle(
@@ -296,11 +299,12 @@ class _InfoCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          _bullet('予定の通知：各予定に設定した時刻に通知されます', textColor),
-          const SizedBox(height: 6),
+          // 手帳（予定）廃止に伴いコメントアウト（復活時に戻す）:
+          // _bullet('予定の通知：各予定に設定した時刻に通知されます', textColor),
+          // const SizedBox(height: 6),
           _bullet('日記の通知：キャラクターが日記を書いたことを毎日お知らせします', textColor),
           const SizedBox(height: 6),
-          _bullet('通知をオフにしても、アプリ内で予定や日記を確認できます', textColor),
+          _bullet('通知をオフにしても、アプリ内で日記を確認できます', textColor),
         ],
       ),
     );

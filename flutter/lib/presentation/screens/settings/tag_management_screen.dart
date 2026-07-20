@@ -640,6 +640,10 @@ class _TagUsageCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 手帳（予定・メモ・タスク）廃止に伴い、タグの使用件数カードを非表示（コメントアウトで残置・復活時に戻す）。
+    return const SizedBox.shrink();
+    // ignore: dead_code
+    /*
     final countAsync = ref.watch(tagUsageCountProvider(tagName));
 
     return _SectionCard(
@@ -684,9 +688,11 @@ class _TagUsageCard extends ConsumerWidget {
         ),
       ),
     );
+    */
   }
 }
 
+// ignore: unused_element
 class _CountItem extends StatelessWidget {
   final String label;
   final int count;

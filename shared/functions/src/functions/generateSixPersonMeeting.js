@@ -130,15 +130,18 @@ exports.generateOrReuseMeeting = onCall(
           viewedCount: viewedMeetings.length,
         });
 
-        // 6. 【CRITICAL】キャッシュ検索（性格タイプのみ、カテゴリ非依存）
-        logger.info("Searching cache (category-independent)", {
+        // 6. 【都度生成】共有会議の再利用を廃止し、毎回その悩みに沿って新規生成する。
+        //    （旧: 同じ性格タイプの共有会議を未閲覧なら使い回していた。悩み内容は反映されなかった）
+        //    再利用に戻す場合は下記の searchMeetingCache 呼び出しを復活させ、cacheResult=null を削除する。
+        logger.info("Generating fresh meeting every time (cache reuse disabled)", {
           personalityKey,
           detectedCategory: category, // 記録用のみ
         });
-        const cacheResult = await searchMeetingCache(
-            personalityKey,
-            viewedMeetings,
-        );
+        // const cacheResult = await searchMeetingCache(
+        //     personalityKey,
+        //     viewedMeetings,
+        // );
+        const cacheResult = null;
 
         let sharedMeetingId;
         let conversation;

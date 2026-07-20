@@ -43,6 +43,8 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
     _confettiController.play();
   }
 
+  // 手帳（カレンダー）廃止でスケジュール確認ミッションをコメントアウトしたため現在は未使用（復活時に再利用）。
+  // ignore: unused_element
   void _goToTodaySheet() {
     Navigator.pop(context);
     if (context.mounted) {
@@ -197,6 +199,8 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
             subLabel: mission.chat6Done ? null : '現在の進捗: ${mission.chatCount} / 6',
             accentColor: accentColor,
           ),
+          // 手帳（カレンダー）廃止に伴い「スケジュール確認」ミッションをコメントアウト（復活時に戻す）。
+          /*
           const SizedBox(height: 10),
           _MissionRow(
             label: '今日のスケジュールを確認する',
@@ -205,6 +209,7 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
             accentColor: accentColor,
             onTap: mission.diaryViewed ? null : _goToTodaySheet,
           ),
+          */
           const SizedBox(height: 10),
           _MissionRow(
             label: '日記を確認する',
@@ -214,6 +219,8 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
             onTap: mission.diaryRead ? null : _goToYesterdaySheet,
           ),
 
+          // 手帳（カレンダー）廃止に伴い、全達成メッセージ（カレンダーに⭐）をコメントアウト（復活時に戻す）。
+          /*
           // 全達成メッセージ
           if (mission.allCompleted) ...[
             const SizedBox(height: 14),
@@ -243,6 +250,7 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
               ),
             ),
           ],
+          */
 
           const SizedBox(height: 16),
           Divider(color: accentColor.withValues(alpha: 0.15), height: 1),

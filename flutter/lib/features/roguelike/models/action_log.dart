@@ -64,6 +64,21 @@ class ActionLog {
     '柔軟性': flexibility,
   };
 
+  /// toMap() のキー（日本語特性名）から ActionLog を復元する。
+  /// 保存済み run の `traits` マップの合算などに使う。
+  factory ActionLog.fromMap(Map<String, int> m) => ActionLog(
+        challenge: m['挑戦性'] ?? 0,
+        caution: m['慎重性'] ?? 0,
+        curiosity: m['好奇心'] ?? 0,
+        planning: m['計画性'] ?? 0,
+        intuition: m['直感性'] ?? 0,
+        logic: m['論理性'] ?? 0,
+        cooperation: m['協調性'] ?? 0,
+        altruism: m['利他性'] ?? 0,
+        persistence: m['執着性'] ?? 0,
+        flexibility: m['柔軟性'] ?? 0,
+      );
+
   // 上位3特性を返す
   List<MapEntry<String, int>> topTraits() {
     final entries = toMap().entries.toList()
@@ -71,23 +86,36 @@ class ActionLog {
     return entries.take(3).toList();
   }
 
+  // 8元素のスコア（それぞれ異なる3特性の組み合わせ）。
+  // 光⇔闇・雷⇔氷は外向/内向の鏡として差別化する。
+  Map<String, int> elementScores() => {
+    '炎': challenge + intuition + persistence,   // 衝動・前進
+    '水': altruism + cooperation + flexibility,  // 受容・つながり
+    '風': curiosity + flexibility + intuition,   // 自由・変化
+    '土': caution + planning + persistence,      // 堅実・継続
+    '雷': challenge + intuition + flexibility,   // 外向の瞬発（直感を外へ放つ）
+    '氷': caution + intuition + persistence,     // 内向の瞬発（直感を内に止める）
+    '光': logic + planning + cooperation,        // 外向の理性（理性を他者へ向ける）
+    '闇': logic + curiosity + caution,           // 内向の理性（理性を内へ向ける）
+  };
+
   // 冒険中の元素傾向を推定
   String inferredElement() {
-    final totals = {
-      '炎': challenge + intuition + persistence,
-      '水': cooperation + altruism + flexibility,
-      '光': logic + planning + caution,
-      '闇': caution + curiosity + logic,
-      '風': curiosity + flexibility + intuition,
-      '土': caution + planning + persistence,
-      '雷': challenge + intuition + flexibility,
-      '氷': caution + logic + planning,
-    };
+    final totals = elementScores();
     final maxVal = totals.values.reduce((a, b) => a > b ? a : b);
     if (maxVal == 0) return '無';
     // 最大値との差が小さい場合は「無」
     final sorted = totals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
     if (sorted[0].value - sorted[1].value < 3) return '無';
     return sorted.first.key;
+  }
+
+  /// 推定元素の「強さ傾向」ラベル（強い傾向／やや強い傾向）。「無」なら空。
+  String elementStrengthLabel() {
+    if (inferredElement() == '無') return '';
+    final sorted = elementScores().entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final margin = sorted[0].value - sorted[1].value;
+    return margin >= 8 ? '強い傾向' : 'やや強い傾向';
   }
 }

@@ -9,6 +9,7 @@ import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
+import '../../../features/roguelike/screens/adventure_personality_tab.dart';
 
 /// Big5解析カテゴリー
 enum Big5AnalysisCategory {
@@ -234,8 +235,11 @@ final big5AnalysisDataProvider = StreamProvider.family<Big5AnalysisData?, String
   });
 });
 
+/// 詳細画面のサブタブ選択（0=基本 / 1=冒険の性格）。
+final characterDetailSegmentProvider = StateProvider<int>((ref) => 0);
+
 /// iOS版CharacterDetailViewと同じデザインのキャラクター詳細画面
-class CharacterDetailScreen extends ConsumerWidget {
+class CharacterDetailScreen extends ConsumerStatefulWidget {
   final String characterId;
 
   const CharacterDetailScreen({
@@ -244,16 +248,45 @@ class CharacterDetailScreen extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CharacterDetailScreen> createState() => _CharacterDetailScreenState();
+}
+
+class _CharacterDetailScreenState extends ConsumerState<CharacterDetailScreen> {
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: ref.read(characterDetailSegmentProvider));
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final characterId = widget.characterId;
+    // セグメント切替（タップ）でページをアニメーション移動させる。
+    ref.listen<int>(characterDetailSegmentProvider, (prev, next) {
+      if (_pageController.hasClients && (_pageController.page?.round() ?? 0) != next) {
+        _pageController.animateToPage(next, duration: const Duration(milliseconds: 250), curve: Curves.easeOut);
+      }
+    });
     final detailAsync = ref.watch(characterDetailDataProvider(characterId));
     final backgroundGradient = ref.watch(backgroundGradientProvider);
     final colorSettings = ref.watch(colorSettingsProvider);
     final textColor = colorSettings.textColor;
     final accentColor = colorSettings.accentColor;
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
+    final segment = ref.watch(characterDetailSegmentProvider);
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
+    return Container(
+      decoration: BoxDecoration(gradient: backgroundGradient),
+      child: Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         leading: IconButton(
@@ -271,10 +304,24 @@ class CharacterDetailScreen extends ConsumerWidget {
             onPressed: () => showElementGuideDialog(context),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: _DetailSegmentControl(
+              selected: segment,
+              accentColor: accentColor,
+              textColor: textColor,
+              onChanged: (i) => ref.read(characterDetailSegmentProvider.notifier).state = i,
+            ),
+          ),
+        ),
       ),
-      body: Container(
-        decoration: BoxDecoration(gradient: backgroundGradient),
-        child: detailAsync.when(
+      body: PageView(
+          controller: _pageController,
+          onPageChanged: (i) => ref.read(characterDetailSegmentProvider.notifier).state = i,
+          children: [
+            detailAsync.when(
           data: (detail) => detail != null
               ? _CharacterDetailBody(
                   characterId: characterId,
@@ -296,6 +343,9 @@ class CharacterDetailScreen extends ConsumerWidget {
               style: TextStyle(color: textColor),
             ),
           ),
+            ),
+            AdventurePersonalityTab(textColor: textColor, accentColor: accentColor),
+          ],
         ),
       ),
     );
@@ -1208,4 +1258,72 @@ class _PersonalityTypeCard extends ConsumerWidget {
     );
   }
 }
+
+/// 詳細画面のサブタブ切替（手帳タブのメモ/タスク切替と同じセグメントスタイル）。
+class _DetailSegmentControl extends StatelessWidget {
+  final int selected;
+  final Color accentColor;
+  final Color textColor;
+  final ValueChanged<int> onChanged;
+
+  const _DetailSegmentControl({
+    required this.selected,
+    required this.accentColor,
+    required this.textColor,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const items = [
+      (0, '基本', Icons.person_outline),
+      (1, '冒険の性格', Icons.explore_outlined),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        children: items.map((it) {
+          final isSelected = selected == it.$1;
+          final color = isSelected ? accentColor : textColor.withValues(alpha: 0.6);
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => onChanged(it.$1),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: isSelected
+                      ? [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4, offset: const Offset(0, 2))]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(it.$3, size: 14, color: color),
+                    const SizedBox(width: 4),
+                    Text(
+                      it.$2,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
 

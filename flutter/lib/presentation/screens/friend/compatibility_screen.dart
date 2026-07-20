@@ -11,11 +11,12 @@ import '../../providers/friend_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
-import '../../widgets/inline_hint_banner.dart';
-import '../../../data/services/hint_service.dart';
+import '../../widgets/ads/screen_banner.dart';
+import '../../../data/services/ad_service.dart';
 import 'compatibility_category_screen.dart';
 import 'friend_ask_screen.dart';
-import '../../providers/calendar_provider.dart';
+// 予定共有機能（手帳／予定廃止に伴い非表示）:
+// import '../../providers/calendar_provider.dart';
 
 /// カテゴリ定義
 class CompatibilityCategoryMeta {
@@ -399,11 +400,12 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     final friendInitial =
         widget.friend.name.isNotEmpty ? widget.friend.name[0] : 'F';
 
-    final friends = ref.watch(friendsProvider).valueOrNull ?? [];
-    final currentFriend = friends.firstWhere(
-      (f) => f.id == widget.friend.id,
-      orElse: () => widget.friend,
-    );
+    // 予定共有設定で使用していたが、機能廃止に伴い不使用（コメントアウトで残置）:
+    // final friends = ref.watch(friendsProvider).valueOrNull ?? [];
+    // final currentFriend = friends.firstWhere(
+    //   (f) => f.id == widget.friend.id,
+    //   orElse: () => widget.friend,
+    // );
 
     final myDetails = ref.watch(characterDetailsProvider).valueOrNull;
     final friendDetailsAsync = ref.watch(userCharacterDetailsProvider(widget.friend.id));
@@ -448,7 +450,11 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
         child: SafeArea(
-          child: _isInitialLoading
+          child: Column(
+            children: [
+              ScreenBanner(adUnitId: AdConfig.friendDetailTopBannerAdUnitId),
+              Expanded(
+                child: _isInitialLoading
               ? Center(child: CircularProgressIndicator(color: accentColor))
               : ListView(
                   physics: const BouncingScrollPhysics(),
@@ -458,17 +464,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                         accentColor, myUserId, myName, myInitial, friendInitial),
                     const SizedBox(height: 12),
 
-                    // 予定の共有設定
-                    _buildShareLevelSection(accentColor, currentFriend, ref),
-                    const SizedBox(height: 4),
+                    // 予定の共有設定（手帳／予定機能の廃止に伴い非表示・コメントアウトで残置）
+                    // _buildShareLevelSection(accentColor, currentFriend, ref),
+                    // const SizedBox(height: 4),
 
-                    // 相性診断ヒントバナー（初回のみ、アバターの下）
-                    InlineHintBanner(
-                      userId: myUserId,
-                      feature: HintService.kCompatibility,
-                      message: '無料ユーザーは各カテゴリを動画広告視聴で解放できます。診断には自分とフレンド双方の性格解析（30回以上チャット）が必要です。',
-                      icon: Icons.favorite_border,
-                    ),
                     const SizedBox(height: 12),
 
                     if (_errorMessage != null) ...[
@@ -598,6 +597,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                     _buildAskButton(accentColor),
                   ],
                 ),
+              ),
+              ScreenBanner(adUnitId: AdConfig.friendDetailBottomBannerAdUnitId),
+            ],
+          ),
         ),
       ),
     );
@@ -633,8 +636,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   }
 
   // ─────────────────────────────────────────
-  // 予定の共有設定セクション
+  // 予定の共有設定セクション（手帳／予定機能の廃止に伴いコメントアウトで残置）
   // ─────────────────────────────────────────
+  /*
   Widget _buildShareLevelSection(Color accentColor, FriendModel currentFriend, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -756,6 +760,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
         return '非公開設定の予定・非公開タグの予定も含めてすべて共有します';
     }
   }
+  */
 
   // ─────────────────────────────────────────
   // アバター行

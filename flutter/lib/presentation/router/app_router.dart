@@ -29,12 +29,15 @@ import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
-import '../screens/character/character_animation_test_screen.dart';
 import '../screens/character/personality_history_screen.dart';
-// [ローグライク試作] 削除時はこのimport3行とルート3行を消す
+// [ローグライク試作] 削除時はこのimport4行とルート4行を消す
 import '../../features/roguelike/screens/roguelike_home_screen.dart';
 import '../../features/roguelike/screens/roguelike_game_screen.dart';
 import '../../features/roguelike/screens/roguelike_result_screen.dart';
+import '../../features/roguelike/screens/roguelike_history_screen.dart';
+import '../../features/roguelike/screens/roguelike_codex_screen.dart';
+import '../../features/roguelike/screens/roguelike_enemy_detail_screen.dart';
+import '../../features/roguelike/models/enemy.dart' show Enemy;
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
@@ -311,12 +314,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const HelpGuideScreen(),
       ),
 
-      // キャラクターアニメーションテスト
-      GoRoute(
-        path: '/character-animation-test',
-        name: 'character-animation-test',
-        builder: (context, state) => const CharacterAnimationTestScreen(),
-      ),
 
       // [ローグライク試作] 削除時はこのGoRoute3つを消す
       GoRoute(
@@ -333,6 +330,25 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/roguelike/result',
         name: 'roguelike-result',
         builder: (context, state) => const RoguelikeResultScreen(),
+      ),
+      GoRoute(
+        path: '/roguelike/history',
+        name: 'roguelike-history',
+        builder: (context, state) => const RoguelikeHistoryScreen(),
+      ),
+      GoRoute(
+        path: '/roguelike/codex',
+        name: 'roguelike-codex',
+        builder: (context, state) => const RoguelikeCodexScreen(),
+      ),
+      GoRoute(
+        path: '/roguelike/codex/enemy',
+        name: 'roguelike-codex-enemy',
+        builder: (context, state) {
+          final enemy = state.extra as Enemy?;
+          if (enemy == null) return const RoguelikeCodexScreen();
+          return RoguelikeEnemyDetailScreen(enemy: enemy);
+        },
       ),
 
     ],

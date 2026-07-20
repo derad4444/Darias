@@ -75,7 +75,8 @@ class DailyMissionDatasource {
   }
 
   DailyMission _checkAllCompleted(DailyMission m) {
-    if (m.loginDone && m.chat2Done && m.chat6Done && m.diaryViewed && m.diaryRead && !m.allCompleted) {
+    // 手帳廃止で diaryViewed（スケジュール確認）を除外（復活時に && m.diaryViewed を戻す）。
+    if (m.loginDone && m.chat2Done && m.chat6Done && m.diaryRead && !m.allCompleted) {
       return m.copyWith(allCompleted: true, completedAt: DateTime.now());
     }
     return m;
