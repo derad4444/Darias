@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-06-10
+**最終更新日**: 2026-07-29
 **ランタイム**: Node.js 22
 **関数数**: 31
 
@@ -704,11 +704,12 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **収集データ**: 当日スケジュール / 翌日スケジュール（明日への言及用、上位3件）/ チャット / 完了Todo / 作成Todo / メモ / 性格診断セッション / 6人会議
+- **収集データ**: チャット（本文は上位5件、件数は `count()` で実数取得）/ 性格診断セッション / 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `dream`(夢) / `strength`(強み) を取得してプロンプトに反映
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
-- **活動なし時の挙動**: 当日のスケジュール・チャット・Todo・メモ・会議・性格診断が全て空の場合（`hasActivity` フラグで判定）、OpenAI API を呼び出さずに `facts: []`, `ai_comment: ""` で Firestore に保存する（API コスト削減 + 架空活動の生成防止）
+- **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
+- **活動なし時の挙動**: 活動が無くても OpenAI API を呼び出し、キャラクターからの声がけのみの日記を保存する（`facts: []`, `ai_comment` あり）。以前は `hasActivity` フラグで API 呼び出しをスキップし `ai_comment: ""` で保存していたが、履歴に空の日記カードが並ぶため変更（2026-07-29）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
 - **FCM通知ログ出力**: 通知の送信結果は以下のレベルで Functions ログに記録される（Firebase Console > Functions ログで確認可能）
@@ -1011,4 +1012,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-06-10（`generateDiary.js` の活動なし判定バグ修正：`parts.length === 0`（未定義変数参照で ReferenceError）→ `!hasActivity`（各サマリー変数の OR 判定）に変更）*
+*最終更新: 2026-07-29（`generateDiary.js`: facts をAI生成からコード生成に変更＋活動なし日もAIで声がけを生成するよう変更）*

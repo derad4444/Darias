@@ -7,12 +7,13 @@ import '../../data/models/schedule_model.dart';
 import '../../data/models/shared_schedule_model.dart';
 import '../../data/models/holiday_model.dart';
 import '../../data/models/monthly_comment_model.dart';
-import '../../data/services/widget_data_service.dart';
+// ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+// import '../../data/services/widget_data_service.dart';
 import '../../data/services/japanese_holiday_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
 import 'friend_provider.dart';
-import '../screens/settings/tag_management_screen.dart';
+// import '../screens/settings/tag_management_screen.dart'; // 同上（tagsProvider/TagItem）
 
 /// CalendarDatasourceのプロバイダー
 final calendarDatasourceProvider = Provider<CalendarDatasource>((ref) {
@@ -76,7 +77,8 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
 
   CalendarController(this._datasource, this._ref) : super(const AsyncValue.data(null)) {
-    // スケジュール更新時にキャッシュ
+    // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+    /* // スケジュール更新時にキャッシュ
     _ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
       next.whenData((schedules) => _cacheSchedules(schedules));
     });
@@ -84,14 +86,15 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
     _ref.listen<List<TagItem>>(tagsProvider, (_, __) {
       final schedules = _ref.read(allSchedulesProvider);
       schedules.whenData((s) => _cacheSchedules(s));
-    });
+    }); */
   }
 
-  void _cacheSchedules(List<ScheduleModel> schedules) {
+  // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+  /* void _cacheSchedules(List<ScheduleModel> schedules) {
     final tags = _ref.read(tagsProvider);
     final tagColors = {for (final t in tags) t.name: t.colorHex};
     WidgetDataService.shared.cacheSchedules(schedules, tagColors: tagColors);
-  }
+  } */
 
   /// スケジュールを追加
   Future<void> addSchedule(ScheduleModel schedule) async {

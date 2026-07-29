@@ -14,7 +14,8 @@ import 'core/theme/app_colors.dart';
 import 'data/services/ad_service.dart';
 import 'data/services/bgm_player.dart';
 import 'data/services/notification_service.dart';
-import 'data/services/widget_data_service.dart';
+// ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+// import 'data/services/widget_data_service.dart';
 import 'firebase_options.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/notification_provider.dart';
@@ -74,8 +75,9 @@ void main() async {
     // 通知サービス初期化
     await NotificationService().initialize();
 
+    // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
     // ウィジェットデータサービス初期化（ネイティブのみ）
-    await WidgetDataService.shared.initialize();
+    // await WidgetDataService.shared.initialize();
   }
 
   // Web ではブラウザのネイティブ context menu を無効化し

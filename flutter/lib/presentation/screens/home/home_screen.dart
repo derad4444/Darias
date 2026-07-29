@@ -271,11 +271,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         ref.read(selectedTabProvider.notifier).state = 1;
         ref.read(dailyMissionBottomSheetTriggerProvider.notifier).state = now;
       } else if (next == DailyMissionNavigation.goToYesterdaySheet) {
+        // 「日記を確認する」→ 履歴画面の日記タブ（index 2）を開く。
+        // 手帳（カレンダー）廃止前はタブ1のカレンダーからボトムシートを開いていた。
         ref.read(dailyMissionNavigationProvider.notifier).state = DailyMissionNavigation.none;
-        final yesterday = DateTime.now().subtract(const Duration(days: 1));
-        ref.read(selectedDayProvider.notifier).state = yesterday;
-        ref.read(selectedTabProvider.notifier).state = 1;
-        ref.read(dailyMissionBottomSheetTriggerProvider.notifier).state = yesterday;
+        final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+        context.push('/history', extra: {'characterId': characterId, 'initialTab': 2});
       }
     });
 

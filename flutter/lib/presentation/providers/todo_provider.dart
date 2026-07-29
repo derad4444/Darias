@@ -1,7 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/datasources/remote/todo_datasource.dart';
 import '../../data/models/todo_model.dart';
-import '../../data/services/widget_data_service.dart';
+// ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+// import '../../data/services/widget_data_service.dart';
 import 'auth_provider.dart';
 
 /// TodoDatasourceのプロバイダー
@@ -92,9 +93,10 @@ class TodoController extends StateNotifier<AsyncValue<void>> {
   final Ref _ref;
 
   TodoController(this._datasource, this._ref) : super(const AsyncValue.data(null)) {
-    _ref.listen<AsyncValue<List<TodoModel>>>(todosProvider, (_, next) {
+    // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+    /* _ref.listen<AsyncValue<List<TodoModel>>>(todosProvider, (_, next) {
       next.whenData((todos) => WidgetDataService.shared.cacheTodos(todos));
-    });
+    }); */
   }
 
   /// Todoを追加

@@ -298,7 +298,9 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
+                        // 「ウィジェットに表示」トグル。showInWidget自体はモデルに残している。
+                        /* const SizedBox(height: 8),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -336,7 +338,7 @@ class _MemoDetailScreenState extends ConsumerState<MemoDetailScreen> {
                               ),
                             ],
                           ),
-                        ),
+                        ), */
                         const SizedBox(height: 8),
                         GestureDetector(
                           onTap: _taskCount > 0 ? () => _showTaskRegistrationSheet(accentColor) : null,

@@ -7,16 +7,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 // import 'package:home_widget/home_widget.dart'; // 手帳ウィジェット廃止に伴いコメントアウト（不使用・復活時に戻す）
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/bgm_player.dart';
-import '../../../data/services/widget_data_service.dart';
+// ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
+// import '../../../data/services/widget_data_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
-import '../../../data/models/memo_model.dart';
-import '../../../data/models/schedule_model.dart';
-import '../../../data/models/todo_model.dart';
-import '../../providers/memo_provider.dart';
-import '../../providers/todo_provider.dart';
-import '../../providers/calendar_provider.dart';
-import '../settings/tag_management_screen.dart';
+// import '../../../data/models/memo_model.dart'; // 同上（ウィジェット用キャッシュでのみ使用）
+// import '../../../data/models/schedule_model.dart'; // 予定通知の再登録停止に伴いコメントアウト
+// import '../../../data/models/todo_model.dart'; // 同上（ウィジェット用キャッシュでのみ使用）
+// import '../../providers/memo_provider.dart'; // 同上
+// import '../../providers/todo_provider.dart'; // 同上
+// import '../../providers/calendar_provider.dart'; // 同上（allSchedulesProvider）
+// import '../settings/tag_management_screen.dart'; // 同上（tagsProvider/TagItem）
 import '../home/home_screen.dart';
 import '../plan/plan_screen.dart';
 import '../character/character_detail_screen.dart';
@@ -27,8 +28,8 @@ import '../../../features/roguelike/widgets/adventure_door_transition.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
-import '../../providers/notification_provider.dart';
-import '../../../data/services/notification_service.dart';
+// import '../../providers/notification_provider.dart'; // 同上（notificationSettingsProvider）
+// import '../../../data/services/notification_service.dart'; // 同上
 
 /// 現在選択されているタブのインデックス
 final selectedTabProvider = StateProvider<int>((ref) => 0);
@@ -44,7 +45,8 @@ class MainShellScreen extends ConsumerStatefulWidget {
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   // 手帳タブ廃止に伴いコメントアウト（不使用・復活時に戻す）。ウィジェットタップ購読。
   // StreamSubscription<Uri?>? _widgetClickSub;
-  bool _hasRescheduledNotifications = false;
+  // 予定通知の再登録停止に伴いコメントアウト（不使用・復活時に戻す）。再登録の重複防止用。
+  // bool _hasRescheduledNotifications = false;
 
   @override
   void initState() {
@@ -53,13 +55,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     BGMPlayer.shared.playBGM('assets/audio/DARIAS BGM.mp3');
     // 音量設定プロバイダーを早期初期化してミュート状態をロードしておく
     ref.read(volumeSettingsProvider);
-    if (!kIsWeb) {
-      // 手帳タブ廃止に伴い、ウィジェットのディープリンク導線をコメントアウト（不使用・復活時に戻す）。
-      /* _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
+    // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
+    // ウィジェットのディープリンク購読と、初回表示時のウィジェット用データキャッシュ。
+    /* if (!kIsWeb) {
+      _widgetClickSub = WidgetDataService.shared.widgetActionStream.listen(_handleWidgetUri);
       // コールドスタート（ウィジェットタップによるアプリ起動）の処理
       HomeWidget.initiallyLaunchedFromHomeWidget().then((uri) {
         if (uri != null) _handleWidgetUri(uri);
-      }); */
+      });
       // 初回表示時にすでにデータが揃っている場合も確実にキャッシュ
       // （ref.listenは初期値では発火しないため、ポストフレームで補完）
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -86,7 +89,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           });
         });
       });
-    }
+    } */
   }
 
   void _updateAppBadge(WidgetRef ref) {
@@ -184,18 +187,22 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     if (!kIsWeb) {
       ref.listen<int>(pendingFriendRequestCountProvider, (_, __) => _updateAppBadge(ref));
       ref.listen<AsyncValue<bool>>(hasNewDiaryProvider, (_, __) => _updateAppBadge(ref));
-      // 起動時に今後の予定通知を再登録（iOSの64件上限対応）
-      ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
+      // 手帳（予定）機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
+      // 起動時に今後の予定通知を再登録（iOSの64件上限対応）していた。
+      // これが生きていると、UIを隠しても過去に登録した予定の通知が届き続ける。
+      /* ref.listen<AsyncValue<List<ScheduleModel>>>(allSchedulesProvider, (_, next) {
         if (_hasRescheduledNotifications || !mounted) return;
         next.whenData((schedules) {
           if (!ref.read(notificationSettingsProvider).scheduleNotifications) return;
           _hasRescheduledNotifications = true;
           NotificationService().rescheduleUpcomingNotifications(schedules);
         });
-      });
+      }); */
     }
 
-    if (!kIsWeb) {
+    // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
+    // 予定・メモ・タスク・タグの変更をウィジェット用ストレージへ書き出していた。
+    /* if (!kIsWeb) {
       ref.listen<AsyncValue<List<MemoModel>>>(memosProvider, (_, next) {
         next.whenData((memos) {
           final tags = ref.read(tagsProvider);
@@ -243,7 +250,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           });
         });
       });
-    }
+    } */
 
     return Scaffold(
       body: IndexedStack(

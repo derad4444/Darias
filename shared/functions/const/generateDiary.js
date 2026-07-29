@@ -103,13 +103,23 @@ async function generateDiary(characterId, userId) {
   */
 
   // 今日のチャット(Post)取得
-  const postSnap = await db.collection("users").doc(userId)
+  const postsQuery = db.collection("users").doc(userId)
       .collection("characters").doc(characterId)
       .collection("posts")
       .where("timestamp", ">=", today)
-      .where("timestamp", "<", tomorrow)
-      .limit(5)
-      .get();
+      .where("timestamp", "<", tomorrow);
+
+  const postSnap = await postsQuery.limit(5).get();
+
+  // facts用の件数は実数を使う（AIに渡す本文は5件までに絞るため、docs.lengthでは足りない）
+  let chatCount = 0;
+  try {
+    const chatCountSnap = await postsQuery.count().get();
+    chatCount = chatCountSnap.data().count;
+  } catch (e) {
+    // count()が使えない環境では取得済みの件数で代替する
+    chatCount = postSnap.size;
+  }
 
   // チャットの文字列整形
   const chatSummary = postSnap.docs.map((doc) => {
@@ -169,6 +179,7 @@ async function generateDiary(characterId, userId) {
 
   // 今日の冒険（心の迷宮＝ローグライク）のプレイ記録（上位3件）
   let roguelikeSummary = "";
+  const roguelikeFacts = [];
   try {
     const runSnap = await db.collection("users").doc(userId)
         .collection("roguelike_runs")
@@ -185,6 +196,7 @@ async function generateDiary(characterId, userId) {
         d.result === "failed" ? `「${worry}」に挑んで力尽きた` :
         `「${worry}」に挑戦した`;
       const defeated = d.enemiesDefeated ? `（敵${d.enemiesDefeated}体撃破）` : "";
+      roguelikeFacts.push(`冒険で${resultText}`);
       return `・${resultText}${defeated}`;
     }).join("\n");
   } catch (e) {
@@ -193,6 +205,7 @@ async function generateDiary(characterId, userId) {
 
   // 今日の性格診断進捗取得（BIG5回答セッション）
   let big5ProgressSummary = "";
+  let big5AnsweredCount = 0;
   try {
     const big5Snap = await db.collection("users").doc(userId)
         .collection("characters").doc(characterId)
@@ -205,6 +218,7 @@ async function generateDiary(characterId, userId) {
       const sessionData = big5Snap.docs[0].data();
       const answeredCount = sessionData.answeredCount || sessionData.answers?.length || 0;
       if (answeredCount > 0) {
+        big5AnsweredCount = answeredCount;
         big5ProgressSummary = `・性格診断を${answeredCount}問回答`;
       }
     }
@@ -223,6 +237,7 @@ async function generateDiary(characterId, userId) {
 
   // 会議の文字列整形（結論も含める）
   let meetingSummary = "";
+  const meetingFacts = [];
   if (!meetingSnap.empty) {
     const meetingPromises = meetingSnap.docs.map(async (doc) => {
       const data = doc.data();
@@ -243,12 +258,32 @@ async function generateDiary(characterId, userId) {
         }
       }
 
-      return conclusion ? `・${concern}→${conclusion}` : `・${concern}`;
+      const fact = concern ?
+        `相談「${concern}」について${conclusion ? "結論を出した" : "話し合った"}` :
+        "相談をした";
+
+      return {
+        line: conclusion ? `・${concern}→${conclusion}` : `・${concern}`,
+        fact: fact,
+      };
     });
 
     const results = await Promise.all(meetingPromises);
-    meetingSummary = results.join("\n");
+    meetingSummary = results.map((r) => r.line).join("\n");
+    meetingFacts.push(...results.map((r) => r.fact));
   }
+
+  // ── facts（「今日やったこと」）の組み立て ────────────────────
+  // factsはAIに書かせず、Firestoreの実データから直接組み立てる。
+  // AIに書かせると、件数指示を満たすために実在しない活動を捏造することがあるため
+  // （仕様書「事実ベース原則: factsはFirestoreから取得した実データのみを元に生成」）。
+  const facts = [];
+  if (chatCount > 0) facts.push(`会話を${chatCount}件やりとりした`);
+  facts.push(...meetingFacts);
+  if (big5AnsweredCount > 0) {
+    facts.push(`性格診断に${big5AnsweredCount}問回答した`);
+  }
+  facts.push(...roguelikeFacts);
 
   // Android度を計算（協調性、外向性、神経症傾向の低さでAndroid度を判定）
   const androidScore =
@@ -269,39 +304,9 @@ async function generateDiary(characterId, userId) {
     diaryStyle = "logic+emotion view,tech+feeling mix,session→chat learning,logical→emotional";
   }
 
-  // 活動がない場合はAI呼び出しをスキップして空データで保存
-  // 手帳廃止に伴い、予定/タスク/メモを除外し冒険を追加（旧はコメントで残置・復活時に戻す）:
-  // const hasActivity = scheduleSummary || chatSummary || completedTodoSummary ||
-  //     createdTodoSummary || memoSummary || meetingSummary || big5ProgressSummary;
-  const hasActivity = chatSummary || meetingSummary ||
-      big5ProgressSummary || roguelikeSummary;
-  if (!hasActivity) {
-    const diaryRef = db.collection("users").doc(userId)
-        .collection("characters").doc(characterId)
-        .collection("diary").doc();
-
-    const now2 = new Date();
-    const jstDate2 = new Date(now2.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
-    const yyyy2 = jstDate2.getFullYear();
-    const mm2 = String(jstDate2.getMonth() + 1).padStart(2, "0");
-    const dd2 = String(jstDate2.getDate()).padStart(2, "0");
-
-    const diaryDoc = {
-      id: diaryRef.id,
-      date: admin.firestore.Timestamp.now(),
-      content: "",
-      diary_type: "activity",
-      facts: [],
-      ai_comment: "",
-      user_comment: "",
-      created_at: admin.firestore.Timestamp.now(),
-      created_date: `${yyyy2}-${mm2}-${dd2}`,
-    };
-
-    await diaryRef.set(diaryDoc);
-    console.log(`📅 Diary saved (no activity) for ${characterId}`);
-    return diaryDoc;
-  }
+  // 活動がない日もAIを呼び、キャラクターからの声がけだけの日記を書く。
+  // （プロンプト側の「活動がない場合は性格特性に基づいた温かい声がけ」指示を使う）
+  // facts は実データから組み立てているため、活動がない日は空配列のままになる。
 
   // アクティビティベースのプロンプト作成
   // 手帳廃止に伴い、引数から予定/タスク/メモ/明日の予定を外し roguelikeSummary を追加（旧はコメントで残置・復活時に戻す）:
@@ -345,12 +350,11 @@ async function generateDiary(characterId, userId) {
   const rawResponse = response.choices[0].message.content.trim();
   console.log("GPT Response:", rawResponse);
 
-  let facts = [];
+  // AIが返すのは ai_comment のみ。facts は上でFirestoreの実データから組み立て済み。
   let aiComment = "";
 
   try {
     const parsed = JSON.parse(rawResponse);
-    facts = Array.isArray(parsed.facts) ? parsed.facts : [];
     aiComment = typeof parsed.ai_comment === "string" ? parsed.ai_comment : "";
   } catch (e) {
     console.warn("Failed to parse GPT JSON response, using raw as ai_comment:", e);
