@@ -451,7 +451,11 @@ class _CharacterDetailBody extends ConsumerWidget {
                     _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
                     _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
                     _InfoRow(label: '適正', value: detail.aptitude, textColor: textColor),
-                    _DreamRow(textColor: textColor, accentColor: accentColor),
+                    _DreamRow(
+                      textColor: textColor,
+                      accentColor: accentColor,
+                      legacyDream: detail.dream,
+                    ),
                   ],
                 ),
               ),
@@ -586,14 +590,26 @@ class _DreamRow extends ConsumerWidget {
   final Color textColor;
   final Color accentColor;
 
-  const _DreamRow({required this.textColor, required this.accentColor});
+  /// 旧保存先 `details/current.dream` の値
+  ///
+  /// `dream/current` はキャラクター詳細が再生成されたときに作られるため、
+  /// それまでの既存ユーザーはこちらにしか夢を持たない。Cloud Functions 側の
+  /// `getDream` と同じフォールバックをクライアントでも行う。
+  final String? legacyDream;
 
-  Future<void> _openSheet(BuildContext context, DreamState dream) async {
+  const _DreamRow({
+    required this.textColor,
+    required this.accentColor,
+    this.legacyDream,
+  });
+
+  Future<void> _openSheet(
+      BuildContext context, DreamState dream, String currentDream) async {
     final selected = await DreamSelectSheet.show(
       context,
       options: dream.dreamOptions,
-      currentDream: dream.dream,
-      title: dream.isUnset ? '夢を選ぶ' : '夢を変更する',
+      currentDream: currentDream,
+      title: currentDream.isEmpty ? '夢を選ぶ' : '夢を変更する',
       subtitle: '性格に合わせて考えた候補です。自分の言葉で入力もできます。',
     );
     if (selected != null && context.mounted) {
@@ -605,13 +621,18 @@ class _DreamRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final dream = ref.watch(dreamProvider).valueOrNull;
+    final dream = ref.watch(dreamProvider).valueOrNull ?? const DreamState();
 
-    // 夢がまだ生成されておらず候補も無い場合は、行そのものを出さない
-    if (dream == null || (dream.isUnset && !dream.hasOptions)) {
+    // dream/current が未作成の既存ユーザーは details/current.dream を表示する
+    final currentDream =
+        dream.dream.isNotEmpty ? dream.dream : (legacyDream?.trim() ?? '');
+
+    // 夢も候補も無い（＝まだ性格が確定していない）場合は行そのものを出さない
+    if (currentDream.isEmpty && !dream.hasOptions) {
       return const SizedBox.shrink();
     }
 
+    final isUnset = currentDream.isEmpty;
     final canChange = dream.hasOptions;
 
     return Container(
@@ -622,7 +643,7 @@ class _DreamRow extends ConsumerWidget {
         color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: dream.isUnset
+          color: isUnset
               ? accentColor.withValues(alpha: 0.8)
               : Colors.white.withValues(alpha: 0.3),
         ),
@@ -642,24 +663,24 @@ class _DreamRow extends ConsumerWidget {
           ),
           Expanded(
             child: Text(
-              dream.isUnset ? 'まだ決まっていません' : dream.dream,
+              isUnset ? 'まだ決まっていません' : currentDream,
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: dream.isUnset ? textColor.withValues(alpha: 0.6) : textColor,
+                color: isUnset ? textColor.withValues(alpha: 0.6) : textColor,
               ),
             ),
           ),
           if (canChange)
             TextButton(
-              onPressed: () => _openSheet(context, dream),
+              onPressed: () => _openSheet(context, dream, currentDream),
               style: TextButton.styleFrom(
                 foregroundColor: accentColor,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(0, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(dream.isUnset ? '選ぶ' : '変更'),
+              child: Text(isUnset ? '選ぶ' : '変更'),
             ),
         ],
       ),
