@@ -25,6 +25,8 @@ import '../../providers/todo_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
+import '../../providers/dream_provider.dart';
+import '../../widgets/dream_select_sheet.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
@@ -52,6 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   // ダイアログ表示中フラグ（多重表示防止）
   bool _isShowingDialog = false;
   bool _isShowingEvolutionDialog = false;
+  bool _isShowingFirstDreamDialog = false;
   bool _isPlayingVoice = false;
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
@@ -293,6 +296,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       if (data != null && !_isShowingEvolutionDialog) {
         _isShowingEvolutionDialog = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _showEvolutionDialog(data));
+      }
+    });
+
+    // 初回の夢選択の監視（初回は性格確定の通知が無く、夢を選ぶ機会がなかった）
+    ref.listen<AsyncValue<bool>>(pendingFirstDreamSelectionProvider, (prev, next) {
+      if (next.valueOrNull == true && !_isShowingFirstDreamDialog) {
+        _isShowingFirstDreamDialog = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstDreamDialog());
       }
     });
 
@@ -878,6 +889,80 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       ),
     );
     if (mounted) setState(() => _isShowingEvolutionDialog = false);
+  }
+
+  /// 初回に性格が確定して夢の候補ができたときのダイアログ
+  ///
+  /// 性格タイプ変化の進化ダイアログは初回には出ない（`axisCalculator` の通知条件が
+  /// `prevElement !== undefined` のため）ので、初回はこちらで知らせる。
+  Future<void> _showFirstDreamDialog() async {
+    // 候補がまだ書き込まれていないことがあるため、ここで一度読み直す
+    final dream = await ref.read(dreamProvider.future);
+    final details = ref.read(characterDetailsProvider).valueOrNull;
+
+    if (!mounted) return;
+    if (dream == null || !dream.hasOptions) {
+      setState(() => _isShowingFirstDreamDialog = false);
+      return;
+    }
+
+    final typeName = details?.typeName;
+    final dreamService = ref.read(dreamServiceProvider);
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('✨ 性格が決まりました', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (typeName != null && typeName.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  typeName,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+              ),
+            const Text(
+              'あなたに合いそうな夢を考えました。\nこの中から選ぶか、自分の言葉で入力できます。',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await dreamService.deferSelection(dream.dreamOptions);
+              if (ctx.mounted) Navigator.pop(ctx);
+            },
+            child: const Text('あとで選ぶ'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('夢を選ぶ'),
+          ),
+        ],
+      ),
+    ).then((_) async {
+      if (!mounted) return;
+      // 「あとで選ぶ」でフラグが下りていれば選択シートは出さない
+      final latest = ref.read(dreamProvider).valueOrNull;
+      if (latest != null && latest.isUnset) {
+        await DreamSelectSheet.show(
+          context,
+          options: dream.dreamOptions,
+          currentDream: '',
+          title: '夢を選ぶ',
+          subtitle: '性格に合わせて考えた候補です。自分の言葉で入力もできます。',
+        );
+      }
+    });
+
+    if (mounted) setState(() => _isShowingFirstDreamDialog = false);
   }
 
   void _showMeetingLockedDialog(BuildContext context, int signalCount) {
@@ -1877,7 +1962,7 @@ class _MeetingSuggestionBanner extends StatelessWidget {
 }
 
 /// 進化ダイアログ：元素/性格タイプが変化したときに表示
-class _TypeEvolutionDialog extends StatefulWidget {
+class _TypeEvolutionDialog extends ConsumerStatefulWidget {
   final String newElement;
   final String newTypeName;
   final int signalCount;
@@ -1893,10 +1978,10 @@ class _TypeEvolutionDialog extends StatefulWidget {
   });
 
   @override
-  State<_TypeEvolutionDialog> createState() => _TypeEvolutionDialogState();
+  ConsumerState<_TypeEvolutionDialog> createState() => _TypeEvolutionDialogState();
 }
 
-class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
+class _TypeEvolutionDialogState extends ConsumerState<_TypeEvolutionDialog>
     with TickerProviderStateMixin {
   late final AnimationController _glowController;
   late final AnimationController _contentController;
@@ -2085,6 +2170,69 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
     );
   }
 
+  /// 性格が変わって夢の候補が作り直されたときの提案セクション
+  ///
+  /// ユーザーが選んだ夢は勝手に差し替えず、新しい候補ができたことだけを伝える。
+  Widget _buildDreamProposal(Color elementColor) {
+    final dream = ref.watch(dreamProvider).valueOrNull;
+    if (dream == null || !dream.pendingProposal || !dream.hasOptions) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 20),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: elementColor.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        children: [
+          if (!dream.isUnset)
+            Text(
+              '今の夢: 「${dream.dream}」',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          const SizedBox(height: 6),
+          Text(
+            '新しい性格に合わせた夢の候補もできました',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => ref.read(dreamServiceProvider).dismissProposal(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.white.withValues(alpha: 0.7),
+                  ),
+                  child: const Text('このまま'),
+                ),
+              ),
+              Expanded(
+                child: TextButton(
+                  onPressed: () => DreamSelectSheet.show(
+                    context,
+                    options: dream.dreamOptions,
+                    currentDream: dream.dream,
+                    title: '夢を選び直す',
+                    subtitle: '新しい性格に合わせた候補です。自分の言葉で入力もできます。',
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: elementColor),
+                  child: const Text('候補を見る'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final elementColor = _elementColors[widget.newElement] ?? const Color(0xFFB0BEC5);
@@ -2182,6 +2330,7 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 12),
                       ),
+                      _buildDreamProposal(elementColor),
                       const SizedBox(height: 24),
                       SizedBox(
                         key: _shareButtonKey,
@@ -2215,6 +2364,12 @@ class _TypeEvolutionDialogState extends State<_TypeEvolutionDialog>
                         child: ElevatedButton(
                           onPressed: () async {
                             await widget.onConfirm();
+                            // 夢の提案に触れずに閉じた場合もフラグを下ろす
+                            // （このダイアログは性格変化時にしか出ないため、残すと出番がない）
+                            final dream = ref.read(dreamProvider).valueOrNull;
+                            if (dream != null && dream.pendingProposal) {
+                              await ref.read(dreamServiceProvider).dismissProposal();
+                            }
                             if (context.mounted) Navigator.of(context).pop();
                           },
                           style: ElevatedButton.styleFrom(

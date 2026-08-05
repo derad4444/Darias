@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/character_provider.dart';
+import '../../providers/dream_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/dream_select_sheet.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
@@ -449,7 +451,7 @@ class _CharacterDetailBody extends ConsumerWidget {
                     _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
                     _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
                     _InfoRow(label: '適正', value: detail.aptitude, textColor: textColor),
-                    _InfoRow(label: '夢', value: detail.dream, textColor: textColor),
+                    _DreamRow(textColor: textColor, accentColor: accentColor),
                   ],
                 ),
               ),
@@ -570,6 +572,95 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 夢の行（他の属性と違い、ユーザーが候補から選び直せる）
+///
+/// 夢は本人限定の `characters/{characterId}/dream/current` に保存されるため、
+/// `details/current` を見る `_InfoRow` ではなく専用のプロバイダーから読む。
+class _DreamRow extends ConsumerWidget {
+  final Color textColor;
+  final Color accentColor;
+
+  const _DreamRow({required this.textColor, required this.accentColor});
+
+  Future<void> _openSheet(BuildContext context, DreamState dream) async {
+    final selected = await DreamSelectSheet.show(
+      context,
+      options: dream.dreamOptions,
+      currentDream: dream.dream,
+      title: dream.isUnset ? '夢を選ぶ' : '夢を変更する',
+      subtitle: '性格に合わせて考えた候補です。自分の言葉で入力もできます。',
+    );
+    if (selected != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('夢を「$selected」にしました')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dream = ref.watch(dreamProvider).valueOrNull;
+
+    // 夢がまだ生成されておらず候補も無い場合は、行そのものを出さない
+    if (dream == null || (dream.isUnset && !dream.hasOptions)) {
+      return const SizedBox.shrink();
+    }
+
+    final canChange = dream.hasOptions;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: dream.isUnset
+              ? accentColor.withValues(alpha: 0.8)
+              : Colors.white.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '夢',
+              style: TextStyle(
+                fontSize: 13,
+                color: textColor.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              dream.isUnset ? 'まだ決まっていません' : dream.dream,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: dream.isUnset ? textColor.withValues(alpha: 0.6) : textColor,
+              ),
+            ),
+          ),
+          if (canChange)
+            TextButton(
+              onPressed: () => _openSheet(context, dream),
+              style: TextButton.styleFrom(
+                foregroundColor: accentColor,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: Text(dream.isUnset ? '選ぶ' : '変更'),
+            ),
         ],
       ),
     );
