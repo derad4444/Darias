@@ -4,6 +4,7 @@ const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS, buildPersonalityTraitsFromAxes} = require("../src/prompts/templates");
 const firestoreCache = require("../src/utils/firestoreCache");
+const {getDream} = require("../src/utils/dreamStore");
 
 // 感情判定関数
 async function detectEmotion(openai, messageText) {
@@ -302,8 +303,16 @@ exports.generateCharacterReply = onCall(
           ? buildPersonalityTraitsFromAxes(axisScores, charData.element || null, charData.typeName || null)
           : null;
 
-        const dreamText = charData.dream ?
-        `なお、このキャラクターの夢は「${charData.dream}」です。` :
+        // 夢は本人限定の dream/current から取得（未移行ユーザーは details.dream にフォールバック）
+        const dreamCacheKey = `dream_${userId}_${characterId}`;
+        let dreamValue = firestoreCache.get(dreamCacheKey);
+        if (dreamValue === undefined) {
+          dreamValue = await getDream(userId, characterId, charData);
+          firestoreCache.set(dreamCacheKey, dreamValue);
+        }
+
+        const dreamText = dreamValue ?
+        `なお、このキャラクターの夢は「${dreamValue}」です。` :
         "なお、このキャラクターの夢はまだ決まっていません。";
 
         // Android度を計算し、プロンプトを生成（5軸スコアがある場合は5軸特性を優先）

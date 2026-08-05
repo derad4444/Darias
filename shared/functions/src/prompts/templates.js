@@ -412,8 +412,10 @@ JSONのみ出力。`;
 
 以下の項目でキャラクター詳細を生成:
 
+dreamsは必ず5個。この性格に合う夢を、方向性を変えて挙げること（仕事/学び/人との関わり/暮らし/自己表現 など）。各20文字以内。
+
 出力形式:
-{"favorite_color":"好きな色","favorite_place":"好きな場所","favorite_word":"口癖","word_tendency":"話し方の特徴","strength":"長所","weakness":"短所","skill":"特技","hobby":"趣味","aptitude":"適性","dream":"夢","favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
+{"favorite_color":"好きな色","favorite_place":"好きな場所","favorite_word":"口癖","word_tendency":"話し方の特徴","strength":"長所","weakness":"短所","skill":"特技","hobby":"趣味","aptitude":"適性","dreams":["夢1","夢2","夢3","夢4","夢5"],"favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
   },
 
   /**

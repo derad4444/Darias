@@ -207,6 +207,16 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
           axisGeneratedAt: admin.firestore.FieldValue.serverTimestamp(),
         }, {merge: true});
         console.log(`✅ axisGeneratedAt保存完了 user=${userId}`);
+
+        // 初回は夢が未選択のため、ホーム画面で候補から選んでもらう
+        await db
+            .collection('users').doc(userId)
+            .collection('personalityMeta').doc('current')
+            .set({
+              pendingFirstDreamSelection: true,
+              firstDreamReadyAt: admin.firestore.FieldValue.serverTimestamp(),
+            }, {merge: true});
+        console.log(`🌠 初回の夢選択フラグをセット user=${userId}`);
       } catch (e) {
         console.error('⚠️ キャラクター詳細生成エラー:', e);
       }

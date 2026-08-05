@@ -3,6 +3,7 @@ const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
+const {getDream} = require("../src/utils/dreamStore");
 
 // Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
 try { admin.app(); } catch (e) { admin.initializeApp(); }
@@ -30,8 +31,9 @@ async function generateDiary(characterId, userId) {
   // キャラクターの個性情報（口癖・話し方・夢・強み）
   const favoriteWord = charData.favorite_word || "";
   const wordTendency = charData.word_tendency || "";
-  const dream = charData.dream || "";
   const strength = charData.strength || "";
+  // 夢は本人限定の dream/current から取得（未移行ユーザーは details.dream にフォールバック）
+  const dream = await getDream(userId, characterId, charData);
 
   // ユーザーのサブスクリプション状態を取得
   let isPremium = false;
