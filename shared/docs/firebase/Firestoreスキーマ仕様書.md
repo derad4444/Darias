@@ -3,8 +3,8 @@
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
 **最終更新日**: 2026-08-05
-**トップレベルコレクション**: 10
-**主な更新**: `users/{userId}/subscription` の `payment_method` にGoogle Play（`google_play`）を明記し、レシート検証で書き込まれるストア別フィールドを追記
+**トップレベルコレクション**: 11
+**主な更新**: 夢を本人限定の `characters/{characterId}/dream` に分離し、性格ごとの共有テンプレート `CharacterDetailsTemplate` を追加。`payment_method` のストア別フィールドも追記
 
 ---
 
@@ -93,12 +93,16 @@
 - **aptitude**: `string` - 適性
 - **hobby**: `string` - 趣味
 - **skill**: `string` - スキル
-- **dream**: `string` - 夢・目標
 - **favorite_place**: `string` - お気に入りの場所
 - **favorite_color**: `string` - 好きな色
 - **favorite_word**: `string` - 好きな言葉
 - **favorite_entertainment_genre**: `string` - 好きなエンターテイメントジャンル
 - **word_tendency**: `string` - 言葉の傾向
+
+> 上記のキャラクター属性は `CharacterDetailsTemplate/{personalityKey}` から複製される（同じ性格キーのユーザー間で同一の値になる）。
+>
+> **夢（`dream`）はこのドキュメントには保存しない。** `details` は firestore.rules で認証済みユーザーの単体取得が許可されているため、ユーザーが自由入力できる夢は本人限定の `characters/{characterId}/dream/current` に置く。移行前に生成された既存ユーザーの `dream` は残存しており、読み取り側のフォールバックに使われる。
+
 - **sixPersonalities**: `array<map>` - 6人会議用の6つの分身データ
   - **characterId**: `string` - キャラクターID（original/opposite/ideal/shadow/child/wise）
   - **name**: `string` - キャラクター名（今の自分/真逆の自分/理想の自分/本音の自分/子供の頃の自分/未来の自分）
@@ -121,7 +125,26 @@
 - **typeName**: `string` - タイプ名（例: "場を沸かす炎タイプ"）。element と relationship/lifestyle 軸で決定
 - **convertedBig5Scores**: `map` - 軸スコアから変換したBIG5スコア（1.0〜5.0）。`confirmedBig5Scores`（質問形式の診断結果）とは別フィールド
 - **axisUpdatedAt**: `timestamp` - 軸スコア最終更新日時
-- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、再実行を防ぐガードとして機能する
+- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、初回生成の重複を防ぐガードとして機能する（以降は性格タイプ変化のたびに再生成される）
+
+#### `users/{userId}/characters/{characterId}/dream`
+
+**ドキュメントID**: `current` (固定)
+**用途**: キャラクターの夢（本人限定）
+
+**フィールド:**
+
+- **dream**: `string` - 現在採用中の夢（最大40文字）
+- **dreamOptions**: `array<string>` - AIが性格から生成した候補5個
+- **dreamSource**: `string` - 夢の由来（`"user"` = ユーザーが選択・入力 / `"ai"` = 候補から暫定採用）
+- **pendingDreamProposal**: `boolean` - 性格が変わって新しい候補ができたことを示すフラグ。進化ダイアログで提案し、確認後に `false` にする
+- **dreamOptionsUpdatedAt**: `timestamp` - 候補の最終更新日時
+- **dreamUpdatedAt**: `timestamp` - ユーザーが夢を選択・入力した日時
+- **updated_at**: `timestamp` - 更新日時
+
+**なぜ `details` と分けているか**: `details` は firestore.rules でフレンドのアバター表示のため認証済みユーザーの単体取得が許可されている。夢はユーザーが自由入力でき、かつ他ユーザーが参照する必要がないため、本人限定ルール（`users/{userId}/{subcollection=**}`）が適用されるこのサブコレクションに置く。
+
+**`dream` は再生成で上書きされない**: 性格タイプが変わって候補が作り直されても、ユーザーが選んだ夢はそのまま維持される。詳細は [性格解析仕様書の夢の選択フロー](../functions/性格解析仕様書.md#夢の選択フロー) を参照。
 
 #### `users/{userId}/characters/{characterId}/personalityHistory`
 
@@ -176,6 +199,8 @@
 - **newElement**: `string` - 変化後の元素（変化時のみ）
 - **newTypeName**: `string` - 変化後のタイプ名（変化時のみ）
 - **typeChangedAt**: `timestamp` - タイプ変化日時（変化時のみ）
+- **pendingFirstDreamSelection**: `boolean` - 初回のキャラクター詳細生成に成功したとき `calculateAndSaveAxisScores` が立てるフラグ。ホーム画面が検知して夢の選択ダイアログを表示し、選択または「あとで選ぶ」で `false` にする
+- **firstDreamReadyAt**: `timestamp` - 上記フラグを立てた日時
 
 **備考:**
 - Flutter `signalCountProvider` がこのドキュメントをリアルタイム購読し、キャラクター詳細画面の進捗表示に使用
@@ -713,6 +738,25 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 
 ---
 
+## `CharacterDetailsTemplate`
+
+**用途**: 性格ごとのキャラクター属性テンプレート（全ユーザー共有・キャッシュ用）
+**ドキュメントID**: `personalityKey`（`Big5Analysis` と同じ形式。例: `O3_C4_E2_A5_N1_female`）
+
+**フィールド:**
+
+- **personality_key**: `string` - 性格タイプのキー
+- **attributes**: `map` - キャラクター属性10項目（`favorite_color` / `favorite_place` / `favorite_word` / `word_tendency` / `strength` / `weakness` / `skill` / `hobby` / `aptitude` / `favorite_entertainment_genre`）
+- **dreams**: `array<string>` - 夢の候補5個
+- **model**: `string` - 生成に使用したモデル（`gpt-4o-2024-11-20`）
+- **updated_at**: `timestamp` - 更新日時
+
+**共有できる理由**: `characterDetails` プロンプトの入力は「四捨五入したBIG5 5値 + 性別」だけで、これは `personalityKey` と1対1に対応する。同じキーなら送信されるプロンプトが文字列レベルで一致するため、結果を使い回せる。
+
+**アクセス権限**: Cloud Function 専用（`firestore.rules` でクライアントからの読み書きを禁止）。各ユーザーには `details/current` と `dream/current` にコピーされる。
+
+---
+
 ## `Big5Analysis`
 
 **用途**: BIG5性格診断の解析結果を保存（共有・キャッシュ用）
@@ -987,7 +1031,13 @@ users/{userId}
 │   │   ├── typeName               ← タイプ名
 │   │   ├── convertedBig5Scores {} ← 軸スコアから変換したBIG5
 │   │   ├── axisUpdatedAt
-│   │   └── axisGeneratedAt        ← 30シグナル時に generateCharacterDetails が1回だけ実行
+│   │   ├── axisGeneratedAt        ← 30シグナル時に generateCharacterDetails を初回実行
+│   │   └── （属性10項目）         ← CharacterDetailsTemplate/{key} から複製
+│   ├── dream/current              ← 夢（本人限定。details と違い他ユーザーは読めない）
+│   │   ├── dream                  ← 現在採用中の夢（再生成で上書きしない）
+│   │   ├── dreamOptions []        ← 候補5個
+│   │   ├── dreamSource            ← "user" / "ai"
+│   │   └── pendingDreamProposal   ← 新候補ができたことを示すフラグ
 │   ├── big5Progress/current
 │   ├── posts/{docId}
 │   ├── meeting_history/{docId}
@@ -1004,7 +1054,8 @@ users/{userId}
 ├── personalityMeta/current         ← シグナル集計メタ（新規）
 │   ├── signalCount
 │   ├── lastSignalAt
-│   └── （タイプ変化時のみ）pendingTypeChangeNotification / newElement / newTypeName
+│   ├── （タイプ変化時のみ）pendingTypeChangeNotification / newElement / newTypeName
+│   └── （初回詳細生成時）pendingFirstDreamSelection / firstDreamReadyAt
 ├── subscription/current
 ├── schedules/{docId}           ← isPublic フィールド追加（2026-04-17）
 ├── todos/{docId}

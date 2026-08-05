@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-07-29
+**最終更新日**: 2026-08-05
 **ランタイム**: Node.js 22
 **関数数**: 31
 
@@ -267,13 +267,13 @@
 #### 5. `generateBig5Analysis` (エクスポート名: `generateBig5AnalysisCallable`)
 - **ソース**: `const/generateBig5Analysis.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: BIG5スコアから解析データ（キャラクター詳細テキスト）を生成・キャッシュ。レガシーBIG5 100問診断の段階完了時（20問・50問・100問）に呼び出される
+- **概要**: BIG5スコアから解析データ（適職・恋愛・ストレス・学習・意思決定のテキスト）を生成・キャッシュ。`generateCharacterDetails` の末尾から呼ばれる（＝初回のキャラクター詳細生成時と、性格タイプが変化して再生成されたとき）
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 - **モデル**: `gpt-4o-2024-11-20`（無料・有料ユーザー共通。2026-04-04 変更）
 - **temperature**: `1.0`（`response_format: json_object` で JSON 崩れを防止。2026-04-04 変更）
-- **キャッシュ**: `personalityKey`（例: `O3_C4_E2_A5_N1_男性`）で Firestore にキャッシュ。最大 6,250 通り（5^5 × 性別2）。各スコアは `Math.round()` で整数化してからキーを生成するため、同じ性格タイプのユーザー間でキャッシュが共有される
+- **キャッシュ**: `personalityKey`（例: `O3_C4_E2_A5_N1_female`）で `Big5Analysis` コレクションにキャッシュ。最大 9,375 通り（5^5 × 性別3: male / female / neutral）。各スコアは `Math.round()` で整数化してからキーを生成するため、同じ性格タイプのユーザー間でキャッシュが共有される。キャラクター属性（口癖・夢など）も同じ考え方で `CharacterDetailsTemplate/{personalityKey}` に共有される
 - **生成レベル**: 3 レベルを並列生成（20問・50問・100問）
   - 20問: career / romance / stress（3カテゴリ、200-300文字）
   - 50問: 上記 + learning / decision（5カテゴリ、300-400文字）
@@ -705,7 +705,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 - **収集データ**: チャット（本文は上位5件、件数は `count()` で実数取得）/ 性格診断セッション / 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
-- **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `dream`(夢) / `strength`(強み) を取得してプロンプトに反映
+- **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `strength`(強み) を、`dream/current` から `dream`(夢) を取得してプロンプトに反映（夢は本人限定サブコレクションに置く。未移行ユーザーは `details/current.dream` にフォールバック）
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
 - **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
@@ -1012,4 +1012,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-07-29（`generateDiary.js`: facts をAI生成からコード生成に変更＋活動なし日もAIで声がけを生成するよう変更）*
+*最終更新: 2026-08-05（キャラクター属性を personalityKey で共有化。夢の保存先を本人限定サブコレクションに変更）*
