@@ -4,7 +4,7 @@
 
 **最終更新日**: 2026-08-05
 **ランタイム**: Node.js 22
-**関数数**: 31
+**関数数**: 32
 
 ---
 
@@ -67,7 +67,7 @@
 
 **共通セキュリティ仕様（全 onCall 関数）:**
 - `request.auth` が null の場合は `unauthenticated` エラーを返す（未認証リクエストを全てブロック）
-- 以下の関数は追加で `request.auth.uid === data.userId` を検証し、不一致の場合は `permission-denied` エラーを返す: `generateCharacterReply`, `answerAppQuestion`, `extractSchedule`, `diagnoseCompatibility`, `askAboutFriend`
+- 以下の関数は追加で `request.auth.uid === data.userId` を検証し、不一致の場合は `permission-denied` エラーを返す: `generateCharacterReply`, `answerAppQuestion`, `diagnoseCompatibility`, `askAboutFriend`
 
 #### 1. `generateCharacterReply`
 - **ソース**: `const/generateCharacterReply.js`
@@ -233,27 +233,6 @@
 **モデル:** `gpt-4o-mini`（固定。質問応答はプレミアム/フリー問わず同一モデル）
 
 ---
-
-#### 3. `extractSchedule`
-- **ソース**: `const/extractSchedule.js`
-- **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: ユーザーメッセージから予定情報を OpenAI で抽出（**複数件対応**。2026-04-04 変更）
-- **リソース**: memory `512MiB` / timeout `120秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: `OPENAI_API_KEY`
-- **その他**: `minInstances: 0`, `enforceAppCheck: false`
-- **モデル**: `gpt-4o-2024-11-20` / temperature `0`（確定的出力）
-- **返却形式**: `{ schedules: ScheduleData[] }`（空配列 = 予定なし）
-  ```json
-  {
-    "schedules": [
-      { "title": "FA定例", "isAllDay": false, "startDate": Timestamp, "endDate": Timestamp,
-        "location": "小会議①(窓有り)", "tag": "", "memo": "", "repeatOption": "none",
-        "remindValue": 0, "remindUnit": "none" },
-      { "title": "各社定例", ... }
-    ]
-  }
-  ```
 
 #### 4. `generateVoice`
 - **ソース**: `const/generateVoice.js`
@@ -865,45 +844,59 @@ REST API として直接アクセス可能。
 
 ```
 shared/functions/
-├── index.js                          # エントリーポイント（遅延ロード）
+├── index.js                          # エントリーポイント（遅延ロードで全関数をexport）
 ├── package.json                      # 依存関係定義
 ├── .env                              # 環境変数（ローカル/デプロイ用）
 │
 ├── health.js                         # ヘルスチェック
-├── validateReceipt.js                # サブスクリプション検証 (Apple/Google/日次チェック) ※v1 API
+├── validateReceipt.js                # サブスク検証（Apple/Google/Apple通知/日次チェック）
 ├── sendContactEmail.js               # 問い合わせメール送信
+├── deleteUserAccount.js              # アカウント削除
 │
-├── const/                            # AI・音声系の callable 関数
+├── const/                            # callable 関数の実装
 │   ├── generateCharacterReply.js     # キャラクター返信生成
-│   ├── classifyAndExtract.js         # AI メッセージ分類・抽出（振り分けゲートウェイ）
+│   ├── classifyAndExtract.js         # メッセージ分類・抽出（振り分けゲートウェイ）＋シグナル保存
 │   ├── answerAppQuestion.js          # アプリ Q&A 回答
-│   ├── extractSchedule.js            # 予定抽出（旧方式・後方互換用）
+│   ├── extractFromImage.js           # 画像→メモ/タスク/予定 AI抽出（Vision）
 │   ├── generateVoice.js              # 音声合成
-│   ├── generateBig5Analysis.js       # BIG5 解析
-│   ├── generateDiary.js              # アクティビティ型日記生成（scheduledDiaryGeneration から呼出）
+│   ├── generateDiary.js              # アクティビティ型日記生成
+│   ├── generateAdventureDiagnosis.js # 冒険（ローグライク）の性格診断
+│   ├── generateCharacterDetails.js   # キャラクター属性＋夢の候補生成（性格ごとに共有）
+│   ├── generateBig5Analysis.js       # BIG5 解析テキスト生成（性格ごとに共有）
+│   ├── generatePersonalityKey.js     # personalityKey 生成（Math.round で整数化）
+│   ├── generatePersonalityNarrative.js # 週次ナラティブ生成
+│   ├── recalculatePersonalityStats.js  # 性格タイプ統計の再集計
+│   ├── generateHolidays.js           # 祝日データ生成
 │   ├── getFriendSchedules.js         # フレンド共有スケジュール取得
 │   ├── diagnoseCompatibility.js      # カテゴリ別相性診断
 │   ├── askAboutFriend.js             # フレンドの好みをキャラクター会話で回答
-│   ├── extractFromImage.js           # 画像→メモ/タスク/予定/複数予定 AI抽出（Vision）
 │   ├── searchUsers.js                # フレンド追加用ユーザー検索
-│   ├── friendRequest.js              # フレンド申請（send/accept/reject/cancel/remove）5関数
-│   └── big5Questions.js              # BIG5 質問定義・スコア計算
+│   └── friendRequest.js              # フレンド申請（send/accept/reject/cancel/remove）5関数
 │
 └── src/
-    ├── config/
-    │   └── config.js                 # defineSecret 定義（OPENAI_API_KEY, GMAIL_USER, GMAIL_APP_PASSWORD）
     ├── clients/
     │   └── openai.js                 # OpenAI クライアント初期化・安全呼出ラッパー
-    ├── prompts/
-    │   └── templates.js              # OpenAI プロンプトテンプレート（diary / activityDiary / characterReply / big5Analysis 等）
-    │                                 # Big5フォーマット関数: buildPersonalityTraits（自然言語形式。diary・characterReply で使用）/ formatBig5ShortWithTraits（コンパクト形式）
-    ├── functions/                     # スケジュール系・複合関数
-    │   ├── scheduledTasks.js          # 祝日登録 + 日記自動生成
-    │   ├── generateMonthlyReview.js   # 月次レビュー
+    ├── config/
+    │   └── config.js                 # defineSecret 定義（OPENAI_API_KEY, GMAIL_USER 等）
+    ├── functions/                    # スケジュール系・複合関数
+    │   ├── scheduledTasks.js         # 祝日登録 + 日記自動生成
+    │   ├── generateMonthlyReview.js  # 月次レビュー
     │   ├── generateSixPersonMeeting.js # 6人会議
-    │   └── sendRegistrationEmail.js   # 登録メール
+    │   └── sendRegistrationEmail.js  # 登録メール
+    ├── personality/
+    │   ├── axisCalculator.js         # 5軸スコア計算・元素判定・詳細生成トリガー
+    │   └── tagAxisMap.js             # タグ→軸のマッピング
+    ├── prompts/
+    │   ├── templates.js              # プロンプト（characterReply / activityDiary /
+    │   │                             #   characterDetails / classifyAndExtract / emotionDetect）
+    │   └── sixPersonMeetingTemplates.js
     └── utils/
-        └── logger.js                  # ログヘルパー
+        ├── dreamStore.js             # 夢の保存・取得・サニタイズ
+        ├── errorHandler.js           # エラーハンドリング
+        ├── firebaseInit.js           # Admin SDK 遅延初期化
+        ├── firestoreCache.js         # 5分TTLのメモリキャッシュ
+        ├── logger.js                 # ログヘルパー
+        └── sixPersonMeeting.js
 ```
 
 ---
@@ -936,7 +929,7 @@ shared/functions/
 
 | 変数名 | 用途 | 使用関数 |
 |--------|------|---------|
-| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, extractSchedule, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility, extractFromImage, askAboutFriend |
+| `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility, extractFromImage, askAboutFriend |
 | `GMAIL_USER` | Gmail 送信元アドレス | sendRegistrationEmail, sendContactEmail |
 | `GMAIL_APP_PASSWORD` | Gmail アプリパスワード | sendRegistrationEmail, sendContactEmail |
 

@@ -6,29 +6,34 @@
 
 ```
 functions/
-├── src/                          # ソースコード
-│   ├── config/                   # 設定管理
-│   │   └── index.js             # 環境変数・アプリケーション設定
-│   ├── functions/               # Firebase Functions
-│   │   ├── characterReply.js    # キャラクター返答生成
-│   │   ├── scheduleExtractor.js # スケジュール抽出
-│   │   ├── voiceGenerator.js    # 音声生成
-│   │   └── scheduledTasks.js    # スケジュールタスク
-│   ├── services/                # ビジネスロジック（将来的な拡張用）
-│   ├── utils/                   # ユーティリティ
-│   │   ├── logger.js           # 統一ログ出力
-│   │   ├── errorHandler.js     # エラーハンドリング
-│   │   ├── validation.js       # バリデーション
-│   │   └── security.js         # セキュリティ機能
-│   ├── types/                   # 型定義（JSDoc）
-│   │   └── index.js            # 型定義
-│   └── index.js                # 新しいメインエントリーポイント
-├── const/                       # 既存の実装（段階的移行中）
-├── keys/                        # サービスアカウントキー
-├── test/                        # テストファイル
-├── index.js                     # Firebase Functions エントリーポイント
-├── package.json                 # 依存関係
-└── README.md                    # このファイル
+├── src/
+│   ├── clients/
+│   │   └── openai.js                    # OpenAIクライアント（リトライ付き）
+│   ├── config/
+│   │   └── config.js                    # シークレット・環境変数定義
+│   ├── functions/
+│   │   ├── generateMonthlyReview.js     # 月次振り返り
+│   │   ├── generateSixPersonMeeting.js  # 6人会議
+│   │   ├── scheduledTasks.js            # 定期実行タスク
+│   │   └── sendRegistrationEmail.js     # 登録確認メール
+│   ├── personality/
+│   │   ├── axisCalculator.js            # 5軸スコア計算・元素判定
+│   │   └── tagAxisMap.js                # タグ→軸のマッピング
+│   ├── prompts/
+│   │   ├── templates.js                 # プロンプトテンプレート集
+│   │   └── sixPersonMeetingTemplates.js
+│   └── utils/
+│       ├── dreamStore.js                # 夢の保存・取得・サニタイズ
+│       ├── errorHandler.js              # エラーハンドリング
+│       ├── firebaseInit.js              # Admin SDK 遅延初期化
+│       ├── firestoreCache.js            # 5分TTLのメモリキャッシュ
+│       ├── logger.js                    # 構造化ログ
+│       └── sixPersonMeeting.js
+├── const/                               # 各Cloud Functionの実装
+├── keys/                                # サービスアカウントキー（gitignore）
+├── index.js                             # エントリーポイント（遅延ロードでexport）
+├── package.json
+└── README.md
 ```
 
 ## 🚀 主要な改善点
@@ -56,23 +61,13 @@ logger.info('Process started', { userId, requestId });
 logger.error('Process failed', error, { context: 'additional data' });
 ```
 
-### 4. **バリデーション強化**
+### 4. **Firestoreキャッシュ**
 ```javascript
-const { Validator } = require('./utils/validation');
+const firestoreCache = require('./utils/firestoreCache');
 
-// 型安全なバリデーション
-Validator.validateCharacterId(characterId);
-Validator.validateMessage(userMessage);
-```
-
-### 5. **セキュリティ対策**
-```javascript
-const { Security } = require('./utils/security');
-
-// レート制限
-Security.checkRateLimit(userId);
-// 入力サニタイゼーション
-const cleaned = Security.sanitizeInput(userInput);
+// 5分TTLのメモリキャッシュ（キャラクター詳細・夢など）
+const cached = firestoreCache.get(key);
+if (cached === undefined) firestoreCache.set(key, value);
 ```
 
 ## 📋 利用可能な関数
