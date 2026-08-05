@@ -16,21 +16,29 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
   int _currentPage = 0;
 
+  // 「AIがあなたを知っていく」という一本の物語として構成する。
+  // 機能紹介の順ではなく、出会い→話す→変化が起きる→使える→はじめる、の体験順に並べる。
+  // 読み飛ばされないよう1枚3〜4行に抑える。
   static const _pages = [
     _OnboardingPage(
-      icon: Icons.psychology_outlined,
-      title: '話すだけで、自分がわかる',
-      body: 'DARIASは、キャラクターとチャットするだけで\nAIが自動的にあなたの性格を解析します。\n\nテストも質問もなし。\n普段の言葉から、あなたを読み取ります。',
+      icon: Icons.egg_alt_outlined,
+      title: 'はじめまして',
+      body: 'このAIは、あなたを何も知りません。\n\n名前も、好きなものも、\nどんなときに嬉しくなるのかも。\n\nこれから、あなたが教えていきます。',
+    ),
+    _OnboardingPage(
+      icon: Icons.chat_bubble_outline,
+      title: '話すだけでいい',
+      body: '性格テストはありません。\n質問に答える必要もありません。\n\nただ話しかけるだけで、\n言葉の選び方から、\nAIがあなたを読み取っていきます。',
     ),
     _OnboardingPage(
       icon: Icons.local_fire_department,
-      title: '性格タイプが明らかに',
-      body: '30回チャットすると、あなたの性格タイプが\n判定されます。\n\n炎・水・風・土など9つの元素タイプで\n「自分ってこういう人間なんだ」\nという気づきが生まれます。\n\n性格が確定すると、キャラクターの返答・\n日記・自分会議にも反映されていきます。',
+      title: '30回話すと、\nあなたの元素が決まる',
+      body: '言葉が30回分たまると、\nあなたの性格が9つの元素のどれかに宿ります。\n\n炎、水、風、雷、光、土、氷、闇、そして無。\n\nこのときAIも、\n赤ちゃんから幼少期へ育ちます。\nあなたを知るほど、あなたに似ていく。',
     ),
     _OnboardingPage(
       icon: Icons.groups,
-      title: '6人の自分で悩みを解決',
-      body: '悩みを入力すると、あなたの性格を持った\n6人の分身が会議を開きます。\n\n「論理派の自分」「感情派の自分」が\nリアルに議論するから、\nどこか納得感がある答えが見つかります。',
+      title: '迷ったら、自分に聞けばいい',
+      body: '「今の自分」「真逆の自分」「本音の自分」\n「理想の自分」「子供の頃の自分」\n「未来の自分」。\n\n6人のあなたが、\nあなたの悩みで本気で言い争います。\n\n他人の助言より、少しだけ刺さります。',
     ),
     // 手帳（予定・メモ・タスク）機能の廃止に伴い、冒険（心の迷宮）の紹介に差し替え。
     // 旧ページはコメントで残置（復活時に戻す）:
@@ -41,13 +49,13 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // ),
     _OnboardingPage(
       icon: Icons.explore_outlined,
-      title: 'ゲームで、自分を知る',
-      body: '「冒険」タブでは、悩みをテーマにした\nダンジョン「心の迷宮」に挑戦できます。\n\n枝道を選んで進み、敵（悩み）を乗り越えると、\nあなたの選び方から心の傾向を診断。\n\nすべて踏破すると、冒険の総合診断も\n受け取れます。',
+      title: '悩みは、倒せる',
+      body: '「完璧主義」「孤独」「評価への恐怖」。\nあなたの悩みがダンジョンになり、\n敵として立ちはだかります。\n\nどう戦うかの選び方に、\nあなた自身の癖が表れます。',
     ),
     _OnboardingPage(
-      icon: Icons.chat_bubble_outline,
-      title: 'さあ、話しかけてみよう',
-      body: 'まずはキャラクターにひと言\n送ってみてください。\n\n何気ない一言から、\nあなたの性格解析がはじまります。\n\n分析が進むほど、DARIASは\nあなたのことをもっとよく知っていきます。',
+      icon: Icons.send_outlined,
+      title: 'さあ、最初のひと言を',
+      body: '「おはよう」でも「疲れた」でも\nかまいません。\n\nその一言が、最初の記憶になります。\n\n今日あったことは、\n毎晩AIが日記に書いて待っています。',
     ),
   ];
 
@@ -165,36 +173,46 @@ class _PageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            page.icon,
-            size: 80,
-            color: Theme.of(context).colorScheme.primary,
+    // 小さい端末でも本文が切れないようスクロール可能にしつつ、
+    // 収まる場合は従来どおり上下中央に置く
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: (constraints.maxHeight - 48).clamp(0.0, double.infinity),
           ),
-          const SizedBox(height: 32),
-          Text(
-            page.title,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.bold,
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                page.icon,
+                size: 80,
+                color: Theme.of(context).colorScheme.primary,
+              ),
+              const SizedBox(height: 32),
+              Text(
+                page.title,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Text(
+                page.body,
+                style: const TextStyle(
+                  fontSize: 15,
+                  height: 1.7,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          Text(
-            page.body,
-            style: const TextStyle(
-              fontSize: 15,
-              height: 1.7,
-              color: Colors.black87,
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+        ),
       ),
     );
   }
