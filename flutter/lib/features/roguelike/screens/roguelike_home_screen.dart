@@ -32,7 +32,11 @@ class RoguelikeHomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider) ?? '';
-    final characterDetailsAsync = ref.watch(userCharacterDetailsProvider(userId));
+    // 自分のキャラクターなので details/current を購読する。
+    // userCharacterDetailsProvider は keepAlive 付きの一度きり取得（フレンド表示用）で、
+    // 性格タイプが変わってもアプリを再起動するまで古い元素のままになる。
+    // ここで渡す element は startGame() を通じて戦闘の元素相性にも使われる。
+    final characterDetailsAsync = ref.watch(characterDetailsProvider);
     final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
 
     return Scaffold(
