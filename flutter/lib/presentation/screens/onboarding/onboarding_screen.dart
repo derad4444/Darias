@@ -32,6 +32,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ),
     _OnboardingPage(
       icon: Icons.local_fire_department,
+      imagePath: 'assets/images/character_growth/赤ちゃん.png',
+      clipImageToCircle: true,
       title: '30回話すと、\nあなたの元素が決まる',
       body: '言葉が30回分たまると、\nあなたの性格が9つの元素のどれかに宿ります。\n\n炎、水、風、雷、光、土、氷、闇、そして無。\n\nこのときAIも、\n赤ちゃんから幼少期へ育ちます。\nあなたを知るほど、あなたに似ていく。',
     ),
@@ -49,11 +51,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     // ),
     _OnboardingPage(
       icon: Icons.explore_outlined,
+      // 全ダンジョン共通ザコの「もやもや」（enemy.dart の commonMobs）
+      imagePath: 'assets/images/roguelike_enemies/haze.png',
       title: '悩みは、倒せる',
       body: '「完璧主義」「孤独」「評価への恐怖」。\nあなたの悩みがダンジョンになり、\n敵として立ちはだかります。\n\nどう戦うかの選び方に、\nあなた自身の癖が表れます。',
     ),
     _OnboardingPage(
       icon: Icons.send_outlined,
+      imagePath: 'assets/images/character_growth/赤ちゃん.png',
+      clipImageToCircle: true,
       title: 'さあ、最初のひと言を',
       body: '「おはよう」でも「疲れた」でも\nかまいません。\n\nその一言が、最初の記憶になります。\n\n今日あったことは、\n毎晩AIが日記に書いて待っています。',
     ),
@@ -185,11 +191,7 @@ class _PageContent extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                page.icon,
-                size: 80,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+              _PageVisual(page: page),
               const SizedBox(height: 32),
               Text(
                 page.title,
@@ -222,5 +224,69 @@ class _OnboardingPage {
   final IconData icon;
   final String title;
   final String body;
-  const _OnboardingPage({required this.icon, required this.title, required this.body});
+
+  /// 指定するとアイコンの代わりに画像を表示する
+  final String? imagePath;
+
+  /// 画像を円形に切り抜くか。
+  /// 成長キャラの画像は背景がグレーで透過していないため、
+  /// 円形に切り抜いて背景グラデーションに馴染ませる（敵画像は透過済みなので不要）。
+  final bool clipImageToCircle;
+
+  const _OnboardingPage({
+    required this.icon,
+    required this.title,
+    required this.body,
+    this.imagePath,
+    this.clipImageToCircle = false,
+  });
+}
+
+/// ページ上部のビジュアル（画像があれば画像、なければアイコン）
+class _PageVisual extends StatelessWidget {
+  final _OnboardingPage page;
+  const _PageVisual({required this.page});
+
+  static const double _size = 130;
+  static const double _imageHeight = 120;
+
+  @override
+  Widget build(BuildContext context) {
+    final path = page.imagePath;
+    if (path == null) {
+      return Icon(
+        page.icon,
+        size: 80,
+        color: Theme.of(context).colorScheme.primary,
+      );
+    }
+
+    // 画像が欠けていてもオンボーディングが止まらないようアイコンに退避する
+    Widget fallback(BuildContext context, Object error, StackTrace? stack) => Icon(
+          page.icon,
+          size: 80,
+          color: Theme.of(context).colorScheme.primary,
+        );
+
+    if (page.clipImageToCircle) {
+      // 円を埋めるため cover で切り抜く
+      return ClipOval(
+        child: Image.asset(
+          path,
+          width: _size,
+          height: _size,
+          fit: BoxFit.cover,
+          errorBuilder: fallback,
+        ),
+      );
+    }
+
+    // 横長の敵画像は左右が切れないよう高さだけ指定して全体を見せる
+    return Image.asset(
+      path,
+      height: _imageHeight,
+      fit: BoxFit.contain,
+      errorBuilder: fallback,
+    );
+  }
 }
