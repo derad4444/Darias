@@ -277,11 +277,12 @@ ai_commentは以下のルールで250〜350文字で作成:
 - 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
   },
   */
-  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, big5ProgressSummary, roguelikeSummary, favoriteWord, wordTendency, dream, strength) => {
+  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, roguelikeSummary, favoriteWord, wordTendency, dream, strength) => {
     const parts = [];
+    // デイリーミッションの達成が一番の成果なので先頭に置く
+    if (dailyMissionSummary) parts.push(`デイリーミッション: ${dailyMissionSummary}`);
     if (chatSummary) parts.push(`会話: ${chatSummary}`);
     if (meetingSummary) parts.push(`相談: ${meetingSummary}`);
-    if (big5ProgressSummary) parts.push(`性格診断: ${big5ProgressSummary}`);
     if (roguelikeSummary) parts.push(`冒険（心の迷宮）: ${roguelikeSummary}`);
     const activitiesText = parts.length > 0 ? parts.join("\n") : "特になし";
 

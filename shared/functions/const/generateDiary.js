@@ -58,6 +58,13 @@ async function generateDiary(characterId, userId) {
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
+  // 日本時間の日付文字列（YYYY-MM-DD）。
+  // dailyMissions のドキュメントIDと、日記の created_date に使う。
+  const jstNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
+  const createdDate = `${jstNow.getFullYear()}-` +
+    `${String(jstNow.getMonth() + 1).padStart(2, "0")}-` +
+    `${String(jstNow.getDate()).padStart(2, "0")}`;
+
   // 手帳（予定）機能の廃止に伴い、予定の取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
   /*
   // 今日のスケジュール取得 (ユーザー固有のスケジュール)
@@ -205,27 +212,26 @@ async function generateDiary(characterId, userId) {
     // roguelike_runs が無い/未整備の場合はスキップ
   }
 
-  // 今日の性格診断進捗取得（BIG5回答セッション）
-  let big5ProgressSummary = "";
-  let big5AnsweredCount = 0;
+  // 今日のデイリーミッション達成状況
+  //
+  // 保存済みの allCompleted は判定条件が変わる前の値が残っていることがあるため、
+  // クライアント（daily_mission_model.dart）と同じ式で組み立て直す。
+  // 手帳廃止で「スケジュール確認(diaryViewed)」は条件から外れている。
+  let dailyMissionSummary = "";
+  let dailyMissionCleared = false;
   try {
-    const big5Snap = await db.collection("users").doc(userId)
-        .collection("characters").doc(characterId)
-        .collection("big5_sessions")
-        .where("createdAt", ">=", today)
-        .where("createdAt", "<", tomorrow)
-        .limit(1)
-        .get();
-    if (!big5Snap.empty) {
-      const sessionData = big5Snap.docs[0].data();
-      const answeredCount = sessionData.answeredCount || sessionData.answers?.length || 0;
-      if (answeredCount > 0) {
-        big5AnsweredCount = answeredCount;
-        big5ProgressSummary = `・性格診断を${answeredCount}問回答`;
+    const missionSnap = await db.collection("users").doc(userId)
+        .collection("dailyMissions").doc(createdDate).get();
+    if (missionSnap.exists) {
+      const m = missionSnap.data() || {};
+      dailyMissionCleared =
+        m.loginDone === true && (m.chatCount || 0) >= 6 && m.diaryRead === true;
+      if (dailyMissionCleared) {
+        dailyMissionSummary = "・今日のミッションを全て達成";
       }
     }
   } catch (e) {
-    // big5_sessionsが存在しない場合はスキップ
+    // dailyMissions が存在しない場合はスキップ
   }
 
   // 今日の会議（6人会議）取得
@@ -282,11 +288,10 @@ async function generateDiary(characterId, userId) {
   // AIに書かせると、件数指示を満たすために実在しない活動を捏造することがあるため
   // （仕様書「事実ベース原則: factsはFirestoreから取得した実データのみを元に生成」）。
   const facts = [];
+  // デイリーミッションの達成が一番の成果なので、他に何件あっても先頭に置く
+  if (dailyMissionCleared) facts.push("デイリーミッションをクリアした");
   if (chatCount > 0) facts.push(`会話を${chatCount}件やりとりした`);
   facts.push(...meetingFacts);
-  if (big5AnsweredCount > 0) {
-    facts.push(`性格診断に${big5AnsweredCount}問回答した`);
-  }
   facts.push(...roguelikeFacts);
 
   // Android度を計算（協調性、外向性、神経症傾向の低さでAndroid度を判定）
@@ -328,7 +333,7 @@ async function generateDiary(characterId, userId) {
       gender,
       chatSummary,
       meetingSummary,
-      big5ProgressSummary,
+      dailyMissionSummary,
       roguelikeSummary,
       favoriteWord,
       wordTendency,
@@ -370,15 +375,7 @@ async function generateDiary(characterId, userId) {
       .collection("characters").doc(characterId)
       .collection("diary").doc();
 
-  // 日付文字列を生成（YYYY-MM-DD形式、日本時間で）
-  const now = new Date();
-  // 日本時間（UTC+9）で日付を取得
-  const jstDate = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
-  const yyyy = jstDate.getFullYear();
-  const mm = String(jstDate.getMonth() + 1).padStart(2, "0");
-  const dd = String(jstDate.getDate()).padStart(2, "0");
-  const createdDate = `${yyyy}-${mm}-${dd}`;
-
+  // createdDate（JSTの YYYY-MM-DD）は関数冒頭で算出済み
   console.log(`📅 Creating diary with created_date: ${createdDate} (JST)`);
 
   // Firestore登録用データ構築

@@ -683,11 +683,12 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **収集データ**: チャット（本文は上位5件、件数は `count()` で実数取得）/ 性格診断セッション / 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
+- **収集データ**: デイリーミッション達成状況 / チャット（本文は上位5件、件数は `count()` で実数取得）/ 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `strength`(強み) を、`dream/current` から `dream`(夢) を取得してプロンプトに反映（夢は本人限定サブコレクションに置く。未移行ユーザーは `details/current.dream` にフォールバック）
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
 - **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
+- **facts の並び順**: `デイリーミッションをクリアした` → `会話を{n}件やりとりした` → `「{悩み}」について相談した`（会議数ぶん）→ `冒険で{結果}`（最大3件）。デイリーミッションは他に何件あっても先頭に置く
 - **活動なし時の挙動**: 活動が無くても OpenAI API を呼び出し、キャラクターからの声がけのみの日記を保存する（`facts: []`, `ai_comment` あり）。以前は `hasActivity` フラグで API 呼び出しをスキップし `ai_comment: ""` で保存していたが、履歴に空の日記カードが並ぶため変更（2026-07-29）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）

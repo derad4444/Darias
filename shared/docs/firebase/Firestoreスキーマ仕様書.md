@@ -304,14 +304,12 @@
 
 | データ | コレクション | 条件 |
 |--------|------------|------|
-| 当日スケジュール | `users/{uid}/schedules` | `startDate` が当日 |
-| 翌日スケジュール | `users/{uid}/schedules` | `startDate` が翌日（上位3件）。明日への言及に使用 |
-| チャット | `users/{uid}/characters/{cid}/posts` | `timestamp` が当日 |
-| 完了Todo | `users/{uid}/todos` | `isCompleted==true` かつ `updatedAt` が当日（上位3件） |
-| 作成Todo | `users/{uid}/todos` | `createdAt` が当日（上位3件） |
-| メモ | `users/{uid}/characters/{cid}/memos` | `createdAt` が当日（上位3件） |
-| 性格診断 | `users/{uid}/characters/{cid}/big5_sessions` | `createdAt` が当日 |
+| デイリーミッション | `users/{uid}/dailyMissions/{YYYY-MM-DD}` | JSTの当日。`loginDone && chatCount >= 6 && diaryRead` で達成を判定 |
+| チャット | `users/{uid}/characters/{cid}/posts` | `timestamp` が当日（本文はAIへ上位5件。件数は `count()` で実数） |
 | 6人会議 | `users/{uid}/characters/{cid}/meeting_history` | `createdAt` が当日（上位2件） |
+| 冒険（ローグライク） | `users/{uid}/roguelike_runs` | `createdAt` が当日（上位3件） |
+
+> 手帳（スケジュール・Todo・メモ）は機能停止に伴い日記の材料から外している。`generateDiary.js` に取得処理がコメントで残置されており、復活時に戻せる。
 
 **インデックス:**
 - `date` (DESC)
