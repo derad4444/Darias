@@ -1172,36 +1172,6 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
           ),
           const SizedBox(height: 24),
         ],
-
-        // 次のステップ
-        if (conclusion.nextSteps.isNotEmpty)
-          _buildSection(
-            title: '次のステップ',
-            child: Column(
-              children: conclusion.nextSteps.asMap().entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        size: 18,
-                        color: Colors.blue,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          entry.value,
-                          style: const TextStyle(fontSize: 14),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
       ],
     );
   }

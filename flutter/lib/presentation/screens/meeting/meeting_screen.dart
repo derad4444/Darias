@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../data/models/six_person_meeting_model.dart';
-import '../../../data/models/todo_model.dart';
 import '../../../data/datasources/remote/meeting_datasource.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/subscription_provider.dart';
@@ -15,7 +14,6 @@ import '../../providers/theme_provider.dart';
 import '../../providers/ad_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../../data/services/ad_service.dart';
-import '../../providers/todo_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
@@ -599,91 +597,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
         const SizedBox(height: 16),
 
-        // 次のステップ
-        if (conclusion.nextSteps.isNotEmpty)
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.flag, color: Colors.blue, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      '次のステップ',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                ...conclusion.nextSteps.asMap().entries.map((entry) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: const BoxDecoration(
-                            color: Colors.blue,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${entry.key + 1}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(child: Text(entry.value)),
-                        // 案3: タスクに追加ボタン
-                        GestureDetector(
-                          onTap: () => _addNextStepAsTodo(entry.value),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.blue.withValues(alpha: 0.4),
-                              ),
-                            ),
-                            child: const Text(
-                              '+タスク',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.blue,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
-
-        const SizedBox(height: 16),
-
         // 共有ボタン
         SizedBox(
           key: _shareButtonKey,
@@ -946,11 +859,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
         .entries
         .map((e) => '${e.key + 1}. ${e.value}')
         .join('\n');
-    final nextSteps = conclusion.nextSteps
-        .asMap()
-        .entries
-        .map((e) => '${e.key + 1}. ${e.value}')
-        .join('\n');
 
     final shareText = '''
 【自分会議の結論】
@@ -963,9 +871,6 @@ ${conclusion.summary}
 
 🎯 アドバイス:
 $recommendations
-
-📝 次のステップ:
-$nextSteps
 
 ---
 #DARIAS #自分会議
@@ -983,40 +888,6 @@ $nextSteps
       await Share.share(text, sharePositionOrigin: origin);
     } catch (e) {
       debugPrint('Share failed: $e');
-    }
-  }
-
-  /// 案3: ネクストステップをタスクに追加
-  Future<void> _addNextStepAsTodo(String stepText) async {
-    final now = DateTime.now();
-    final todo = TodoModel(
-      id: '',
-      title: stepText,
-      description: '自分会議のネクストステップ',
-      isCompleted: false,
-      dueDate: null,
-      priority: TodoPriority.medium,
-      tag: '',
-      createdAt: now,
-      updatedAt: now,
-    );
-
-    try {
-      await ref.read(todoControllerProvider.notifier).addTodo(todo);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('タスクに追加しました'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('タスクの追加に失敗しました: $e')),
-        );
-      }
     }
   }
 

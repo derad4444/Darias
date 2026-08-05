@@ -1,6 +1,6 @@
 # DARIAS SNS共有仕様書
 
-**最終更新日**: 2026-06-27
+**最終更新日**: 2026-08-06
 
 ---
 
@@ -82,11 +82,6 @@ await Share.share(text, sharePositionOrigin: origin);
 🎯 アドバイス:
 1. {recommendation1}
 2. {recommendation2}
-...
-
-📝 次のステップ:
-1. {nextStep1}
-2. {nextStep2}
 ...
 
 ---

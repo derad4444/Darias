@@ -2,9 +2,9 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-08-05
+**最終更新日**: 2026-08-06
 **トップレベルコレクション**: 11
-**主な更新**: 夢を本人限定の `characters/{characterId}/dream` に分離し、性格ごとの共有テンプレート `CharacterDetailsTemplate` を追加。`payment_method` のストア別フィールドも追記
+**主な更新**: 自分会議の結論から nextSteps を削除。夢を本人限定の `characters/{characterId}/dream` に分離し、性格ごとの共有テンプレート `CharacterDetailsTemplate` を追加。`payment_method` のストア別フィールドも追記
 
 ---
 
@@ -851,8 +851,9 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
       - **timestamp**: `string` - タイムスタンプ
   - **conclusion**: `map` - 結論
     - **summary**: `string` - サマリー
-    - **recommendations**: `array<string>` - 推奨事項（3項目）
-    - **nextSteps**: `array<string>` - 次のステップ（3項目）
+    - **recommendations**: `array<string>` - アドバイス（3項目）
+
+    > 過去に生成されたドキュメントには `nextSteps` フィールドが残っているが、クライアント・Cloud Functions とも参照しない。
 - **ratings**: `map` - 評価情報
   - **totalRatings**: `number` - 評価総数
   - **ratingSum**: `number` - 評価合計値

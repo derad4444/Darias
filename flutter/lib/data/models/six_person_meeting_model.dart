@@ -178,22 +178,16 @@ enum MessagePosition { left, right }
 class MeetingConclusion {
   final String summary;
   final List<String> recommendations;
-  final List<String> nextSteps;
 
   const MeetingConclusion({
     required this.summary,
     required this.recommendations,
-    required this.nextSteps,
   });
 
   factory MeetingConclusion.fromMap(Map<String, dynamic> map) {
     return MeetingConclusion(
       summary: map['summary'] as String? ?? '',
       recommendations: (map['recommendations'] as List<dynamic>?)
-              ?.map((e) => e as String)
-              .toList() ??
-          [],
-      nextSteps: (map['nextSteps'] as List<dynamic>?)
               ?.map((e) => e as String)
               .toList() ??
           [],
