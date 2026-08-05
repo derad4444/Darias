@@ -54,23 +54,32 @@ final diaryForDateProvider = Provider.family<DiaryModel?, DateTime>((ref, date) 
   );
 });
 
-/// 新しい日記があるかどうかのプロバイダー（カレンダータブバッジ用）
-final hasNewDiaryProvider = FutureProvider<bool>((ref) async {
+/// 未読の日記の件数（履歴ボタン・アプリアイコンのバッジ用）
+///
+/// `lastSeenDiaryDate` より新しい日付の日記を数える。
+/// 一度も日記タブを開いていない場合は全件を未読として扱う。
+final unreadDiaryCountProvider = FutureProvider<int>((ref) async {
   final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return false;
+  if (userId == null) return 0;
 
   final diariesAsync = ref.watch(currentCharacterDiariesProvider);
   final diaries = diariesAsync.valueOrNull;
-  if (diaries == null || diaries.isEmpty) return false;
+  if (diaries == null || diaries.isEmpty) return 0;
 
-  final latestDate = diaries.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
-  final hint = HintService(userId);
-  final lastSeen = await hint.getLastSeenDiaryDate();
-  if (lastSeen == null) return true;
+  final lastSeen = await HintService(userId).getLastSeenDiaryDate();
+  if (lastSeen == null) return diaries.length;
 
-  final latest = DateTime(latestDate.year, latestDate.month, latestDate.day);
   final seen = DateTime(lastSeen.year, lastSeen.month, lastSeen.day);
-  return latest.isAfter(seen);
+  return diaries
+      .where((d) =>
+          DateTime(d.date.year, d.date.month, d.date.day).isAfter(seen))
+      .length;
+});
+
+/// 新しい日記があるかどうかのプロバイダー
+final hasNewDiaryProvider = FutureProvider<bool>((ref) async {
+  final count = await ref.watch(unreadDiaryCountProvider.future);
+  return count > 0;
 });
 
 /// 日記バッジクリア（カレンダータブタップ時に呼ぶ）
@@ -82,7 +91,8 @@ Future<void> clearDiaryBadge(WidgetRef ref) async {
   if (diaries == null || diaries.isEmpty) return;
   final latestDate = diaries.map((d) => d.date).reduce((a, b) => a.isAfter(b) ? a : b);
   await HintService(userId).setLastSeenDiaryDate(latestDate);
-  ref.invalidate(hasNewDiaryProvider);
+  // hasNewDiaryProvider は unreadDiaryCountProvider を watch しているので連動して再計算される
+  ref.invalidate(unreadDiaryCountProvider);
 }
 
 /// 日記コントローラー

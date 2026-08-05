@@ -31,6 +31,22 @@ final meetingHistoryProvider =
   return datasource.watchMeetingHistory(characterId: characterId);
 });
 
+/// 自分会議を一度でも使ったことがあるか（ホームの New バッジ用）
+///
+/// 履歴を全件購読すると無駄なので、1件だけ取得して有無を判定する。
+/// 読み込み中は `null` を返すため、呼び出し側は「使用済み」として扱い
+/// 既存ユーザーにバッジが一瞬出るのを避けること。
+final hasUsedMeetingProvider = StreamProvider<bool>((ref) {
+  final characterId = ref.watch(currentCharacterIdProvider);
+  final datasource = ref.watch(meetingDatasourceProvider);
+  if (datasource == null || characterId == null || characterId.isEmpty) {
+    return Stream.value(false);
+  }
+  return datasource
+      .watchMeetingHistory(characterId: characterId, limit: 1)
+      .map((history) => history.isNotEmpty);
+});
+
 /// 会議一覧のProvider（旧パス - 互換性のため残す）
 final meetingsProvider = StreamProvider<List<MeetingModel>>((ref) {
   final datasource = ref.watch(meetingDatasourceProvider);

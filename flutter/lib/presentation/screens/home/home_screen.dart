@@ -20,6 +20,7 @@ import '../../../data/models/todo_model.dart';
 import '../../providers/calendar_provider.dart';
 import '../../providers/chat_provider.dart';
 import '../../../data/datasources/remote/chat_datasource.dart';
+import '../../providers/meeting_provider.dart';
 import '../../providers/memo_provider.dart';
 import '../../providers/todo_provider.dart';
 import '../../../data/services/ad_service.dart';
@@ -316,8 +317,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
     final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
-    // 未読の日記があれば履歴ボタンに New バッジを出す
-    final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
+    // 自分会議を一度も使っていない間だけ New バッジを出す（読み込み中は出さない）
+    final hasUsedMeeting = ref.watch(hasUsedMeetingProvider).valueOrNull ?? true;
+    // 未読の日記の件数を履歴ボタンの右上にバッジ表示する
+    final unreadDiaryCount = ref.watch(unreadDiaryCountProvider).valueOrNull ?? 0;
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -399,13 +402,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          // 自分会議ボタン（signalCount >= 30 で解放）
+                          // 自分会議ボタン（signalCount >= 30 で解放。未使用のうちだけ New）
                           _ActionButton(
                             icon: signalCount >= 30 ? Icons.groups : Icons.lock,
                             label: '自分会議',
                             accentColor: accentColor,
                             isEnabled: signalCount >= 30,
-                            showNewBadge: signalCount >= 30,
+                            showNewBadge: signalCount >= 30 && !hasUsedMeeting,
                             onTap: () {
                               if (signalCount >= 30) {
                                 context.push('/meeting');
@@ -454,13 +457,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             orElse: () => const SizedBox.shrink(),
                           ),
                           const SizedBox(width: 8),
-                          // 履歴ボタン（未読の日記があれば New バッジを出す）
+                          // 履歴ボタン（未読の日記の件数をバッジ表示）
                           _ActionButton(
                             icon: Icons.history,
                             label: '履歴',
                             accentColor: accentColor,
                             isOutlined: true,
-                            showNewBadge: hasNewDiary,
+                            badgeCount: unreadDiaryCount,
                             onTap: () => context.push('/history', extra: characterId),
                           ),
                           // [ローグライク試作] 非表示中（リリース時に復活予定）
@@ -1540,6 +1543,9 @@ class _ActionButton extends StatelessWidget {
   final bool isEnabled;
   final bool isOutlined;
   final bool showNewBadge;
+
+  /// 0より大きいとき、ボタン右上にアプリアイコン風の件数バッジを出す
+  final int badgeCount;
   final VoidCallback onTap;
 
   const _ActionButton({
@@ -1549,6 +1555,7 @@ class _ActionButton extends StatelessWidget {
     this.isEnabled = true,
     this.isOutlined = false,
     this.showNewBadge = false,
+    this.badgeCount = 0,
     required this.onTap,
   });
 
@@ -1556,7 +1563,24 @@ class _ActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: Stack(
+        // バッジをボタンの枠外にはみ出させる
+        clipBehavior: Clip.none,
+        children: [
+          _buildButton(),
+          if (badgeCount > 0)
+            Positioned(
+              top: -6,
+              right: -6,
+              child: _CountBadge(count: badgeCount),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildButton() {
+    return Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isOutlined
@@ -1608,7 +1632,6 @@ class _ActionButton extends StatelessWidget {
             ],
           ],
         ),
-      ),
     );
   }
 }
@@ -2397,6 +2420,47 @@ class _TypeEvolutionDialogState extends ConsumerState<_TypeEvolutionDialog>
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// アプリアイコン風の件数バッジ（赤丸＋白抜き数字）
+class _CountBadge extends StatelessWidget {
+  final int count;
+
+  const _CountBadge({required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      // 1桁なら円、2桁以上は横長のピル型になる
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF3B30),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: Colors.white, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        widthFactor: 1,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+            height: 1.1,
+          ),
+        ),
       ),
     );
   }

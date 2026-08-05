@@ -93,9 +93,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   }
 
   void _updateAppBadge(WidgetRef ref) {
-    final count = ref.read(pendingFriendRequestCountProvider);
-    final hasNewDiary = ref.read(hasNewDiaryProvider).valueOrNull ?? false;
-    FlutterAppBadger.updateBadgeCount(count + (hasNewDiary ? 1 : 0));
+    final friendRequests = ref.read(pendingFriendRequestCountProvider);
+    final unreadDiaries = ref.read(unreadDiaryCountProvider).valueOrNull ?? 0;
+    FlutterAppBadger.updateBadgeCount(friendRequests + unreadDiaries);
   }
 
   // 手帳タブ廃止に伴いコメントアウト（削除せず残置。復活時に戻す）。
@@ -186,7 +186,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     // アプリアイコンバッジ更新（iOS only）
     if (!kIsWeb) {
       ref.listen<int>(pendingFriendRequestCountProvider, (_, __) => _updateAppBadge(ref));
-      ref.listen<AsyncValue<bool>>(hasNewDiaryProvider, (_, __) => _updateAppBadge(ref));
+      ref.listen<AsyncValue<int>>(unreadDiaryCountProvider, (_, __) => _updateAppBadge(ref));
       // 手帳（予定）機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
       // 起動時に今後の予定通知を再登録（iOSの64件上限対応）していた。
       // これが生きていると、UIを隠しても過去に登録した予定の通知が届き続ける。
