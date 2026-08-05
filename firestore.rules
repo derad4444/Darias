@@ -5,19 +5,28 @@ service cloud.firestore {
 
     // ユーザー認証が必要な個人データ
     match /users/{userId} {
-      // 認証済みユーザーはプロフィール基本情報（name, email, character_id 等）を読み取り可能
-      // ※サブスクリプション等の機密データはサブコレクションで管理されており対象外
-      allow read: if request.auth != null;
+      // フレンド機能のため、userId を指定した単体取得のみ認証済みユーザーに許可する
+      // （QRコード・共有リンクからのフレンド追加で name / character_id を参照する）
+      //
+      // list（コレクション一覧取得）は禁止。許可すると認証済みの第三者が
+      // 全ユーザーの name / email を一括取得できてしまう。
+      // フレンド検索は Cloud Function `searchUsers` 経由で行うため、
+      // クライアントが users を list する必要はない。
+      allow get: if request.auth != null;
+      allow list: if false;
 
       // ユーザー自身は書き込み可能
       allow write: if request.auth != null && request.auth.uid == userId;
 
-      // キャラクター詳細（アバター表示用）- 認証済みユーザーが読み取り可能
+      // キャラクター詳細（フレンドのアバター表示用）- 単体取得のみ許可
+      // 夢はユーザーが自由入力できるため、ここではなく本人限定の
+      // characters/{characterId}/dream/current に保存する
       match /characters/{characterId}/details/{detailId} {
-        allow read: if request.auth != null;
+        allow get: if request.auth != null;
+        allow list: if false;
       }
 
-      // ユーザーのサブコレクション（予定、日記など）はユーザー自身のみ
+      // ユーザーのサブコレクション（予定、日記、夢など）はユーザー自身のみ
       match /{subcollection=**} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
@@ -39,6 +48,13 @@ service cloud.firestore {
     match /Big5Analysis/{personalityKey} {
       allow read: if request.auth != null;
       allow write: if false;
+    }
+
+    // 性格ごとのキャラクター属性テンプレート - Cloud Function 専用（Admin SDKはルールを迂回する）
+    // 各ユーザーには details/current と dream/current にコピーされるため、
+    // クライアントがこのコレクションを直接読む必要はない
+    match /CharacterDetailsTemplate/{personalityKey} {
+      allow read, write: if false;
     }
 
     // お問い合わせ - 認証済みユーザーは作成可能
