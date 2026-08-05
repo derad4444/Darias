@@ -260,8 +260,10 @@ async function generateDiary(characterId, userId) {
         }
       }
 
+      // 会議が結論テキストを返しても、ユーザーの中で答えが出たとは限らないため
+      // facts では「相談した」という事実だけを書く
       const fact = concern ?
-        `相談「${concern}」について${conclusion ? "結論を出した" : "話し合った"}` :
+        `「${concern}」について相談した` :
         "相談をした";
 
       return {
