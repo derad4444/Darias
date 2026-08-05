@@ -40,11 +40,15 @@ function dreamRef(userId, characterId) {
  */
 function sanitizeDream(value) {
   if (typeof value !== "string") return "";
-  return value
+  const collapsed = value
       .replace(CONTROL_CHARS, " ")
       .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, DREAM_MAX_LENGTH);
+      .trim();
+  // サロゲートペア（絵文字など）を途中で割らないようコードポイント単位で切る
+  // （クライアント側 DreamService.sanitize と同じ規則）
+  const points = Array.from(collapsed);
+  if (points.length <= DREAM_MAX_LENGTH) return collapsed;
+  return points.slice(0, DREAM_MAX_LENGTH).join("");
 }
 
 /**
