@@ -77,19 +77,44 @@ const cleaned = Security.sanitizeInput(userInput);
 
 ## 📋 利用可能な関数
 
-### HTTP Functions
+`index.js` の export と一致させること。詳細な仕様は [`shared/docs/functions/Cloud Functions仕様書.md`](../docs/functions/Cloud%20Functions仕様書.md) を参照。
+
+### チャット・AI生成
 - `generateCharacterReply` - キャラクターの返答生成
-- `extractSchedule` - テキストからスケジュール抽出  
-- `createVoice` - テキストから音声生成
-- `generateBig5AnalysisCallable` - Big5性格解析生成（Firestore キャッシュあり）
-- `generateCharacterAttributesCallable` - キャラクター属性生成
+- `classifyAndExtract` - チャット入力の分類とメモ/タスク/予定の抽出
+- `answerAppQuestion` - アプリの使い方への回答
+- `extractFromImage` - 画像からの情報抽出
+- `generateVoice` - テキストから音声生成
+- `generateAdventureDiagnosis` - 冒険（ローグライク）の性格診断
+- `generateOrReuseMeeting` - 6人会議の生成
+
+### 性格解析
+- `generateBig5Analysis` - Big5性格解析生成（`Big5Analysis` にキャッシュ）
+- `generatePersonalityNarrative` - 性格ナラティブ生成
+- `recalculatePersonalityStats` - 性格タイプ統計の再集計
+- `backfillSixPersonalities` - 6人分身データのバックフィル
+
+### フレンド
+- `searchUsers` - ユーザー検索
+- `sendFriendRequest` / `acceptFriendRequest` / `rejectFriendRequest` / `cancelFriendRequest` / `removeFriend`
+- `getFriendSchedules` - フレンドの公開予定取得
+- `diagnoseCompatibility` - 相性診断
+- `askAboutFriend` - フレンドについて質問
+
+### 課金
+- `validateAppStoreReceipt` / `validateGooglePlayReceipt` - レシート検証
+- `appleServerNotification` - App Store サーバー通知の受信
+- `checkSubscriptionStatus` - サブスク状態の定期チェック（毎日0:00 JST）
+
+### メール・その他
+- `sendRegistrationEmail` / `sendContactEmail`
+- `deleteUserAccount` - アカウント削除
+- `health` - ヘルスチェック
 
 ### Scheduled Functions
-- `generateDiary` - 日記自動生成（毎日23:50）
-- `generateCharacterMaster` - キャラクター画像生成マスター（毎日2:00）
-- `generateCharacterWorker` - キャラクター画像生成ワーカー
-- `scheduledCharacterDetails` - キャラクター詳細生成（毎日0:00）
-- `scheduledHolidays` - 祝日登録（毎年1月1日）
+- `scheduledDiaryGeneration` - 日記自動生成
+- `generateMonthlyReview` / `generateMonthlyReviewHttp` - 月次振り返り
+- `scheduledHolidays` - 祝日登録
 
 ## 🔧 開発・デプロイ
 
