@@ -49,6 +49,11 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
     _tabController = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
     // 日記タブが選択されたらバッジをクリア
     _tabController.addListener(_onTabChanged);
+    // 日記タブを直接開いた場合（デイリーミッションの「日記を確認する」など）は
+    // タブ切り替えが起きずリスナーが発火しないため、ここでクリアする
+    if (widget.initialTab == 2) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _clearDiaryBadge());
+    }
   }
 
   void _onTabChanged() {
