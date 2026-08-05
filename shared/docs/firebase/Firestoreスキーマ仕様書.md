@@ -2,9 +2,9 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-07-10
+**最終更新日**: 2026-08-05
 **トップレベルコレクション**: 10
-**主な更新**: `techou_survey_responses`（手帳タブ廃止アンケートの匿名回答）を追加
+**主な更新**: `users/{userId}/subscription` の `payment_method` にGoogle Play（`google_play`）を明記し、レシート検証で書き込まれるストア別フィールドを追記
 
 ---
 
@@ -604,11 +604,23 @@
 
 - **status**: `string` - ステータス（"active", "cancelled", "expired", "free"）
 - **plan**: `string` - プラン名（"free", "premium"）
-- **payment_method**: `string` - 支払い方法（"app_store"など）
+- **payment_method**: `string` - 支払い方法（"app_store" = iOS / "google_play" = Android / "unknown"）
 - **auto_renewal**: `boolean` - 自動更新フラグ
 - **start_date**: `timestamp` - 開始日
 - **end_date**: `timestamp | null` - 終了日
 - **updated_at**: `timestamp` - 更新日時
+- **product_id**: `string` - 商品ID（`com.character.premium.monthly`）※レシート検証時に書き込み
+
+iOS（`validateAppStoreReceipt`）のみ書き込むフィールド:
+
+- **transaction_id**: `string` - トランザクションID
+- **original_transaction_id**: `string` - 初回トランザクションID
+
+Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
+
+- **purchase_token**: `string` - Google Play の購入トークン（Play Developer API での再検証に使用）
+
+> レシート検証（`shared/functions/validateReceipt.js`）を経由せずクライアントがフォールバック更新した場合は、`end_date` を含む上記の一部が書き込まれない。詳細は [サブスクリプション仕様書](../architecture/サブスクリプション仕様書.md) を参照。
 
 ---
 
