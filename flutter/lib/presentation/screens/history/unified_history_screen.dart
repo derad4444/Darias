@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -12,8 +14,8 @@ import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/diary_provider.dart';
+import '../../providers/friend_provider.dart';
 import '../../providers/meeting_provider.dart';
-import '../../providers/notification_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../diary/diary_detail_screen.dart';
@@ -52,8 +54,21 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
   void _onTabChanged() {
     // タブインデックス2（日記）が選択されたらバッジをクリア
     if (_tabController.index == 2 && !_tabController.indexIsChanging) {
-      ref.read(notificationServiceProvider).clearBadge();
+      _clearDiaryBadge();
     }
+  }
+
+  /// 日記の既読日時を保存し、アプリアイコンのバッジを更新する
+  ///
+  /// `/history` は MainShell の外のルートなので、MainShell 側の
+  /// `ref.listen` に頼らずここで直接 OS バッジを更新する。
+  Future<void> _clearDiaryBadge() async {
+    await clearDiaryBadge(ref);
+    if (kIsWeb || !mounted) return;
+    // 日記を既読にした後に残るのはフレンド申請の分だけ
+    FlutterAppBadger.updateBadgeCount(
+      ref.read(pendingFriendRequestCountProvider),
+    );
   }
 
   @override

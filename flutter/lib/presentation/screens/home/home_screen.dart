@@ -25,6 +25,7 @@ import '../../providers/todo_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
+import '../../providers/diary_provider.dart';
 import '../../providers/dream_provider.dart';
 import '../../widgets/dream_select_sheet.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
@@ -315,6 +316,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
     final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    // 未読の日記があれば履歴ボタンに New バッジを出す
+    final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -451,12 +454,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             orElse: () => const SizedBox.shrink(),
                           ),
                           const SizedBox(width: 8),
-                          // 履歴ボタン
+                          // 履歴ボタン（未読の日記があれば New バッジを出す）
                           _ActionButton(
                             icon: Icons.history,
                             label: '履歴',
                             accentColor: accentColor,
                             isOutlined: true,
+                            showNewBadge: hasNewDiary,
                             onTap: () => context.push('/history', extra: characterId),
                           ),
                           // [ローグライク試作] 非表示中（リリース時に復活予定）

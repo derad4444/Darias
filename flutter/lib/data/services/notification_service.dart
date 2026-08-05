@@ -389,7 +389,6 @@ class NotificationService {
     );
   }
 
-  Future<void> clearBadge() async {}
 }
 
 /// バックグラウンドメッセージハンドラ（トップレベル・別isolate）

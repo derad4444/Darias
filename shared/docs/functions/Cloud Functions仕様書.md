@@ -697,6 +697,10 @@ Cloud Scheduler による定期実行バッチ。
   - `INFO "Diary notification skipped: disabled by user"` — `diaryNotificationsEnabled === false`
   - `WARN "Diary notification skipped: invalid FCM token (cleaned up)"` — トークン無効（Firestore から削除済み）
   - `ERROR "Diary notification failed"` — その他のエラー（`errorCode` / `errorMessage` を含む）
+- **未読バッジ（クライアント側）**: FCMペイロードに `badge` は含めない。未読表示はクライアントが `hasNewDiaryProvider`（最新の日記の日付 > `lastSeenDiaryDate`）で判定する
+  - アプリアイコンのバッジ: `main_shell_screen.dart` の `_updateAppBadge()` が `フレンド申請数 + (未読の日記があれば1)` を設定
+  - ホーム画面の「履歴」ボタン: 未読があれば `New` バッジを表示
+  - 既読化: 履歴画面の「日記」タブを開いたときに `clearDiaryBadge()` が `lastSeenDiaryDate` を更新し、アプリアイコンのバッジも更新する（`unified_history_screen.dart`）
 
 #### 11. `generateMonthlyReview`
 - **ソース**: `src/functions/generateMonthlyReview.js`
