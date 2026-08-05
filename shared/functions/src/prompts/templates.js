@@ -73,16 +73,39 @@ const TRAIT_SHORT_LABELS = {
 };
 
 /**
+ * Big5スコアをラベル参照用の 1〜5 の整数に正規化する
+ *
+ * `convertedBig5Scores` は axisCalculator の `convertToBig5()` が返す連続値（例: 3.4）。
+ * TRAIT_DESCRIPTIONS / TRAIT_SHORT_LABELS のキーは 1〜5 の整数なので、
+ * 正規化せずに添字にすると undefined になりラベルがプロンプトから消える。
+ * personalityKey 生成（generatePersonalityKey）と同じ四捨五入に揃えることで、
+ * 同じ personalityKey なら同一のプロンプト文字列になることも保証する。
+ *
+ * @param {number} score - Big5スコア（連続値可）
+ * @return {number} - 1〜5 の整数
+ */
+function toTraitLevel(score) {
+  const n = Math.round(Number(score));
+  if (!Number.isFinite(n)) return 3;
+  return Math.min(5, Math.max(1, n));
+}
+
+/**
  * Big5スコアを数値＋説明の詳細形式でフォーマット
  * @param {Object} scores - Big5 scores object
  * @return {string} - 例: "- 開放性(Openness): 3/5（新しさと安定のバランスを取る）"
  */
 function formatBig5WithTraits(scores) {
-  return `- 開放性(Openness): ${scores.openness}/5（${TRAIT_DESCRIPTIONS.openness[scores.openness]}）
-- 誠実性(Conscientiousness): ${scores.conscientiousness}/5（${TRAIT_DESCRIPTIONS.conscientiousness[scores.conscientiousness]}）
-- 外向性(Extraversion): ${scores.extraversion}/5（${TRAIT_DESCRIPTIONS.extraversion[scores.extraversion]}）
-- 協調性(Agreeableness): ${scores.agreeableness}/5（${TRAIT_DESCRIPTIONS.agreeableness[scores.agreeableness]}）
-- 神経症傾向(Neuroticism): ${scores.neuroticism}/5（${TRAIT_DESCRIPTIONS.neuroticism[scores.neuroticism]}）`;
+  const o = toTraitLevel(scores.openness);
+  const c = toTraitLevel(scores.conscientiousness);
+  const e = toTraitLevel(scores.extraversion);
+  const a = toTraitLevel(scores.agreeableness);
+  const n = toTraitLevel(scores.neuroticism);
+  return `- 開放性(Openness): ${o}/5（${TRAIT_DESCRIPTIONS.openness[o]}）
+- 誠実性(Conscientiousness): ${c}/5（${TRAIT_DESCRIPTIONS.conscientiousness[c]}）
+- 外向性(Extraversion): ${e}/5（${TRAIT_DESCRIPTIONS.extraversion[e]}）
+- 協調性(Agreeableness): ${a}/5（${TRAIT_DESCRIPTIONS.agreeableness[a]}）
+- 神経症傾向(Neuroticism): ${n}/5（${TRAIT_DESCRIPTIONS.neuroticism[n]}）`;
 }
 
 /**
@@ -91,7 +114,12 @@ function formatBig5WithTraits(scores) {
  * @return {string} - 例: "O3(バランス型)C4(計画的)E2(内向的)A5(共感型)N1(超安定)"
  */
 function formatBig5ShortWithTraits(scores) {
-  return `O${scores.openness}(${TRAIT_SHORT_LABELS.openness[scores.openness]})C${scores.conscientiousness}(${TRAIT_SHORT_LABELS.conscientiousness[scores.conscientiousness]})E${scores.extraversion}(${TRAIT_SHORT_LABELS.extraversion[scores.extraversion]})A${scores.agreeableness}(${TRAIT_SHORT_LABELS.agreeableness[scores.agreeableness]})N${scores.neuroticism}(${TRAIT_SHORT_LABELS.neuroticism[scores.neuroticism]})`;
+  const o = toTraitLevel(scores.openness);
+  const c = toTraitLevel(scores.conscientiousness);
+  const e = toTraitLevel(scores.extraversion);
+  const a = toTraitLevel(scores.agreeableness);
+  const n = toTraitLevel(scores.neuroticism);
+  return `O${o}(${TRAIT_SHORT_LABELS.openness[o]})C${c}(${TRAIT_SHORT_LABELS.conscientiousness[c]})E${e}(${TRAIT_SHORT_LABELS.extraversion[e]})A${a}(${TRAIT_SHORT_LABELS.agreeableness[a]})N${n}(${TRAIT_SHORT_LABELS.neuroticism[n]})`;
 }
 
 /**
