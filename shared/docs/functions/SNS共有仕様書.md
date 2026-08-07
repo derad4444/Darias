@@ -35,6 +35,37 @@ await Share.share(text, sharePositionOrigin: origin);
 **ソース**: `lib/presentation/screens/diary/diary_detail_screen.dart`  
 **ボタン**: AppBar右上のシェアアイコン（`Icons.share`）  
 **メソッド**: `_shareDiary()`  
+**共有タイプ**: テキストのみ（`Share.share`）
+
+**共有テキスト形式**:
+
+```
+{dateString}の日記
+
+【活動記録タイプの場合】
+今日やったこと:
+・{fact1}
+・{fact2}
+{aiComment}
+
+【フリーテキストタイプの場合】
+{content}
+
+---
+ひとこと: {userComment}  ← userComment がある場合のみ
+
+#DARIAS #日記
+```
+
+**ハッシュタグ**: `#DARIAS #日記`
+
+---
+
+### 2. 自分会議（MeetingScreen）
+
+**ソース**: `lib/presentation/screens/meeting/meeting_screen.dart`  
+**ボタン**: 会議結果画面のシェアボタン  
+**メソッド**: `_shareMeeting()`  
 **共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
 
 #### 画像生成の仕組み
@@ -73,37 +104,6 @@ await Share.share(text, sharePositionOrigin: origin);
   共有するかどうかはユーザー自身が決める行為であるため
 - 共有中は `_isSharing = true` → ボタンをスピナー＋「準備中...」にして無効化（多重タップ防止）
 - iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
-
-**共有テキスト形式**:
-
-```
-{dateString}の日記
-
-【活動記録タイプの場合】
-今日やったこと:
-・{fact1}
-・{fact2}
-{aiComment}
-
-【フリーテキストタイプの場合】
-{content}
-
----
-ひとこと: {userComment}  ← userComment がある場合のみ
-
-#DARIAS #日記
-```
-
-**ハッシュタグ**: `#DARIAS #日記`
-
----
-
-### 2. 自分会議（MeetingScreen）
-
-**ソース**: `lib/presentation/screens/meeting/meeting_screen.dart`  
-**ボタン**: 会議結果画面のシェアボタン  
-**メソッド**: `_shareMeeting()`  
-**共有タイプ**: テキストのみ（`Share.share`）
 
 **共有テキスト形式**:
 
