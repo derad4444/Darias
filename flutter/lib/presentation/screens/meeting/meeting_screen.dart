@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../data/models/six_person_meeting_model.dart';
 import '../../../data/datasources/remote/meeting_datasource.dart';
@@ -32,6 +36,9 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   final _topicController = TextEditingController();
   final _scrollController = ScrollController();
   final _shareButtonKey = GlobalKey();
+  // 画面外に置くシェアカードのキー（進化ダイアログ・ローグライク結果と同方式）
+  final _shareCardKey = GlobalKey();
+  bool _isSharing = false;
   late final FocusNode _topicFocusNode;
 
   // API レスポンス
@@ -139,11 +146,30 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: SafeArea(
-          child: _isLoading
-              ? _buildLoading()
-              : _meetingResponse != null
-                  ? _buildMeetingRoom(accentColor)
-                  : _buildTopicInput(accentColor),
+          child: Stack(
+            children: [
+              _isLoading
+                  ? _buildLoading()
+                  : _meetingResponse != null
+                      ? _buildMeetingRoom(accentColor)
+                      : _buildTopicInput(accentColor),
+
+              // 画面外に静的シェアカードを配置してキャプチャする
+              // （アニメーション中の画面をそのまま撮ると崩れるため、専用カードを別に描く）
+              if (_showConclusion && _meetingResponse != null)
+                Positioned(
+                  left: -9999,
+                  top: 0,
+                  child: RepaintBoundary(
+                    key: _shareCardKey,
+                    child: _MeetingShareCard(
+                      concern: _concern,
+                      conclusion: _meetingResponse!.conversation.conclusion,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -602,10 +628,21 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           key: _shareButtonKey,
           width: double.infinity,
           child: OutlinedButton.icon(
-            onPressed: _shareMeeting,
-            icon: const Icon(Icons.share, color: Colors.green),
-            label:
-                const Text('会議結果を共有', style: TextStyle(color: Colors.green)),
+            onPressed: _isSharing ? null : _shareMeeting,
+            icon: _isSharing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.green,
+                    ),
+                  )
+                : const Icon(Icons.share, color: Colors.green),
+            label: Text(
+              _isSharing ? '準備中...' : '会議結果を共有',
+              style: const TextStyle(color: Colors.green),
+            ),
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Colors.green),
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -877,17 +914,44 @@ $recommendations
 ''';
 
     final text = shareText.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSharing) return;
 
+    setState(() => _isSharing = true);
+
+    // シェアボタンの位置（iOS の popover origin。渡さないと iOS16+ で無言失敗する）
     final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
     final origin = box != null
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
 
     try {
-      await Share.share(text, sharePositionOrigin: origin);
+      final boundary =
+          _shareCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) throw Exception('share card not ready');
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) throw Exception('image encode failed');
+
+      final dir = await getTemporaryDirectory();
+      final file = await File('${dir.path}/darias_meeting.png')
+          .writeAsBytes(byteData.buffer.asUint8List());
+
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        text: text,
+        sharePositionOrigin: origin,
+      );
     } catch (e) {
-      debugPrint('Share failed: $e');
+      // 画像生成不可（web等）はテキストのみにフォールバック
+      debugPrint('Share card capture failed ($e), falling back to text share');
+      try {
+        await Share.share(text, sharePositionOrigin: origin);
+      } catch (e2) {
+        debugPrint('Share failed: $e2');
+      }
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
   }
 
@@ -1405,4 +1469,173 @@ class _BulletPoint extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 会議結果のシェアカード（画面外でキャプチャしてPNG化する）
+///
+/// 進化ダイアログ・ローグライク結果と同じパステル縦グラデで統一している。
+/// 結論サマリーは200〜300文字あるが、途中で切れているほうが体裁が悪いため省略しない。
+class _MeetingShareCard extends StatelessWidget {
+  final String concern;
+  final MeetingConclusion conclusion;
+
+  const _MeetingShareCard({required this.concern, required this.conclusion});
+
+  static const _members =
+      '今の自分・真逆の自分・理想の自分\n本音の自分・子供の頃の自分・未来の自分';
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        width: 360,
+        padding: const EdgeInsets.all(22),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFFFF1F6), Color(0xFFF1F7FF)],
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Center(
+              child: Text(
+                '自分会議 — 6人の私',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // 相談内容
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
+              ),
+              child: Text(
+                '💭 $concern',
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  height: 1.5,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF444444),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            _sectionLabel('💡 会議の結論'),
+            const SizedBox(height: 6),
+            _panel(
+              Text(
+                conclusion.summary,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  height: 1.65,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ),
+
+            if (conclusion.recommendations.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _sectionLabel('🎯 アドバイス'),
+              const SizedBox(height: 6),
+              _panel(
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < conclusion.recommendations.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(
+                          bottom:
+                              i == conclusion.recommendations.length - 1 ? 0 : 8,
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${i + 1}.',
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orange,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                conclusion.recommendations[i],
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  height: 1.55,
+                                  color: Color(0xFF333333),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 18),
+            const Center(
+              child: Text(
+                _members,
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, height: 1.5, color: Colors.grey),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Center(
+              child: Text(
+                'DARIAS',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                  color: Color(0xFF9E9E9E),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionLabel(String text) => Text(
+        text,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF555555),
+        ),
+      );
+
+  Widget _panel(Widget child) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.75),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: child,
+      );
 }
