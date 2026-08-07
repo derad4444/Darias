@@ -18,6 +18,8 @@ import '../../providers/friend_provider.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/share/meeting_share_card.dart';
+import '../../widgets/share/share_card_capture.dart';
 import '../diary/diary_detail_screen.dart';
 
 /// 履歴タブ
@@ -827,10 +829,35 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
   bool _isLoading = true;
   String? _errorMessage;
 
+  // 共有（実行直後の会議画面と同じカード・同じテキストを使う）
+  final _shareButtonKey = GlobalKey();
+  final _shareCardKey = GlobalKey();
+  bool _isSharing = false;
+
   @override
   void initState() {
     super.initState();
     _loadMeetingDetail();
+  }
+
+  Future<void> _shareMeeting() async {
+    final data = _meetingData;
+    if (data == null || _isSharing) return;
+
+    setState(() => _isSharing = true);
+    try {
+      await shareCardWithText(
+        cardKey: _shareCardKey,
+        buttonKey: _shareButtonKey,
+        fileName: 'darias_meeting.png',
+        text: buildMeetingShareText(
+          concern: widget.meeting.userConcern,
+          conclusion: data.conversation.conclusion,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
+    }
   }
 
   Future<void> _loadMeetingDetail() async {
@@ -866,7 +893,22 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
             gradient: widget.backgroundGradient,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: Column(
+          child: Stack(
+            children: [
+              // 画面外に静的シェアカードを配置してキャプチャする（会議画面と同方式）
+              if (_meetingData != null)
+                Positioned(
+                  left: -9999,
+                  top: 0,
+                  child: RepaintBoundary(
+                    key: _shareCardKey,
+                    child: MeetingShareCard(
+                      concern: widget.meeting.userConcern,
+                      conclusion: _meetingData!.conversation.conclusion,
+                    ),
+                  ),
+                ),
+              Column(
             children: [
               // ハンドル
               Container(
@@ -892,6 +934,21 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
                       ),
                     ),
                     const Spacer(),
+                    // 会議データを読み込めているときだけ共有できる
+                    if (_meetingData != null)
+                      IconButton(
+                        key: _shareButtonKey,
+                        icon: _isSharing
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.share),
+                        tooltip: '会議結果を共有',
+                        onPressed: _isSharing ? null : _shareMeeting,
+                      ),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
@@ -946,6 +1003,8 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
                     ),
                   ),
                 ),
+            ],
+          ),
             ],
           ),
         );

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../data/models/diary_model.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -8,6 +7,8 @@ import '../../providers/daily_mission_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
+import '../../widgets/share/diary_share_card.dart';
+import '../../widgets/share/share_card_capture.dart';
 
 /// 日記詳細をシートで表示するヘルパー
 void showDiaryDetailSheet({
@@ -49,6 +50,8 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   late final TextEditingController _commentController;
   bool _isSaving = false;
   final GlobalKey _shareButtonKey = GlobalKey();
+  final GlobalKey _shareCardKey = GlobalKey();
+  bool _isSharing = false;
 
   @override
   void initState() {
@@ -91,7 +94,18 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
             gradient: backgroundGradient,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          child: SafeArea(
+          child: Stack(
+            children: [
+              // 画面外に静的シェアカードを配置してキャプチャする（会議・冒険と同方式）
+              Positioned(
+                left: -9999,
+                top: 0,
+                child: RepaintBoundary(
+                  key: _shareCardKey,
+                  child: DiaryShareCard(diary: widget.diary),
+                ),
+              ),
+              SafeArea(
             minimum: const EdgeInsets.only(top: 24),
             child: Column(
             children: [
@@ -121,8 +135,14 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                     const Spacer(),
                     IconButton(
                       key: _shareButtonKey,
-                      icon: const Icon(Icons.share),
-                      onPressed: _shareDiary,
+                      icon: _isSharing
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.share),
+                      onPressed: _isSharing ? null : _shareDiary,
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -160,6 +180,8 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
               ),
             ],
           ),
+          ),
+            ],
           ),
         );
       },
@@ -519,46 +541,19 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
   }
 
   Future<void> _shareDiary() async {
-    final buffer = StringBuffer();
-    buffer.writeln('${widget.diary.dateString}の日記\n');
+    if (_isSharing) return;
 
-    if (widget.diary.isActivityType) {
-      final facts = widget.diary.facts ?? [];
-      if (facts.isNotEmpty) {
-        buffer.writeln('今日やったこと:');
-        for (final fact in facts) {
-          buffer.writeln('・$fact');
-        }
-        buffer.writeln();
-      }
-      if (widget.diary.aiComment?.isNotEmpty == true) {
-        buffer.writeln(widget.diary.aiComment);
-      }
-    } else {
-      buffer.writeln(widget.diary.content);
-    }
-
-    if (widget.diary.userComment.isNotEmpty) {
-      buffer.writeln('\n---\nひとこと: ${widget.diary.userComment}');
-    }
-
-    buffer.writeln('\n#DARIAS #日記');
-    final text = buffer.toString().trim();
-    if (text.isEmpty) return;
-
-    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
-    final origin = box != null
-        ? box.localToGlobal(Offset.zero) & box.size
-        : null;
-
+    setState(() => _isSharing = true);
     try {
-      await Share.share(
-        text,
+      await shareCardWithText(
+        cardKey: _shareCardKey,
+        buttonKey: _shareButtonKey,
+        fileName: 'darias_diary.png',
+        text: buildDiaryShareText(widget.diary),
         subject: '${widget.diary.dateString}の日記',
-        sharePositionOrigin: origin,
       );
-    } catch (e) {
-      debugPrint('Share failed: $e');
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
   }
 }

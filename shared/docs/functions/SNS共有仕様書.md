@@ -28,6 +28,22 @@ await Share.share(text, sharePositionOrigin: origin);
 
 ---
 
+## 共通実装（`presentation/widgets/share/`）
+
+シェアカードは複数画面から使うため、共通ウィジェットに切り出している。
+
+| ファイル | 役割 |
+|---------|------|
+| `share_card_scaffold.dart` | カードの共通枠（幅360・パステル縦グラデ `#FFF1F6`→`#F1F7FF`・DARIASフッター）。`ShareCardLabel` / `ShareCardPanel` / `kShareCardBodyStyle` も提供 |
+| `share_card_capture.dart` | `shareCardWithText()`。RepaintBoundary → PNG → 一時ファイル → `Share.shareXFiles`。失敗時はテキストのみにフォールバックし、iOS の `sharePositionOrigin` も処理する |
+| `meeting_share_card.dart` | `MeetingShareCard` と `buildMeetingShareText()`。会議画面と会議履歴の両方から使う |
+| `diary_share_card.dart` | `DiaryShareCard` と `buildDiaryShareText()` |
+
+> 進化ダイアログ（`home_screen.dart`）とローグライク結果（`roguelike_result_screen.dart`）は
+> 個別実装のまま。配色は揃えてあるので、変更が必要になったらこの共通部品へ寄せる。
+
+---
+
 ## 機能別仕様
 
 ### 1. 日記（DiaryDetailSheet）
@@ -35,7 +51,33 @@ await Share.share(text, sharePositionOrigin: origin);
 **ソース**: `lib/presentation/screens/diary/diary_detail_screen.dart`  
 **ボタン**: AppBar右上のシェアアイコン（`Icons.share`）  
 **メソッド**: `_shareDiary()`  
-**共有タイプ**: テキストのみ（`Share.share`）
+**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
+
+#### シェアカードデザイン（`DiaryShareCard`）
+
+```
+┌────────────────────────────┐
+│        DARIAS の日記         │
+│       2026年8月8日(金)        │
+│  📝 今日やったこと            │
+│  ┌──────────────────────┐  │
+│  │ ・{fact} …             │  │
+│  └──────────────────────┘  │
+│  ┌──────────────────────┐  │
+│  │ {aiComment 全文}       │  │
+│  └──────────────────────┘  │
+│  ✍️ ひとこと                 │  ← userComment がある場合のみ
+│  ┌──────────────────────┐  │
+│  │ {userComment}          │  │
+│  └──────────────────────┘  │
+│           DARIAS            │
+└────────────────────────────┘
+```
+
+- **アクティビティ型**は `facts` ＋ `aiComment`、**旧形式のフリーテキスト型**は `content` を1枚に出す
+- `aiComment`（250〜350文字）は読ませる文なので省略しない
+- 一時ファイル名は `darias_diary.png`
+- 共有中はシェアアイコンをスピナーに差し替えて無効化（多重タップ防止）
 
 **共有テキスト形式**:
 
@@ -77,7 +119,7 @@ await Share.share(text, sharePositionOrigin: origin);
 
 キャプチャ後は `getTemporaryDirectory()` に `darias_meeting.png` として保存し `XFile` として渡す。
 
-#### シェアカードデザイン（`_MeetingShareCard`・width 360）
+#### シェアカードデザイン（`MeetingShareCard`）
 
 ```
 ┌────────────────────────────┐
@@ -124,6 +166,15 @@ await Share.share(text, sharePositionOrigin: origin);
 ---
 #DARIAS #自分会議
 ```
+
+#### 会議履歴からの共有
+
+**ソース**: `lib/presentation/screens/history/unified_history_screen.dart`（`_MeetingDetailSheet`）
+**ボタン**: 会議詳細シートのヘッダー右上のシェアアイコン
+
+履歴からも同じ `MeetingShareCard` と `buildMeetingShareText()` を使うため、**実行直後と見た目・文面が完全に一致する**。
+相談内容は履歴側の `MeetingHistoryModel.userConcern` から取る。
+会議データの読み込みが終わるまで（`_meetingData == null`）はボタンを出さない。
 
 **ハッシュタグ**: `#DARIAS #自分会議`
 
@@ -282,8 +333,13 @@ Stack
 
 | ファイル | 共有機能 |
 |---------|---------|
+| `presentation/widgets/share/share_card_scaffold.dart` | カード共通枠 |
+| `presentation/widgets/share/share_card_capture.dart` | キャプチャ＋共有の共通処理 |
+| `presentation/widgets/share/meeting_share_card.dart` | 会議カード＋共有テキスト |
+| `presentation/widgets/share/diary_share_card.dart` | 日記カード＋共有テキスト |
 | `presentation/screens/diary/diary_detail_screen.dart` | 日記シェア（`_shareDiary`） |
 | `presentation/screens/meeting/meeting_screen.dart` | 自分会議シェア（`_shareMeeting`） |
+| `presentation/screens/history/unified_history_screen.dart` | 会議履歴からのシェア（`_MeetingDetailSheet._shareMeeting`） |
 | `presentation/screens/home/home_screen.dart` | 進化ダイアログシェア（`_captureAndShare`、`_buildShareCard`） |
 | `presentation/screens/friend/compatibility_category_screen.dart` | 相性診断シェア（`_share`） |
 | `features/roguelike/screens/roguelike_result_screen.dart` | ローグライク結果シェア（`_captureAndShare`、`_ShareCard`・画像+テキスト） |
