@@ -860,11 +860,11 @@ class _LifeAdviceCard extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        _line('🗺️', '冒険では', advice.inGame, const Color(0xFF7A6A55)),
+        _line('🗺️', '冒険での姿', advice.inGame, const Color(0xFF7A6A55)),
         const SizedBox(height: 4),
-        _line('🏠', '暮らしでは', advice.inLife, const Color(0xFF3F7FA8)),
+        _line('🏠', '日常での強み', advice.inLife, const Color(0xFF3F7FA8)),
         const SizedBox(height: 4),
-        _line('👣', 'やってみる', advice.tryNext, const Color(0xFFC2541E)),
+        _line('💡', 'アドバイス', advice.tryNext, const Color(0xFFC2541E)),
       ],
     );
   }
@@ -876,7 +876,8 @@ class _LifeAdviceCard extends StatelessWidget {
         Text(emoji, style: const TextStyle(fontSize: 12)),
         const SizedBox(width: 5),
         SizedBox(
-          width: 62,
+          // 「日常での強み」が6文字なので折り返さない幅を確保する
+          width: 74,
           child: Text(label,
               style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
         ),
