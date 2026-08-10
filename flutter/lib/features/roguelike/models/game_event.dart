@@ -64,6 +64,13 @@ class GameEvent {
   /// このイベントは相棒（仲間）がいない時だけ抽選される（加入イベント等）。
   final bool excludeWithCompanion;
 
+  /// **売買を繰り返せる店**として専用UIで表示する（行商人）。
+  ///
+  /// 通常のイベントは1回選ぶと結果表示 →「進む」で終了するが、
+  /// 店は「立ち去る」を選ぶまで買う・売る・鞄を開くを繰り返せる。
+  /// そのため `choices` は使わず、`MerchantShopView` が描画を担当する。
+  final bool isShop;
+
   const GameEvent({
     required this.id,
     required this.title,
@@ -71,6 +78,7 @@ class GameEvent {
     required this.choices,
     this.requiresCompanion = false,
     this.excludeWithCompanion = false,
+    this.isShop = false,
   });
 }
 
@@ -761,85 +769,13 @@ class GameEvents {
       ],
     ),
 
-    // 商人イベント
+    // 商人イベント（売買を繰り返せる店。描画は MerchantShopView が担当する）
     GameEvent(
       id: 'merchant_event',
       title: '行商人',
       description: '怪しげな行商人が荷車を引いている。「特別なものを売りますよ」と声をかけてきた。',
-      choices: [
-        EventChoice(
-          label: '回復薬を買う（金貨3）',
-          riskHint: '確定',
-          upfrontCost: {'money': -3},
-          selectTrait: ActionLog(planning: 2),
-          outcomes: [
-            Outcome(
-              tier: OutcomeTier.success, weight: 1,
-              resultText: '回復薬を手に入れた。いざとなればこれで乗り切れる。',
-              resourceChanges: {'items': 1},
-            ),
-          ],
-        ),
-        EventChoice(
-          label: '宝の地図を買う（金貨2）',
-          riskHint: '確定・宝箱が判明（成人）',
-          upfrontCost: {'money': -2},
-          minStage: GrowthStage.young,
-          selectTrait: ActionLog(logic: 2, curiosity: 1),
-          outcomes: [
-            Outcome(
-              tier: OutcomeTier.success, weight: 1,
-              resultText: '宝の在りかが記された地図を手に入れた。宝箱の場所が分かった。',
-              revealTreasure: true,
-            ),
-          ],
-        ),
-        // 値切り交渉（回復薬のみが対象で使い所が薄いため廃止・コメントで残置）
-        /*
-        EventChoice(
-          label: '値切り交渉する',
-          riskHint: '成功すれば安い／失敗で評判down（成人）',
-          minStage: GrowthStage.adult,
-          selectTrait: ActionLog(flexibility: 2, logic: 1),
-          outcomes: [
-            Outcome(
-              tier: OutcomeTier.success, weight: 60,
-              resultText: 'うまく値切って回復薬を安く手に入れた。',
-              resourceChanges: {'money': -1, 'items': 1},
-            ),
-            Outcome(
-              tier: OutcomeTier.failure, weight: 40,
-              resultText: 'しつこい交渉に商人は気を悪くした。結局言い値で買わされてしまった。',
-              resourceChanges: {'money': -3, 'items': 1},
-              traitDelta: ActionLog(caution: 1),
-            ),
-          ],
-        ),
-        */
-        EventChoice(
-          label: '鉄の剣を買う ⚔️攻撃+3（金貨5）',
-          riskHint: '与ダメが上がる／今より弱ければ買わない',
-          selectTrait: ActionLog(challenge: 1, planning: 1),
-          buyEquipId: 'iron_sword',
-        ),
-        EventChoice(
-          label: '鉄の鎧を買う 🛡️被ダメ-2（金貨5）',
-          riskHint: '被ダメが減る／今より弱ければ買わない',
-          selectTrait: ActionLog(caution: 1, planning: 1),
-          buyEquipId: 'iron_armor',
-        ),
-        EventChoice(
-          label: '何も買わない',
-          riskHint: 'リスクなし',
-          selectTrait: ActionLog(caution: 1),
-          outcomes: [
-            Outcome(
-              tier: OutcomeTier.success, weight: 1,
-              resultText: '今は不要と判断して立ち去った。',
-            ),
-          ],
-        ),
-      ],
+      isShop: true,
+      choices: [],
     ),
 
     // 別れ道（枝道マップ自体が分岐のため二重で違和感 → 廃止。コメントで残置）

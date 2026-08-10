@@ -524,6 +524,44 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
     );
   }
 
+  // ===== 行商人での売買（設計書 §3 §7.2） =====
+
+  /// 行商人から [id] を買う。金貨が足りない／鞄が満杯なら何も起きない
+  /// （買えるかどうかはUI側でも判定してボタンを無効化する）。
+  ///
+  /// 買った装備は**自動装備しない**。鞄に入れるだけで、装備は鞄画面で選ぶ。
+  void buyFromMerchant(String id) {
+    final s = state;
+    if (s == null) return;
+    final price = BagItem.priceOf(id);
+    if (s.money < price || s.bagIsFull) return;
+
+    state = s.copyWith(
+      money: s.money - price,
+      bag: s.bagAdded(id),
+      // 地図の購入は先を見通そうとする行動。
+      actionLog: id == kTreasureMapId
+          ? _mergeTrait(s.actionLog, const ActionLog(planning: 1, curiosity: 1))
+          : s.actionLog,
+    );
+  }
+
+  /// 鞄の [index] を行商人に売る。**売値は買値の半分（端数切り捨て）。**
+  ///
+  /// 買値 > 売値が全アイテムで成立するため、売買を繰り返して金貨を増やす
+  /// 抜け穴は生じない。
+  void sellToMerchant(int index) {
+    final s = state;
+    if (s == null || index < 0 || index >= s.bag.length) return;
+    final item = s.bag[index];
+    state = s.copyWith(
+      money: s.money + item.sellPrice,
+      bag: s.bagRemovedAt(index),
+      // 損得を計算して手放す判断。
+      actionLog: _mergeTrait(s.actionLog, const ActionLog(logic: 1, planning: 1)),
+    );
+  }
+
   // ===== 入手時の分岐（設計書 §4） =====
 
   /// 満杯時に鞄の [index] を捨てて、待機中のアイテムを受け取る。

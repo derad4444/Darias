@@ -18,6 +18,7 @@ import '../widgets/map_grid_widget.dart';
 import '../widgets/resource_bar_widget.dart';
 import '../widgets/bag_sheet.dart';
 import '../widgets/pickup_dialogs.dart';
+import '../widgets/merchant_shop_view.dart';
 import '../widgets/dungeon_theme.dart';
 import '../widgets/roguelike_banner.dart';
 import '../../../presentation/providers/character_provider.dart';
@@ -284,6 +285,9 @@ class _EventView extends StatelessWidget {
     if (lastChoice != null) {
       return _EventResultView(event: event, choice: lastChoice, outcome: state.lastOutcome, notice: state.eventNotice, ref: ref);
     }
+
+    // 店（行商人）は「立ち去る」まで続く専用UIで描画する。
+    if (event.isShop) return MerchantShopView(event: event);
 
     final choices = GameEvents.forStage(event.choices, state.growthStage)
         .where((c) => !c.requiresCompanion || state.hasCompanion)
