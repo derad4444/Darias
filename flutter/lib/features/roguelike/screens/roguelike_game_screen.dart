@@ -549,28 +549,38 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                       child: Text(
                         openGroup == null
                             ? 'どうする？　（行動を選んでください）'
-                            : '$openGroup　（どの型で挑む？）',
+                            : '$openGroup　（効果は同じ。挑み方を選ぶ）',
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                       ),
                     ),
-                    // 1段目にはグループを1枚のカードとして出す
+                    // 1段目はグループを1枚のカードとして出す。
+                    //
+                    // **グループ内の型は威力・成功率・自傷まで完全に同一**で、
+                    // 違うのは加算される特性だけ。つまりゲーム上の判断は1段目で
+                    // 完結する。そこで威力・成功率も1段目に出し、他の行動と
+                    // 同じ土俵で比較できるようにする（2段目は挑み方を選ぶだけ）。
                     if (openGroup == null)
                       for (final g in {for (final c in grouped) c.group!})
-                        _ChoiceCard(
-                          emoji: '✨',
-                          title: g,
-                          tag: null,
-                          cost: const {},
-                          extraAction: 0,
-                          description: '自傷あり・1回のみ。挑み方を選ぶ',
-                          successRate: 0,
-                          isGuaranteed: false,
-                          showRate: false,
-                          sealed: false,
-                          damageInfo: null,
-                          fleeNote: null,
-                          onTap: () => setState(() => _openGroup = g),
-                        ),
+                        Builder(builder: (_) {
+                          final rep = grouped.firstWhere((c) => c.group == g);
+                          final repOut = _repOutcome(rep);
+                          final (tagText, tagColor) = _battleTag(rep, repOut);
+                          return _ChoiceCard(
+                            emoji: '✨',
+                            title: g,
+                            tag: (tagText, tagColor),
+                            cost: rep.upfrontCost,
+                            extraAction: 0,
+                            description: rep.riskHint,
+                            successRate: rep.successRate,
+                            isGuaranteed: rep.isGuaranteed,
+                            showRate: true,
+                            sealed: false,
+                            damageInfo: _damageInfo(repOut, widget.state.weaponAtk, widget.state.armorDef),
+                            fleeNote: null,
+                            onTap: () => setState(() => _openGroup = g),
+                          );
+                        }),
                     ...choices.map((c) {
                       final sealed = state.sealedChoices.contains(c.label);
                       final rep = _repOutcome(c);
