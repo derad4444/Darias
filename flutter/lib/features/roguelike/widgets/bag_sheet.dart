@@ -84,6 +84,8 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
               const SizedBox(height: 10),
               _capacityHint(state),
               const SizedBox(height: 12),
+              _foodSection(state),
+              const SizedBox(height: 12),
               if (hasSelection)
                 _detail(context, state, _selected)
               else
@@ -188,6 +190,72 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
         fontSize: 12,
         fontWeight: FontWeight.bold,
         color: free > 0 ? Colors.white : const Color(0xFFFFD9D9),
+      ),
+    );
+  }
+
+  // ── 食料（スタック・枠を使わない別枠） ──────────────────
+  //
+  // 食料は個数で持つ消耗品で、イベントで自動的に減る（選んで使うものではない）。
+  // アイテム枠を奪うと鞄が食料で埋まってしまうため、**容量には数えない**別枠に置く。
+  Widget _foodSection(GameState state) {
+    final food = state.food;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: _kBagCard.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _kBagAccent.withValues(alpha: 0.3)),
+            ),
+            child: const Center(child: Text('🍞', style: TextStyle(fontSize: 24))),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    const Text('食料',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _kBagText)),
+                    const SizedBox(width: 8),
+                    Text('$food',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: food <= 1 ? Colors.red : _kBagText,
+                        )),
+                    const SizedBox(width: 2),
+                    const Text('個', style: TextStyle(fontSize: 11, color: _kBagText)),
+                  ],
+                ),
+                Text(
+                  food <= 0
+                      ? '食料が尽きている。足りない分は体力で払うことになる。'
+                      : '道中で自動的に消費される。カバンの枠は使わない。',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    color: food <= 0 ? const Color(0xFFC0554A) : _kBagText.withValues(alpha: 0.65),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const _Badge(text: 'まとめて所持', color: Color(0xFF7A6A55)),
+        ],
       ),
     );
   }

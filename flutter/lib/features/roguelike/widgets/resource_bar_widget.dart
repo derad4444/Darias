@@ -64,9 +64,9 @@ class ResourceBarWidget extends StatelessWidget {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    Expanded(child: _Pill(emoji: '🍞', label: '食料', value: '${state.food}')),
                     Expanded(child: _Pill(emoji: '💰', label: '金貨', value: '${state.money}')),
-                    // 回復薬は鞄の中身として管理するのでピルには出さない。
+                    // 食料・回復薬は鞄の中で管理するのでピルには出さない。
+                    // （食料はスタック扱いで、鞄の枠は使わない別枠に置く）
                     if (state.hasCompanion) Expanded(child: _Pill(emoji: '🤝', label: '絆', value: '${state.bond}')),
                     Expanded(
                       child: _Pill(
