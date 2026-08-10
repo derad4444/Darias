@@ -539,6 +539,8 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
     state = s.copyWith(
       money: s.money - price,
       bag: s.bagAdded(id),
+      // 装備は買っても自動装備しない。拾った時と同じく持ち替えるか選ばせる。
+      pendingEquipId: Equipments.byId(id) != null ? id : null,
       // 地図の購入は先を見通そうとする行動。
       actionLog: id == kTreasureMapId
           ? _mergeTrait(s.actionLog, const ActionLog(planning: 1, curiosity: 1))

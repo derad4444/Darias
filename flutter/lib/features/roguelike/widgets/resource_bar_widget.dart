@@ -78,19 +78,8 @@ class ResourceBarWidget extends StatelessWidget {
                     ),
                   ],
                 ),
-                // 装備中の武器・防具は装備時のみ3段目に表示（タップで鞄へ）。
-                if (state.weapon != null || state.armor != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (state.weapon != null)
-                        Expanded(child: _Pill(emoji: '⚔️', label: state.weapon!.name, value: '攻+${state.weaponAtk}', onTap: onOpenBag)),
-                      if (state.armor != null)
-                        Expanded(child: _Pill(emoji: '🛡️', label: state.armor!.name, value: '防-${state.armorDef}', onTap: onOpenBag)),
-                      if (state.weapon == null || state.armor == null) const Spacer(),
-                    ],
-                  ),
-                ],
+                // 装備中の武器・防具はヘッダーに出さない。
+                // 持ち物はカバンの中で一元的に確認する。
               ],
             ),
           ),
