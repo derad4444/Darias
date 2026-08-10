@@ -8,6 +8,7 @@ import 'dungeon.dart';
 import 'action_log.dart';
 import 'outcome.dart';
 import 'equipment.dart';
+import 'bag_item.dart';
 
 enum GrowthStage { baby, young, adult }
 
@@ -90,11 +91,15 @@ class GameState {
   final int maxHp;
   final int food;
   final int money;
-  final int itemCount;
   final int bond;
   final Companion? companion; // null＝相棒なし（絆は無効）
-  final Equipment? weapon; // 装備中の武器（null＝素手）。ランごとリセット。
-  final Equipment? armor;  // 装備中の防具（null＝防具なし）。ランごとリセット。
+
+  /// 鞄の中身。武器・防具・回復薬・宝の地図がすべて**1つ1枠**で入る。
+  /// 装備中の武器・防具も枠を消費する。ランごとリセット。
+  final List<BagItem> bag;
+
+  /// 鞄の容量。成長段階で決まる（赤ちゃん3 / 幼少4 / 大人5）。
+  final int bagCapacity;
   final List<List<MapCell>> map;
   final int playerLayer; // 現在いる層（0＝スタート層）
   final int playerIndex; // 現在いる層内のノード位置
@@ -129,11 +134,10 @@ class GameState {
     required this.maxHp,
     required this.food,
     required this.money,
-    required this.itemCount,
     required this.bond,
     this.companion,
-    this.weapon,
-    this.armor,
+    this.bag = const [],
+    required this.bagCapacity,
     required this.map,
     required this.playerLayer,
     required this.playerIndex,
@@ -168,11 +172,111 @@ class GameState {
   bool get isAtBoss => map[playerLayer][playerIndex].type == CellType.boss;
   bool get hasCompanion => companion != null;
 
+  // ===== 鞄からの導出 =====
+
+  BagItem? _equippedOf(EquipKind kind) {
+    for (final b in bag) {
+      if (b.equipped && b.equipment?.kind == kind) return b;
+    }
+    return null;
+  }
+
+  /// 装備中の武器（null＝素手）。
+  Equipment? get weapon => _equippedOf(EquipKind.weapon)?.equipment;
+
+  /// 装備中の防具（null＝防具なし）。
+  Equipment? get armor => _equippedOf(EquipKind.armor)?.equipment;
+
+  /// 所持している回復薬の数。
+  int get itemCount => bag.where((b) => b.isPotion).length;
+
+  /// 宝の地図を持っているか。
+  bool get hasTreasureMap => bag.any((b) => b.isTreasureMap);
+
+  /// 鞄の使用枠数。
+  int get bagUsed => bag.length;
+
+  /// 鞄の空き枠数。
+  int get bagFree => (bagCapacity - bag.length).clamp(0, bagCapacity);
+
+  bool get bagIsFull => bag.length >= bagCapacity;
+
   /// 武器による与ダメ加算（未装備＝0）。
   int get weaponAtk => weapon?.power ?? 0;
 
   /// 防具による被ダメ軽減（未装備＝0）。
   int get armorDef => armor?.power ?? 0;
+
+  /// [id] を1つ加えた鞄を返す。**空きが無ければ何も足さずに返す**
+  /// （満杯時に何を捨てるかはUI側で選ばせる）。
+  /// 装備は追加しただけでは装備されない（`bagEquipped` で明示的に装備する）。
+  List<BagItem> bagAdded(String id) {
+    if (bagIsFull) return bag;
+    return [...bag, BagItem(id)];
+  }
+
+  /// 鞄の [index] 番目を取り除いた鞄を返す。
+  List<BagItem> bagRemovedAt(int index) {
+    if (index < 0 || index >= bag.length) return bag;
+    return [...bag]..removeAt(index);
+  }
+
+  /// 回復薬の所持数を [target] に合わせた鞄を返す。
+  ///
+  /// 増やす場合は**空き枠の分しか入らない**（入りきらない分は失われる）。
+  /// イベント・戦闘報酬の `items` 増減をそのまま鞄に反映するために使う。
+  /// 満杯で入りきらなかったかは [potionOverflow] で判定できる。
+  List<BagItem> bagWithPotionCount(int target) {
+    final now = itemCount;
+    if (target == now) return bag;
+    if (target < now) {
+      var list = bag;
+      for (var i = 0; i < now - target; i++) {
+        final j = list.indexWhere((b) => b.isPotion);
+        if (j < 0) break;
+        list = [...list]..removeAt(j);
+      }
+      return list;
+    }
+    final canAdd = (target - now).clamp(0, bagFree);
+    return [...bag, for (var i = 0; i < canAdd; i++) const BagItem(kPotionId)];
+  }
+
+  /// 回復薬を [target] 個にしようとしたとき、鞄に入りきらない数。
+  int potionOverflow(int target) =>
+      target <= itemCount ? 0 : (target - itemCount - bagFree).clamp(0, 99);
+
+  /// 回復薬を1つ取り除いた鞄を返す（持っていなければそのまま）。
+  List<BagItem> bagPotionRemoved() {
+    final i = bag.indexWhere((b) => b.isPotion);
+    return i < 0 ? bag : bagRemovedAt(i);
+  }
+
+  /// 鞄の [index] 番目を装備した鞄を返す。
+  /// **同種（武器／防具）の他の装備は自動的に外れる**（スロットは種別ごとに1つ）。
+  List<BagItem> bagEquipped(int index) {
+    if (index < 0 || index >= bag.length) return bag;
+    final kind = bag[index].equipment?.kind;
+    if (kind == null) return bag;
+    return [
+      for (var i = 0; i < bag.length; i++)
+        if (i == index)
+          bag[i].copyWith(equipped: true)
+        else if (bag[i].equipment?.kind == kind)
+          bag[i].copyWith(equipped: false)
+        else
+          bag[i],
+    ];
+  }
+
+  /// 鞄の [index] 番目の装備を外した鞄を返す。
+  List<BagItem> bagUnequipped(int index) {
+    if (index < 0 || index >= bag.length) return bag;
+    return [
+      for (var i = 0; i < bag.length; i++)
+        i == index ? bag[i].copyWith(equipped: false) : bag[i],
+    ];
+  }
 
   /// 到達した深さ（通過した層数。スタート層を1と数える）。
   int get reachedDepth => playerLayer + 1;
@@ -191,12 +295,10 @@ class GameState {
     int? maxHp,
     int? food,
     int? money,
-    int? itemCount,
     int? bond,
     Companion? companion,
     bool clearCompanion = false,
-    Equipment? weapon,
-    Equipment? armor,
+    List<BagItem>? bag,
     List<List<MapCell>>? map,
     int? playerLayer,
     int? playerIndex,
@@ -233,11 +335,11 @@ class GameState {
       maxHp: newMaxHp,
       food: (food ?? this.food).clamp(0, 99),
       money: (money ?? this.money).clamp(0, 99),
-      itemCount: (itemCount ?? this.itemCount).clamp(0, 9),
       bond: (bond ?? this.bond).clamp(0, 10),
       companion: clearCompanion ? null : (companion ?? this.companion),
-      weapon: weapon ?? this.weapon,
-      armor: armor ?? this.armor,
+      // 鞄は容量を超えないよう切り詰める（溢れる操作はUI側で防ぐ前提の保険）
+      bag: (bag ?? this.bag).take(bagCapacity).toList(),
+      bagCapacity: bagCapacity,
       map: map ?? this.map,
       playerLayer: playerLayer ?? this.playerLayer,
       playerIndex: playerIndex ?? this.playerIndex,
@@ -281,19 +383,20 @@ class GameState {
     required String characterName,
     required Dungeon dungeon,
   }) {
-    // HP・食料・金貨・回復薬は成長段階で増える（大人ほど多く始められる）。
+    // HP・食料・金貨・回復薬・鞄の容量は成長段階で増える（大人ほど多く始められる）。
     // 絆は全段階0スタート。相棒（仲間）が加入して初めて意味を持つ。
-    final (hp, food, money, items) = switch (stage) {
-      GrowthStage.baby  => (20, 1, 1, 0),
-      GrowthStage.young => (30, 3, 3, 0),
-      GrowthStage.adult => (40, 5, 5, 1),
+    final (hp, food, money, items, capacity) = switch (stage) {
+      GrowthStage.baby  => (20, 1, 1, 0, 3),
+      GrowthStage.young => (30, 3, 3, 0, 4),
+      GrowthStage.adult => (40, 5, 5, 1, 5),
     };
     return GameState(
       hp: hp,
       maxHp: hp,
       food: food,
       money: money,
-      itemCount: items,
+      bag: [for (var i = 0; i < items; i++) const BagItem(kPotionId)],
+      bagCapacity: capacity,
       bond: 0,
       map: _generateMap(),
       playerLayer: 0,

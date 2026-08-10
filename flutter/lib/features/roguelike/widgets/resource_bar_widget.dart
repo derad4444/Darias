@@ -10,11 +10,15 @@ class ResourceBarWidget extends StatelessWidget {
   final String avatarPath;
   final VoidCallback onMenu;
 
+  /// 鞄ピルのタップで鞄画面を開く。
+  final VoidCallback onOpenBag;
+
   const ResourceBarWidget({
     super.key,
     required this.state,
     required this.avatarPath,
     required this.onMenu,
+    required this.onOpenBag,
   });
 
   @override
@@ -62,23 +66,30 @@ class ResourceBarWidget extends StatelessWidget {
                   children: [
                     Expanded(child: _Pill(emoji: '🍞', label: '食料', value: '${state.food}')),
                     Expanded(child: _Pill(emoji: '💰', label: '金貨', value: '${state.money}')),
-                    Expanded(child: _Pill(emoji: '🧪', label: '回復薬', value: '${state.itemCount}/9')),
+                    Expanded(child: _Pill(emoji: '🧪', label: '回復薬', value: '${state.itemCount}')),
                     if (state.hasCompanion) Expanded(child: _Pill(emoji: '🤝', label: '絆', value: '${state.bond}')),
                   ],
                 ),
-                // 装備（武器・防具）は装備時のみ3段目に表示。
-                if (state.weapon != null || state.armor != null) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      if (state.weapon != null)
-                        Expanded(child: _Pill(emoji: '⚔️', label: state.weapon!.name, value: '攻+${state.weaponAtk}')),
-                      if (state.armor != null)
-                        Expanded(child: _Pill(emoji: '🛡️', label: state.armor!.name, value: '防-${state.armorDef}')),
-                      if (state.weapon == null || state.armor == null) const Spacer(),
-                    ],
-                  ),
-                ],
+                const SizedBox(height: 4),
+                // 3段目: 鞄（タップで鞄画面）と装備中の武器・防具。
+                Row(
+                  children: [
+                    Expanded(
+                      child: _Pill(
+                        emoji: '🎒',
+                        label: '鞄',
+                        value: '${state.bagUsed}/${state.bagCapacity}',
+                        onTap: onOpenBag,
+                        highlight: state.bagIsFull,
+                      ),
+                    ),
+                    if (state.weapon != null)
+                      Expanded(child: _Pill(emoji: '⚔️', label: state.weapon!.name, value: '攻+${state.weaponAtk}', onTap: onOpenBag)),
+                    if (state.armor != null)
+                      Expanded(child: _Pill(emoji: '🛡️', label: state.armor!.name, value: '防-${state.armorDef}', onTap: onOpenBag)),
+                    if (state.weapon == null || state.armor == null) const Spacer(),
+                  ],
+                ),
               ],
             ),
           ),
@@ -148,15 +159,35 @@ class _Pill extends StatelessWidget {
   final String emoji;
   final String label;
   final String value;
-  const _Pill({required this.emoji, required this.label, required this.value});
+
+  /// タップで開くもの（鞄ピル・装備ピル）。null なら非タップ。
+  final VoidCallback? onTap;
+
+  /// 満杯など注意を引きたいとき。
+  final bool highlight;
+
+  const _Pill({
+    required this.emoji,
+    required this.label,
+    required this.value,
+    this.onTap,
+    this.highlight = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final isLow = (int.tryParse(value.split('/').first) ?? 99) <= 2;
-    return Container(
+    // 鞄は「3/5」でも残量が少ない訳ではないので、低下警告の対象から外す。
+    final isLow = onTap == null && (int.tryParse(value.split('/').first) ?? 99) <= 2;
+    final body = Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(color: const Color(0xFFF5F7FB), borderRadius: BorderRadius.circular(14)),
+      decoration: BoxDecoration(
+        color: highlight ? const Color(0xFFFFE9E9) : const Color(0xFFF5F7FB),
+        borderRadius: BorderRadius.circular(14),
+        border: onTap != null
+            ? Border.all(color: const Color(0xFF6E9BE6).withValues(alpha: 0.35))
+            : null,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -173,6 +204,12 @@ class _Pill extends StatelessWidget {
           Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: isLow ? Colors.red : null)),
         ],
       ),
+    );
+    if (onTap == null) return body;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: body,
     );
   }
 }

@@ -10,6 +10,7 @@ import '../models/dungeon.dart';
 import '../models/action_log.dart';
 import '../models/outcome.dart';
 import '../models/equipment.dart';
+import '../models/bag_item.dart';
 import '../models/element_affinity.dart';
 import '../data/roguelike_datasource.dart';
 
@@ -374,7 +375,7 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       maxHp: maxHp,
       food: food,
       money: money,
-      itemCount: items,
+      bag: s.bagWithPotionCount(items),
       bond: bond,
       companion: newCompanion,
       map: revealedMap,
@@ -427,35 +428,105 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
 
   /// 装備を「今より強ければ乗り換え」で適用する。戻り値は (適用後state, 結果メッセージ)。
   /// 弱い装備なら乗り換えず現状維持（＝ドロップは常に損しない）。
+  // ===== 鞄の操作（鞄画面から呼ぶ。探索中・戦闘中いつでも可） =====
+
+  /// 鞄の [index] 番目を装備する。同種の装備は自動的に外れる。
+  /// 装備の持ち替えは柔軟性、状況に応じた判断として記録する。
+  void equipFromBag(int index) {
+    final s = state;
+    if (s == null) return;
+    final item = s.bag[index].equipment;
+    if (item == null) return;
+    final before = item.kind == EquipKind.weapon ? s.weapon : s.armor;
+    // 何も装備していない所への装備は「持ち替え」ではないので特性を動かさない。
+    final isSwap = before != null && before.id != item.id;
+    state = s.copyWith(
+      bag: s.bagEquipped(index),
+      actionLog: isSwap
+          ? _mergeTrait(s.actionLog, const ActionLog(flexibility: 1, challenge: 1))
+          : s.actionLog,
+    );
+  }
+
+  /// 鞄の [index] 番目の装備を外す。
+  void unequipFromBag(int index) {
+    final s = state;
+    if (s == null) return;
+    state = s.copyWith(bag: s.bagUnequipped(index));
+  }
+
+  /// 鞄の [index] 番目を捨てる。**行商人がいなくても、いつでもできる。**
+  /// 捨てた対象で特性が分かれる（回復薬＝守りを手放す／装備＝攻めを手放す）。
+  void discardFromBag(int index) {
+    final s = state;
+    if (s == null || index < 0 || index >= s.bag.length) return;
+    final item = s.bag[index];
+    state = s.copyWith(
+      bag: s.bagRemovedAt(index),
+      actionLog: _mergeTrait(
+        s.actionLog,
+        item.isPotion
+            ? const ActionLog(challenge: 1)
+            : const ActionLog(caution: 1),
+      ),
+    );
+  }
+
+  /// 鞄の回復薬を1つ使ってHPを回復する。
+  void usePotionFromBag(int index) {
+    final s = state;
+    if (s == null || index < 0 || index >= s.bag.length) return;
+    if (!s.bag[index].isPotion) return;
+    state = s.copyWith(
+      hp: s.hp + kPotionHealAmount,
+      bag: s.bagRemovedAt(index),
+    );
+  }
+
+  /// 鞄の宝の地図を使って宝箱の位置を明かす。
+  void useTreasureMapFromBag(int index) {
+    final s = state;
+    if (s == null || index < 0 || index >= s.bag.length) return;
+    if (!s.bag[index].isTreasureMap) return;
+    final revealed = [
+      for (final row in s.map)
+        [
+          for (final c in row)
+            c.type == CellType.chest ? c.copyWith(isRevealed: true) : c,
+        ],
+    ];
+    state = s.copyWith(
+      bag: s.bagRemovedAt(index),
+      map: revealed,
+      actionLog: _mergeTrait(s.actionLog, const ActionLog(planning: 1)),
+    );
+  }
+
+  /// 装備を鞄に入れる。空きが無ければ入らない（満杯時の破棄選択はUI側で行う）。
+  /// 拾った装備は**自動では装備しない**（持ち替えるかはプレイヤーが選ぶ）。
   (GameState, String) _applyEquip(GameState s, Equipment item) {
-    final current = item.kind == EquipKind.weapon ? s.weapon : s.armor;
-    if (current == null || item.power > current.power) {
-      final ns = item.kind == EquipKind.weapon
-          ? s.copyWith(weapon: item)
-          : s.copyWith(armor: item);
-      return (ns, '${item.emoji}${item.name}を装備した！（${item.effectLabel}）');
+    if (s.bagIsFull) {
+      return (s, '${item.emoji}${item.name}を見つけたが、鞄がいっぱいで持てなかった。');
     }
-    return (s, '${item.emoji}${item.name}を手に入れたが、今の装備（${current.name}）の方が良さそうだ。');
+    return (
+      s.copyWith(bag: s.bagAdded(item.id)),
+      '${item.emoji}${item.name}を手に入れた！（${item.effectLabel}）',
+    );
   }
 
   /// 行商人での装備購入。今より強く、金貨が足りる時だけ購入・装備する。
   void _handleBuyEquip(GameState s, EventChoice choice) {
     final item = Equipments.byId(choice.buyEquipId!);
     if (item == null) return;
-    final current = item.kind == EquipKind.weapon ? s.weapon : s.armor;
-    final better = current == null || item.power > current.power;
-
     GameState ns = s;
     String msg;
-    if (!better) {
-      msg = 'すでに${current.emoji}${current.name}（${current.effectLabel}）を装備している。${item.name}は買わずにおいた。';
-    } else if (s.money < item.price) {
+    if (s.money < item.price) {
       msg = '金貨が足りない…${item.name}（金貨${item.price}）は買えなかった。';
+    } else if (s.bagIsFull) {
+      msg = '鞄がいっぱいで${item.name}を持てない。何かを手放す必要がある。';
     } else {
-      ns = item.kind == EquipKind.weapon
-          ? s.copyWith(money: s.money - item.price, weapon: item)
-          : s.copyWith(money: s.money - item.price, armor: item);
-      msg = '${item.emoji}${item.name}を購入！ 装備した（${item.effectLabel}）。';
+      ns = s.copyWith(money: s.money - item.price, bag: s.bagAdded(item.id));
+      msg = '${item.emoji}${item.name}を購入！ 鞄に入れた（${item.effectLabel}）。';
     }
 
     state = ns.copyWith(
@@ -532,7 +603,7 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       hp: hp,
       food: food,
       money: money,
-      itemCount: items,
+      bag: s.bagWithPotionCount(items),
       bond: bond,
       currentEnemy: updatedEnemy,
       battleMessages: messages,
@@ -589,7 +660,7 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
           hp: next.hp + (reward['hp'] ?? 0) + addMaxHp, // 最大HP増加分はその場で回復もする
           food: next.food + (reward['food'] ?? 0),
           money: next.money + (reward['money'] ?? 0),
-          itemCount: next.itemCount + (reward['items'] ?? 0),
+          bag: next.bagWithPotionCount(next.itemCount + (reward['items'] ?? 0)),
           battleMessages: msgs,
           battleHistory: desc.isNotEmpty ? (List<String>.from(hist)..add('報酬: $desc')) : hist,
           currentEnemy: updatedEnemy,
@@ -690,7 +761,7 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       food: food,
       money: money,
       bond: bond,
-      itemCount: items,
+      bag: s.bagWithPotionCount(items),
       battleMessages: msgs,
       battleTurns: turns,
       sealedChoices: sealed,

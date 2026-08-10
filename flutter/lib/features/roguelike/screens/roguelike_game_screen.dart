@@ -16,6 +16,7 @@ import '../models/element_affinity.dart';
 import '../providers/roguelike_provider.dart';
 import '../widgets/map_grid_widget.dart';
 import '../widgets/resource_bar_widget.dart';
+import '../widgets/bag_sheet.dart';
 import '../widgets/dungeon_theme.dart';
 import '../widgets/roguelike_banner.dart';
 import '../../../presentation/providers/character_provider.dart';
@@ -58,6 +59,7 @@ class RoguelikeGameScreen extends ConsumerWidget {
                 state: gameState,
                 avatarPath: avatarPath,
                 onMenu: () => _confirmQuit(context, ref),
+                onOpenBag: () => showBagSheet(context),
               ),
               Expanded(
                 child: switch (gameState.phase) {
