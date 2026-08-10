@@ -216,6 +216,13 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
                 _NotableActionsCard(actions: _topNotable(state.notableActions)),
               ],
 
+              // 冒険での振る舞いを日常に翻訳して返す。
+              // 「◯◯が光る冒険でした」だけだと読み流されてしまうため。
+              if (topTraits.isNotEmpty && topTraits.first.value > 0) ...[
+                const SizedBox(height: 14),
+                _LifeAdviceCard(topTraits: topTraits),
+              ],
+
               const SizedBox(height: 14),
               _MessageCard(text: _generateMessage(state, topTraits, inferredElement)),
 
@@ -329,8 +336,12 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
       GameResult.failed => '途中で力尽きましたが、その過程に多くのものが見えました。',
       null => '今回の冒険を振り返ります。',
     };
-    final traitText = t2 != null ? '$t1や$t2' : t1;
-    return '$phase\n$traitTextが光る冒険でした。';
+    // 「◯◯が光る冒険でした」で止めず、その特性が何をしていたかまで言う。
+    // 抽象的な特性名だけだと自分のことだと感じられないため。
+    final a1 = TraitAdvice.of(t1);
+    final detail = a1 != null ? '${a1.inGame}ね。' : '';
+    final traitText = t2 != null ? '$t1と$t2' : t1;
+    return '$phase\n$traitTextが光る冒険でした。$detail';
   }
 
   String _generateMessage(GameState state, List<MapEntry<String, int>> topTraits, String inferred) {
@@ -789,6 +800,95 @@ class _CodexRow extends StatelessWidget {
 }
 
 // ===== 印象的だった行動 =====
+/// 冒険での振る舞いを日常に翻訳して返すカード。
+///
+/// 上位2特性について「冒険では何をしていたか → それは日常のどこで効くか →
+/// 次に何を試すか」の3段で見せる。診断を読み物で終わらせず、
+/// **現実の行動に接続する**のがこの画面の狙い。
+class _LifeAdviceCard extends StatelessWidget {
+  final List<MapEntry<String, int>> topTraits;
+  const _LifeAdviceCard({required this.topTraits});
+
+  @override
+  Widget build(BuildContext context) {
+    // 上位2つまで。3つ出すと読む気が失せるため絞る。
+    final picks = topTraits
+        .where((e) => e.value > 0 && TraitAdvice.of(e.key) != null)
+        .take(2)
+        .toList();
+    if (picks.isEmpty) return const SizedBox.shrink();
+
+    return _Card(
+      color: const Color(0xFFFFF8EC),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _cardTitle('この力を、暮らしでも'),
+              const SizedBox(width: 6),
+              const Text('🌱', style: TextStyle(fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '冒険で見えたあなたの動き方は、そのまま日常でも使えます。',
+            style: TextStyle(fontSize: 11, color: Colors.grey),
+          ),
+          const SizedBox(height: 12),
+          for (var i = 0; i < picks.length; i++) ...[
+            if (i > 0) const SizedBox(height: 14),
+            _adviceBlock(picks[i].key),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _adviceBlock(String trait) {
+    final info = TraitInfo.of(trait);
+    final advice = TraitAdvice.of(trait)!;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(info.emoji, style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: 6),
+            Text(trait,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+          ],
+        ),
+        const SizedBox(height: 6),
+        _line('🗺️', '冒険では', advice.inGame, const Color(0xFF7A6A55)),
+        const SizedBox(height: 4),
+        _line('🏠', '暮らしでは', advice.inLife, const Color(0xFF3F7FA8)),
+        const SizedBox(height: 4),
+        _line('👣', 'やってみる', advice.tryNext, const Color(0xFFC2541E)),
+      ],
+    );
+  }
+
+  Widget _line(String emoji, String label, String text, Color color) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 12)),
+        const SizedBox(width: 5),
+        SizedBox(
+          width: 62,
+          child: Text(label,
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
+        ),
+        Expanded(
+          child: Text(text,
+              style: const TextStyle(fontSize: 12, height: 1.55, color: Color(0xFF333333))),
+        ),
+      ],
+    );
+  }
+}
+
 class _NotableActionsCard extends StatelessWidget {
   final List<NotableAction> actions;
   const _NotableActionsCard({required this.actions});
