@@ -177,36 +177,11 @@ class Dungeons {
             selectTrait: const ActionLog(logic: 1, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '悩みのパターンを冷静に観察した。次の一手が見えた。', damageToEnemy: 5, damageToPlayer: 2)],
           ),
-          BattleChoice(
-            label: '仲間に相談する',
-            riskHint: '絆を消費・特効（成人・相棒）',
-            upfrontCost: {'bond': -1},
-            minStage: GrowthStage.adult,
-            requiresCompanion: true,
-            selectTrait: const ActionLog(cooperation: 2, altruism: 1),
-            outcomes: [Outcome(tier: OutcomeTier.great, weight: 1, resultText: '仲間の視点で見つめ直すと、悩みは驚くほど小さくなった。', damageToEnemy: 13)],
-          ),
-          BattleChoice(
-            label: '交渉して距離を縮める',
-            riskHint: '当たれば特効（成人）',
-            minStage: GrowthStage.adult,
-            selectTrait: const ActionLog(flexibility: 1, cooperation: 2),
-            outcomes: [
-              Outcome(tier: OutcomeTier.great, weight: 65, resultText: '相手の立場を理解しようと歩み寄った。わだかまりが大きく解けた。', damageToEnemy: 15),
-              Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '歩み寄ろうとしたが、空回りした。少し気まずくなっただけだ。', damageToEnemy: 4, traitDelta: ActionLog(caution: 1)),
-            ],
-          ),
-          // 既存2つは協調寄りに偏っていたため、距離を置く型も用意して選択肢に幅を出す。
-          BattleChoice(
-            label: '割り切って距離を置く',
-            riskHint: '当たれば特効（成人）',
-            minStage: GrowthStage.adult,
-            selectTrait: const ActionLog(logic: 2, caution: 1),
-            outcomes: [
-              Outcome(tier: OutcomeTier.great, weight: 65, resultText: '合わない相手もいる。そう割り切ると、心の重さが消えた。', damageToEnemy: 15),
-              Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '距離を置こうとしたが、かえって気になってしまった。', damageToEnemy: 4, traitDelta: ActionLog(persistence: 1)),
-            ],
-          ),
+          // 特効3型。**威力は _special と完全に同じ**にして、どれを選ぶかだけが
+          // 性格のシグナルになるようにする。自傷・1回制限も他ボスと揃える。
+          _special('仲間に相談する', '仲間の視点で見つめ直すと、悩みは驚くほど小さくなった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
+          _special('交渉して距離を縮める', '相手の立場を理解しようと歩み寄った。わだかまりが大きく解けた。', trait: const ActionLog(flexibility: 3, cooperation: 1)),
+          _special('割り切って距離を置く', '合わない相手もいる。そう割り切ると、心の重さが消えた。', trait: const ActionLog(logic: 3, caution: 1)),
           Enemies.healChoice,
         ],
       ),
@@ -557,6 +532,9 @@ class Dungeons {
             selectTrait: const ActionLog(logic: 1, curiosity: 1),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '冷静に観察すると、守護者の動きにパターンを見つけた。', damageToEnemy: 7, damageToPlayer: 5)],
           ),
+          // 最終ボスの特効3型。相棒の有無で選べる型が偏らないよう、
+          // 相棒必須は1つだけにして残り2つは単独でも選べるようにする。
+          // 威力は最終ボス用に強め（dmg20・自傷6）で3型とも共通。
           BattleChoice(
             label: '仲間と力を合わせる',
             riskHint: '絆-2・自傷あり・1回のみ・最大火力（成人・相棒）',
@@ -564,13 +542,17 @@ class Dungeons {
             minStage: GrowthStage.adult,
             requiresCompanion: true,
             oncePerBattle: true,
-            selectTrait: const ActionLog(cooperation: 2, altruism: 2),
+            selectTrait: const ActionLog(cooperation: 3, altruism: 1),
             outcomes: [
               // 成功（60%）: 最大火力。失敗（40%）: かみ合わず小ダメージ（絆・自傷は消費）。
               Outcome(tier: OutcomeTier.great, weight: 60, resultText: '仲間と力を合わせ、守護者を追い詰めた。絆の力は強い。ただし無理を通した反動もある。', damageToEnemy: 20, damageToPlayer: 6),
               Outcome(tier: OutcomeTier.failure, weight: 40, resultText: '息を合わせようとしたが、かみ合わなかった。それでも一矢は報いた。', damageToEnemy: 6, damageToPlayer: 6),
             ],
           ),
+          _special('これまでの自分を信じる', 'ここまで越えてきた悩みの数を思い出した。もう同じ自分ではない。',
+              dmg: 20, dmgSelf: 6, trait: const ActionLog(persistence: 3, challenge: 1)),
+          _special('迷いごと受け入れる', '迷いを消そうとするのをやめた。抱えたまま進めばいいと気づいた。',
+              dmg: 20, dmgSelf: 6, trait: const ActionLog(flexibility: 3, intuition: 1)),
           Enemies.healChoice,
         ],
       ),
