@@ -825,7 +825,7 @@ class _LifeAdviceCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              _cardTitle('この力を、暮らしでも'),
+              _cardTitle('日常へのヒント'),
               const SizedBox(width: 6),
               const Text('🌱', style: TextStyle(fontSize: 15)),
             ],
