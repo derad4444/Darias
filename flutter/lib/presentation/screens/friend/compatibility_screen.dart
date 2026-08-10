@@ -97,9 +97,38 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     super.initState();
     _loadDocument();
     _markCompatibilityNotificationRead();
-    if (!kIsWeb) {
+    // プレミアムは広告を出さないので事前ロードもしない（無駄な広告リクエストを避ける）
+    if (!kIsWeb && !ref.read(effectiveIsPremiumProvider)) {
       _rewardedAdManager.loadAd();
     }
+  }
+
+  /// 診断の完了を待つ。無料ユーザーのみ動画広告を挟む。
+  ///
+  /// プレミアムは広告なしで診断結果をそのまま待つ。
+  /// 無料ユーザーは広告の再生と診断を並行させ、両方の完了を待つ
+  /// （広告を見ている間に診断が進むため体感待ち時間が短くなる）。
+  Future<CategoryDiagnosis?> _awaitDiagnosisWithAd(
+    Future<CategoryDiagnosis?> diagnosisFuture,
+  ) async {
+    if (ref.read(effectiveIsPremiumProvider)) {
+      return diagnosisFuture;
+    }
+
+    final adCompleter = Completer<void>();
+    _rewardedAdManager.onAdDismissed = () {
+      if (!adCompleter.isCompleted) adCompleter.complete();
+    };
+    final showed = await _rewardedAdManager.showAd();
+    if (!showed) adCompleter.complete();
+
+    CategoryDiagnosis? diagnosis;
+    await Future.wait([
+      adCompleter.future,
+      diagnosisFuture.then((r) => diagnosis = r),
+    ]);
+    _rewardedAdManager.loadAd();
+    return diagnosis;
   }
 
   Future<void> _markCompatibilityNotificationRead() async {
@@ -262,27 +291,12 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
       _errorMessage = null;
     });
 
-    CategoryDiagnosis? diagnosis;
-
-    final diagnosisFuture = ref
-        .read(friendControllerProvider.notifier)
-        .runCategoryDiagnosis(
-          friendId: widget.friend.id,
-          category: cat.key,
-        );
-
-    final adCompleter = Completer<void>();
-    _rewardedAdManager.onAdDismissed = () {
-      if (!adCompleter.isCompleted) adCompleter.complete();
-    };
-    final showed = await _rewardedAdManager.showAd();
-    if (!showed) adCompleter.complete();
-
-    await Future.wait([
-      adCompleter.future,
-      diagnosisFuture.then((r) => diagnosis = r),
-    ]);
-    _rewardedAdManager.loadAd();
+    final diagnosis = await _awaitDiagnosisWithAd(
+      ref.read(friendControllerProvider.notifier).runCategoryDiagnosis(
+            friendId: widget.friend.id,
+            category: cat.key,
+          ),
+    );
 
     if (!mounted) return;
     setState(() => _processingCategoryKey = null);
@@ -295,7 +309,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     // ローカルステートを即時更新（Firestoreのリロードを待たない）
     setState(() {
       _localUnlocked.add(cat.key);
-      _localCategories[cat.key] = diagnosis!;
+      _localCategories[cat.key] = diagnosis;
       // 再診断完了でstaleフラグをローカルでクリア（_loadDocumentで最終確定）
       _isStale = false;
     });
@@ -307,7 +321,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
         builder: (_) => CompatibilityCategoryScreen(
           friend: widget.friend,
           category: cat,
-          diagnosis: diagnosis!,
+          diagnosis: diagnosis,
           animateOnEntry: true,
         ),
       ),
@@ -337,25 +351,12 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
       _errorMessage = null;
     });
 
-    CategoryDiagnosis? diagnosis;
-
-    final diagnosisFuture = ref
-        .read(friendControllerProvider.notifier)
-        .runCategoryDiagnosis(
-          friendId: widget.friend.id,
-          category: cat.key,
-        );
-    final adCompleter = Completer<void>();
-    _rewardedAdManager.onAdDismissed = () {
-      if (!adCompleter.isCompleted) adCompleter.complete();
-    };
-    final showed = await _rewardedAdManager.showAd();
-    if (!showed) adCompleter.complete();
-    await Future.wait([
-      adCompleter.future,
-      diagnosisFuture.then((r) => diagnosis = r),
-    ]);
-    _rewardedAdManager.loadAd();
+    final diagnosis = await _awaitDiagnosisWithAd(
+      ref.read(friendControllerProvider.notifier).runCategoryDiagnosis(
+            friendId: widget.friend.id,
+            category: cat.key,
+          ),
+    );
 
     if (!mounted) return;
     setState(() => _processingCategoryKey = null);
@@ -366,7 +367,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
     }
 
     setState(() {
-      _localCategories[cat.key] = diagnosis!;
+      _localCategories[cat.key] = diagnosis;
       _localUnlocked.add(cat.key);
       _isStale = false;
     });
@@ -378,7 +379,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
         builder: (_) => CompatibilityCategoryScreen(
           friend: widget.friend,
           category: cat,
-          diagnosis: diagnosis!,
+          diagnosis: diagnosis,
           animateOnEntry: true,
         ),
       ),
