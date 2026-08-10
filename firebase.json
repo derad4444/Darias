@@ -17,6 +17,15 @@
       ]
     },
     {
+      "site": "dariasapp",
+      "public": "dl",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ]
+    },
+    {
       "site": "darias-app",
       "public": "flutter/build/web",
       "ignore": [

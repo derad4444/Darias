@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/constants/app_links.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -2078,7 +2079,8 @@ class _TypeEvolutionDialogState extends ConsumerState<_TypeEvolutionDialog>
   Future<void> _captureAndShare() async {
     if (_isSharing) return;
     setState(() => _isSharing = true);
-    final shareText = 'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #性格診断';
+    final shareText =
+        'DARIASで「${widget.newTypeName}」になりました！ #DARIAS #性格診断\n${AppLinks.share}';
     try {
       final boundary = _offscreenCardKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
       if (boundary == null) throw Exception('boundary not found');

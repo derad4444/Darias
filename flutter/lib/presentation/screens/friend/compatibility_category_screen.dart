@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../../core/constants/app_links.dart';
 import '../../../data/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -78,6 +79,7 @@ class _CompatibilityCategoryScreenState
       buffer.writeln('\n💡 ${d.advice}');
     }
     buffer.writeln('\n#DARIAS #相性診断');
+    buffer.writeln(AppLinks.share);
 
     final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
     final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;

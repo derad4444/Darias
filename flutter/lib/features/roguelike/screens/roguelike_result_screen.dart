@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/constants/app_links.dart';
 import '../models/game_state.dart';
 import '../models/dungeon.dart';
 import '../models/game_event.dart';
@@ -260,7 +261,7 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
     final topText = topTraits.isNotEmpty && topTraits.first.value > 0 ? topTraits.first.key : '';
     final text = 'DARIAS 心の迷宮 — $verb\n称号「$title」'
         '${topText.isNotEmpty ? '／際立った傾向: $topText' : ''}'
-        '${inferred != '無' ? '／元素:$inferred' : ''}\n#DARIAS #心の迷宮';
+        '${inferred != '無' ? '／元素:$inferred' : ''}\n#DARIAS #心の迷宮\n${AppLinks.share}';
 
     // シェアボタンの位置（iOS の popover origin。渡さないと iOS16+ で無言失敗する）
     final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;

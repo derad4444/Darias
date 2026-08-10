@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../../core/constants/app_links.dart';
 import '../data/roguelike_datasource.dart';
 import '../models/action_log.dart';
 import '../models/dungeon.dart';
@@ -286,7 +287,7 @@ class _AdventurePersonalityTabState extends ConsumerState<AdventurePersonalityTa
     if (_sharing) return;
     setState(() => _sharing = true);
     final text = 'DARIAS 心の迷宮 — 全踏破！ 私の冒険の性格診断\n'
-        '「${diagnosis.summary}」\n#DARIAS #心の迷宮';
+        '「${diagnosis.summary}」\n#DARIAS #心の迷宮\n${AppLinks.share}';
     final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
     final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
     try {

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DARIAS をダウンロード</title>
+
+    <!-- LPと重複するページなので検索結果には出さない -->
+    <meta name="robots" content="noindex, follow" />
+    <link rel="canonical" href="https://my-character-app.web.app/" />
+    <link rel="icon" href="https://my-character-app.web.app/favicon.ico" />
+
+    <!-- SNSでリンクを共有したときのカード表示（画像はLP側のものを参照） -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://dariasapp.web.app/" />
+    <meta property="og:title" content="DARIAS〜もう1人の自分と向き合う、思考整理AI〜" />
+    <meta property="og:description" content="考えすぎて動けない人のための&quot;もう1人の自分&quot;と対話するアプリ。思考を整理し、言葉にして返してくれる思考整理特化型AIアプリです。" />
+    <meta property="og:image" content="https://my-character-app.web.app/images/logo.png" />
+    <meta property="og:site_name" content="DARIAS" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DARIAS〜もう1人の自分と向き合う、思考整理AI〜" />
+    <meta name="twitter:description" content="考えすぎて動けない人のための&quot;もう1人の自分&quot;と対話するアプリ。思考を整理し、言葉にして返してくれる思考整理特化型AIアプリです。" />
+    <meta name="twitter:image" content="https://my-character-app.web.app/images/logo.png" />
+
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: linear-gradient(180deg, #fff1f6 0%, #f1f7ff 100%);
+        color: #333;
+        font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        text-align: center;
+      }
+      .logo { width: 88px; height: 88px; border-radius: 20px; }
+      .msg { font-size: 15px; color: #666; }
+      .links { display: flex; flex-direction: column; gap: 12px; }
+      .links a {
+        display: inline-block;
+        padding: 12px 28px;
+        border-radius: 999px;
+        background: #6b7fd7;
+        color: #fff;
+        font-weight: 700;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <img class="logo" src="https://my-character-app.web.app/images/logo.png" alt="DARIAS" />
+    <p class="msg">ストアへ移動しています...</p>
+
+    <!-- JSが無効／リダイレクトが失敗した場合の手動導線 -->
+    <div class="links">
+      <a href="https://apps.apple.com/app/id6753144594">App Store で見る</a>
+      <a href="https://my-character-app.web.app/">DARIAS について</a>
+    </div>
+
+    <script>
+      (function () {
+        var APP_STORE = 'https://apps.apple.com/app/id6753144594';
+        var PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.darias.darias';
+        var LP = 'https://my-character-app.web.app/';
+
+        // Android版はPlay未公開のため当面LPへ送る。
+        // Playリリース後にこのフラグを true にすれば PLAY_STORE へ切り替わる。
+        var ANDROID_RELEASED = false;
+
+        var ua = navigator.userAgent || '';
+        // iPadOS 13+ はUAがMacintoshになるため、タッチ有無で判別する
+        var isIOS =
+          /iPhone|iPad|iPod/.test(ua) ||
+          (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+        var isAndroid = /Android/.test(ua);
+
+        var dest = LP;
+        if (isIOS) {
+          dest = APP_STORE;
+        } else if (isAndroid) {
+          dest = ANDROID_RELEASED ? PLAY_STORE : LP;
+        }
+
+        // 戻るボタンでこのページに戻ってループしないよう replace を使う
+        location.replace(dest);
+      })();
+    </script>
+  </body>
+</html>

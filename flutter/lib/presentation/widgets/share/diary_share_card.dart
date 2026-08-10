@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_links.dart';
 import '../../../data/models/diary_model.dart';
 import 'share_card_scaffold.dart';
 
@@ -99,5 +100,6 @@ String buildDiaryShareText(DiaryModel diary) {
   }
 
   buffer.writeln('\n#DARIAS #日記');
+  buffer.writeln(AppLinks.share);
   return buffer.toString().trim();
 }

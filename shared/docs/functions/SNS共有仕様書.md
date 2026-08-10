@@ -1,6 +1,6 @@
 # DARIAS SNS共有仕様書
 
-**最終更新日**: 2026-08-08
+**最終更新日**: 2026-08-10
 
 ---
 
@@ -8,6 +8,32 @@
 
 DARIAS では以下の画面でコンテンツをOSネイティブのシェアシートへ渡すSNS共有機能を提供する。  
 共有には `share_plus` パッケージ（v10.1.4）を使用する。
+
+### 共有URL（配布リンク）
+
+全ての共有テキストの末尾に、ハッシュタグの次行として配布URLを1行入れる。
+
+```
+https://dariasapp.web.app
+```
+
+**定数**: `lib/core/constants/app_links.dart` の `AppLinks.share`。  
+6箇所の共有テキストから参照するため、URL変更時はこの1箇所のみ修正する。
+
+**リダイレクトページ**: リポジトリ直下の `dl/`（Firebase Hosting サイト `dariasapp`）。  
+ストアURLをそのまま載せるとiOS/Androidで出し分けが必要になるため、UA判定で振り分ける静的HTMLを1枚挟む。
+
+| 端末 | 遷移先 |
+|------|--------|
+| iOS（iPhone / iPad） | `https://apps.apple.com/app/id6753144594` |
+| Android | LP（Play未公開のため。`dl/index.html` の `ANDROID_RELEASED` を `true` にすればPlayへ切り替わる） |
+| PC・その他 | LP（`https://my-character-app.web.app/`） |
+
+- 判定は静的配信のためクライアントJSで行う。`location.replace()` を使い、戻るボタンでループしないようにする
+- iPadOS 13+ はUAが `Macintosh` になるため `navigator.maxTouchPoints` を併用して判定する
+- JS無効時のフォールバックとして App Store と LP への手動リンクを表示する
+- SNSでのリンクカード表示用にOGPを設定する（画像はLP側の `images/logo.png` を参照）
+- LPとの重複ページのため `noindex` と `robots.txt` の `Disallow: /` を設定する
 
 ### iOS実機対応の共通実装ルール
 
@@ -39,8 +65,9 @@ await Share.share(text, sharePositionOrigin: origin);
 | `meeting_share_card.dart` | `MeetingShareCard` と `buildMeetingShareText()`。会議画面と会議履歴の両方から使う |
 | `diary_share_card.dart` | `DiaryShareCard` と `buildDiaryShareText()` |
 
-> 進化ダイアログ（`home_screen.dart`）とローグライク結果（`roguelike_result_screen.dart`）は
-> 個別実装のまま。配色は揃えてあるので、変更が必要になったらこの共通部品へ寄せる。
+> 進化ダイアログ（`home_screen.dart`）、ローグライク結果（`roguelike_result_screen.dart`）、
+> 冒険の性格診断（`adventure_personality_tab.dart`）は個別実装のまま。
+> 配色は揃えてあるので、変更が必要になったらこの共通部品へ寄せる。
 
 ---
 
@@ -97,6 +124,7 @@ await Share.share(text, sharePositionOrigin: origin);
 ひとこと: {userComment}  ← userComment がある場合のみ
 
 #DARIAS #日記
+https://dariasapp.web.app
 ```
 
 **ハッシュタグ**: `#DARIAS #日記`
@@ -165,6 +193,7 @@ await Share.share(text, sharePositionOrigin: origin);
 
 ---
 #DARIAS #自分会議
+https://dariasapp.web.app
 ```
 
 #### 会議履歴からの共有
@@ -236,7 +265,7 @@ RepaintBoundary (key: _offscreenCardKey)
 - 共有中は `_isSharing = true` → スピナー表示 + ボタン無効化（多重タップ防止）
 - 完了後 `_isSharing = false`
 
-**共有テキスト**: `DARIASで「{typeName}」になりました！ #DARIAS #性格診断`  
+**共有テキスト**: `DARIASで「{typeName}」になりました！ #DARIAS #性格診断\nhttps://dariasapp.web.app`  
 **ハッシュタグ**: `#DARIAS #性格診断`
 
 ---
@@ -260,6 +289,7 @@ RepaintBoundary (key: _offscreenCardKey)
 💡 {advice}  ← advice がある場合のみ
 
 #DARIAS #相性診断
+https://dariasapp.web.app
 ```
 
 **カテゴリ別アイコン・ラベル**:
@@ -312,7 +342,48 @@ Stack
 - 共有中は `_isSharing = true` → スピナー表示＋ボタン無効化（多重タップ防止）
 - iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
 
-**共有テキスト**: `DARIAS 心の迷宮 — 「{worry}」を克服しました！\n称号「{title}」／際立った傾向: {topTrait}／元素:{element}\n#DARIAS #心の迷宮`
+**共有テキスト**: `DARIAS 心の迷宮 — 「{worry}」を克服しました！\n称号「{title}」／際立った傾向: {topTrait}／元素:{element}\n#DARIAS #心の迷宮\nhttps://dariasapp.web.app`
+**ハッシュタグ**: `#DARIAS #心の迷宮`
+
+---
+
+### 6. 冒険の性格診断タブ（AdventurePersonalityTab）
+
+**ソース**: `lib/features/roguelike/screens/adventure_personality_tab.dart`
+**ボタン**: 診断カード下の「シェア」ボタン（`Icons.ios_share`、`_shareButtonKey` 付き）
+**メソッド**: `_share(diagnosis)`
+**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
+
+全ダンジョン踏破後に出る総合診断（`RoguelikeDiagnosis`）を共有する。ローグライク結果画面（5番）が
+1回の冒険の結果を出すのに対し、こちらは**全踏破時の総合診断**である点が異なる。
+
+#### 画像生成の仕組み
+
+タブルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを
+`RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（他画面と同方式）。
+カードは `diagnosis != null` のときのみツリーへ追加する。
+
+キャプチャ後は `getTemporaryDirectory()` に `darias_diagnosis.png` として保存し `XFile` として渡す。
+
+#### シェアカードデザイン（`_ShareCard`・width 360）
+
+```
+┌──────────────────────────────┐
+│    心の迷宮 — 全踏破 総合診断     │
+│        🔥 炎タイプ              │  ← 元素絵文字＋タイプ名（無=「型なし」）
+│    挑戦性 ・ 利他性 ・ 好奇心      │  ← 上位3傾向（値>0のみ）
+│  ┌────────────────────────┐  │
+│  │ {diagnosis.summary 全文} │  │
+│  └────────────────────────┘  │
+│            DARIAS             │
+└──────────────────────────────┘
+背景: パステル縦グラデ(#FFF1F6→#F1F7FF)
+```
+
+- 共有中は `_sharing = true` → ボタンをスピナーにして無効化（多重タップ防止）
+- iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
+
+**共有テキスト**: `DARIAS 心の迷宮 — 全踏破！ 私の冒険の性格診断\n「{summary}」\n#DARIAS #心の迷宮\nhttps://dariasapp.web.app`
 **ハッシュタグ**: `#DARIAS #心の迷宮`
 
 ---
@@ -326,6 +397,7 @@ Stack
 | 性格診断（進化ダイアログ） | `#DARIAS #性格診断` |
 | 相性診断 | `#DARIAS #相性診断` |
 | ローグライク（心の迷宮） | `#DARIAS #心の迷宮` |
+| 冒険の性格診断（全踏破） | `#DARIAS #心の迷宮` |
 
 ---
 
@@ -333,6 +405,8 @@ Stack
 
 | ファイル | 共有機能 |
 |---------|---------|
+| `core/constants/app_links.dart` | 共有URL定数（`AppLinks.share`） |
+| `dl/index.html`（リポジトリ直下） | 端末判定リダイレクトページ（Hostingサイト `dariasapp`） |
 | `presentation/widgets/share/share_card_scaffold.dart` | カード共通枠 |
 | `presentation/widgets/share/share_card_capture.dart` | キャプチャ＋共有の共通処理 |
 | `presentation/widgets/share/meeting_share_card.dart` | 会議カード＋共有テキスト |
@@ -343,3 +417,4 @@ Stack
 | `presentation/screens/home/home_screen.dart` | 進化ダイアログシェア（`_captureAndShare`、`_buildShareCard`） |
 | `presentation/screens/friend/compatibility_category_screen.dart` | 相性診断シェア（`_share`） |
 | `features/roguelike/screens/roguelike_result_screen.dart` | ローグライク結果シェア（`_captureAndShare`、`_ShareCard`・画像+テキスト） |
+| `features/roguelike/screens/adventure_personality_tab.dart` | 冒険の性格診断シェア（`_share`、`_ShareCard`・画像+テキスト） |

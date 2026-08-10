@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_links.dart';
 import '../../../data/models/six_person_meeting_model.dart';
 import 'share_card_scaffold.dart';
 
@@ -126,6 +127,7 @@ $recommendations
 
 ---
 #DARIAS #自分会議
+${AppLinks.share}
 '''
       .trim();
 }
