@@ -216,12 +216,6 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
                 _NotableActionsCard(actions: _topNotable(state.notableActions)),
               ],
 
-              // 冒険での振る舞いを日常に翻訳して返す。
-              // 「◯◯が光る冒険でした」だけだと読み流されてしまうため。
-              if (topTraits.isNotEmpty && topTraits.first.value > 0) ...[
-                const SizedBox(height: 14),
-                _LifeAdviceCard(topTraits: topTraits),
-              ],
 
               const SizedBox(height: 14),
               _MessageCard(text: _generateMessage(state, topTraits, inferredElement)),
@@ -344,17 +338,27 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
     return '$phase\n$traitTextが光る冒険でした。$detail';
   }
 
+  /// ひとことメッセージ。**最も高い特性1つ**について、
+  /// 「冒険で何をしていたか → それは日常のどこで効くか → 次に何を試すか」を
+  /// 一続きの文章で伝える。
+  ///
+  /// 箇条書きにすると読み飛ばされ、特性名だけだと他人事になる。
+  /// 冒険での具体的な振る舞いから入り、現実の行動提案まで運ぶのが狙い。
   String _generateMessage(GameState state, List<MapEntry<String, int>> topTraits, String inferred) {
     final name = state.characterName;
     if (topTraits.isEmpty || topTraits.first.value == 0) {
       return '$nameの新たな一面は、次の冒険でもっと見えてくるかもしれません。';
     }
     final t1 = topTraits[0].key;
-    final hint = state.hasCompanion
-        ? '次の冒険では、仲間との絆をもっと深めてみると、さらに大きな力が引き出されるかもしれません。'
-        : '次の冒険では、誰かと手を取り合うと、また違う一面が見えるかもしれません。';
-    final elem = inferred != '無' ? '$inferredのような' : '';
-    return 'あなたは$t1を備えた$elem冒険者です。\n$hint';
+    final advice = TraitAdvice.of(t1);
+    if (advice == null) {
+      final elem = inferred != '無' ? '$inferredのような' : '';
+      return 'あなたは$t1を備えた$elem冒険者です。';
+    }
+    return '今回の冒険で、あなたは${advice.inGame}。'
+        'そこに出ていたのが$t1です。\n\n'
+        'これは冒険の中だけの話ではありません。${advice.inLife}。\n\n'
+        '${advice.tryNext}。';
   }
 }
 
@@ -800,96 +804,6 @@ class _CodexRow extends StatelessWidget {
 }
 
 // ===== 印象的だった行動 =====
-/// 冒険での振る舞いを日常に翻訳して返すカード。
-///
-/// 上位2特性について「冒険では何をしていたか → それは日常のどこで効くか →
-/// 次に何を試すか」の3段で見せる。診断を読み物で終わらせず、
-/// **現実の行動に接続する**のがこの画面の狙い。
-class _LifeAdviceCard extends StatelessWidget {
-  final List<MapEntry<String, int>> topTraits;
-  const _LifeAdviceCard({required this.topTraits});
-
-  @override
-  Widget build(BuildContext context) {
-    // 上位2つまで。3つ出すと読む気が失せるため絞る。
-    final picks = topTraits
-        .where((e) => e.value > 0 && TraitAdvice.of(e.key) != null)
-        .take(2)
-        .toList();
-    if (picks.isEmpty) return const SizedBox.shrink();
-
-    return _Card(
-      color: const Color(0xFFFFF8EC),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _cardTitle('日常へのヒント'),
-              const SizedBox(width: 6),
-              const Text('🌱', style: TextStyle(fontSize: 15)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            '冒険で見えたあなたの動き方は、そのまま日常でも使えます。',
-            style: TextStyle(fontSize: 11, color: Colors.grey),
-          ),
-          const SizedBox(height: 12),
-          for (var i = 0; i < picks.length; i++) ...[
-            if (i > 0) const SizedBox(height: 14),
-            _adviceBlock(picks[i].key),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _adviceBlock(String trait) {
-    final info = TraitInfo.of(trait);
-    final advice = TraitAdvice.of(trait)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(info.emoji, style: const TextStyle(fontSize: 16)),
-            const SizedBox(width: 6),
-            Text(trait,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-          ],
-        ),
-        const SizedBox(height: 6),
-        _line('🗺️', '冒険での姿', advice.inGame, const Color(0xFF7A6A55)),
-        const SizedBox(height: 4),
-        _line('🏠', '日常での強み', advice.inLife, const Color(0xFF3F7FA8)),
-        const SizedBox(height: 4),
-        _line('💡', 'アドバイス', advice.tryNext, const Color(0xFFC2541E)),
-      ],
-    );
-  }
-
-  Widget _line(String emoji, String label, String text, Color color) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 12)),
-        const SizedBox(width: 5),
-        SizedBox(
-          // 「日常での強み」が6文字なので折り返さない幅を確保する
-          width: 74,
-          child: Text(label,
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
-        ),
-        Expanded(
-          child: Text(text,
-              style: const TextStyle(fontSize: 12, height: 1.55, color: Color(0xFF333333))),
-        ),
-      ],
-    );
-  }
-}
-
 class _NotableActionsCard extends StatelessWidget {
   final List<NotableAction> actions;
   const _NotableActionsCard({required this.actions});
