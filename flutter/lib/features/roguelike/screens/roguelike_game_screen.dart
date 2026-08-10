@@ -461,18 +461,32 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
         .where((c) => !c.requiresCompanion || state.hasCompanion)
         .where((c) => !c.requiresItem || state.itemCount > 0)
         // 「1回のみ」の選択肢は、この戦闘で使用済みなら出さない。
-        .where((c) => !c.oncePerBattle || !state.usedChoices.contains(c.label))
+        // 「1回のみ」はグループ単位で判定する（特効3型のうち1つ使ったら全部消える）
+        .where((c) => !c.oncePerBattle || !state.usedChoices.contains(c.group ?? c.label))
         .toList();
     // 「逃げる」は常に一番下に並べる（他の順序は維持）。
     final ordered = [...filtered.where((c) => !c.isFlee), ...filtered.where((c) => c.isFlee)];
 
-    // 特効はグループにまとめて2段階で選ばせる。同威力の型が3つあり、
-    // そのまま並べると選択肢が7つになって選びにくいため。
+    // グループ（特効・安全策）は2段階で選ばせる。同威力の型が3つあり、
+    // そのまま並べると選択肢が増えすぎて選びにくいため。
     final grouped = ordered.where((c) => c.group != null).toList();
     final openGroup = _openGroup;
+
+    // 1段目の並びは**元の順序を保つ**。グループは「最初のメンバーがいた位置」に
+    // 1枚だけ差し込み、残りのメンバーは飛ばす（並びが入れ替わると操作を誤る）。
+    final firstLevel = <Object>[]; // BattleChoice もしくはグループ名(String)
+    final emitted = <String>{};
+    for (final c in ordered) {
+      final g = c.group;
+      if (g == null) {
+        firstLevel.add(c);
+      } else if (emitted.add(g)) {
+        firstLevel.add(g);
+      }
+    }
     final choices = openGroup != null
         ? grouped.where((c) => c.group == openGroup).toList()
-        : ordered.where((c) => c.group == null).toList();
+        : const <BattleChoice>[];
     final isDefeated = enemy.isDefeated;
     // 広告を出さない条件は _watchAd() と揃える。文言と実挙動を食い違わせない。
     final noAd = ref.watch(effectiveIsPremiumProvider) || kIsWeb;
@@ -553,21 +567,22 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                         style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                       ),
                     ),
-                    // 1段目はグループを1枚のカードとして出す。
+                    // 1段目は**元の並び順のまま**描く。グループは1枚のカードにまとめ、
+                    // 最初のメンバーがいた位置に差し込む。
                     //
                     // **グループ内の型は威力・成功率・自傷まで完全に同一**で、
                     // 違うのは加算される特性だけ。つまりゲーム上の判断は1段目で
                     // 完結する。そこで威力・成功率も1段目に出し、他の行動と
                     // 同じ土俵で比較できるようにする（2段目は挑み方を選ぶだけ）。
                     if (openGroup == null)
-                      for (final g in {for (final c in grouped) c.group!})
-                        Builder(builder: (_) {
-                          final rep = grouped.firstWhere((c) => c.group == g);
+                      ...firstLevel.map((item) {
+                        if (item is String) {
+                          final rep = grouped.firstWhere((c) => c.group == item);
                           final repOut = _repOutcome(rep);
                           final (tagText, tagColor) = _battleTag(rep, repOut);
                           return _ChoiceCard(
-                            emoji: '✨',
-                            title: g,
+                            emoji: _battleIcon(rep),
+                            title: item,
                             tag: (tagText, tagColor),
                             cost: rep.upfrontCost,
                             extraAction: 0,
@@ -578,9 +593,31 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                             sealed: false,
                             damageInfo: _damageInfo(repOut, widget.state.weaponAtk, widget.state.armorDef),
                             fleeNote: null,
-                            onTap: () => setState(() => _openGroup = g),
+                            onTap: () => setState(() => _openGroup = item),
                           );
-                        }),
+                        }
+                        final c = item as BattleChoice;
+                        final sealed = state.sealedChoices.contains(c.label);
+                        final repOut = _repOutcome(c);
+                        final (tagText, tagColor) = _battleTag(c, repOut);
+                        return _ChoiceCard(
+                          emoji: _battleIcon(c),
+                          title: c.label,
+                          tag: c.isFlee ? null : (tagText, tagColor),
+                          cost: c.upfrontCost,
+                          extraAction: 0,
+                          description: c.riskHint,
+                          successRate: c.successRate,
+                          isGuaranteed: c.isGuaranteed,
+                          showRate: !c.isFlee,
+                          sealed: sealed,
+                          damageInfo: c.isFlee ? null : _damageInfo(repOut, widget.state.weaponAtk, widget.state.armorDef),
+                          fleeNote: c.isFlee ? '離脱を試みる' : null,
+                          onTap: sealed
+                              ? null
+                              : () => ref.read(roguelikeProvider.notifier).performBattleAction(c),
+                        );
+                      }),
                     ...choices.map((c) {
                       final sealed = state.sealedChoices.contains(c.label);
                       final rep = _repOutcome(c);

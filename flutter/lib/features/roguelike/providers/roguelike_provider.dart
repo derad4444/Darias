@@ -738,7 +738,11 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       actionLog: _mergeTrait(_mergeTrait(s.actionLog, choice.selectTrait), outcome.traitDelta),
       sealedChoices: const {}, // 自分の手番が来たので封じ解除
       // 「1回のみ」の選択肢はこの戦闘中もう出さないよう使用済みに記録する。
-      usedChoices: choice.oncePerBattle ? {...s.usedChoices, choice.label} : s.usedChoices,
+      // グループ（特効の3型）は**グループ単位で1回**。ラベルで記録すると
+      // 1つ使っても残り2つが選べてしまい、実質3回撃てることになる。
+      usedChoices: choice.oncePerBattle
+          ? {...s.usedChoices, choice.group ?? choice.label}
+          : s.usedChoices,
       notableActions: _appendNotable(s.notableActions, choice.label, choice.selectTrait),
     );
 
