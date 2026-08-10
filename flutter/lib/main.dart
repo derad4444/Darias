@@ -21,9 +21,15 @@ import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/notification_provider.dart';
 import 'presentation/providers/theme_provider.dart';
 import 'presentation/router/app_router.dart';
+import 'dart:async' show unawaited;
+import 'data/services/app_review_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // アプリ評価の判定に使う初回起動日を記録する（未記録なら今日）。
+  // インストール直後のユーザーには評価を聞かないための基準。
+  unawaited(AppReviewService().markFirstLaunch());
 
   // Firebase初期化
   await Firebase.initializeApp(

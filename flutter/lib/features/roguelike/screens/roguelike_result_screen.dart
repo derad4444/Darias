@@ -20,6 +20,8 @@ import '../widgets/dungeon_theme.dart';
 import '../widgets/roguelike_banner.dart';
 import '../providers/roguelike_provider.dart';
 import '../../../presentation/providers/auth_provider.dart';
+import '../../../presentation/widgets/app_review_dialog.dart';
+import '../../../data/services/app_review_service.dart';
 import '../../../presentation/providers/character_provider.dart';
 import '../../../presentation/screens/main/main_shell_screen.dart' show selectedTabProvider;
 import '../../../presentation/widgets/character/element_effect_widget.dart' show characterGrowthAssetPath;
@@ -99,8 +101,31 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
 
     // ボス撃破（クリア）＝その悩みの克服を記録（心の図鑑）
     if (state.result == GameResult.clear) {
+      // 初踏破かどうかを、記録する前の状態で判定する
+      final firstClear = !(ref.read(clearedDungeonsProvider(userId)).valueOrNull ?? const <String>{})
+          .contains(state.dungeonId);
       await ds.recordClear(userId: userId, dungeonId: state.dungeonId, worry: dungeon.worry);
+      if (firstClear) await _maybeAskReview(dungeon.worry);
     }
+  }
+
+  /// 悩みを初めて克服したときにアプリ評価を聞く。
+  ///
+  /// **このアプリで最も達成感のある瞬間**なので聞くのに適している。
+  /// 同じ悩みの2回目以降は出さない（初踏破のみ）。
+  Future<void> _maybeAskReview(String worry) async {
+    final svc = AppReviewService();
+    if (!await svc.shouldAsk()) return;
+    // 克服演出を読む時間を取ってから出す
+    await Future.delayed(const Duration(seconds: 4));
+    if (!mounted) return;
+    await showAppReviewDialog(
+      context,
+      emoji: '🎉',
+      headline: 'おめでとうございます！',
+      achievement: '「$worry」を克服しました。\nここまで向き合えたのは、あなたの力です。',
+      service: svc,
+    );
   }
 
   @override

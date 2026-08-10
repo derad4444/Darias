@@ -20,6 +20,8 @@ import '../../../data/services/hint_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/share/meeting_share_card.dart';
 import '../../widgets/share/share_card_capture.dart';
+import '../../widgets/app_review_dialog.dart';
+import '../../../data/services/app_review_service.dart';
 
 /// 6人会議画面（iOS版SixPersonMeetingViewと同じフロー）
 class MeetingScreen extends ConsumerStatefulWidget {
@@ -51,7 +53,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   bool _isLoading = false;
   bool _showConclusion = false;
   String _concern = '';
-  int _userRating = 0;
   int _usageCount = 0;
 
   @override
@@ -650,36 +651,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           ),
         ),
 
-        const SizedBox(height: 12),
-
-        // 評価ボタン
-        SizedBox(
-          width: double.infinity,
-          child: OutlinedButton.icon(
-            onPressed: _showRatingDialog,
-            icon: Icon(
-              _userRating > 0 ? Icons.star : Icons.star_border,
-              color: _userRating > 0 ? Colors.amber : Colors.blue,
-            ),
-            label: Text(
-              _userRating > 0 ? '評価済み ($_userRating)' : 'この会議を評価する',
-              style: TextStyle(
-                color: _userRating > 0 ? Colors.amber : Colors.blue,
-              ),
-            ),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(
-                color: _userRating > 0 ? Colors.amber : Colors.blue,
-              ),
-              backgroundColor:
-                  _userRating > 0 ? Colors.amber.withValues(alpha: 0.1) : null,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -860,8 +831,28 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
         });
         // 結論へスクロール
         Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+        _maybeAskReview();
       }
     }
+  }
+
+  /// 結論が出たあとにアプリ評価を聞く。
+  ///
+  /// **会議は3つのきっかけの中で最も頻度が高い**ため、通算3回目以降に絞る
+  /// （判定は `AppReviewService.shouldAsk`）。結論を読む時間を取ってから出す。
+  Future<void> _maybeAskReview() async {
+    final svc = AppReviewService();
+    await svc.recordMeetingFinished();
+    if (!await svc.shouldAsk(isMeeting: true)) return;
+    await Future.delayed(const Duration(seconds: 3));
+    if (!mounted) return;
+    await showAppReviewDialog(
+      context,
+      emoji: '💡',
+      headline: '会議おつかれさまでした',
+      achievement: '6人の自分と向き合って、考えが少し整理できたでしょうか。',
+      service: svc,
+    );
   }
 
   /// 結論へスキップ
@@ -873,6 +864,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
       _showConclusion = true;
     });
     Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
+    _maybeAskReview();
   }
 
   void _scrollToBottom() {
@@ -901,75 +893,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
-  }
-
-  /// 評価ダイアログ（API連携）
-  void _showRatingDialog() {
-    int tempRating = _userRating;
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: const Text('この会議を評価'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('会議の満足度を5段階で評価してください'),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (index) {
-                  return IconButton(
-                    icon: Icon(
-                      index < tempRating ? Icons.star : Icons.star_border,
-                      color: Colors.amber,
-                      size: 36,
-                    ),
-                    onPressed: () {
-                      setDialogState(() {
-                        tempRating = index + 1;
-                      });
-                    },
-                  );
-                }),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('キャンセル'),
-            ),
-            ElevatedButton(
-              onPressed: tempRating > 0
-                  ? () async {
-                      final meetingId = _meetingResponse?.meetingId;
-                      if (meetingId != null) {
-                        await ref
-                            .read(meetingControllerProvider.notifier)
-                            .rateMeeting(meetingId, tempRating);
-                      }
-                      if (mounted) {
-                        setState(() {
-                          _userRating = tempRating;
-                        });
-                      }
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('評価を保存しました')),
-                        );
-                      }
-                    }
-                  : null,
-              child: const Text('送信'),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   /// プレミアムアップグレードダイアログ

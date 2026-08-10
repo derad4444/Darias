@@ -86,6 +86,9 @@ dependencies:
   shared_preferences: ^2.3.4
   path_provider: ^2.1.5
 
+  # アプリ評価（OS標準のレビュー画面をアプリ内に表示する）
+  in_app_review: ^2.0.9
+
   # Audio
   just_audio: ^0.9.43
   just_audio_web: ^0.4.15

@@ -10,6 +10,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import '../../widgets/app_review_dialog.dart';
+import '../../../data/services/app_review_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_links.dart';
 import '../../../core/theme/app_colors.dart';
@@ -896,6 +898,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         },
       ),
     );
+
+    // 性格タイプの進化は「使い続けた結果、自分が変わった」と最も実感する瞬間。
+    // 元々レアなので追加条件は付けず、共通条件だけで聞く。
+    if (mounted) {
+      final svc = AppReviewService();
+      if (await svc.shouldAsk()) {
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          await showAppReviewDialog(
+            context,
+            emoji: '✨',
+            headline: 'あなたの変化が見えました',
+            achievement: '「${data.newTypeName}」へと性格タイプが変わりました。\n続けてきたからこその変化です。',
+            service: svc,
+          );
+        }
+      }
+    }
     if (mounted) setState(() => _isShowingEvolutionDialog = false);
   }
 
