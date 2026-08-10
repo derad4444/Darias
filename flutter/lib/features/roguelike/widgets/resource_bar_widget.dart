@@ -69,11 +69,10 @@ class ResourceBarWidget extends StatelessWidget {
                     // 回復薬は鞄の中身として管理するのでピルには出さない。
                     if (state.hasCompanion) Expanded(child: _Pill(emoji: '🤝', label: '絆', value: '${state.bond}')),
                     Expanded(
-                      flex: state.hasCompanion ? 1 : 2,
-                      child: _BagButton(
-                        used: state.bagUsed,
-                        capacity: state.bagCapacity,
-                        isFull: state.bagIsFull,
+                      child: _Pill(
+                        emoji: '🎒',
+                        label: 'カバン',
+                        value: '${state.bagUsed}/${state.bagCapacity}',
                         onTap: onOpenBag,
                       ),
                     ),
@@ -157,72 +156,6 @@ class _HpPill extends StatelessWidget {
 }
 
 /// 汎用リソースピル（絵文字＋ラベル＋数値）。
-/// 鞄を開くボタン。
-///
-/// 他のピル（表示のみ）と混ざって「押せる」ことが伝わらなかったため、
-/// **塗り・影・矢印アイコン**を付けてボタンとして際立たせる。
-class _BagButton extends StatelessWidget {
-  final int used;
-  final int capacity;
-  final bool isFull;
-  final VoidCallback onTap;
-
-  const _BagButton({
-    required this.used,
-    required this.capacity,
-    required this.isFull,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // 配色は他のピルと同じヘッダーの青系に揃える（鞄の中身の茶色は持ち込まない）。
-    // 押せることは枠線・矢印アイコン・淡い塗りで示す。
-    final accent = isFull ? const Color(0xFFC0554A) : const Color(0xFF6E9BE6);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: Material(
-        color: accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accent.withValues(alpha: 0.55)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text('🎒', style: TextStyle(fontSize: 13)),
-                const SizedBox(width: 3),
-                Flexible(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('カバン',
-                          maxLines: 1,
-                          style: TextStyle(fontSize: 9, color: accent, fontWeight: FontWeight.bold)),
-                      Text('$used/$capacity',
-                          maxLines: 1,
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: accent)),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right, size: 15, color: accent),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Pill extends StatelessWidget {
   final String emoji;
   final String label;
@@ -248,9 +181,6 @@ class _Pill extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFF5F7FB),
         borderRadius: BorderRadius.circular(14),
-        border: onTap != null
-            ? Border.all(color: const Color(0xFF6E9BE6).withValues(alpha: 0.35))
-            : null,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -262,6 +192,9 @@ class _Pill extends StatelessWidget {
               Text(emoji, style: const TextStyle(fontSize: 13)),
               const SizedBox(width: 2),
               Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10, color: Colors.grey))),
+              // 押せるピル（鞄・装備）だけ矢印を出す。配色は他のピルと同じまま。
+              if (onTap != null)
+                const Icon(Icons.chevron_right, size: 13, color: Colors.grey),
             ],
           ),
           const SizedBox(height: 2),
