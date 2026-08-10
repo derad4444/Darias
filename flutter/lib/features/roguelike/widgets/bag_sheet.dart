@@ -45,6 +45,9 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
   /// 詳細パネルに出しているスロット。中身が減ったら自動で補正する。
   int _selected = 0;
 
+  /// 食料枠を選んでいるか（食料はアイテム枠の外なので index では表せない）。
+  bool _foodSelected = false;
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(roguelikeProvider);
@@ -84,9 +87,9 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
               const SizedBox(height: 10),
               _capacityHint(state),
               const SizedBox(height: 12),
-              _foodSection(state),
-              const SizedBox(height: 12),
-              if (hasSelection)
+              if (_foodSelected)
+                _foodDetail(state)
+              else if (hasSelection)
                 _detail(context, state, _selected)
               else
                 _emptyDetail(),
@@ -161,23 +164,45 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
     );
   }
 
-  // ── スロット一覧（容量ぶん並べ、空きは点線＋） ──────────────
+  // ── スロット一覧（容量ぶん＋右端に食料枠） ──────────────
+  //
+  // 食料はアイテム枠を消費しないので、区切り線を挟んだ**別枠**として右端に置く。
   Widget _slots(GameState state) {
     return Row(
       children: [
         for (var i = 0; i < state.bagCapacity; i++)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 2),
               child: i < state.bag.length
                   ? _FilledSlot(
                       item: state.bag[i],
-                      selected: i == _selected,
-                      onTap: () => setState(() => _selected = i),
+                      selected: !_foodSelected && i == _selected,
+                      onTap: () => setState(() {
+                        _selected = i;
+                        _foodSelected = false;
+                      }),
                     )
                   : const _EmptySlot(),
             ),
           ),
+        // 容量に含まれないことを示す区切り
+        Container(
+          width: 1,
+          height: 44,
+          margin: const EdgeInsets.symmetric(horizontal: 5),
+          color: Colors.white.withValues(alpha: 0.4),
+        ),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: _FoodSlot(
+              count: state.food,
+              selected: _foodSelected,
+              onTap: () => setState(() => _foodSelected = true),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -194,67 +219,80 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
     );
   }
 
-  // ── 食料（スタック・枠を使わない別枠） ──────────────────
+  // ── 食料の詳細（右端の食料枠を選んだとき） ──────────────
   //
   // 食料は個数で持つ消耗品で、イベントで自動的に減る（選んで使うものではない）。
-  // アイテム枠を奪うと鞄が食料で埋まってしまうため、**容量には数えない**別枠に置く。
-  Widget _foodSection(GameState state) {
+  // 1個1枠にすると初期状態で鞄が食料に埋まるため、**容量には数えない**別枠に置く。
+  Widget _foodDetail(GameState state) {
     final food = state.food;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _kBagCard.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(16),
+        color: _kBagCard,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 76,
+            height: 76,
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: _kBagAccent.withValues(alpha: 0.3)),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _kBagAccent.withValues(alpha: 0.35)),
             ),
-            child: const Center(child: Text('🍞', style: TextStyle(fontSize: 24))),
+            child: const Center(child: Text('🍞', style: TextStyle(fontSize: 36))),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.baseline,
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     const Text('食料',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _kBagText)),
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _kBagText)),
                     const SizedBox(width: 8),
                     Text('$food',
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: food <= 1 ? Colors.red : _kBagText,
+                          color: food <= 1 ? const Color(0xFFC0554A) : _kBagText,
                         )),
-                    const SizedBox(width: 2),
                     const Text('個', style: TextStyle(fontSize: 11, color: _kBagText)),
                   ],
                 ),
+                const SizedBox(height: 5),
+                const Row(
+                  children: [
+                    _Badge(text: '消耗品', color: _kBagAccent),
+                    SizedBox(width: 5),
+                    _Badge(text: 'カバンの枠を使わない', color: Color(0xFF7A6A55)),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                const Text(
+                  '道中で少しずつ減っていく携行食。\nまとめて持てるので枠は取らない。',
+                  style: TextStyle(fontSize: 12, height: 1.5, color: _kBagText),
+                ),
+                const SizedBox(height: 8),
                 Text(
                   food <= 0
                       ? '食料が尽きている。足りない分は体力で払うことになる。'
-                      : '道中で自動的に消費される。カバンの枠は使わない。',
+                      : '足りなくなると、不足分は体力で払うことになる。',
                   style: TextStyle(
-                    fontSize: 10.5,
-                    color: food <= 0 ? const Color(0xFFC0554A) : _kBagText.withValues(alpha: 0.65),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                    color: food <= 0 ? const Color(0xFFC0554A) : const Color(0xFFC2541E),
                   ),
                 ),
               ],
             ),
           ),
-          const _Badge(text: 'まとめて所持', color: Color(0xFF7A6A55)),
         ],
       ),
     );
@@ -448,6 +486,60 @@ class _FilledSlot extends StatelessWidget {
                       child: const Icon(Icons.check, size: 9, color: Colors.white),
                     ),
                   ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 右端の食料枠。アイテム枠と違い**個数をまとめて持つ**ので数バッジを出す。
+class _FoodSlot extends StatelessWidget {
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FoodSlot({required this.count, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final low = count <= 1;
+    return AspectRatio(
+      aspectRatio: 0.82,
+      child: Material(
+        color: _kBagCard,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? _kBagAccent : Colors.brown.withValues(alpha: 0.18),
+                width: selected ? 2.5 : 1,
+              ),
+            ),
+            child: Stack(
+              children: [
+                const Center(child: Text('🍞', style: TextStyle(fontSize: 24))),
+                Positioned(
+                  right: 2,
+                  top: 2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: low ? const Color(0xFFC0554A) : const Color(0xFF7A6A55),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      '$count',
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
