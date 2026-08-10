@@ -39,7 +39,14 @@ List<BattleChoice> _bossChoices({
   required String observeLabel,
   required String observeText,
   int observeDmg = 6,
-  required BattleChoice special,
+
+  /// テーマ特効。**同じ威力の型を複数用意し、どれを選ぶかを性格のシグナルにする。**
+  ///
+  /// 特効は他の選択肢より与ダメ・被ダメとも優位で、押さない理由がない。
+  /// ボスごとに1つしか無いと「そのダンジョンを選んだ人は全員その特性が付く」
+  /// ことになり、性格ではなくダンジョン選択を測ってしまっていた。
+  /// 威力を揃えた複数の型から選ばせることで、初めて選択が性格を表す。
+  required List<BattleChoice> specials,
 }) =>
     [
       BattleChoice(
@@ -74,7 +81,7 @@ List<BattleChoice> _bossChoices({
           ),
         ],
       ),
-      special,
+      ...specials,
       Enemies.healChoice,
     ];
 
@@ -189,6 +196,17 @@ class Dungeons {
               Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '歩み寄ろうとしたが、空回りした。少し気まずくなっただけだ。', damageToEnemy: 4, traitDelta: ActionLog(caution: 1)),
             ],
           ),
+          // 既存2つは協調寄りに偏っていたため、距離を置く型も用意して選択肢に幅を出す。
+          BattleChoice(
+            label: '割り切って距離を置く',
+            riskHint: '当たれば特効（成人）',
+            minStage: GrowthStage.adult,
+            selectTrait: const ActionLog(logic: 2, caution: 1),
+            outcomes: [
+              Outcome(tier: OutcomeTier.great, weight: 65, resultText: '合わない相手もいる。そう割り切ると、心の重さが消えた。', damageToEnemy: 15),
+              Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '距離を置こうとしたが、かえって気になってしまった。', damageToEnemy: 4, traitDelta: ActionLog(persistence: 1)),
+            ],
+          ),
           Enemies.healChoice,
         ],
       ),
@@ -231,7 +249,10 @@ class Dungeons {
             selectTrait: const ActionLog(logic: 2, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '分からないことを一つずつ調べると、霧が少し晴れた。', damageToEnemy: 6, damageToPlayer: 2)],
           ),
+          // 同じ「将来不安」でも、乗り越え方は人によって違う。威力は同じ。
           _special('小さな目標を立てる', '遠い未来ではなく、今できることに集中した。不安が一気に薄れた。', dmg: 14, trait: const ActionLog(planning: 3, logic: 1)),
+          _special('なるようになると構える', '先のことは分からない。そう受け入れると、肩の力が抜けた。', dmg: 14, trait: const ActionLog(flexibility: 3, intuition: 1)),
+          _special('不安の正体を書き出す', '漠然とした不安を言葉にすると、大きさが分かって怖くなくなった。', dmg: 14, trait: const ActionLog(logic: 3, curiosity: 1)),
           Enemies.healChoice,
         ],
       ),
@@ -273,7 +294,10 @@ class Dungeons {
             selectTrait: const ActionLog(logic: 2, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '感情から離れて事実を見た。否定の声が静かになった。', damageToEnemy: 7, damageToPlayer: 2)],
           ),
-          _special('過去の成功を思い出す', 'できたことを振り返ると、否定の声が大きく弱まった。', dmg: 14, trait: const ActionLog(persistence: 2, planning: 1)),
+          // 「自己否定」の乗り越え方も一つではない。
+          _special('過去の成功を思い出す', 'できたことを振り返ると、否定の声が大きく弱まった。', dmg: 14, trait: const ActionLog(persistence: 3, planning: 1)),
+          _special('誰かの言葉を思い出す', 'かけてもらった言葉を思い返すと、声が少し優しくなった。', dmg: 14, trait: const ActionLog(altruism: 3, cooperation: 1)),
+          _special('今の自分で十分と認める', '足りない所ではなく、今ここにいる自分を認めた。', dmg: 14, trait: const ActionLog(flexibility: 3, caution: 1)),
           Enemies.healChoice,
         ],
       ),
@@ -301,7 +325,11 @@ class Dungeons {
           confrontFailText: '人目が気になりすぎて、言葉に詰まってしまった。',
           observeLabel: '相手をよく観察する',
           observeText: '相手も完璧ではないと気づくと、怖さが和らいだ。',
-          special: _special('自分の物差しで測る', '他人ではなく自分の基準で考えると、評価の鎖がほどけた。', trait: const ActionLog(logic: 2, flexibility: 2)),
+          specials: [
+            _special('自分の物差しで測る', '他人ではなく自分の基準で考えると、評価の鎖がほどけた。', trait: const ActionLog(logic: 3, flexibility: 1)),
+            _special('見られる前提で飛び込む', 'どう思われるかは考えない。やりたいほうへ踏み出した。', trait: const ActionLog(challenge: 3, intuition: 1)),
+            _special('信頼できる人に確かめる', '本当のところどう見えているか聞くと、恐れは思い込みだった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
+          ],
         ),
       ),
     ),
@@ -329,7 +357,11 @@ class Dungeons {
           confrontFailText: '寂しさに飲まれ、心を閉ざしてしまった。',
           observeLabel: '今あるつながりを思い出す',
           observeText: '支えてくれた人を思い出すと、心細さが薄れた。',
-          special: _special('誰かに声をかける', '勇気を出して頼ると、孤独は思ったより小さかった。', trait: const ActionLog(cooperation: 2, altruism: 1)),
+          specials: [
+            _special('誰かに声をかける', '勇気を出して頼ると、孤独は思ったより小さかった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
+            _special('一人の時間を味方にする', '独りは悪いことじゃない。そう捉え直すと静けさが心地よくなった。', trait: const ActionLog(flexibility: 3, logic: 1)),
+            _special('外へ足を運んでみる', '家を出て人のいる場所へ行った。それだけで世界が少し広がった。', trait: const ActionLog(challenge: 3, curiosity: 1)),
+          ],
         ),
       ),
     ),
@@ -356,7 +388,11 @@ class Dungeons {
           confrontFailText: '急ぎすぎて空回りし、かえって消耗した。',
           observeLabel: '深呼吸して落ち着く',
           observeText: 'ひと呼吸おくと、焦りの渦が静まった。',
-          special: _special('一つずつ片付ける', '全部ではなく、今やる一つに集中すると焦りが消えた。', trait: const ActionLog(planning: 3, caution: 1)),
+          specials: [
+            _special('一つずつ片付ける', '全部ではなく、今やる一つに集中すると焦りが消えた。', trait: const ActionLog(planning: 3, caution: 1)),
+            _special('あえて手を止める', '走るのをやめて深く息をした。焦りは急ぐほど濃くなると気づいた。', trait: const ActionLog(caution: 3, intuition: 1)),
+            _special('やらないことを決める', '全部は無理だと認め、切り捨てるものを選んだ。', trait: const ActionLog(logic: 3, flexibility: 1)),
+          ],
         ),
       ),
     ),
@@ -382,7 +418,11 @@ class Dungeons {
           confrontFailText: '怒りに怒りで返し、互いに激しく傷ついた。',
           observeLabel: 'ひと呼吸おいて距離を取る',
           observeText: '一歩引いて眺めると、炎の勢いが弱まった。',
-          special: _special('怒りの奥の本音を見る', '本当は何が悲しかったのかに気づくと、怒りがほどけた。', trait: const ActionLog(logic: 2, altruism: 2)),
+          specials: [
+            _special('怒りの奥の本音を見る', '本当は何が悲しかったのかに気づくと、怒りがほどけた。', trait: const ActionLog(logic: 3, altruism: 1)),
+            _special('相手の事情を想像する', '相手にも事情があったのかもしれない。そう思うと熱が引いた。', trait: const ActionLog(altruism: 3, cooperation: 1)),
+            _special('言葉にしてぶつける', '溜め込まず、怒っていると正直に伝えた。抱えるより軽くなった。', trait: const ActionLog(challenge: 3, persistence: 1)),
+          ],
         ),
       ),
     ),
@@ -408,7 +448,11 @@ class Dungeons {
           confrontFailText: 'やはり決めきれず、堂々巡りに戻ってしまった。',
           observeLabel: '選択肢を書き出して比べる',
           observeText: '紙に並べて見ると、本当に大事な軸が見えてきた。',
-          special: _special('直感で決める', '考え尽くした先で、最後は直感を信じて決めた。', trait: const ActionLog(intuition: 3, challenge: 1)),
+          specials: [
+            _special('直感で決める', '考え尽くした先で、最後は直感を信じて決めた。', trait: const ActionLog(intuition: 3, challenge: 1)),
+            _special('判断の基準を書き出す', '何を大事にしたいのかを紙に出すと、答えは自ずと決まった。', trait: const ActionLog(logic: 3, planning: 1)),
+            _special('決めてから考える', 'まず選んでしまい、そのあと正解にしていくと腹をくくった。', trait: const ActionLog(persistence: 3, flexibility: 1)),
+          ],
         ),
       ),
     ),
@@ -436,7 +480,11 @@ class Dungeons {
           confrontFailText: 'こだわりすぎて終わらず、気力をすり減らした。',
           observeLabel: '全体のバランスを見る',
           observeText: '一歩引いて全体を見ると、十分に良い出来だと分かった。',
-          special: _special('60点で良しとする', '「完璧」より「完了」を選ぶと、呪縛がほどけた。', trait: const ActionLog(flexibility: 3, planning: 1)),
+          specials: [
+            _special('60点で良しとする', '「完璧」より「完了」を選ぶと、呪縛がほどけた。', trait: const ActionLog(flexibility: 3, planning: 1)),
+            _special('人に見せて意見をもらう', '一人で磨き続けず、途中で見せた。他人の目が基準を教えてくれた。', trait: const ActionLog(cooperation: 3, curiosity: 1)),
+            _special('締め切りを先に決める', '完璧かどうかではなく、いつ出すかを先に固定した。', trait: const ActionLog(planning: 3, logic: 1)),
+          ],
         ),
       ),
     ),
@@ -463,7 +511,11 @@ class Dungeons {
           confrontFailText: '腰が上がらず、先送りの重さが増した。',
           observeLabel: 'やることを小さく分ける',
           observeText: '大きな塊を小さく刻むと、最初の一歩が踏み出せた。',
-          special: _special('とりあえず5分だけ動く', '5分だけのつもりが、動き出すと勢いがついた。', trait: const ActionLog(challenge: 2, flexibility: 2)),
+          specials: [
+            _special('とりあえず5分だけ動く', '5分だけのつもりが、動き出すと勢いがついた。', trait: const ActionLog(challenge: 3, intuition: 1)),
+            _special('なぜ避けているか考える', '面倒の正体を見に行くと、思ったより小さな引っかかりだった。', trait: const ActionLog(curiosity: 3, logic: 1)),
+            _special('やる時間を先に押さえる', 'いつやるかを決めて枠を確保した。意志ではなく仕組みで動く。', trait: const ActionLog(planning: 3, persistence: 1)),
+          ],
         ),
       ),
     ),
