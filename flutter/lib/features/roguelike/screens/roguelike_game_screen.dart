@@ -72,6 +72,18 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (gameState.phase == GamePhase.victory || gameState.phase == GamePhase.gameOver) {
+      // 撤退は結果画面を出さずダンジョン選択へ戻す。
+      // 途中で引いた冒険は選択数が少なく、性格診断として意味のある材料にならないため。
+      if (gameState.result == GameResult.retreat) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ref.read(selectedTabProvider.notifier).state = 4; // 冒険タブ＝ダンジョン選択
+          context.go('/');
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => ref.read(roguelikeProvider.notifier).resetGame(),
+          );
+        });
+        return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/roguelike/result'));
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }

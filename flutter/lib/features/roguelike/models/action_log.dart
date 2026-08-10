@@ -101,28 +101,60 @@ class ActionLog {
     '闇': logic + curiosity + caution,           // 内向の理性（理性を内へ向ける）
   };
 
+  /// 特性の合計値（元素スコアを冒険の長さで正規化するために使う）。
+  int get totalPoints =>
+      challenge + caution + curiosity + planning + intuition +
+      logic + cooperation + altruism + persistence + flexibility;
+
+  /// 平均的な冒険での「元素スコア ÷ 特性合計」。
+  ///
+  /// 素点をそのまま比べると、**イベントで付きやすい特性を持つ元素が有利**になる
+  /// （論理性・慎重性の供給が多く、闇が独走していた）。プレイヤーの選択と無関係な
+  /// この偏りを打ち消すため、期待比率で割って「平均よりどれだけ突出したか」で比べる。
+  static const Map<String, double> _elementBaseline = {
+    '炎': 0.2920, '水': 0.2568, '風': 0.2858, '土': 0.3165,
+    '雷': 0.3061, '氷': 0.3099, '光': 0.3342, '闇': 0.3240,
+  };
+
+  /// 元素ごとの出やすさの補正係数。
+  ///
+  /// 期待比率で割ってもまだ偏る。**元素どうしの相関**が理由で、
+  /// 水は利他性を独占するため他と競合せず勝ちやすく、逆に雷は炎・風と
+  /// 特性を食い合って勝ちにくい。この構造的な有利不利を打ち消す係数。
+  ///
+  /// **イベントの `selectTrait` 配分を変えたら再計算が必要**
+  /// （算出方法はローグライク冒険ゲーム仕様書 §7.2 を参照）。
+  static const Map<String, double> _elementCalibration = {
+    '炎': 0.9426, '水': 0.8543, '風': 1.0368, '土': 0.9882,
+    '雷': 1.0201, '氷': 1.1049, '光': 1.0289, '闇': 1.0242,
+  };
+
+  /// 正規化した元素スコア（値が大きいほど、平均的な冒険より突出している）。
+  Map<String, double> normalizedElementScores() {
+    final total = totalPoints;
+    if (total == 0) return {for (final e in _elementBaseline.keys) e: 0.0};
+    return {
+      for (final entry in elementScores().entries)
+        entry.key: (entry.value / total / _elementBaseline[entry.key]!) *
+            _elementCalibration[entry.key]!,
+    };
+  }
+
   // 冒険中の元素傾向を推定
   String inferredElement() {
-    final totals = elementScores();
-    final maxVal = totals.values.reduce((a, b) => a > b ? a : b);
-    if (maxVal == 0) return '無';
-    // 1位と2位が同点なら「無」。
-    //
-    // 8元素は特性を共有している（例: 炎と雷は挑戦性・直感性が共通で、
-    // 差がつくのは執着性 vs 柔軟性だけ）ため、差は構造的に開きにくい。
-    // かつて閾値が3だったときは「無」が26〜54%を占め、
-    // 実際には強い傾向が3つあるのに「型なし」と診断されていた。
-    final sorted = totals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    if (sorted[0].value - sorted[1].value < 1) return '無';
+    if (totalPoints == 0) return '無';
+    final sorted = normalizedElementScores().entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    // 1位と2位が拮抗していれば「無」（傾向が割れている）。
+    if (sorted[0].value - sorted[1].value < 0.04) return '無';
     return sorted.first.key;
   }
 
   /// 推定元素の「強さ傾向」ラベル（強い傾向／やや強い傾向）。「無」なら空。
   String elementStrengthLabel() {
     if (inferredElement() == '無') return '';
-    final sorted = elementScores().entries.toList()
+    final sorted = normalizedElementScores().entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
-    final margin = sorted[0].value - sorted[1].value;
-    return margin >= 8 ? '強い傾向' : 'やや強い傾向';
+    return sorted[0].value - sorted[1].value >= 0.15 ? '強い傾向' : 'やや強い傾向';
   }
 }
