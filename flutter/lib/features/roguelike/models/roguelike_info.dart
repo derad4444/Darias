@@ -98,6 +98,26 @@ class TraitAdvice {
   };
 
   static TraitAdvice? of(String trait) => all[trait];
+
+  /// **最も高い特性1つ**から、日常への橋渡し文を組み立てる。
+  ///
+  /// 「冒険で何をしていたか → それは日常のどこで効くか → 次に何を試すか」を
+  /// 一続きの文章にする。箇条書きにすると読み飛ばされ、特性名だけだと
+  /// 他人事になるため、冒険での具体的な振る舞いから入る。
+  ///
+  /// 結果画面・シェアカード・図鑑のボス詳細で同じ文を使う。
+  /// [compact] が true のときは1段落に詰める（シェアカード用）。
+  static String messageFor(String trait, {bool compact = false}) {
+    final a = all[trait];
+    if (a == null) return '';
+    if (compact) {
+      return '${a.inGame}。それが$traitです。\n${a.tryNext}。';
+    }
+    return '今回の冒険で、あなたは${a.inGame}。'
+        'そこに出ていたのが$traitです。\n\n'
+        'これは冒険の中だけの話ではありません。${a.inLife}。\n\n'
+        '${a.tryNext}。';
+  }
 }
 
 /// 元素のアイコン（絵文字）と一言。

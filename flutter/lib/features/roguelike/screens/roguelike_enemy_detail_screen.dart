@@ -336,6 +336,23 @@ class _AnalysisSection extends ConsumerWidget {
                 Text('${el.emoji} ${el.description}',
                     style: const TextStyle(fontSize: 12, height: 1.5, color: kRoguelikeInk)),
               ],
+              // 踏破時の傾向を日常へ橋渡しする文。結果画面と同じ文面を使い、
+              // あとから見返しても「で、自分はどうすればいいのか」が分かるようにする。
+              if (top.isNotEmpty && TraitAdvice.of(top.first.key) != null) ...[
+                const SizedBox(height: 12),
+                const Divider(height: 1),
+                const SizedBox(height: 10),
+                const Row(
+                  children: [
+                    Text('🌱 ', style: TextStyle(fontSize: 13)),
+                    Text('日常へのヒント',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(TraitAdvice.messageFor(top.first.key),
+                    style: const TextStyle(fontSize: 12, height: 1.6, color: kRoguelikeInk)),
+              ],
             ],
           ),
         ),

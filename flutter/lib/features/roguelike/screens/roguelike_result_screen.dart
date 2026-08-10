@@ -350,15 +350,12 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
       return '$nameの新たな一面は、次の冒険でもっと見えてくるかもしれません。';
     }
     final t1 = topTraits[0].key;
-    final advice = TraitAdvice.of(t1);
-    if (advice == null) {
+    final msg = TraitAdvice.messageFor(t1);
+    if (msg.isEmpty) {
       final elem = inferred != '無' ? '$inferredのような' : '';
       return 'あなたは$t1を備えた$elem冒険者です。';
     }
-    return '今回の冒険で、あなたは${advice.inGame}。'
-        'そこに出ていたのが$t1です。\n\n'
-        'これは冒険の中だけの話ではありません。${advice.inLife}。\n\n'
-        '${advice.tryNext}。';
+    return msg;
   }
 }
 
@@ -1010,6 +1007,23 @@ class _ShareCard extends StatelessWidget {
                     ],
                   );
                 }).toList(),
+              ),
+            ],
+            // 日常への橋渡し文。数値だけのカードだと共有先で意味が伝わらないため、
+            // 「この人がどういう人か」が一目で分かる一文を載せる。
+            if (shown.isNotEmpty && TraitAdvice.of(shown.first.key) != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  TraitAdvice.messageFor(shown.first.key, compact: true),
+                  style: const TextStyle(fontSize: 12, height: 1.6, color: Color(0xFF444444)),
+                ),
               ),
             ],
             const SizedBox(height: 14),
