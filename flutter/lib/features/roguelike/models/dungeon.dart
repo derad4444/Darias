@@ -85,20 +85,30 @@ List<BattleChoice> _bossChoices({
       Enemies.healChoice,
     ];
 
+/// 特効をまとめる2段階選択のグループ名。
+const String kSpecialGroup = 'とっておきの一手';
+
 /// テーマ特効の大ダメージ選択肢を作る共通ヘルパー（成人）。
 /// 高火力の見返りとして (1) 成功率制で外すことがある (2) 自傷を伴う
 /// (3) 1回の戦闘で1度だけ、という3重の制約でノーリスクの一択にならないようにする。
 BattleChoice _special(String label, String text,
-        {int dmg = 14, int dmgSelf = 4, ActionLog trait = const ActionLog()}) =>
+        {int dmg = 14,
+        int dmgSelf = 4,
+        ActionLog trait = const ActionLog(),
+        bool requiresCompanion = false,
+        Map<String, int> reward = const {}}) =>
     BattleChoice(
       label: label,
-      riskHint: '特効・自傷あり・1回のみ（成人）',
+      riskHint: '自傷あり・1回のみ（成人）',
       minStage: GrowthStage.adult,
+      requiresCompanion: requiresCompanion,
       selectTrait: trait,
       oncePerBattle: true,
+      // 2段階選択にまとめる（一覧が長くなりすぎないように）
+      group: kSpecialGroup,
       outcomes: [
         // 成功（60%）: 高ダメージ。失敗（40%）: 空振りで小ダメージ（自傷は変わらず）。
-        Outcome(tier: OutcomeTier.great, weight: 60, resultText: text, damageToEnemy: dmg, damageToPlayer: dmgSelf),
+        Outcome(tier: OutcomeTier.great, weight: 60, resultText: text, damageToEnemy: dmg, damageToPlayer: dmgSelf, resourceChanges: reward),
         Outcome(tier: OutcomeTier.failure, weight: 40, resultText: '渾身の一手だったが、うまく決まらなかった。', damageToEnemy: (dmg / 4).round(), damageToPlayer: dmgSelf),
       ],
     );
@@ -179,7 +189,11 @@ class Dungeons {
           ),
           // 特効3型。**威力は _special と完全に同じ**にして、どれを選ぶかだけが
           // 性格のシグナルになるようにする。自傷・1回制限も他ボスと揃える。
-          _special('仲間に相談する', '仲間の視点で見つめ直すと、悩みは驚くほど小さくなった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
+          // 相棒がいるときだけ現れる型。**絆は減らさず、むしろ深まる。**
+          // 頼ることで関係が悪くなるのは不自然なため。威力は他の型と同じ。
+          _special('仲間に相談する', '仲間の視点で見つめ直すと、悩みは驚くほど小さくなった。絆も深まった。',
+              requiresCompanion: true, reward: const {'bond': 1},
+              trait: const ActionLog(cooperation: 3, altruism: 1)),
           _special('交渉して距離を縮める', '相手の立場を理解しようと歩み寄った。わだかまりが大きく解けた。', trait: const ActionLog(flexibility: 3, cooperation: 1)),
           _special('割り切って距離を置く', '合わない相手もいる。そう割り切ると、心の重さが消えた。', trait: const ActionLog(logic: 3, caution: 1)),
           Enemies.healChoice,
@@ -535,20 +549,9 @@ class Dungeons {
           // 最終ボスの特効3型。相棒の有無で選べる型が偏らないよう、
           // 相棒必須は1つだけにして残り2つは単独でも選べるようにする。
           // 威力は最終ボス用に強め（dmg20・自傷6）で3型とも共通。
-          BattleChoice(
-            label: '仲間と力を合わせる',
-            riskHint: '絆-2・自傷あり・1回のみ・最大火力（成人・相棒）',
-            upfrontCost: {'bond': -2},
-            minStage: GrowthStage.adult,
-            requiresCompanion: true,
-            oncePerBattle: true,
-            selectTrait: const ActionLog(cooperation: 3, altruism: 1),
-            outcomes: [
-              // 成功（60%）: 最大火力。失敗（40%）: かみ合わず小ダメージ（絆・自傷は消費）。
-              Outcome(tier: OutcomeTier.great, weight: 60, resultText: '仲間と力を合わせ、守護者を追い詰めた。絆の力は強い。ただし無理を通した反動もある。', damageToEnemy: 20, damageToPlayer: 6),
-              Outcome(tier: OutcomeTier.failure, weight: 40, resultText: '息を合わせようとしたが、かみ合わなかった。それでも一矢は報いた。', damageToEnemy: 6, damageToPlayer: 6),
-            ],
-          ),
+          _special('仲間と力を合わせる', '仲間と力を合わせ、守護者を追い詰めた。絆の力は強い。',
+              dmg: 20, dmgSelf: 6, requiresCompanion: true, reward: const {'bond': 1},
+              trait: const ActionLog(cooperation: 3, altruism: 1)),
           _special('これまでの自分を信じる', 'ここまで越えてきた悩みの数を思い出した。もう同じ自分ではない。',
               dmg: 20, dmgSelf: 6, trait: const ActionLog(persistence: 3, challenge: 1)),
           _special('迷いごと受け入れる', '迷いを消そうとするのをやめた。抱えたまま進めばいいと気づいた。',

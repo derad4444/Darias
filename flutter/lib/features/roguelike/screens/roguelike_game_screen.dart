@@ -377,6 +377,9 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
   int _msgIndex = 0; // メッセージ順送りの現在位置
   bool _adBusy = false; // 広告表示中（ボタン二度押し防止）
 
+  /// 開いている選択肢グループ（特効の2段階選択）。null＝1段目。
+  String? _openGroup;
+
   @override
   void initState() {
     super.initState();
@@ -461,7 +464,15 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
         .where((c) => !c.oncePerBattle || !state.usedChoices.contains(c.label))
         .toList();
     // 「逃げる」は常に一番下に並べる（他の順序は維持）。
-    final choices = [...filtered.where((c) => !c.isFlee), ...filtered.where((c) => c.isFlee)];
+    final ordered = [...filtered.where((c) => !c.isFlee), ...filtered.where((c) => c.isFlee)];
+
+    // 特効はグループにまとめて2段階で選ばせる。同威力の型が3つあり、
+    // そのまま並べると選択肢が7つになって選びにくいため。
+    final grouped = ordered.where((c) => c.group != null).toList();
+    final openGroup = _openGroup;
+    final choices = openGroup != null
+        ? grouped.where((c) => c.group == openGroup).toList()
+        : ordered.where((c) => c.group == null).toList();
     final isDefeated = enemy.isDefeated;
     // 広告を出さない条件は _watchAd() と揃える。文言と実挙動を食い違わせない。
     final noAd = ref.watch(effectiveIsPremiumProvider) || kIsWeb;
@@ -533,10 +544,33 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                       ),
                     )
                   else ...[
-                    const Padding(
-                      padding: EdgeInsets.only(left: 4, bottom: 8),
-                      child: Text('どうする？　（行動を選んでください）', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white)),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 8),
+                      child: Text(
+                        openGroup == null
+                            ? 'どうする？　（行動を選んでください）'
+                            : '$openGroup　（どの型で挑む？）',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
+                      ),
                     ),
+                    // 1段目にはグループを1枚のカードとして出す
+                    if (openGroup == null)
+                      for (final g in {for (final c in grouped) c.group!})
+                        _ChoiceCard(
+                          emoji: '✨',
+                          title: g,
+                          tag: null,
+                          cost: const {},
+                          extraAction: 0,
+                          description: '自傷あり・1回のみ。挑み方を選ぶ',
+                          successRate: 0,
+                          isGuaranteed: false,
+                          showRate: false,
+                          sealed: false,
+                          damageInfo: null,
+                          fleeNote: null,
+                          onTap: () => setState(() => _openGroup = g),
+                        ),
                     ...choices.map((c) {
                       final sealed = state.sealedChoices.contains(c.label);
                       final rep = _repOutcome(c);
@@ -554,9 +588,31 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                         sealed: sealed,
                         damageInfo: c.isFlee ? null : _damageInfo(rep, widget.state.weaponAtk, widget.state.armorDef),
                         fleeNote: c.isFlee ? '離脱を試みる' : null,
-                        onTap: sealed ? null : () => ref.read(roguelikeProvider.notifier).performBattleAction(c),
+                        onTap: sealed
+                            ? null
+                            : () {
+                                // 選んだらグループを閉じて1段目に戻しておく
+                                if (_openGroup != null) setState(() => _openGroup = null);
+                                ref.read(roguelikeProvider.notifier).performBattleAction(c);
+                              },
                       );
                     }),
+                    if (openGroup != null)
+                      _ChoiceCard(
+                        emoji: '↩️',
+                        title: '戻る',
+                        tag: null,
+                        cost: const {},
+                        extraAction: 0,
+                        description: '他の行動を選び直す',
+                        successRate: 0,
+                        isGuaranteed: false,
+                        showRate: false,
+                        sealed: false,
+                        damageInfo: null,
+                        fleeNote: null,
+                        onTap: () => setState(() => _openGroup = null),
+                      ),
                   ],
                 ],
               ),

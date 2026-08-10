@@ -44,6 +44,13 @@ class BattleChoice with WeightedChoice {
   /// ボス特効のような強力な一手向け。
   final bool oncePerBattle;
 
+  /// **同じ枠にまとめて2段階で選ばせるグループ名**（例: '特効'）。
+  ///
+  /// 特効は「同じ威力の型を3つ用意して、どれを選ぶかを性格のシグナルにする」
+  /// 設計のため数が増える。全部を並べると選択肢が7つになり選びにくいので、
+  /// 一度「とっておきの一手」を選んでから型を選ぶ形にする。
+  final String? group;
+
   const BattleChoice({
     required this.label,
     this.riskHint = '',
@@ -55,6 +62,7 @@ class BattleChoice with WeightedChoice {
     this.requiresCompanion = false,
     this.requiresItem = false,
     this.oncePerBattle = false,
+    this.group,
   });
 
   /// この選択肢が与えうる最大ダメージ（封じ対象を選ぶのに使う）。
