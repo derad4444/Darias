@@ -380,6 +380,18 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
   /// 開いている選択肢グループ（特効の2段階選択）。null＝1段目。
   String? _openGroup;
 
+  /// 選択肢リストのスクロール。段を移動したときに先頭へ戻すために持つ。
+  final ScrollController _choiceScroll = ScrollController();
+
+  /// 段を切り替える。スクロール位置が引き継がれると
+  /// 2段目がリストの途中から表示されてしまうので、必ず先頭へ戻す。
+  void _setGroup(String? g) {
+    setState(() => _openGroup = g);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_choiceScroll.hasClients) _choiceScroll.jumpTo(0);
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -448,6 +460,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
   void dispose() {
     _badgeCtrl.dispose();
     _shakeCtrl.dispose();
+    _choiceScroll.dispose();
     super.dispose();
   }
 
@@ -509,6 +522,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
           // スクロール: 「どうする？」＋選択肢リストのみ。
           Expanded(
             child: SingleChildScrollView(
+              controller: _choiceScroll,
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -594,7 +608,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                             sealed: false,
                             damageInfo: _damageInfo(repOut, widget.state.weaponAtk, widget.state.armorDef),
                             fleeNote: null,
-                            onTap: () => setState(() => _openGroup = item),
+                            onTap: () => _setGroup(item),
                           );
                         }
                         final c = item as BattleChoice;
@@ -640,7 +654,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                             ? null
                             : () {
                                 // 選んだらグループを閉じて1段目に戻しておく
-                                if (_openGroup != null) setState(() => _openGroup = null);
+                                if (_openGroup != null) _setGroup(null);
                                 ref.read(roguelikeProvider.notifier).performBattleAction(c);
                               },
                       );
@@ -659,7 +673,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                         sealed: false,
                         damageInfo: null,
                         fleeNote: null,
-                        onTap: () => setState(() => _openGroup = null),
+                        onTap: () => _setGroup(null),
                       ),
                   ],
                 ],
