@@ -176,42 +176,44 @@ class _BagButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 鞄の中身と揃えた、オレンジと茶の中間色。
-    const base = Color(0xFFC98A4E);
-    final color = isFull ? const Color(0xFFC0554A) : base;
+    // 配色は他のピルと同じヘッダーの青系に揃える（鞄の中身の茶色は持ち込まない）。
+    // 押せることは枠線・矢印アイコン・淡い塗りで示す。
+    final accent = isFull ? const Color(0xFFC0554A) : const Color(0xFF6E9BE6);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: Material(
-        color: color,
+        color: accent.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(14),
-        elevation: 2,
-        shadowColor: color.withValues(alpha: 0.5),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: accent.withValues(alpha: 0.55)),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('🎒', style: TextStyle(fontSize: 15)),
-                const SizedBox(width: 4),
+                const Text('🎒', style: TextStyle(fontSize: 13)),
+                const SizedBox(width: 3),
                 Flexible(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('カバン',
+                      Text('カバン',
                           maxLines: 1,
-                          style: TextStyle(fontSize: 9, color: Colors.white70, fontWeight: FontWeight.bold)),
+                          style: TextStyle(fontSize: 9, color: accent, fontWeight: FontWeight.bold)),
                       Text('$used/$capacity',
                           maxLines: 1,
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white)),
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: accent)),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, size: 16, color: Colors.white),
+                Icon(Icons.chevron_right, size: 15, color: accent),
               ],
             ),
           ),
