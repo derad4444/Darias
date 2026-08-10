@@ -411,6 +411,8 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
     // 「逃げる」は常に一番下に並べる（他の順序は維持）。
     final choices = [...filtered.where((c) => !c.isFlee), ...filtered.where((c) => c.isFlee)];
     final isDefeated = enemy.isDefeated;
+    // 広告を出さない条件は _watchAd() と揃える。文言と実挙動を食い違わせない。
+    final noAd = ref.watch(effectiveIsPremiumProvider) || kIsWeb;
     // メッセージ送り中は選択肢を隠し、メッセージウィンドウを表示する。
     final messages = state.battleMessages;
     final showingMessages = messages.isNotEmpty;
@@ -441,7 +443,11 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                           Text('${enemy.name}を乗り越えた！', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF2E9E6B))),
                           const SizedBox(height: 6),
                           Text(
-                            enemy.isBoss ? '広告を見て結果を確認しますか？' : '広告を見て探索を続けますか？',
+                            noAd
+                                ? (enemy.isBoss ? '結果を確認しますか？' : '探索を続けますか？')
+                                : (enemy.isBoss
+                                    ? '広告を見て結果を確認しますか？'
+                                    : '広告を見て探索を続けますか？'),
                             style: const TextStyle(fontSize: 12, color: Colors.grey),
                             textAlign: TextAlign.center,
                           ),
@@ -453,7 +459,13 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                               onPressed: _adBusy ? null : (enemy.isBoss ? _seeResult : _proceedExplore),
                               child: _adBusy
                                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                  : Text(enemy.isBoss ? '🎬 結果を見る' : '🎬 次に進む'),
+                                  : Text(
+                                      noAd
+                                          ? (enemy.isBoss ? '結果を見る' : '次に進む')
+                                          : (enemy.isBoss
+                                              ? '🎬 結果を見る'
+                                              : '🎬 次に進む'),
+                                    ),
                             ),
                           ),
                           const SizedBox(height: 8),
