@@ -7,9 +7,12 @@ import '../models/bag_item.dart';
 import '../models/game_state.dart';
 import '../providers/roguelike_provider.dart';
 
-// 鞄の中＝革のカバンの内側をイメージした、オレンジと茶の中間色。
-const Color _kBagBgTop = Color(0xFFC98A4E);
-const Color _kBagBgBottom = Color(0xFF8F5A2E);
+// 鞄の中＝革のカバンの内側をイメージした、オレンジ→茶のグラデーション。
+// 上を明るいオレンジ、下を深い茶にして、口から奥へ向かって暗くなる立体感を出す。
+// 2色が近いとベタ塗りに見えるため、明度差を大きく取り中間色も挟む。
+const Color _kBagBgTop = Color(0xFFE8A661);
+const Color _kBagBgMid = Color(0xFFC07C42);
+const Color _kBagBgBottom = Color(0xFF6E4020);
 const Color _kBagCard = Color(0xFFFDF4E6); // 生成りのカード
 const Color _kBagAccent = Color(0xFFE0842C);
 const Color _kBagText = Color(0xFF4A3520);
@@ -54,7 +57,8 @@ class _BagSheetState extends ConsumerState<_BagSheet> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [_kBagBgTop, _kBagBgBottom],
+          colors: [_kBagBgTop, _kBagBgMid, _kBagBgBottom],
+          stops: [0.0, 0.45, 1.0],
         ),
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
