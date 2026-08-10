@@ -54,10 +54,10 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
     if (state == null || userId == null || userId.isEmpty) return;
     _saved = true;
 
-    final top = state.actionLog.topTraits();
-    final inferred = state.actionLog.inferredElement();
+    final top = state.finalActionLog.topTraits();
+    final inferred = state.finalActionLog.inferredElement();
     final title = AdventureTitle.decide(
-      log: state.actionLog,
+      log: state.finalActionLog,
       result: state.result,
       inferredElement: inferred,
     );
@@ -73,7 +73,7 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
         'result': state.result?.name ?? 'retreat',
         'title': title,
         'topTrait': top.isNotEmpty ? top.first.key : '',
-        'traits': state.actionLog.toMap(),
+        'traits': state.finalActionLog.toMap(),
         'growthStage': state.growthStage.name,
         'dungeonId': state.dungeonId,
         'worry': dungeon.worry,
@@ -113,9 +113,9 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
     }
 
     final result = state.result;
-    final topTraits = state.actionLog.topTraits();
-    final inferredElement = state.actionLog.inferredElement();
-    final title = AdventureTitle.decide(log: state.actionLog, result: result, inferredElement: inferredElement);
+    final topTraits = state.finalActionLog.topTraits();
+    final inferredElement = state.finalActionLog.inferredElement();
+    final title = AdventureTitle.decide(log: state.finalActionLog, result: result, inferredElement: inferredElement);
     final dungeon = Dungeons.byId(state.dungeonId);
 
     // 図鑑・克服の進捗
@@ -180,7 +180,10 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
               _CharacterCard(state: state, avatarPath: avatarPath),
 
               const SizedBox(height: 14),
-              _SummaryCard(text: _generateSummary(state, topTraits)),
+              _SummaryCard(
+                text: _generateSummary(state, topTraits),
+                bagStyle: state.bagStyleLabel,
+              ),
 
               const SizedBox(height: 14),
               // 推定元素 ＋ TOP3
@@ -188,7 +191,7 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(child: _ElementCard(element: inferredElement, strength: state.actionLog.elementStrengthLabel(), homeElement: state.element)),
+                    Expanded(child: _ElementCard(element: inferredElement, strength: state.finalActionLog.elementStrengthLabel(), homeElement: state.element)),
                     const SizedBox(width: 12),
                     Expanded(flex: 1, child: _TopTraitsCard(top: topTraits)),
                   ],
@@ -196,7 +199,7 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
               ),
 
               const SizedBox(height: 14),
-              _RadarCard(traits: state.actionLog.toMap()),
+              _RadarCard(traits: state.finalActionLog.toMap()),
 
               const SizedBox(height: 14),
               _CodexCard(
@@ -512,7 +515,12 @@ class _StatMini extends StatelessWidget {
 // ===== 冒険のまとめ =====
 class _SummaryCard extends StatelessWidget {
   final String text;
-  const _SummaryCard({required this.text});
+
+  /// 鞄の使い方の一言（空なら出さない）。持ち物の選択が診断に効いていることを
+  /// ユーザーに伝えるための行（設計書 §7.3）。
+  final String bagStyle;
+
+  const _SummaryCard({required this.text, required this.bagStyle});
 
   @override
   Widget build(BuildContext context) {
@@ -528,6 +536,25 @@ class _SummaryCard extends StatelessWidget {
                 _cardTitle('冒険のまとめ'),
                 const SizedBox(height: 8),
                 Text(text, style: const TextStyle(fontSize: 13, height: 1.6)),
+                if (bagStyle.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Text('🎒', style: TextStyle(fontSize: 15)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          bagStyle,
+                          style: const TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFB5713C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),

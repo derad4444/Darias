@@ -279,6 +279,45 @@ class GameState {
     ];
   }
 
+  /// **冒険を終えた時点の鞄の中身**から加算する特性（設計書 §5）。
+  ///
+  /// 道中の一回一回の選択では測れない「結局どう持ち歩いたか」を見る。
+  /// 終了経路が複数あるため、状態から導出する形にして取りこぼしを防いでいる。
+  ActionLog get _bagEndingTraits {
+    var log = const ActionLog();
+    // 回復薬を抱えたまま終えた＝守りを厚くしておきたい人
+    if (itemCount >= 3) log = log.copyWith(caution: 2);
+    // 使わない装備を持ち歩いたまま終えた＝手放せない人
+    final unusedGear = bag.where((b) => b.isEquipment && !b.equipped).length;
+    if (unusedGear > 0) log = log.copyWith(persistence: unusedGear.clamp(1, 3));
+    // 地図を使わずに持ち続けた＝抱え込む人
+    if (hasTreasureMap) log = log.copyWith(persistence: 1);
+    return log;
+  }
+
+  /// 結果画面・保存で使う最終的な行動ログ。
+  /// 道中の `actionLog` に、終了時の鞄の使い方（[_bagEndingTraits]）を足したもの。
+  ActionLog get finalActionLog {
+    final b = _bagEndingTraits;
+    return actionLog.copyWith(
+      caution: b.caution,
+      persistence: b.persistence,
+    );
+  }
+
+  /// 鞄の使い方を一言でまとめたラベル（結果画面用・設計書 §7.3）。
+  /// 該当が無ければ空文字。
+  String get bagStyleLabel {
+    final unusedGear = bag.where((b) => b.isEquipment && !b.equipped).length;
+    if (unusedGear >= 2 || (hasTreasureMap && unusedGear >= 1)) {
+      return '手に入れたものを手放せないタイプ';
+    }
+    if (itemCount >= 3) return '備えを厚くして進むタイプ';
+    if (bagUsed == 0) return '身軽なまま駆け抜けるタイプ';
+    if (weapon != null && armor != null) return '装備を整えて挑むタイプ';
+    return '';
+  }
+
   /// 鞄の [index] 番目の装備を外した鞄を返す。
   List<BagItem> bagUnequipped(int index) {
     if (index < 0 || index >= bag.length) return bag;
