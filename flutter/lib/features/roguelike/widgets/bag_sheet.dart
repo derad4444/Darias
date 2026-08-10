@@ -6,7 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bag_item.dart';
 import '../models/game_state.dart';
 import '../providers/roguelike_provider.dart';
-import 'dungeon_theme.dart';
+
+// 鞄の中＝革のカバンの内側をイメージした、オレンジと茶の中間色。
+const Color _kBagBgTop = Color(0xFFC98A4E);
+const Color _kBagBgBottom = Color(0xFF8F5A2E);
+const Color _kBagCard = Color(0xFFFDF4E6); // 生成りのカード
+const Color _kBagAccent = Color(0xFFE0842C);
+const Color _kBagText = Color(0xFF4A3520);
 
 /// 鞄（インベントリ）のボトムシート。
 ///
@@ -25,192 +31,279 @@ Future<void> showBagSheet(BuildContext context) {
   );
 }
 
-class _BagSheet extends ConsumerWidget {
+class _BagSheet extends ConsumerStatefulWidget {
   const _BagSheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_BagSheet> createState() => _BagSheetState();
+}
+
+class _BagSheetState extends ConsumerState<_BagSheet> {
+  /// 詳細パネルに出しているスロット。中身が減ったら自動で補正する。
+  int _selected = 0;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(roguelikeProvider);
     if (state == null) return const SizedBox.shrink();
 
+    final hasSelection = _selected < state.bag.length;
+
     return Container(
       decoration: const BoxDecoration(
-        color: kRoguelikeCard,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [_kBagBgTop, _kBagBgBottom],
+        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
       child: SafeArea(
         top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 42,
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.15),
+                  color: Colors.white.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
-            ),
-            Row(
-              children: [
-                const Text('🎒', style: TextStyle(fontSize: 20)),
-                const SizedBox(width: 6),
-                const Text('鞄', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(width: 8),
-                Text(
-                  '${state.bagUsed} / ${state.bagCapacity}',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: state.bagIsFull ? Colors.red : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              '装備している武器・防具も枠を使う。売れるのは行商人だけ。',
-              style: TextStyle(fontSize: 11, color: Colors.grey),
-            ),
-            const SizedBox(height: 12),
-            if (state.bag.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: Text('鞄は空っぽだ。', style: TextStyle(color: Colors.grey))),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: state.bag.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (_, i) => _BagRow(state: state, index: i),
-                ),
-              ),
-            // 空き枠を点線で見せる（あと何個持てるかを直感的に）
-            if (state.bagFree > 0) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  for (var i = 0; i < state.bagFree; i++)
-                    Container(
-                      width: 26,
-                      height: 26,
-                      margin: const EdgeInsets.only(right: 6),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: Colors.black.withValues(alpha: 0.15),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(width: 4),
-                  Text('空き${state.bagFree}', style: const TextStyle(fontSize: 11, color: Colors.grey)),
-                ],
-              ),
+              _header(context, state),
+              const SizedBox(height: 12),
+              _slots(state),
+              const SizedBox(height: 10),
+              _capacityHint(state),
+              const SizedBox(height: 12),
+              if (hasSelection)
+                _detail(context, state, _selected)
+              else
+                _emptyDetail(),
             ],
-          ],
+          ),
         ),
       ),
     );
   }
-}
 
-class _BagRow extends ConsumerWidget {
-  final GameState state;
-  final int index;
+  // ── ヘッダー（タイトル・所持数・閉じる） ──────────────────
+  Widget _header(BuildContext context, GameState state) {
+    return Row(
+      children: [
+        const SizedBox(width: 40),
+        Expanded(
+          child: Column(
+            children: [
+              const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('🎒', style: TextStyle(fontSize: 22)),
+                  SizedBox(width: 8),
+                  Text(
+                    'カバン',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  '所持数  ${state.bagUsed} / ${state.bagCapacity}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: state.bagIsFull ? Colors.red : _kBagText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          width: 40,
+          child: Align(
+            alignment: Alignment.topRight,
+            child: Material(
+              color: Colors.white.withValues(alpha: 0.9),
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: () => Navigator.pop(context),
+                child: const Padding(
+                  padding: EdgeInsets.all(7),
+                  child: Icon(Icons.close, size: 20, color: _kBagText),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
-  const _BagRow({required this.state, required this.index});
+  // ── スロット一覧（容量ぶん並べ、空きは点線＋） ──────────────
+  Widget _slots(GameState state) {
+    return Row(
+      children: [
+        for (var i = 0; i < state.bagCapacity; i++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3),
+              child: i < state.bag.length
+                  ? _FilledSlot(
+                      item: state.bag[i],
+                      selected: i == _selected,
+                      onTap: () => setState(() => _selected = i),
+                    )
+                  : const _EmptySlot(),
+            ),
+          ),
+      ],
+    );
+  }
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget _capacityHint(GameState state) {
+    final free = state.bagFree;
+    return Text(
+      free > 0 ? 'あと $free 個まで持てます' : 'いっぱいです。何かを手放そう',
+      style: TextStyle(
+        fontSize: 12,
+        fontWeight: FontWeight.bold,
+        color: free > 0 ? Colors.white : const Color(0xFFFFD9D9),
+      ),
+    );
+  }
+
+  Widget _emptyDetail() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      decoration: BoxDecoration(
+        color: _kBagCard.withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: const Center(
+        child: Text('カバンは空っぽだ。', style: TextStyle(color: _kBagText)),
+      ),
+    );
+  }
+
+  // ── 詳細パネル ──────────────────────────────────────
+  Widget _detail(BuildContext context, GameState state, int index) {
     final item = state.bag[index];
     final notifier = ref.read(roguelikeProvider.notifier);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: item.equipped
-            ? const Color(0xFF6E9BE6).withValues(alpha: 0.10)
-            : const Color(0xFFF5F7FB),
-        borderRadius: BorderRadius.circular(14),
-        border: item.equipped
-            ? Border.all(color: const Color(0xFF6E9BE6).withValues(alpha: 0.45))
-            : null,
+        color: _kBagCard,
+        borderRadius: BorderRadius.circular(18),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(item.emoji, style: const TextStyle(fontSize: 20)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: _kBagAccent.withValues(alpha: 0.35)),
+                ),
+                child: Center(child: Text(item.emoji, style: const TextStyle(fontSize: 36))),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Flexible(
-                      child: Text(
-                        item.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                      ),
+                    Text(
+                      item.name,
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _kBagText),
                     ),
-                    if (item.equipped) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF6E9BE6),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text('装備中', style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold)),
-                      ),
-                    ],
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        _Badge(text: item.categoryLabel, color: _kBagAccent),
+                        if (item.equipped) ...[
+                          const SizedBox(width: 5),
+                          const _Badge(text: '装備中', color: Color(0xFF3F8F5E)),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Text(
+                      item.description,
+                      style: const TextStyle(fontSize: 12, height: 1.5, color: _kBagText),
+                    ),
                   ],
                 ),
-                Text(item.effectLabel, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
-            ),
+              ),
+            ],
           ),
-          // 装備 / 外す / 使う
-          if (item.isEquipment)
-            _SmallButton(
-              label: item.equipped ? '外す' : '装備',
-              onTap: () => item.equipped
-                  ? notifier.unequipFromBag(index)
-                  : notifier.equipFromBag(index),
-            )
-          else if (item.isPotion)
-            _SmallButton(
-              label: '使う',
-              // 満タンで飲むと無駄になるだけなので押させない
-              onTap: state.hp >= state.maxHp
-                  ? null
-                  : () => notifier.usePotionFromBag(index),
-            )
-          else if (item.isTreasureMap)
-            _SmallButton(
-              label: '使う',
-              onTap: () => notifier.useTreasureMapFromBag(index),
-            ),
-          const SizedBox(width: 6),
-          _SmallButton(
-            label: '捨てる',
-            danger: true,
-            onTap: () => _confirmDiscard(context, ref, item),
+          const SizedBox(height: 10),
+          Text(
+            item.effectDetail,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFC2541E)),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (item.isEquipment)
+                _ActionButton(
+                  label: item.equipped ? 'はずす' : 'そうびする',
+                  onTap: () => item.equipped
+                      ? notifier.unequipFromBag(index)
+                      : notifier.equipFromBag(index),
+                )
+              else if (item.isPotion)
+                _ActionButton(
+                  label: 'つかう',
+                  // 満タンで飲んでも無駄になるだけなので押させない
+                  onTap: state.hp >= state.maxHp ? null : () => notifier.usePotionFromBag(index),
+                )
+              else if (item.isTreasureMap)
+                _ActionButton(
+                  label: 'つかう',
+                  onTap: () => notifier.useTreasureMapFromBag(index),
+                ),
+              const Spacer(),
+              _ActionButton(
+                label: 'すてる',
+                danger: true,
+                onTap: () => _confirmDiscard(context, item, index),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '行商人に会えれば 金貨${item.sellPrice} で売れる',
+            style: TextStyle(fontSize: 10.5, color: _kBagText.withValues(alpha: 0.6)),
           ),
         ],
       ),
     );
   }
 
-  Future<void> _confirmDiscard(BuildContext context, WidgetRef ref, BagItem item) async {
+  Future<void> _confirmDiscard(BuildContext context, BagItem item, int index) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -232,35 +325,129 @@ class _BagRow extends ConsumerWidget {
         ],
       ),
     );
-    if (ok == true) {
+    if (ok == true && mounted) {
       ref.read(roguelikeProvider.notifier).discardFromBag(index);
+      // 末尾を捨てると選択位置が範囲外になるので手前に寄せる
+      setState(() => _selected = _selected.clamp(0, 99));
     }
   }
 }
 
-class _SmallButton extends StatelessWidget {
+// ── スロット ────────────────────────────────────────────
+
+class _FilledSlot extends StatelessWidget {
+  final BagItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilledSlot({required this.item, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 0.82,
+      child: Material(
+        color: _kBagCard,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: selected ? _kBagAccent : Colors.brown.withValues(alpha: 0.18),
+                width: selected ? 2.5 : 1,
+              ),
+            ),
+            child: Stack(
+              children: [
+                Center(child: Text(item.emoji, style: const TextStyle(fontSize: 26))),
+                if (item.equipped)
+                  Positioned(
+                    right: 3,
+                    top: 3,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF3F8F5E),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.check, size: 9, color: Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptySlot extends StatelessWidget {
+  const _EmptySlot();
+
+  @override
+  Widget build(BuildContext context) {
+    return AspectRatio(
+      aspectRatio: 0.82,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+        ),
+        child: Icon(Icons.add, color: Colors.white.withValues(alpha: 0.55), size: 22),
+      ),
+    );
+  }
+}
+
+// ── 部品 ────────────────────────────────────────────────
+
+class _Badge extends StatelessWidget {
+  final String text;
+  final Color color;
+  const _Badge({required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          text,
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
+        ),
+      );
+}
+
+class _ActionButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
   final bool danger;
 
-  const _SmallButton({required this.label, this.onTap, this.danger = false});
+  const _ActionButton({required this.label, this.onTap, this.danger = false});
 
   @override
   Widget build(BuildContext context) {
-    final color = danger ? Colors.red : const Color(0xFF6E9BE6);
+    final color = danger ? const Color(0xFFC0554A) : _kBagAccent;
     final enabled = onTap != null;
     return Material(
-      color: enabled ? color.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.04),
-      borderRadius: BorderRadius.circular(10),
+      color: enabled ? color.withValues(alpha: 0.18) : Colors.black.withValues(alpha: 0.05),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
           child: Text(
             label,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 13,
               fontWeight: FontWeight.bold,
               color: enabled ? color : Colors.grey,
             ),

@@ -54,6 +54,37 @@ class BagItem {
         _ => equipment?.effectLabel ?? '',
       };
 
+  /// 種別バッジの文言。
+  String get categoryLabel => switch (id) {
+        kPotionId => '回復アイテム',
+        kTreasureMapId => '探索アイテム',
+        _ => equipment?.kind == EquipKind.weapon ? '武器' : '防具',
+      };
+
+  /// 詳細パネルに出す説明文。
+  String get description => switch (id) {
+        kPotionId => '飲むと傷が癒える薬。\n戦っている最中でも使える。',
+        kTreasureMapId => '宝箱の在りかが記された地図。\n使うと盤面の宝箱が見えるようになる。',
+        'branch' => 'その辺で拾った手頃な枝。\n無いよりはずっとましだ。',
+        'iron_sword' => '扱いやすい鉄の剣。\nひと振りの重みが心を落ち着ける。',
+        'master_sword' => '名工が鍛えたひと振り。\n迷いごと断ち切れそうな切れ味。',
+        'cloth_armor' => '厚手の布を重ねた服。\n無防備よりはずっと心強い。',
+        'iron_armor' => '鉄を打ち出した鎧。\n重いが、その重さが守ってくれる。',
+        'holy_robe' => '祈りが編み込まれたローブ。\n身にまとうと不思議と落ち着く。',
+        _ => '',
+      };
+
+  /// 効果の数値表記（詳細パネル用）。
+  String get effectDetail => switch (id) {
+        kPotionId => '回復量：HP +$kPotionHealAmount',
+        kTreasureMapId => '効果：宝箱の位置が判明',
+        _ => equipment == null
+            ? ''
+            : (equipment!.kind == EquipKind.weapon
+                ? '与ダメージ +${equipment!.power}'
+                : '被ダメージ -${equipment!.power}'),
+      };
+
   /// 買値（金貨）。
   static int priceOf(String id) => switch (id) {
         kPotionId => 3,
