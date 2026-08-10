@@ -45,7 +45,7 @@ List<BattleChoice> _bossChoices({
       BattleChoice(
         label: '正面から向き合う',
         riskHint: '当たり外れあり',
-        selectTrait: const ActionLog(challenge: 3, persistence: 1),
+        selectTrait: const ActionLog(challenge: 1, persistence: 2),
         outcomes: [
           Outcome(
             tier: OutcomeTier.success, weight: 65,
@@ -65,7 +65,7 @@ List<BattleChoice> _bossChoices({
         label: observeLabel,
         riskHint: '安定・低リスク（幼少〜）',
         minStage: GrowthStage.young,
-        selectTrait: const ActionLog(logic: 3, caution: 1),
+        selectTrait: const ActionLog(logic: 2, planning: 2),
         outcomes: [
           Outcome(
             tier: OutcomeTier.success, weight: 1,
@@ -156,7 +156,7 @@ class Dungeons {
           BattleChoice(
             label: '正面から向き合う',
             riskHint: '当たり外れあり',
-            selectTrait: const ActionLog(challenge: 2, persistence: 1),
+            selectTrait: const ActionLog(challenge: 1, persistence: 2),
             outcomes: [
               Outcome(tier: OutcomeTier.success, weight: 65, resultText: '真剣に向き合うと、悩みの核心が見えてきた。', damageToEnemy: 9, damageToPlayer: 6),
               Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '感情が先走り、うまく向き合えなかった。深く傷ついた。', damageToEnemy: 4, damageToPlayer: 9, traitDelta: ActionLog(caution: 1)),
@@ -167,7 +167,7 @@ class Dungeons {
             label: '観察する',
             riskHint: '安定・低リスク（幼少〜）',
             minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 2, caution: 1),
+            selectTrait: const ActionLog(logic: 1, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '悩みのパターンを冷静に観察した。次の一手が見えた。', damageToEnemy: 5, damageToPlayer: 2)],
           ),
           BattleChoice(
@@ -176,14 +176,14 @@ class Dungeons {
             upfrontCost: {'bond': -1},
             minStage: GrowthStage.adult,
             requiresCompanion: true,
-            selectTrait: const ActionLog(cooperation: 3, altruism: 1),
+            selectTrait: const ActionLog(cooperation: 2, altruism: 1),
             outcomes: [Outcome(tier: OutcomeTier.great, weight: 1, resultText: '仲間の視点で見つめ直すと、悩みは驚くほど小さくなった。', damageToEnemy: 13)],
           ),
           BattleChoice(
             label: '交渉して距離を縮める',
             riskHint: '当たれば特効（成人）',
             minStage: GrowthStage.adult,
-            selectTrait: const ActionLog(flexibility: 2, cooperation: 2),
+            selectTrait: const ActionLog(flexibility: 1, cooperation: 2),
             outcomes: [
               Outcome(tier: OutcomeTier.great, weight: 65, resultText: '相手の立場を理解しようと歩み寄った。わだかまりが大きく解けた。', damageToEnemy: 15),
               Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '歩み寄ろうとしたが、空回りした。少し気まずくなっただけだ。', damageToEnemy: 4, traitDelta: ActionLog(caution: 1)),
@@ -217,7 +217,7 @@ class Dungeons {
           BattleChoice(
             label: '正面から向き合う',
             riskHint: '当たり外れあり',
-            selectTrait: const ActionLog(challenge: 3, persistence: 1),
+            selectTrait: const ActionLog(challenge: 1, persistence: 2),
             outcomes: [
               Outcome(tier: OutcomeTier.success, weight: 65, resultText: '不安を直視した。怖かったが、少し楽になった。', damageToEnemy: 8, damageToPlayer: 6),
               Outcome(tier: OutcomeTier.failure, weight: 35, resultText: '考えるほど不安が膨らみ、飲み込まれそうになった。', damageToEnemy: 3, damageToPlayer: 8, traitDelta: ActionLog(caution: 1)),
@@ -228,7 +228,7 @@ class Dungeons {
             label: '情報を集めて見通す',
             riskHint: '安定・低リスク（幼少〜）',
             minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 3, caution: 1),
+            selectTrait: const ActionLog(logic: 2, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '分からないことを一つずつ調べると、霧が少し晴れた。', damageToEnemy: 6, damageToPlayer: 2)],
           ),
           _special('小さな目標を立てる', '遠い未来ではなく、今できることに集中した。不安が一気に薄れた。', dmg: 14, trait: const ActionLog(planning: 3, logic: 1)),
@@ -259,7 +259,7 @@ class Dungeons {
           BattleChoice(
             label: '自分を信じて攻撃する',
             riskHint: '当たり外れあり・封じられやすい',
-            selectTrait: const ActionLog(challenge: 3, persistence: 2),
+            selectTrait: const ActionLog(challenge: 2, persistence: 1),
             outcomes: [
               Outcome(tier: OutcomeTier.success, weight: 60, resultText: '「できる」と言い聞かせて立ち向かった。', damageToEnemy: 9, damageToPlayer: 7),
               Outcome(tier: OutcomeTier.failure, weight: 40, resultText: '勢いだけで挑んだが、否定の声に呑まれた。', damageToEnemy: 4, damageToPlayer: 9, traitDelta: ActionLog(caution: 1)),
@@ -270,7 +270,7 @@ class Dungeons {
             label: '客観的に分析する',
             riskHint: '安定・低リスク（幼少〜）',
             minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 3, caution: 1),
+            selectTrait: const ActionLog(logic: 2, planning: 2),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '感情から離れて事実を見た。否定の声が静かになった。', damageToEnemy: 7, damageToPlayer: 2)],
           ),
           _special('過去の成功を思い出す', 'できたことを振り返ると、否定の声が大きく弱まった。', dmg: 14, trait: const ActionLog(persistence: 2, planning: 1)),
@@ -329,7 +329,7 @@ class Dungeons {
           confrontFailText: '寂しさに飲まれ、心を閉ざしてしまった。',
           observeLabel: '今あるつながりを思い出す',
           observeText: '支えてくれた人を思い出すと、心細さが薄れた。',
-          special: _special('誰かに声をかける', '勇気を出して頼ると、孤独は思ったより小さかった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
+          special: _special('誰かに声をかける', '勇気を出して頼ると、孤独は思ったより小さかった。', trait: const ActionLog(cooperation: 2, altruism: 1)),
         ),
       ),
     ),
@@ -491,7 +491,7 @@ class Dungeons {
           BattleChoice(
             label: '全力で立ち向かう',
             riskHint: '当たり外れあり',
-            selectTrait: const ActionLog(challenge: 3, persistence: 2),
+            selectTrait: const ActionLog(challenge: 2, persistence: 1),
             outcomes: [
               Outcome(tier: OutcomeTier.success, weight: 70, resultText: '全てをぶつけた。大きなダメージを与えたが、反撃も受けた。', damageToEnemy: 12, damageToPlayer: 10),
               Outcome(tier: OutcomeTier.failure, weight: 30, resultText: '勢い任せの一撃は受け止められ、手痛い反撃を浴びた。', damageToEnemy: 6, damageToPlayer: 14, traitDelta: ActionLog(caution: 1)),
@@ -502,7 +502,7 @@ class Dungeons {
             label: '観察して弱点を探す',
             riskHint: '安定・低リスク（幼少〜）',
             minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 3, caution: 2),
+            selectTrait: const ActionLog(logic: 1, curiosity: 1),
             outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '冷静に観察すると、守護者の動きにパターンを見つけた。', damageToEnemy: 7, damageToPlayer: 5)],
           ),
           BattleChoice(
@@ -512,7 +512,7 @@ class Dungeons {
             minStage: GrowthStage.adult,
             requiresCompanion: true,
             oncePerBattle: true,
-            selectTrait: const ActionLog(cooperation: 3, altruism: 2),
+            selectTrait: const ActionLog(cooperation: 2, altruism: 2),
             outcomes: [
               // 成功（60%）: 最大火力。失敗（40%）: かみ合わず小ダメージ（絆・自傷は消費）。
               Outcome(tier: OutcomeTier.great, weight: 60, resultText: '仲間と力を合わせ、守護者を追い詰めた。絆の力は強い。ただし無理を通した反動もある。', damageToEnemy: 20, damageToPlayer: 6),

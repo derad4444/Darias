@@ -209,7 +209,7 @@ class GameEvents {
         EventChoice(
           label: '食料を分ける',
           riskHint: '善意の投資',
-          selectTrait: ActionLog(altruism: 3, cooperation: 1),
+          selectTrait: ActionLog(altruism: 2, cooperation: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 35,
@@ -246,7 +246,7 @@ class GameEvents {
         EventChoice(
           label: '立ち去る',
           riskHint: 'リスクなし',
-          selectTrait: ActionLog(planning: 1),
+          selectTrait: ActionLog(planning: 1, persistence: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -267,7 +267,7 @@ class GameEvents {
         EventChoice(
           label: '崖道を進む',
           riskHint: '危険だが速い',
-          selectTrait: ActionLog(challenge: 3, intuition: 1),
+          selectTrait: ActionLog(challenge: 2, intuition: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 20,
@@ -292,7 +292,7 @@ class GameEvents {
           label: '迂回路を行く',
           riskHint: '安全だが遅い（🍞-1）',
           extraFoodCost: 1,
-          selectTrait: ActionLog(caution: 2, planning: 1),
+          selectTrait: ActionLog(caution: 3, planning: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -306,7 +306,7 @@ class GameEvents {
           riskHint: '安全寄り・絆を消費（成人・相棒）',
           minStage: GrowthStage.adult,
           requiresCompanion: true,
-          selectTrait: ActionLog(logic: 2, caution: 1, cooperation: 1),
+          selectTrait: ActionLog(logic: 1, caution: 1, cooperation: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 80,
@@ -333,7 +333,7 @@ class GameEvents {
         EventChoice(
           label: '入って探索する',
           riskHint: '高リターンだが危険',
-          selectTrait: ActionLog(curiosity: 3, challenge: 1),
+          selectTrait: ActionLog(curiosity: 1, challenge: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 20,
@@ -386,7 +386,7 @@ class GameEvents {
         EventChoice(
           label: '無視して進む',
           riskHint: 'リスクなし・体力温存',
-          selectTrait: ActionLog(planning: 1),
+          selectTrait: ActionLog(planning: 1, caution: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -407,7 +407,7 @@ class GameEvents {
         EventChoice(
           label: '休憩を取る',
           riskHint: '確定・食料を消費',
-          selectTrait: ActionLog(altruism: 3, cooperation: 2),
+          selectTrait: ActionLog(altruism: 1, cooperation: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -488,7 +488,7 @@ class GameEvents {
           riskHint: '安全だが遅い（🍞-1・幼少〜）',
           extraFoodCost: 1,
           minStage: GrowthStage.young,
-          selectTrait: ActionLog(logic: 3, curiosity: 2),
+          selectTrait: ActionLog(logic: 2, curiosity: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 6,
@@ -517,7 +517,7 @@ class GameEvents {
         EventChoice(
           label: '無視する',
           riskHint: 'リスクなし',
-          selectTrait: ActionLog(caution: 1),
+          selectTrait: ActionLog(caution: 2, flexibility: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -538,7 +538,7 @@ class GameEvents {
         EventChoice(
           label: '近づいて調べる',
           riskHint: '未知に踏み込む（好奇心）',
-          selectTrait: ActionLog(curiosity: 3, logic: 1),
+          selectTrait: ActionLog(curiosity: 3, intuition: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 25,
@@ -562,7 +562,7 @@ class GameEvents {
         EventChoice(
           label: 'そっと触れてみる',
           riskHint: '直感に賭ける（当たり外れ）',
-          selectTrait: ActionLog(challenge: 2, intuition: 1),
+          selectTrait: ActionLog(intuition: 2, curiosity: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 40,
@@ -600,7 +600,7 @@ class GameEvents {
         EventChoice(
           label: '耳を傾けて向き合う',
           riskHint: '自分と対話する（好奇心）',
-          selectTrait: ActionLog(curiosity: 2, logic: 1),
+          selectTrait: ActionLog(curiosity: 2, altruism: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 35,
@@ -624,7 +624,7 @@ class GameEvents {
         EventChoice(
           label: '理屈で問い返す',
           riskHint: '冷静に考える（論理）',
-          selectTrait: ActionLog(logic: 3),
+          selectTrait: ActionLog(logic: 3, persistence: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 70,
@@ -641,7 +641,7 @@ class GameEvents {
         EventChoice(
           label: '耳をふさいで先へ',
           riskHint: 'リスクなし・向き合わない',
-          selectTrait: ActionLog(caution: 1),
+          selectTrait: ActionLog(caution: 1, persistence: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -663,7 +663,7 @@ class GameEvents {
           riskHint: '安全だが遅い（🍞-1・幼少〜）',
           extraFoodCost: 1,
           minStage: GrowthStage.young,
-          selectTrait: ActionLog(curiosity: 2, logic: 2, persistence: 1),
+          selectTrait: ActionLog(curiosity: 2, logic: 2, persistence: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 30,
@@ -685,7 +685,7 @@ class GameEvents {
         EventChoice(
           label: '直感で意味を掴む',
           riskHint: 'ひらめきに賭ける（当たり外れ）',
-          selectTrait: ActionLog(intuition: 2, challenge: 1),
+          selectTrait: ActionLog(intuition: 3, flexibility: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 35,
@@ -707,7 +707,7 @@ class GameEvents {
         EventChoice(
           label: '無視して進む',
           riskHint: 'リスクなし',
-          selectTrait: ActionLog(caution: 1),
+          selectTrait: ActionLog(caution: 1, flexibility: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -746,7 +746,7 @@ class GameEvents {
           label: '軽く休んで先へ進む',
           riskHint: '確定・食料を少し消費（成人）',
           minStage: GrowthStage.young,
-          selectTrait: ActionLog(flexibility: 1),
+          selectTrait: ActionLog(flexibility: 2, intuition: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -758,7 +758,7 @@ class GameEvents {
         EventChoice(
           label: '休まず進む',
           riskHint: 'リスクなし・体力温存',
-          selectTrait: ActionLog(challenge: 1, persistence: 1),
+          selectTrait: ActionLog(challenge: 1, persistence: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -788,7 +788,7 @@ class GameEvents {
         EventChoice(
           label: '明るい右の道へ',
           riskHint: '安全・低リターン',
-          selectTrait: ActionLog(caution: 1),
+          selectTrait: ActionLog(caution: 1, planning: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -800,7 +800,7 @@ class GameEvents {
         EventChoice(
           label: '暗い左の道へ',
           riskHint: '高リターンだが危険',
-          selectTrait: ActionLog(curiosity: 3, challenge: 1),
+          selectTrait: ActionLog(curiosity: 2, intuition: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 25,
@@ -856,7 +856,7 @@ class GameEvents {
           riskHint: '回復薬消費・相手次第',
           upfrontCost: {'items': -1},
           requiresItem: true,
-          selectTrait: ActionLog(altruism: 3, cooperation: 2),
+          selectTrait: ActionLog(altruism: 2, cooperation: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 80,
@@ -874,7 +874,7 @@ class GameEvents {
         EventChoice(
           label: '食料を分ける',
           riskHint: '食料消費・相手次第',
-          selectTrait: ActionLog(altruism: 3, cooperation: 1),
+          selectTrait: ActionLog(altruism: 2, cooperation: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.great, weight: 40,
@@ -897,7 +897,7 @@ class GameEvents {
           upfrontCost: {'items': -1},
           minStage: GrowthStage.young,
           requiresItem: true,
-          selectTrait: ActionLog(logic: 2, caution: 2, altruism: 1),
+          selectTrait: ActionLog(logic: 2, caution: 1, altruism: 2),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
@@ -910,7 +910,7 @@ class GameEvents {
         EventChoice(
           label: '立ち去る',
           riskHint: 'リスクなし',
-          selectTrait: ActionLog(persistence: 1),
+          selectTrait: ActionLog(persistence: 1, flexibility: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,

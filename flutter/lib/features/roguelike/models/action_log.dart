@@ -94,7 +94,9 @@ class ActionLog {
     '風': curiosity + flexibility + intuition,   // 自由・変化
     '土': caution + planning + persistence,      // 堅実・継続
     '雷': challenge + intuition + flexibility,   // 外向の瞬発（直感を外へ放つ）
-    '氷': caution + intuition + persistence,     // 内向の瞬発（直感を内に止める）
+    // 氷は本編（axisCalculator.js）で「内向・論理重視・直感」と定義されている。
+    // 執着性だと炎・土と全特性が重なって埋もれるため、本編に合わせて論理性を持たせる。
+    '氷': caution + intuition + logic,           // 内向の瞬発（直感を内に止める）
     '光': logic + planning + cooperation,        // 外向の理性（理性を他者へ向ける）
     '闇': logic + curiosity + caution,           // 内向の理性（理性を内へ向ける）
   };
@@ -104,9 +106,14 @@ class ActionLog {
     final totals = elementScores();
     final maxVal = totals.values.reduce((a, b) => a > b ? a : b);
     if (maxVal == 0) return '無';
-    // 最大値との差が小さい場合は「無」
+    // 1位と2位が同点なら「無」。
+    //
+    // 8元素は特性を共有している（例: 炎と雷は挑戦性・直感性が共通で、
+    // 差がつくのは執着性 vs 柔軟性だけ）ため、差は構造的に開きにくい。
+    // かつて閾値が3だったときは「無」が26〜54%を占め、
+    // 実際には強い傾向が3つあるのに「型なし」と診断されていた。
     final sorted = totals.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-    if (sorted[0].value - sorted[1].value < 3) return '無';
+    if (sorted[0].value - sorted[1].value < 1) return '無';
     return sorted.first.key;
   }
 

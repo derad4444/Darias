@@ -171,7 +171,8 @@ class Enemies {
         label: '逃げる',
         riskHint: '離脱を試みる',
         isFlee: true,
-        selectTrait: ActionLog(flexibility: 1),
+        // 引くのも判断。柔軟性は供給が少なく水・風・雷が伸びないため厚くする。
+        selectTrait: ActionLog(flexibility: 2),
       );
 
   /// ザコ（もやもや・断片）共通の選択肢。dmg で強さを調整。
@@ -179,7 +180,8 @@ class Enemies {
         BattleChoice(
           label: '立ち向かう',
           riskHint: '当たり外れあり',
-          selectTrait: const ActionLog(challenge: 2),
+          // 挑戦性だけだと炎と雷が区別できないため直感性を足す。
+          selectTrait: const ActionLog(challenge: 1, intuition: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 70,
@@ -199,7 +201,8 @@ class Enemies {
           label: '観察していなす',
           riskHint: '安定・低リスク（幼少〜）',
           minStage: GrowthStage.young,
-          selectTrait: const ActionLog(logic: 2, caution: 1),
+          // 論理性＋慎重性は闇に二重で入り独走の主因だったため好奇心へ。
+          selectTrait: const ActionLog(logic: 1, curiosity: 1),
           outcomes: [
             Outcome(
               tier: OutcomeTier.success, weight: 1,
