@@ -376,6 +376,8 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       food: food,
       money: money,
       bag: s.bagWithPotionCount(items),
+      // 鞄に入りきらない回復薬は装備と同じく「捨てるか諦めるか」を選ばせる
+      pendingPickupId: s.potionOverflow(items) > 0 ? kPotionId : null,
       bond: bond,
       companion: newCompanion,
       map: revealedMap,
@@ -502,15 +504,96 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
     );
   }
 
-  /// 装備を鞄に入れる。空きが無ければ入らない（満杯時の破棄選択はUI側で行う）。
-  /// 拾った装備は**自動では装備しない**（持ち替えるかはプレイヤーが選ぶ）。
+  /// 装備を拾ったときの処理。
+  ///
+  /// - **鞄が満杯**なら `pendingPickupId` を立てて「何を捨てるか／諦めるか」を選ばせる
+  /// - **空きがある**なら鞄に入れ、`pendingEquipId` を立てて「装備するか」を選ばせる
+  ///
+  /// 拾った装備を自動装備しないのは、**持ち替えるかどうか自体が
+  /// 執着性⇔柔軟性の判断材料**になるため（設計書 §4）。
   (GameState, String) _applyEquip(GameState s, Equipment item) {
     if (s.bagIsFull) {
-      return (s, '${item.emoji}${item.name}を見つけたが、鞄がいっぱいで持てなかった。');
+      return (
+        s.copyWith(pendingPickupId: item.id),
+        '${item.emoji}${item.name}を見つけた。だが鞄はいっぱいだ…',
+      );
     }
     return (
-      s.copyWith(bag: s.bagAdded(item.id)),
+      s.copyWith(bag: s.bagAdded(item.id), pendingEquipId: item.id),
       '${item.emoji}${item.name}を手に入れた！（${item.effectLabel}）',
+    );
+  }
+
+  // ===== 入手時の分岐（設計書 §4） =====
+
+  /// 満杯時に鞄の [index] を捨てて、待機中のアイテムを受け取る。
+  void resolvePickupByDiscard(int index) {
+    final s = state;
+    final pending = s?.pendingPickupId;
+    if (s == null || pending == null) return;
+    if (index < 0 || index >= s.bag.length) return;
+
+    final dropped = s.bag[index];
+    final afterDrop = s.bagRemovedAt(index);
+    state = s.copyWith(
+      bag: [...afterDrop, BagItem(pending)],
+      clearPendingPickup: true,
+      // 手放した対象で分かれる。回復薬＝守りを捨てる／装備＝攻めを捨てる。
+      actionLog: _mergeTrait(
+        s.actionLog,
+        dropped.isPotion
+            ? const ActionLog(challenge: 1)
+            : const ActionLog(caution: 1),
+      ),
+    );
+  }
+
+  /// 満杯時に新しいアイテムのほうを諦める。
+  /// **今持っているものを守るという強い執着のシグナル。**
+  void abandonPickup() {
+    final s = state;
+    if (s == null || s.pendingPickupId == null) return;
+    state = s.copyWith(
+      clearPendingPickup: true,
+      actionLog: _mergeTrait(s.actionLog, const ActionLog(persistence: 2)),
+    );
+  }
+
+  /// 拾った装備を装備するか決める。
+  ///
+  /// [equip] が true なら装備する。既に同種を装備していた場合は**持ち替え**になり、
+  /// 断った場合は今の装備に固執したとみなす。
+  void resolvePendingEquip(bool equip) {
+    final s = state;
+    final pending = s?.pendingEquipId;
+    if (s == null || pending == null) return;
+
+    final item = Equipments.byId(pending);
+    if (item == null) {
+      state = s.copyWith(clearPendingEquip: true);
+      return;
+    }
+    // 直前に鞄へ入れたもの＝同じIDで未装備の最後の1つ
+    final index = s.bag.lastIndexWhere((b) => b.id == pending && !b.equipped);
+    final hadSame = (item.kind == EquipKind.weapon ? s.weapon : s.armor) != null;
+
+    if (!equip) {
+      state = s.copyWith(
+        clearPendingEquip: true,
+        // 何も装備していない状態で見送るのは「持ち物を増やしただけ」なので
+        // 執着とは言えない。既に装備がある時だけ執着性を加算する。
+        actionLog: hadSame
+            ? _mergeTrait(s.actionLog, const ActionLog(persistence: 2))
+            : s.actionLog,
+      );
+      return;
+    }
+    state = s.copyWith(
+      bag: index >= 0 ? s.bagEquipped(index) : s.bag,
+      clearPendingEquip: true,
+      actionLog: hadSame
+          ? _mergeTrait(s.actionLog, const ActionLog(flexibility: 1, challenge: 1))
+          : s.actionLog,
     );
   }
 

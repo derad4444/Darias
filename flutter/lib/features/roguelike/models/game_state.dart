@@ -100,6 +100,14 @@ class GameState {
 
   /// 鞄の容量。成長段階で決まる（赤ちゃん3 / 幼少4 / 大人5）。
   final int bagCapacity;
+
+  /// **鞄が満杯で受け取れなかったアイテムのID。**
+  /// 「何を捨てるか」または「諦めるか」をプレイヤーに選ばせている間だけ入る。
+  final String? pendingPickupId;
+
+  /// **鞄に入れた装備の「装備するか」を確認中のID。**
+  /// 拾った装備を自動装備しないため、その場で持ち替えるか選ばせる。
+  final String? pendingEquipId;
   final List<List<MapCell>> map;
   final int playerLayer; // 現在いる層（0＝スタート層）
   final int playerIndex; // 現在いる層内のノード位置
@@ -138,6 +146,8 @@ class GameState {
     this.companion,
     this.bag = const [],
     required this.bagCapacity,
+    this.pendingPickupId,
+    this.pendingEquipId,
     required this.map,
     required this.playerLayer,
     required this.playerIndex,
@@ -299,6 +309,10 @@ class GameState {
     Companion? companion,
     bool clearCompanion = false,
     List<BagItem>? bag,
+    String? pendingPickupId,
+    bool clearPendingPickup = false,
+    String? pendingEquipId,
+    bool clearPendingEquip = false,
     List<List<MapCell>>? map,
     int? playerLayer,
     int? playerIndex,
@@ -340,6 +354,8 @@ class GameState {
       // 鞄は容量を超えないよう切り詰める（溢れる操作はUI側で防ぐ前提の保険）
       bag: (bag ?? this.bag).take(bagCapacity).toList(),
       bagCapacity: bagCapacity,
+      pendingPickupId: clearPendingPickup ? null : (pendingPickupId ?? this.pendingPickupId),
+      pendingEquipId: clearPendingEquip ? null : (pendingEquipId ?? this.pendingEquipId),
       map: map ?? this.map,
       playerLayer: playerLayer ?? this.playerLayer,
       playerIndex: playerIndex ?? this.playerIndex,

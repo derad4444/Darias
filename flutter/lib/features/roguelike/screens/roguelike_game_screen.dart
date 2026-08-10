@@ -17,6 +17,7 @@ import '../providers/roguelike_provider.dart';
 import '../widgets/map_grid_widget.dart';
 import '../widgets/resource_bar_widget.dart';
 import '../widgets/bag_sheet.dart';
+import '../widgets/pickup_dialogs.dart';
 import '../widgets/dungeon_theme.dart';
 import '../widgets/roguelike_banner.dart';
 import '../../../presentation/providers/character_provider.dart';
@@ -27,11 +28,42 @@ import '../../../presentation/widgets/character/element_effect_widget.dart' show
 
 const _kPink = Color(0xFFE08AAE);
 
-class RoguelikeGameScreen extends ConsumerWidget {
+class RoguelikeGameScreen extends ConsumerStatefulWidget {
   const RoguelikeGameScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RoguelikeGameScreen> createState() => _RoguelikeGameScreenState();
+}
+
+class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
+  /// 入手ダイアログを二重に開かないためのフラグ。
+  bool _pickupDialogOpen = false;
+
+  /// 入手待ちの状態が立っていればダイアログを出す（設計書 §4）。
+  void _handlePendingPickup(GameState s) {
+    if (_pickupDialogOpen) return;
+    final showFull = s.pendingPickupId != null;
+    final showEquip = s.pendingEquipId != null;
+    if (!showFull && !showEquip) return;
+
+    _pickupDialogOpen = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        _pickupDialogOpen = false;
+        return;
+      }
+      // 満杯の判断を先に片付ける（両方立つことは無いが順序を固定しておく）
+      if (showFull) {
+        await showPickupFullDialog(context, ref);
+      } else {
+        await showEquipPromptDialog(context, ref);
+      }
+      if (mounted) setState(() => _pickupDialogOpen = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final gameState = ref.watch(roguelikeProvider);
 
     if (gameState == null) {
@@ -42,6 +74,8 @@ class RoguelikeGameScreen extends ConsumerWidget {
       WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/roguelike/result'));
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    _handlePendingPickup(gameState);
 
     final details = ref.watch(characterDetailsProvider).valueOrNull;
     final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
