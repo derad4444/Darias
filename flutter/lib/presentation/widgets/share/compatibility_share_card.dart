@@ -72,12 +72,36 @@ class CompatibilityShareCard extends StatelessWidget {
             valueColor: AlwaysStoppedAnimation<Color>(category.color),
           ),
         ),
-        const SizedBox(height: 16),
-        ShareCardPanel(
-          child: Text(diagnosis.comment, style: kShareCardBodyStyle),
+        const SizedBox(height: 14),
+        // コメントは30文字以内の短文（diagnoseCompatibility.js のプロンプト制約）。
+        // パネルに入れると間延びするのでカードの見出しとして中央に大きく置く。
+        Center(
+          child: Text(
+            '「${diagnosis.comment}」',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.5,
+              fontWeight: FontWeight.bold,
+              color: category.color,
+            ),
+          ),
         ),
-        if (diagnosis.advice.isNotEmpty) ...[
+        if (diagnosis.conversation.isNotEmpty) ...[
           const SizedBox(height: 14),
+          Divider(color: Colors.black.withValues(alpha: 0.08), height: 1),
+          const SizedBox(height: 14),
+          // 会話は4〜5ターン。カードで一番情報量のある部分なので全件載せる
+          for (final message in diagnosis.conversation)
+            _Bubble(
+              message: message,
+              myUserId: myUserId,
+              friendUserId: friendUserId,
+              accentColor: category.color,
+            ),
+        ],
+        if (diagnosis.advice.isNotEmpty) ...[
+          const SizedBox(height: 4),
           const ShareCardLabel('💡 アドバイス'),
           const SizedBox(height: 6),
           ShareCardPanel(
@@ -85,6 +109,76 @@ class CompatibilityShareCard extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// カード用の静的チャットバブル
+///
+/// 画面側の `CompatibilityChatBubble` と配色を揃えるが、
+/// キャプチャ対象なのでアニメーションは持たない。
+class _Bubble extends StatelessWidget {
+  final CompatibilityMessage message;
+  final String myUserId;
+  final String friendUserId;
+  final Color accentColor;
+
+  const _Bubble({
+    required this.message,
+    required this.myUserId,
+    required this.friendUserId,
+    required this.accentColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMe = message.isMyCharacter;
+    final tint = isMe ? accentColor : Colors.indigo;
+    final avatar = CharacterAvatarWidget(
+      userId: isMe ? myUserId : friendUserId,
+      size: 26,
+      fallbackText: '',
+      fallbackBackgroundColor: tint.withValues(alpha: 0.2),
+      fallbackTextColor: tint,
+    );
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: isMe
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
+        children: [
+          if (isMe) ...[avatar, const SizedBox(width: 7)],
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: isMe ? 0.15 : 0.08),
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(isMe ? 4 : 13),
+                  topRight: Radius.circular(isMe ? 13 : 4),
+                  bottomLeft: const Radius.circular(13),
+                  bottomRight: const Radius.circular(13),
+                ),
+                border: Border.all(
+                  color: tint.withValues(alpha: isMe ? 0.3 : 0.2),
+                ),
+              ),
+              child: Text(
+                message.text,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ),
+          ),
+          if (!isMe) ...[const SizedBox(width: 7), avatar],
+        ],
+      ),
     );
   }
 }

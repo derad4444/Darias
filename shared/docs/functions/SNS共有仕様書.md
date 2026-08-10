@@ -297,9 +297,12 @@ RepaintBoundary (key: _offscreenCardKey)
 │   自分              ◯◯      │
 │          82%               │  ← スコア（34px・カテゴリ色）
 │      ▓▓▓▓▓▓▓▓░░            │  ← スコアバー
-│  ┌──────────────────────┐  │
-│  │ {comment 全文}         │  │
-│  └──────────────────────┘  │
+│   「{comment}」             │  ← 見出し扱い（15px太字・カテゴリ色）
+│  ────────────────────────  │
+│  🧑「{text}」               │  ← conversation を全件バブル表示
+│         「{text}」🧑        │
+│  🧑「{text}」               │
+│         「{text}」🧑        │
 │  💡 アドバイス               │  ← advice がある場合のみ
 │  ┌──────────────────────┐  │
 │  │ {advice}              │  │
@@ -313,6 +316,14 @@ RepaintBoundary (key: _offscreenCardKey)
   キャプチャ時にネットワーク読み込み待ちは発生しない
 - 名前は幅96で1行省略（`TextOverflow.ellipsis`）
 - スコアバーは `score / 100` を **0.0〜1.0にクランプ**する（範囲外の値でもはみ出さないように）
+- **`comment` はパネルに入れず中央の見出しとして大きく置く**。
+  `diagnoseCompatibility.js` のプロンプトで「30文字以内の短文」と制約されており、
+  パネルに入れると余白が目立つため（`advice` は60文字以内なのでパネルのまま）
+- **`conversation`（4〜5ターン）を全件バブルで載せる**。カードで最も情報量のある部分。
+  配色は画面側の `CompatibilityChatBubble` と揃える（自分=カテゴリ色 / 相手=indigo）が、
+  キャプチャ対象のためカード用バブル `_Bubble` はアニメーションを持たない
+- **共有テキスト側に会話は入れない**。SNS本文が長くなり折りたたまれるため、
+  会話は画像で見せてテキストは結果（comment / advice）のみとする
 - 共有中は `_isSharing = true` → シェアアイコンをスピナーに差し替えて無効化（多重タップ防止）
 - iOS の `sharePositionOrigin` は `shareCardWithText()` が `_shareButtonKey` から算出する
 
