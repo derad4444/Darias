@@ -15,6 +15,7 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../widgets/character_avatar_widget.dart';
 import '../../../data/services/ad_service.dart';
 import '../../../data/services/hint_service.dart';
+import '../../../features/roguelike/providers/roguelike_provider.dart';
 
 /// iOS版OptionViewと同じデザインの設定画面
 class SettingsScreen extends ConsumerWidget {
@@ -166,6 +167,12 @@ class SettingsScreen extends ConsumerWidget {
                       onTap: () => _confirmResetDiagnosis(context, ref),
                     ),
 
+                    // 冒険（心の迷宮）の記録リセット
+                    _DangerButton(
+                      title: '冒険の記録をリセット',
+                      onTap: () => _confirmResetRoguelike(context, ref),
+                    ),
+
                     // ログアウト
                     _DangerButton(
                       title: 'ログアウト',
@@ -266,6 +273,68 @@ class SettingsScreen extends ConsumerWidget {
             SnackBar(content: Text('リセットに失敗しました: $e')),
           );
         }
+      }
+    }
+  }
+
+  /// 冒険（心の迷宮）の記録をすべて消す。
+  ///
+  /// 消えるのは冒険まわりだけで、本編の性格診断・キャラクターには触れない。
+  /// 取り消せないので、何が消えるかを具体的に列挙してから確認する。
+  Future<void> _confirmResetRoguelike(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('冒険の記録をリセット'),
+        content: const Text(
+          '心の迷宮の記録がすべて削除されます。\n\n'
+          '・冒険の履歴と結果\n'
+          '・克服した悩みの記録\n'
+          '・図鑑（出会ったイベント・敵・称号）\n'
+          '・全踏破の総合診断\n'
+          '・本日の挑戦回数\n\n'
+          '本編の性格診断やキャラクターには影響しません。\n'
+          'この操作は取り消せません。よろしいですか？',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('キャンセル'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('リセットする'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    final userId = ref.read(currentUserIdProvider);
+    if (userId == null || userId.isEmpty) return;
+
+    try {
+      await ref.read(roguelikeDatasourceProvider).deleteAllRecords(userId: userId);
+      // 画面が購読しているプロバイダーを作り直して表示を最新にする
+      ref.invalidate(clearedDungeonsProvider);
+      ref.invalidate(codexProvider);
+      ref.invalidate(roguelikeStaminaProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('冒険の記録をリセットしました'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('リセットに失敗しました: $e')),
+        );
       }
     }
   }

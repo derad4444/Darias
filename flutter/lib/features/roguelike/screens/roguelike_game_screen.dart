@@ -582,7 +582,8 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
                           final (tagText, tagColor) = _battleTag(rep, repOut);
                           return _ChoiceCard(
                             emoji: _battleIcon(rep),
-                            title: item,
+                            // 「＞」で、押すと次の選択があることを示す
+                            title: '$item　＞',
                             tag: (tagText, tagColor),
                             cost: rep.upfrontCost,
                             extraAction: 0,

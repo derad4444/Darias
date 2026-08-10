@@ -85,6 +85,41 @@ class RoguelikeDatasource {
       .doc(userId)
       .collection('roguelike_runs');
 
+  /// **そのユーザーの冒険記録をすべて削除する**（設定画面のリセット用）。
+  ///
+  /// 消すのは以下の5種類。冒険に関するものだけで、本編のデータには触れない。
+  /// - `roguelike_runs`   … 冒険履歴（結果画面から保存されるもの）
+  /// - `roguelike_clears` … 克服した悩みの記録
+  /// - `roguelike_meta/codex`     … 図鑑（出会ったイベント・敵・称号）
+  /// - `roguelike_meta/diagnosis` … 全踏破時の総合診断
+  /// - `roguelike_meta/stamina`   … 1日の挑戦回数
+  ///
+  /// 履歴が多いと1バッチ（500件）に収まらないため分割してコミットする。
+  Future<void> deleteAllRecords({required String userId}) async {
+    Future<void> deleteCollection(CollectionReference<Map<String, dynamic>> col) async {
+      while (true) {
+        final snap = await col.limit(400).get();
+        if (snap.docs.isEmpty) return;
+        final batch = _firestore.batch();
+        for (final d in snap.docs) {
+          batch.delete(d.reference);
+        }
+        await batch.commit();
+        if (snap.docs.length < 400) return;
+      }
+    }
+
+    await deleteCollection(_col(userId));
+    await deleteCollection(_clearsCol(userId));
+
+    final meta = _firestore.collection('users').doc(userId).collection('roguelike_meta');
+    await Future.wait([
+      meta.doc('codex').delete(),
+      meta.doc('diagnosis').delete(),
+      meta.doc('stamina').delete(),
+    ]);
+  }
+
   /// 冒険結果を保存する（createdAt はサーバ時刻）。
   Future<void> saveRun({
     required String userId,
