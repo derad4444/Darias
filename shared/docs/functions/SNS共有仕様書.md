@@ -64,6 +64,7 @@ await Share.share(text, sharePositionOrigin: origin);
 | `share_card_capture.dart` | `shareCardWithText()`。RepaintBoundary → PNG → 一時ファイル → `Share.shareXFiles`。失敗時はテキストのみにフォールバックし、iOS の `sharePositionOrigin` も処理する |
 | `meeting_share_card.dart` | `MeetingShareCard` と `buildMeetingShareText()`。会議画面と会議履歴の両方から使う |
 | `diary_share_card.dart` | `DiaryShareCard` と `buildDiaryShareText()` |
+| `compatibility_share_card.dart` | `CompatibilityShareCard` と `buildCompatibilityShareText()` |
 
 > 進化ダイアログ（`home_screen.dart`）、ローグライク結果（`roguelike_result_screen.dart`）、
 > 冒険の性格診断（`adventure_personality_tab.dart`）は個別実装のまま。
@@ -275,9 +276,47 @@ RepaintBoundary (key: _offscreenCardKey)
 **ソース**: `lib/presentation/screens/friend/compatibility_category_screen.dart`  
 **ボタン**: AppBar右上のシェアアイコン（`Icons.share`）。`_showResult == true` になってから出現  
 **メソッド**: `_share()`  
-**共有タイプ**: テキストのみ（`Share.share`）
+**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
 
-**共有テキスト形式**:
+#### 画像生成の仕組み
+
+画面ルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを
+`RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（他画面と同方式）。
+カードは結果表示後（`_showResult == true`）にのみツリーへ追加する。
+
+キャプチャ・共有は共通関数 `shareCardWithText()` に任せ、一時ファイル名は `darias_compatibility.png`。
+
+#### シェアカードデザイン（`CompatibilityShareCard`）
+
+共通枠 `ShareCardScaffold` を使う。
+
+```
+┌────────────────────────────┐
+│      相性診断 — 💫 恋愛      │
+│    🧑        💫        🧑    │  ← 自分とフレンドのアバター（56px）
+│   自分              ◯◯      │
+│          82%               │  ← スコア（34px・カテゴリ色）
+│      ▓▓▓▓▓▓▓▓░░            │  ← スコアバー
+│  ┌──────────────────────┐  │
+│  │ {comment 全文}         │  │
+│  └──────────────────────┘  │
+│  💡 アドバイス               │  ← advice がある場合のみ
+│  ┌──────────────────────┐  │
+│  │ {advice}              │  │
+│  └──────────────────────┘  │
+│           DARIAS            │
+└────────────────────────────┘
+背景: パステル縦グラデ(#FFF1F6→#F1F7FF)
+```
+
+- アバターは `CharacterAvatarWidget`。`Image.asset`（アプリ同梱）のため
+  キャプチャ時にネットワーク読み込み待ちは発生しない
+- 名前は幅96で1行省略（`TextOverflow.ellipsis`）
+- スコアバーは `score / 100` を **0.0〜1.0にクランプ**する（範囲外の値でもはみ出さないように）
+- 共有中は `_isSharing = true` → シェアアイコンをスピナーに差し替えて無効化（多重タップ防止）
+- iOS の `sharePositionOrigin` は `shareCardWithText()` が `_shareButtonKey` から算出する
+
+**共有テキスト形式**（`buildCompatibilityShareText()`）:
 
 ```
 {cat.icon} {friendName}との{cat.label}の相性
@@ -411,6 +450,7 @@ Stack
 | `presentation/widgets/share/share_card_capture.dart` | キャプチャ＋共有の共通処理 |
 | `presentation/widgets/share/meeting_share_card.dart` | 会議カード＋共有テキスト |
 | `presentation/widgets/share/diary_share_card.dart` | 日記カード＋共有テキスト |
+| `presentation/widgets/share/compatibility_share_card.dart` | 相性診断カード＋共有テキスト |
 | `presentation/screens/diary/diary_detail_screen.dart` | 日記シェア（`_shareDiary`） |
 | `presentation/screens/meeting/meeting_screen.dart` | 自分会議シェア（`_shareMeeting`） |
 | `presentation/screens/history/unified_history_screen.dart` | 会議履歴からのシェア（`_MeetingDetailSheet._shareMeeting`） |

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
-import '../../../core/constants/app_links.dart';
 import '../../../data/models/friend_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
+import '../../widgets/share/compatibility_share_card.dart';
+import '../../widgets/share/share_card_capture.dart';
 import '../../widgets/ads/screen_banner.dart';
 import '../../../data/services/ad_service.dart';
 import 'compatibility_screen.dart' show CompatibilityCategoryMeta;
@@ -16,6 +16,7 @@ class CompatibilityCategoryScreen extends ConsumerStatefulWidget {
   final FriendModel friend;
   final CompatibilityCategoryMeta category;
   final CategoryDiagnosis diagnosis;
+
   /// true: 初回診断直後 → 会話アニメーションあり
   /// false: 再訪問 → 静的表示
   final bool animateOnEntry;
@@ -41,6 +42,8 @@ class _CompatibilityCategoryScreenState
   int _messageIndex = 0;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _shareButtonKey = GlobalKey();
+  final GlobalKey _shareCardKey = GlobalKey();
+  bool _isSharing = false;
 
   @override
   void initState() {
@@ -67,26 +70,21 @@ class _CompatibilityCategoryScreenState
   }
 
   Future<void> _share() async {
-    final cat = widget.category;
-    final d = widget.diagnosis;
-    final friendName = widget.friend.name;
-
-    final buffer = StringBuffer();
-    buffer.writeln('${cat.icon} ${friendName}との${cat.label}の相性\n');
-    buffer.writeln('相性スコア: ${d.score}%\n');
-    buffer.writeln(d.comment);
-    if (d.advice.isNotEmpty) {
-      buffer.writeln('\n💡 ${d.advice}');
-    }
-    buffer.writeln('\n#DARIAS #相性診断');
-    buffer.writeln(AppLinks.share);
-
-    final box = _shareButtonKey.currentContext?.findRenderObject() as RenderBox?;
-    final origin = box != null ? box.localToGlobal(Offset.zero) & box.size : null;
+    if (_isSharing) return;
+    setState(() => _isSharing = true);
     try {
-      await Share.share(buffer.toString().trim(), sharePositionOrigin: origin);
-    } catch (e) {
-      debugPrint('Share failed: $e');
+      await shareCardWithText(
+        cardKey: _shareCardKey,
+        buttonKey: _shareButtonKey,
+        text: buildCompatibilityShareText(
+          category: widget.category,
+          diagnosis: widget.diagnosis,
+          friendName: widget.friend.name,
+        ),
+        fileName: 'darias_compatibility.png',
+      );
+    } finally {
+      if (mounted) setState(() => _isSharing = false);
     }
   }
 
@@ -97,15 +95,15 @@ class _CompatibilityCategoryScreenState
       return;
     }
 
-    _messageTimer =
-        Timer.periodic(const Duration(milliseconds: 1400), (timer) {
+    _messageTimer = Timer.periodic(const Duration(milliseconds: 1400), (timer) {
       if (_messageIndex >= messages.length) {
         timer.cancel();
         Future.delayed(const Duration(milliseconds: 600), () {
           if (mounted) {
             setState(() => _showResult = true);
-            WidgetsBinding.instance
-                .addPostFrameCallback((_) => _scrollToBottom());
+            WidgetsBinding.instance.addPostFrameCallback(
+              (_) => _scrollToBottom(),
+            );
           }
         });
         return;
@@ -163,8 +161,17 @@ class _CompatibilityCategoryScreenState
             SizedBox(
               key: _shareButtonKey,
               child: IconButton(
-                onPressed: _share,
-                icon: Icon(Icons.share, color: cat.color),
+                onPressed: _isSharing ? null : _share,
+                icon: _isSharing
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cat.color,
+                        ),
+                      )
+                    : Icon(Icons.share, color: cat.color),
                 tooltip: 'シェア',
               ),
             ),
@@ -172,45 +179,72 @@ class _CompatibilityCategoryScreenState
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Container(
-        decoration: BoxDecoration(gradient: gradient),
-        child: SafeArea(
-          child: Column(
-            children: [
-              ScreenBanner(adUnitId: AdConfig.compatibilityTopBannerAdUnitId),
-              Expanded(
-                child: ListView(
-            controller: _scrollController,
-            physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-            children: [
-              // チャット会話（最初に表示）
-              if (_displayedMessages.isNotEmpty) ...[
-                _buildChatSection(cat.color, myUserId, myName),
-                const SizedBox(height: 20),
-              ] else if (widget.animateOnEntry) ...[
-                // アニメーション開始前
-                Container(
-                  padding: const EdgeInsets.all(32),
-                  child: Center(
-                    child: CircularProgressIndicator(color: cat.color),
+      body: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(gradient: gradient),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  ScreenBanner(
+                    adUnitId: AdConfig.compatibilityTopBannerAdUnitId,
                   ),
-                ),
-              ],
+                  Expanded(
+                    child: ListView(
+                      controller: _scrollController,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                      children: [
+                        // チャット会話（最初に表示）
+                        if (_displayedMessages.isNotEmpty) ...[
+                          _buildChatSection(cat.color, myUserId, myName),
+                          const SizedBox(height: 20),
+                        ] else if (widget.animateOnEntry) ...[
+                          // アニメーション開始前
+                          Container(
+                            padding: const EdgeInsets.all(32),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: cat.color,
+                              ),
+                            ),
+                          ),
+                        ],
 
-              // チャット後にスコア + コメント + アドバイスを表示
-              if (_showResult) ...[
-                _buildScoreBadge(cat),
-                const SizedBox(height: 16),
-                _buildResultDetail(cat),
-              ],
-            ],
+                        // チャット後にスコア + コメント + アドバイスを表示
+                        if (_showResult) ...[
+                          _buildScoreBadge(cat),
+                          const SizedBox(height: 16),
+                          _buildResultDetail(cat),
+                        ],
+                      ],
+                    ),
+                  ),
+                  ScreenBanner(
+                    adUnitId: AdConfig.compatibilityBottomBannerAdUnitId,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // オフスクリーンのシェアカード（キャプチャ専用）
+          if (_showResult)
+            Positioned(
+              left: -9999,
+              top: 0,
+              child: RepaintBoundary(
+                key: _shareCardKey,
+                child: CompatibilityShareCard(
+                  category: cat,
+                  diagnosis: widget.diagnosis,
+                  myUserId: myUserId,
+                  myName: myName,
+                  friendUserId: widget.friend.id,
+                  friendName: widget.friend.name,
                 ),
               ),
-              ScreenBanner(adUnitId: AdConfig.compatibilityBottomBannerAdUnitId),
-            ],
-          ),
-        ),
+            ),
+        ],
       ),
     );
   }
@@ -298,14 +332,16 @@ class _CompatibilityCategoryScreenState
             ],
           ),
           const SizedBox(height: 12),
-          ..._displayedMessages.map((msg) => CompatibilityChatBubble(
-                message: msg,
-                myUserId: myUserId,
-                friendUserId: widget.friend.id,
-                myName: myName,
-                friendName: widget.friend.name,
-                accentColor: accentColor,
-              )),
+          ..._displayedMessages.map(
+            (msg) => CompatibilityChatBubble(
+              message: msg,
+              myUserId: myUserId,
+              friendUserId: widget.friend.id,
+              myName: myName,
+              friendName: widget.friend.name,
+              accentColor: accentColor,
+            ),
+          ),
         ],
       ),
     );
@@ -393,8 +429,10 @@ class _AnimatedScoreBarState extends State<_AnimatedScoreBar>
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-    _bar = Tween<double>(begin: 0, end: widget.score / 100)
-        .animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
+    _bar = Tween<double>(
+      begin: 0,
+      end: widget.score / 100,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) _ctrl.forward();
     });
@@ -441,7 +479,8 @@ class CompatibilityChatBubble extends StatefulWidget {
   });
 
   @override
-  State<CompatibilityChatBubble> createState() => CompatibilityChatBubbleState();
+  State<CompatibilityChatBubble> createState() =>
+      CompatibilityChatBubbleState();
 }
 
 class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
@@ -484,8 +523,9 @@ class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
           padding: const EdgeInsets.only(bottom: 10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment:
-                isMe ? MainAxisAlignment.start : MainAxisAlignment.end,
+            mainAxisAlignment: isMe
+                ? MainAxisAlignment.start
+                : MainAxisAlignment.end,
             children: [
               if (isMe) ...[
                 Column(
@@ -494,8 +534,9 @@ class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
                       userId: widget.myUserId,
                       size: 32,
                       fallbackText: '',
-                      fallbackBackgroundColor:
-                          widget.accentColor.withValues(alpha: 0.2),
+                      fallbackBackgroundColor: widget.accentColor.withValues(
+                        alpha: 0.2,
+                      ),
                       fallbackTextColor: widget.accentColor,
                     ),
                     const SizedBox(height: 3),
@@ -513,8 +554,10 @@ class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
               ],
               Flexible(
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
                   decoration: BoxDecoration(
                     color: isMe
                         ? widget.accentColor.withValues(alpha: 0.15)
@@ -545,8 +588,9 @@ class CompatibilityChatBubbleState extends State<CompatibilityChatBubble>
                       userId: widget.friendUserId,
                       size: 32,
                       fallbackText: '',
-                      fallbackBackgroundColor:
-                          Colors.indigo.withValues(alpha: 0.2),
+                      fallbackBackgroundColor: Colors.indigo.withValues(
+                        alpha: 0.2,
+                      ),
                       fallbackTextColor: Colors.indigo,
                     ),
                     const SizedBox(height: 3),
