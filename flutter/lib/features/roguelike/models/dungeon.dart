@@ -36,7 +36,6 @@ class Dungeon {
 List<BattleChoice> _bossChoices({
   required String confrontText,
   required String confrontFailText,
-  required String observeLabel,
   required String observeText,
   int observeDmg = 6,
 
@@ -68,19 +67,10 @@ List<BattleChoice> _bossChoices({
         ],
       ),
       Enemies.fleeChoice,
-      BattleChoice(
-        label: observeLabel,
-        riskHint: '安定・低リスク（幼少〜）',
-        minStage: GrowthStage.young,
-        selectTrait: const ActionLog(logic: 2, planning: 2),
-        outcomes: [
-          Outcome(
-            tier: OutcomeTier.success, weight: 1,
-            resultText: observeText,
-            damageToEnemy: observeDmg, damageToPlayer: 2,
-          ),
-        ],
-      ),
+      // 安全策も3型にする。特効と同じく威力は同一で、選ぶ型だけが性格を表す。
+      // 1つ固定（論理性+計画性）だと、慎重に進む人も段取り重視の人も
+      // 同じ特性が入り、光・闇・土を区別できなかった。
+      ...Enemies.observeChoices(dmg: observeDmg, dmgSelf: 2, text: observeText),
       ...specials,
       Enemies.healChoice,
     ];
@@ -180,13 +170,7 @@ class Dungeons {
             ],
           ),
           Enemies.fleeChoice,
-          BattleChoice(
-            label: '観察する',
-            riskHint: '安定・低リスク（幼少〜）',
-            minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 1, planning: 2),
-            outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '悩みのパターンを冷静に観察した。次の一手が見えた。', damageToEnemy: 5, damageToPlayer: 2)],
-          ),
+          ...Enemies.observeChoices(dmg: 5, dmgSelf: 2, text: '悩みのパターンを冷静に観察した。次の一手が見えた。'),
           // 特効3型。**威力は _special と完全に同じ**にして、どれを選ぶかだけが
           // 性格のシグナルになるようにする。自傷・1回制限も他ボスと揃える。
           // 相棒がいるときだけ現れる型。**絆は減らさず、むしろ深まる。**
@@ -231,13 +215,7 @@ class Dungeons {
             ],
           ),
           Enemies.fleeChoice,
-          BattleChoice(
-            label: '情報を集めて見通す',
-            riskHint: '安定・低リスク（幼少〜）',
-            minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 2, planning: 2),
-            outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '分からないことを一つずつ調べると、霧が少し晴れた。', damageToEnemy: 6, damageToPlayer: 2)],
-          ),
+          ...Enemies.observeChoices(dmg: 6, dmgSelf: 2, text: '分からないことを一つずつ調べると、霧が少し晴れた。'),
           // 同じ「将来不安」でも、乗り越え方は人によって違う。威力は同じ。
           _special('小さな目標を立てる', '遠い未来ではなく、今できることに集中した。不安が一気に薄れた。', dmg: 14, trait: const ActionLog(planning: 3, logic: 1)),
           _special('なるようになると構える', '先のことは分からない。そう受け入れると、肩の力が抜けた。', dmg: 14, trait: const ActionLog(flexibility: 3, intuition: 1)),
@@ -276,13 +254,7 @@ class Dungeons {
             ],
           ),
           Enemies.fleeChoice,
-          BattleChoice(
-            label: '客観的に分析する',
-            riskHint: '安定・低リスク（幼少〜）',
-            minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 2, planning: 2),
-            outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '感情から離れて事実を見た。否定の声が静かになった。', damageToEnemy: 7, damageToPlayer: 2)],
-          ),
+          ...Enemies.observeChoices(dmg: 7, dmgSelf: 2, text: '感情から離れて事実を見た。否定の声が静かになった。'),
           // 「自己否定」の乗り越え方も一つではない。
           _special('過去の成功を思い出す', 'できたことを振り返ると、否定の声が大きく弱まった。', dmg: 14, trait: const ActionLog(persistence: 3, planning: 1)),
           _special('誰かの言葉を思い出す', 'かけてもらった言葉を思い返すと、声が少し優しくなった。', dmg: 14, trait: const ActionLog(altruism: 3, cooperation: 1)),
@@ -312,7 +284,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: '怖さを認めつつ、自分の言葉で向き合った。',
           confrontFailText: '人目が気になりすぎて、言葉に詰まってしまった。',
-          observeLabel: '相手をよく観察する',
           observeText: '相手も完璧ではないと気づくと、怖さが和らいだ。',
           specials: [
             _special('自分の物差しで測る', '他人ではなく自分の基準で考えると、評価の鎖がほどけた。', trait: const ActionLog(logic: 3, flexibility: 1)),
@@ -344,7 +315,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: '寂しさを否定せず、そのまま受け止めた。',
           confrontFailText: '寂しさに飲まれ、心を閉ざしてしまった。',
-          observeLabel: '今あるつながりを思い出す',
           observeText: '支えてくれた人を思い出すと、心細さが薄れた。',
           specials: [
             _special('誰かに声をかける', '勇気を出して頼ると、孤独は思ったより小さかった。', trait: const ActionLog(cooperation: 3, altruism: 1)),
@@ -375,7 +345,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: '焦りを認めつつ、勢いだけで動かないようにした。',
           confrontFailText: '急ぎすぎて空回りし、かえって消耗した。',
-          observeLabel: '深呼吸して落ち着く',
           observeText: 'ひと呼吸おくと、焦りの渦が静まった。',
           specials: [
             _special('一つずつ片付ける', '全部ではなく、今やる一つに集中すると焦りが消えた。', trait: const ActionLog(planning: 3, caution: 1)),
@@ -405,7 +374,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: '怒りを真正面から受け止め、力でねじ伏せた。',
           confrontFailText: '怒りに怒りで返し、互いに激しく傷ついた。',
-          observeLabel: 'ひと呼吸おいて距離を取る',
           observeText: '一歩引いて眺めると、炎の勢いが弱まった。',
           specials: [
             _special('怒りの奥の本音を見る', '本当は何が悲しかったのかに気づくと、怒りがほどけた。', trait: const ActionLog(logic: 3, altruism: 1)),
@@ -435,7 +403,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: 'えいやと踏み込み、迷いを断ち切った。',
           confrontFailText: 'やはり決めきれず、堂々巡りに戻ってしまった。',
-          observeLabel: '選択肢を書き出して比べる',
           observeText: '紙に並べて見ると、本当に大事な軸が見えてきた。',
           specials: [
             _special('直感で決める', '考え尽くした先で、最後は直感を信じて決めた。', trait: const ActionLog(intuition: 3, challenge: 1)),
@@ -467,7 +434,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: '細部まで詰め切り、力ずくで仕上げた。',
           confrontFailText: 'こだわりすぎて終わらず、気力をすり減らした。',
-          observeLabel: '全体のバランスを見る',
           observeText: '一歩引いて全体を見ると、十分に良い出来だと分かった。',
           specials: [
             _special('60点で良しとする', '「完璧」より「完了」を選ぶと、呪縛がほどけた。', trait: const ActionLog(flexibility: 3, planning: 1)),
@@ -498,7 +464,6 @@ class Dungeons {
         choices: _bossChoices(
           confrontText: 'とにかく手をつけると、重さが少し軽くなった。',
           confrontFailText: '腰が上がらず、先送りの重さが増した。',
-          observeLabel: 'やることを小さく分ける',
           observeText: '大きな塊を小さく刻むと、最初の一歩が踏み出せた。',
           specials: [
             _special('とりあえず5分だけ動く', '5分だけのつもりが、動き出すと勢いがついた。', trait: const ActionLog(challenge: 3, intuition: 1)),
@@ -539,13 +504,7 @@ class Dungeons {
             ],
           ),
           Enemies.fleeChoice,
-          BattleChoice(
-            label: '観察して弱点を探す',
-            riskHint: '安定・低リスク（幼少〜）',
-            minStage: GrowthStage.young,
-            selectTrait: const ActionLog(logic: 1, curiosity: 1),
-            outcomes: [Outcome(tier: OutcomeTier.success, weight: 1, resultText: '冷静に観察すると、守護者の動きにパターンを見つけた。', damageToEnemy: 7, damageToPlayer: 5)],
-          ),
+          ...Enemies.observeChoices(dmg: 7, dmgSelf: 5, text: '冷静に観察すると、守護者の動きにパターンを見つけた。'),
           // 最終ボスの特効3型。相棒の有無で選べる型が偏らないよう、
           // 相棒必須は1つだけにして残り2つは単独でも選べるようにする。
           // 威力は最終ボス用に強め（dmg20・自傷6）で3型とも共通。

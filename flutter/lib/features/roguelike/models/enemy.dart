@@ -174,6 +174,37 @@ class Enemies {
         ],
       );
 
+  /// 観察系（安全策）をまとめる2段階選択のグループ名。
+  static const String observeGroup = '落ち着いて対処する';
+
+  /// 安全策の3型を作る。**威力・成功率・自傷は3つとも同一**にすること。
+  ///
+  /// 特性の割り当ては光・闇・土を区別できる組み合わせにしている
+  /// （闇=論理+好奇心+慎重 / 土=慎重+計画+執着 / 光=論理+計画+協調）。
+  /// 単一特性（論理性だけ等）にすると2元素に同時に入り区別できない。
+  static List<BattleChoice> observeChoices({
+    required int dmg,
+    required int dmgSelf,
+    required String text,
+  }) =>
+      [
+        _observe('じっくり見極める', text, dmg, dmgSelf, const ActionLog(logic: 2, curiosity: 1)),
+        _observe('慎重に構える', text, dmg, dmgSelf, const ActionLog(caution: 2, persistence: 1)),
+        _observe('段取りを組む', text, dmg, dmgSelf, const ActionLog(planning: 2, cooperation: 1)),
+      ];
+
+  static BattleChoice _observe(String label, String text, int dmg, int dmgSelf, ActionLog trait) =>
+      BattleChoice(
+        label: label,
+        riskHint: '安定・低リスク（幼少〜）',
+        minStage: GrowthStage.young,
+        group: observeGroup,
+        selectTrait: trait,
+        outcomes: [
+          Outcome(tier: OutcomeTier.success, weight: 1, resultText: text, damageToEnemy: dmg, damageToPlayer: dmgSelf),
+        ],
+      );
+
   /// 逃げる。
   static BattleChoice get fleeChoice => const BattleChoice(
         label: '逃げる',
@@ -205,20 +236,10 @@ class Enemies {
           ],
         ),
         fleeChoice,
-        BattleChoice(
-          label: '観察していなす',
-          riskHint: '安定・低リスク（幼少〜）',
-          minStage: GrowthStage.young,
-          // 論理性＋慎重性は闇に二重で入り独走の主因だったため好奇心へ。
-          selectTrait: const ActionLog(logic: 1, curiosity: 1),
-          outcomes: [
-            Outcome(
-              tier: OutcomeTier.success, weight: 1,
-              resultText: '落ち着いて見極め、うまくいなした。',
-              damageToEnemy: dmg - 3, damageToPlayer: 2,
-            ),
-          ],
-        ),
+        // 「落ち着いて対処する」の3型。**威力・成功率・自傷はすべて同一**で、
+        // 違うのは加算される特性だけ。安全策を取る人の中でも
+        // 「分析で行くか・慎重に構えるか・段取りで攻めるか」を測るために分けている。
+        ...observeChoices(dmg: dmg - 3, dmgSelf: 2, text: '落ち着いて見極め、うまくいなした。'),
         healChoice,
       ];
 
