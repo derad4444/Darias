@@ -93,6 +93,22 @@ class AppReviewService {
     }
   }
 
+  /// App Store のアプリID（`openStoreListing` に必要）。
+  static const String _appStoreId = '6753144594';
+
+  /// ストアのアプリページを開く（**アプリを離れる**）。
+  ///
+  /// アプリ内の評価画面では**星しか付けられず、文章のレビューは書けない**。
+  /// 文章レビューは検索順位や新規ユーザーの判断に効くため、
+  /// 星を付けてくれた人にだけ、続けて任意でお願いする。
+  Future<void> openStoreListing() async {
+    try {
+      await _inAppReview.openStoreListing(appStoreId: _appStoreId);
+    } catch (e) {
+      debugPrint('AppReviewService: openStoreListing failed ($e)');
+    }
+  }
+
   /// 「また今度」が押されたとき。回数に応じて次回まで間隔を空ける。
   Future<void> postpone() async {
     final p = await SharedPreferences.getInstance();
