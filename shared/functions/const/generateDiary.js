@@ -349,26 +349,13 @@ async function generateDiary(characterId, userId) {
   // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
   const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
 
-  const response = await openai.chat.completions.create({
-    model: model,
-    messages: [{role: "user", content: prompt}],
-    response_format: {type: "json_object"},
-  });
-
-  // AIからの返答をJSONとして取得
-  const rawResponse = response.choices[0].message.content.trim();
-  console.log("GPT Response:", rawResponse);
-
   // AIが返すのは ai_comment のみ。facts は上でFirestoreの実データから組み立て済み。
-  let aiComment = "";
-
-  try {
-    const parsed = JSON.parse(rawResponse);
-    aiComment = typeof parsed.ai_comment === "string" ? parsed.ai_comment : "";
-  } catch (e) {
-    console.warn("Failed to parse GPT JSON response, using raw as ai_comment:", e);
-    aiComment = rawResponse;
-  }
+  //
+  // **壊れた出力を絶対にユーザーへ出さない。**
+  // 以前は JSON.parse に失敗すると生の応答をそのまま ai_comment にしていたため、
+  // モデルが暴走したときの多言語トークンの羅列が日記に保存されていた。
+  // 1度だけ再試行し、それでも駄目なら安全な定型文にする。
+  const aiComment = await requestAiComment(openai, model, prompt);
 
   // Firestoreに保存
   const diaryRef = db.collection("users").doc(userId)
@@ -398,4 +385,72 @@ async function generateDiary(characterId, userId) {
 }
 
 // ✅ バッチ用に共通関数をexport
+/**
+ * ai_comment が実用に耐える文章かを判定する。
+ *
+ * モデルが暴走すると多言語のトークンが延々と並ぶ（例: 「محتوى json 480 512 0 0 َ ...」）。
+ * 日本語の日記として明らかに壊れているものを弾くための最低限のチェック。
+ *
+ * @param {string} text 判定対象
+ * @return {boolean} 日記として出せるなら true
+ */
+function isUsableComment(text) {
+  if (typeof text !== "string") return false;
+  const t = text.trim();
+  // 短すぎる／長すぎる（プロンプトは250〜350文字を指示している）
+  if (t.length < 40 || t.length > 800) return false;
+  // 日本語（ひらがな・カタカナ・漢字）が半分未満なら壊れているとみなす
+  const jp = (t.match(/[ぁ-んァ-ヶ一-龠]/g) || []).length;
+  if (jp / t.length < 0.5) return false;
+  // JSONの破片が混ざっている
+  if (/["{}]\s*$|^\s*[[{]/.test(t)) return false;
+  return true;
+}
+
+/**
+ * ai_comment をAIに生成させる。壊れていたら1度だけ再試行し、
+ * それでも駄目なら安全な定型文を返す（生の応答は絶対に返さない）。
+ *
+ * @param {object} openai OpenAIクライアント
+ * @param {string} model モデル名
+ * @param {string} prompt プロンプト
+ * @return {Promise<string>} 日記に載せるコメント
+ */
+async function requestAiComment(openai, model, prompt) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: model,
+        messages: [{role: "user", content: prompt}],
+        response_format: {type: "json_object"},
+        // 上限を切らないと暴走時に延々と生成し続ける。
+        // ai_comment は250〜350文字（日本語 ~1.5chars/token）なので 600 で十分。
+        max_tokens: 600,
+        // 既定の 1.0 は出力が不安定になりやすい。日記は堅実さを優先する。
+        temperature: 0.8,
+      });
+
+      const raw = (response.choices[0].message.content || "").trim();
+      let comment = "";
+      try {
+        const parsed = JSON.parse(raw);
+        comment = typeof parsed.ai_comment === "string" ? parsed.ai_comment : "";
+      } catch (e) {
+        console.warn(`日記コメントのJSON解析に失敗 (${attempt}回目):`, e.message);
+      }
+
+      if (isUsableComment(comment)) return comment.trim();
+      console.warn(`日記コメントが不正 (${attempt}回目). 長さ=${comment.length}`);
+    } catch (e) {
+      console.warn(`日記コメントの生成に失敗 (${attempt}回目):`, e.message);
+    }
+  }
+
+  // 2回とも駄目だった。**生の応答は使わない。**
+  // 日記が空になるより、当たり障りのない一文が入っているほうが体験として良い。
+  console.error("日記コメントの生成に2回とも失敗したため定型文を使用");
+  return "今日もおつかれさま。うまく言葉にできない日もあるけれど、" +
+    "こうして一日を振り返れたこと自体が積み重ねになるよ。また明日、話そう。";
+}
+
 exports.generateDiary = generateDiary;

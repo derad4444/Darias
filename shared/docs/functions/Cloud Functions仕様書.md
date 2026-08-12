@@ -691,6 +691,17 @@ Cloud Scheduler による定期実行バッチ。
 - **facts の並び順**: `デイリーミッションをクリアした` → `会話を{n}件やりとりした` → `「{悩み}」について相談した`（会議数ぶん）→ `冒険で{結果}`（最大3件）。デイリーミッションは他に何件あっても先頭に置く
 - **活動なし時の挙動**: 活動が無くても OpenAI API を呼び出し、キャラクターからの声がけのみの日記を保存する（`facts: []`, `ai_comment` あり）。以前は `hasActivity` フラグで API 呼び出しをスキップし `ai_comment: ""` で保存していたが、履歴に空の日記カードが並ぶため変更（2026-07-29）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
+- **生成パラメータ**: `max_tokens: 600` / `temperature: 0.8`。
+  上限を切らないと暴走時に延々と生成し続ける（ai_comment は250〜350文字＝日本語 ~1.5chars/token なので600で十分）。
+  既定の `temperature: 1.0` は出力が不安定になりやすいため下げている（修正: 2026-08-12）
+- **壊れた出力を絶対にユーザーへ出さない**（`requestAiComment` / `isUsableComment`、修正: 2026-08-12）
+  - 以前は `JSON.parse` 失敗時に**生の応答をそのまま `ai_comment` にしていた**ため、
+    モデルが暴走したときの多言語トークンの羅列（例: `」} محتوى json 480 512 0 0 َ ...`）が
+    そのまま日記に保存されていた
+  - 現在は **JSON解析＋内容チェックに通らなければ1度だけ再試行**し、
+    2回とも駄目なら**安全な定型文**を入れる。生の応答は決して使わない
+  - 内容チェック（`isUsableComment`）: 40〜800文字 / **日本語（かな・漢字）が5割以上** /
+    JSONの破片が混ざっていない。モデルが暴走すると多言語トークンが並ぶため日本語比率で弾く
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
 - **FCM通知ログ出力**: 通知の送信結果は以下のレベルで Functions ログに記録される（Firebase Console > Functions ログで確認可能）
   - `INFO "Diary notification sent"` — 送信成功
