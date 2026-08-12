@@ -52,18 +52,29 @@ async function generateDiary(characterId, userId) {
     console.warn("Failed to check subscription status, using free tier:", error);
   }
 
-  // 今日の日付
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const tomorrow = new Date(today);
-  tomorrow.setDate(today.getDate() + 1);
-
   // 日本時間の日付文字列（YYYY-MM-DD）。
   // dailyMissions のドキュメントIDと、日記の created_date に使う。
   const jstNow = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Tokyo"}));
   const createdDate = `${jstNow.getFullYear()}-` +
     `${String(jstNow.getMonth() + 1).padStart(2, "0")}-` +
     `${String(jstNow.getDate()).padStart(2, "0")}`;
+
+  // 「今日」の範囲（**JSTの0時〜24時**）。
+  //
+  // Cloud Functions の Node は既定でUTC動作するため、`new Date().setHours(0,0,0,0)` は
+  // **UTCの0時**になる。以前はそれを使っていたため集計範囲が JST 9:00〜翌9:00 となり、
+  // **JST 0:00〜9:00 に行った会話・会議・冒険が日記に反映されなかった**
+  // （日記の日付 createdDate はJSTなので、範囲だけが9時間ずれていた）。
+  //
+  // createdDate と同じJSTの日付から範囲を作り、全ての集計で共有する。
+  const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+  const today = new Date(
+      Date.UTC(jstNow.getFullYear(), jstNow.getMonth(), jstNow.getDate()) - JST_OFFSET_MS,
+  );
+  const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+  console.log(
+      `📆 集計範囲(JST基準): ${today.toISOString()} 〜 ${tomorrow.toISOString()}`,
+  );
 
   // 手帳（予定）機能の廃止に伴い、予定の取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
   /*

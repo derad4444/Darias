@@ -684,6 +684,16 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
 - **収集データ**: デイリーミッション達成状況 / チャット（本文は上位5件、件数は `count()` で実数取得）/ 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
+- **集計範囲は JST の 0時〜24時**（修正: 2026-08-12）
+  - Cloud Functions の Node は既定でUTC動作するため、`new Date().setHours(0,0,0,0)` は**UTCの0時**になる。
+    以前はそれを使っていたため集計範囲が **JST 9:00〜翌9:00** となり、
+    **JST 0:00〜9:00 の会話・会議・冒険が日記に反映されていなかった**
+    （日記の日付 `created_date` はJSTで算出していたため、範囲だけが9時間ずれていた）
+  - 現在は `created_date` と同じJST日付から範囲を作り、**チャット・会議・冒険・ToDo・メモの全ての集計で共有**する
+  - バッチは JST 23:50 実行のため、前日分が混ざる方向のズレは元々起きていない（取りこぼしのみだった）
+- **「会話した」の判定**: `posts` の実件数が1件以上のときだけ facts に載せる。
+  `posts` は**ユーザーが発言したときだけ1件作られる**（`content`＝ユーザー発言、`analysis_result`＝AIの返信を1ドキュメントに保存）ため、
+  発言していないのにカウントされることはない
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `strength`(強み) を、`dream/current` から `dream`(夢) を取得してプロンプトに反映（夢は本人限定サブコレクションに置く。未移行ユーザーは `details/current.dream` にフォールバック）
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
