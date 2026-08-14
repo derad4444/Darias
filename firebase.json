@@ -8,15 +8,6 @@
   },
   "hosting": [
     {
-      "site": "my-character-app",
-      "public": "lp",
-      "ignore": [
-        "firebase.json",
-        "**/.*",
-        "**/node_modules/**"
-      ]
-    },
-    {
       "site": "dariasapp",
       "public": "dl",
       "ignore": [
