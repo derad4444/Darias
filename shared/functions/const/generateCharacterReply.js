@@ -55,6 +55,26 @@ const {getFirestore, admin} = require("../src/utils/firebaseInit");
 
 const db = getFirestore();
 
+// ユーザーメッセージの上限。チャット入力欄は100文字までだが、自分会議の結論
+// （200-300文字で生成される）をそのまま送る経路があるため、それが収まる長さにする。
+// 途中で切ると、AIが「返答」ではなく「切れた文の続き」を書いてしまう。
+const USER_MESSAGE_MAX_CHARS = 400;
+
+/**
+ * ユーザーメッセージを上限内に収める。上限を超える場合も文の途中では切らず、
+ * 直前の句点・感嘆符・疑問符までで打ち切る。
+ * @param {string} text 元のメッセージ
+ * @return {string} 上限内に収めたメッセージ
+ */
+function trimMessage(text) {
+  if (!text) return "";
+  if (text.length <= USER_MESSAGE_MAX_CHARS) return text;
+  const head = text.substring(0, USER_MESSAGE_MAX_CHARS);
+  const lastBreak = Math.max(
+      head.lastIndexOf("。"), head.lastIndexOf("！"), head.lastIndexOf("？"));
+  return lastBreak > 0 ? head.substring(0, lastBreak + 1) : head;
+}
+
 // フェーズ別 max_completion_tokens（日本語 ~1.5chars/token + バッファ）
 function getMaxTokensForPhase(phase) {
   if (phase === 2) return 250; // ~150文字
@@ -341,10 +361,10 @@ exports.generateCharacterReply = onCall(
           });
         }
 
-        // 新しいユーザーメッセージを追加（100文字制限）
+        // 新しいユーザーメッセージを追加
         messages.push({
           role: "user",
-          content: userMessage.substring(0, 100),
+          content: trimMessage(userMessage),
         });
 
         const completion = await safeOpenAICall(

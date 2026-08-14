@@ -238,11 +238,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
       debugPrint('🔄 _triggerMeetingFollowup: characterId=$characterId, conclusion=${conclusion.length}chars');
+      final signalCount = ref.read(signalCountProvider).valueOrNull ?? 0;
       final result = await ref.read(chatControllerProvider.notifier).sendMessage(
         characterId: characterId,
         message: '【自分会議の結論】$conclusion',
+        phase: _calcPhase(signalCount, ref.read(sessionChatCountProvider)),
       );
-      debugPrint('✅ _triggerMeetingFollowup: reply=${result?.reply.substring(0, 20)}');
+      // 返答が20文字未満でも例外にならないよう長さを見てから切る
+      final reply = result?.reply ?? '';
+      debugPrint('✅ _triggerMeetingFollowup: reply=${reply.substring(0, reply.length < 20 ? reply.length : 20)}');
       _stopLoadingDots();
       if (mounted) {
         setState(() {

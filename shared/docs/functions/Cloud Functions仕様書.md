@@ -83,7 +83,7 @@
 | パラメータ | 型 | 説明 |
 |-----------|-----|------|
 | `characterId` | `string` | キャラクターID |
-| `userMessage` | `string` | ユーザーのメッセージ（100文字まで処理） |
+| `userMessage` | `string` | ユーザーのメッセージ（400文字まで処理。超える場合も文の途中では切らず、直前の `。！？` までで打ち切る） |
 | `userId` | `string` | Firebase Auth UID |
 | `isPremium` | `boolean` | プレミアムユーザーフラグ |
 | `chatHistory` | `array<{userMessage, aiResponse}>` | 直近2件の会話履歴 |
