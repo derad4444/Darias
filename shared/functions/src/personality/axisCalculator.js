@@ -3,6 +3,7 @@
 const {admin} = require('../utils/firebaseInit');
 const {TAG_AXIS_MAP, AXES} = require('./tagAxisMap');
 const {generateCharacterDetails} = require('../../const/generateCharacterDetails');
+const {hasDecisiveKeyChange} = require('../../const/generatePersonalityKey');
 const {OPENAI_API_KEY} = require('../config/config');
 
 // ── 元素判定 ──────────────────────────────────────────
@@ -263,6 +264,26 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
       } catch (e) {
         console.error('⚠️ キャラクター詳細再生成エラー:', e);
       }
+    }
+    return;
+  }
+
+  // タイプ名も元素も変わらないまま Big5スコアだけが動くケースの救済。
+  //
+  // スコアは10シグナルごとに更新されるが、属性・夢の候補はタイプ変化時にしか
+  // 作り直されないため、放置すると古い性格の口癖・長所・夢がそのまま残る
+  // （2026-08-14 に既存10ユーザーで実際に発生していたのを確認しバックフィル済み）。
+  // 丸め境界での往復による無駄な再生成を避けるため、判定にはヒステリシスを入れている。
+  const prevAxisGeneratedAt = prevSnap.data()?.axisGeneratedAt;
+  if (prevAxisGeneratedAt &&
+      hasDecisiveKeyChange(prevSnap.data()?.personalityKey, convertedBig5Scores, gender)) {
+    console.log(`🔄 性格キー変化によりキャラクター詳細を再生成: ${prevSnap.data()?.personalityKey} user=${userId}`);
+    try {
+      await generateCharacterDetails(charId, userId, OPENAI_API_KEY.value().trim());
+      // フレンドとの相性はBig5スコアから出しているため作り直しが必要
+      await markCompatibilityStale(db, userId);
+    } catch (e) {
+      console.error('⚠️ キャラクター詳細再生成エラー（性格キー変化）:', e);
     }
   }
 }

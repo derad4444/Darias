@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/dream_provider.dart';
+import '../providers/theme_provider.dart';
 
 /// 夢を選ぶシート
 ///
@@ -67,15 +68,19 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
   void initState() {
     super.initState();
     final current = widget.currentDream.trim();
-    // 現在の夢が候補に無い＝自由入力したものなので、入力欄に復元する
+    // 「自分で入力する」を選んだときに今の夢から書き直せるよう、候補にあるかに
+    // かかわらず入力欄の初期値にしておく
+    _controller = TextEditingController(text: current);
+
     if (current.isNotEmpty && !widget.options.contains(current)) {
+      // 現在の夢が候補に無い＝過去に自由入力したものなので入力状態で開く
       _isCustom = true;
-      _controller = TextEditingController(text: current);
     } else {
       _selected = current.isNotEmpty
           ? current
           : (widget.options.isNotEmpty ? widget.options.first : null);
-      _controller = TextEditingController();
+      // 候補が1つも無いときは自由入力しか手段がないので最初から開いておく
+      _isCustom = widget.options.isEmpty;
     }
   }
 
@@ -111,6 +116,16 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = theme.colorScheme.primary;
+    // ホーム画面と同じ背景にして、開いたときの色の落差をなくす
+    final gradient = ref.watch(backgroundGradientProvider);
+    // ユーザーが濃い色を設定している場合に文字が読めなくなるのを防ぐ
+    final isDarkBackground = gradient.colors
+            .map((c) => c.computeLuminance())
+            .reduce((a, b) => a + b) /
+        gradient.colors.length <
+        0.4;
+    final textColor = isDarkBackground ? Colors.white : theme.colorScheme.onSurface;
+    final subTextColor = textColor.withValues(alpha: 0.7);
 
     return SafeArea(
       top: false,
@@ -121,7 +136,7 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
         ),
         child: Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
+            gradient: gradient,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
@@ -140,17 +155,42 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
                   ),
                 ),
               ),
-              Text(
-                widget.title,
-                style: theme.textTheme.titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
+              Row(
+                children: [
+                  // 閉じる手段が下スワイプしかないと「やめたい」ときに迷うため、
+                  // 明示的な戻るボタンを左に置く。呼び出し元は null を受け取る。
+                  SizedBox(
+                    width: 40,
+                    child: IconButton(
+                      onPressed: _isSaving ? null : () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back),
+                      color: textColor,
+                      iconSize: 22,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      tooltip: '戻る',
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+                  // タイトルを中央に保つため、戻るボタンと同じ幅を右にも取る
+                  const SizedBox(width: 40),
+                ],
               ),
               if (widget.subtitle != null) ...[
                 const SizedBox(height: 6),
                 Text(
                   widget.subtitle!,
-                  style: theme.textTheme.bodySmall
-                      ?.copyWith(color: theme.hintColor),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(color: subTextColor),
                 ),
               ],
               const SizedBox(height: 12),
@@ -164,6 +204,7 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
                           label: option,
                           selected: !_isCustom && _selected == option,
                           accent: accent,
+                          textColor: textColor,
                           onTap: _isSaving
                               ? null
                               : () => setState(() {
@@ -176,6 +217,7 @@ class _DreamSelectSheetState extends ConsumerState<DreamSelectSheet> {
                         label: '自分で入力する',
                         selected: _isCustom,
                         accent: accent,
+                        textColor: textColor,
                         onTap: _isSaving
                             ? null
                             : () => setState(() => _isCustom = true),
@@ -227,12 +269,14 @@ class _OptionRow extends StatelessWidget {
   final String label;
   final bool selected;
   final Color accent;
+  final Color textColor;
   final VoidCallback? onTap;
 
   const _OptionRow({
     required this.label,
     required this.selected,
     required this.accent,
+    required this.textColor,
     required this.onTap,
   });
 
@@ -248,7 +292,7 @@ class _OptionRow extends StatelessWidget {
           children: [
             Icon(
               selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-              color: selected ? accent : theme.hintColor,
+              color: selected ? accent : textColor.withValues(alpha: 0.45),
               size: 22,
             ),
             const SizedBox(width: 12),
@@ -257,6 +301,7 @@ class _OptionRow extends StatelessWidget {
                 label,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  color: textColor,
                 ),
               ),
             ),

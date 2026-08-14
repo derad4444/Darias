@@ -2,9 +2,9 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-08-06
+**最終更新日**: 2026-08-14
 **トップレベルコレクション**: 11
-**主な更新**: 自分会議の結論から nextSteps を削除。夢を本人限定の `characters/{characterId}/dream` に分離し、性格ごとの共有テンプレート `CharacterDetailsTemplate` を追加。`payment_method` のストア別フィールドも追記
+**主な更新**: `details/current` に `personalityKey` を明記し、保存キーとスコアがずれる条件・小数キーの是正（2026-08-14 バックフィル）を追記
 
 ---
 
@@ -125,7 +125,12 @@
 - **typeName**: `string` - タイプ名（例: "場を沸かす炎タイプ"）。element と relationship/lifestyle 軸で決定
 - **convertedBig5Scores**: `map` - 軸スコアから変換したBIG5スコア（1.0〜5.0）。`confirmedBig5Scores`（質問形式の診断結果）とは別フィールド
 - **axisUpdatedAt**: `timestamp` - 軸スコア最終更新日時
-- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、初回生成の重複を防ぐガードとして機能する（以降は性格タイプ変化のたびに再生成される）
+- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、初回生成の重複を防ぐガードとして機能する（以降は性格タイプの変化、または性格キーがはっきり変わったときに再生成される）
+- **personalityKey**: `string` - 丸めたBig5 5値＋性別（例 `O5_C3_E4_A2_N5_女性`）。`CharacterDetailsTemplate` と `Big5Analysis` の参照キーになる
+
+> **保存されているキーとスコアはずれることがある**: `convertedBig5Scores` は10シグナルごとに更新されるが、`personalityKey` は再生成時にしか書き換わらない。ずれが一定以上になった時点で再生成される（判定は `hasDecisiveKeyChange()`。詳細は [性格解析仕様書](../functions/性格解析仕様書.md#性格キーの変化による再生成ヒステリシス付き)）。
+>
+> 2026-08-14 のバックフィル以前は、丸めずに保存された小数キー（`O4.77…_C2.46…_男性`）が混在していた。現在は解消済みだが、`parsePersonalityKey()` は互換のため小数キーと旧並び順（`O3_C3_A3_E3_N3`）も読める。
 
 #### `users/{userId}/characters/{characterId}/dream`
 

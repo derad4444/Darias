@@ -60,6 +60,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   bool _isShowingDialog = false;
   bool _isShowingEvolutionDialog = false;
   bool _isShowingFirstDreamDialog = false;
+  bool _isShowingDreamProposalDialog = false;
   bool _isPlayingVoice = false;
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
@@ -314,6 +315,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         _isShowingFirstDreamDialog = true;
         WidgetsBinding.instance.addPostFrameCallback((_) => _showFirstDreamDialog());
       }
+    });
+
+    // 夢の新しい候補ができたときの監視
+    //
+    // 進化ダイアログの中にも提案があるが、そちらはタイプ名が変わったときしか
+    // 開かない。タイプ名が変わらないまま性格キーだけ動いた場合は表示経路が
+    // 無くなるため、pendingDreamProposal を直接見て単独のダイアログを出す。
+    ref.listen<AsyncValue<DreamState?>>(dreamProvider, (prev, next) {
+      final dream = next.valueOrNull;
+      if (dream == null || !dream.pendingProposal || !dream.hasOptions) return;
+      // 初回選択・進化ダイアログが出ているときは、そちらに任せて重ねない
+      if (_isShowingDreamProposalDialog ||
+          _isShowingFirstDreamDialog ||
+          _isShowingEvolutionDialog) {
+        return;
+      }
+      _isShowingDreamProposalDialog = true;
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _showDreamProposalDialog(dream));
     });
 
     final backgroundGradient = ref.watch(backgroundGradientProvider);
@@ -927,6 +947,95 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   ///
   /// 性格タイプ変化の進化ダイアログは初回には出ない（`axisCalculator` の通知条件が
   /// `prevElement !== undefined` のため）ので、初回はこちらで知らせる。
+  /// 夢の新しい候補ができたことを知らせるダイアログ
+  ///
+  /// 今の夢は自動で差し替えない。ユーザーが「候補を見る」を選んだときだけ
+  /// 選択シートを開く。「このまま」を選んだ場合はフラグだけ下ろす。
+  Future<void> _showDreamProposalDialog(DreamState dream) async {
+    if (!mounted) return;
+
+    // 選択シートで「戻る」を押した場合はこのダイアログに戻し、
+    // 「このまま」を選び直せるようにする（選ばずに閉じると行き場がなくなるため）
+    while (mounted) {
+      final decided = await _askDreamProposal(dream);
+      if (decided) break;
+    }
+
+    if (mounted) setState(() => _isShowingDreamProposalDialog = false);
+    return;
+  }
+
+  /// 夢の提案ダイアログを1回表示する
+  ///
+  /// 戻り値が false のときは「候補を見たが選ばずに戻った」状態で、
+  /// 呼び出し側がもう一度このダイアログを出す。
+  Future<bool> _askDreamProposal(DreamState dream) async {
+    final dreamService = ref.read(dreamServiceProvider);
+
+    final wantsToChange = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('✨ 新しい夢の候補', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '性格の変化に合わせて、夢の候補を考え直しました。',
+              textAlign: TextAlign.center,
+            ),
+            if (!dream.isUnset) ...[
+              const SizedBox(height: 12),
+              Text(
+                '今の夢\n「${dream.dream}」',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'そのままでも、選び直しても大丈夫です。',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('このまま'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('候補を見る'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return true;
+
+    if (wantsToChange != true) {
+      // 「このまま」またはダイアログを閉じた場合は今の夢を維持して終了
+      await dreamService.dismissProposal();
+      return true;
+    }
+
+    final selected = await DreamSelectSheet.show(
+      context,
+      options: dream.dreamOptions,
+      currentDream: dream.dream,
+      title: dream.isUnset ? '夢を選ぶ' : '夢を変更する',
+      subtitle: '性格に合わせて考えた候補です。自分の言葉で入力もできます。',
+    );
+
+    // 夢を選んだ場合は selectDream 側でフラグが下りている
+    if (selected != null) return true;
+
+    // 「戻る」または閉じた場合は、このままを選べるダイアログへ戻す
+    return false;
+  }
+
   Future<void> _showFirstDreamDialog() async {
     // 候補がまだ書き込まれていないことがあるため、ここで一度読み直す
     final dream = await ref.read(dreamProvider.future);
