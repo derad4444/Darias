@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../../data/models/user_model.dart';
+import '../../data/services/analytics_service.dart';
 
 /// Firebase Auth インスタンス
 final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
@@ -113,6 +114,9 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
             .set(characterDetailData);
       }
 
+      // 登録完了を計測する（本アプリの認証はメールのみ）
+      await AnalyticsService.instance.logSignUp(method: 'email');
+
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -131,6 +135,7 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
         email: email,
         password: password,
       );
+      await AnalyticsService.instance.logLogin(method: 'email');
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

@@ -41,6 +41,7 @@ import '../../widgets/daily_mission_sheet.dart';
 import '../../../data/models/daily_mission_model.dart';
 import '../main/main_shell_screen.dart';
 import 'chat_opener.dart';
+import '../../../data/services/analytics_service.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -558,7 +559,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                               if (isPremium) {
                                 _playVoice();
                               } else {
-                                context.push('/premium');
+                                context.push('/premium?source=voice');
                               }
                             },
                             child: _isPlayingVoice
@@ -618,7 +619,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.push('/premium');
+              context.push('/premium?source=web_chat_limit');
             },
             child: const Text('プレミアムへ'),
           ),
@@ -680,6 +681,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         // チャットミッション進捗を更新
         if (result != null) {
           await ref.read(dailyMissionProvider.notifier).incrementChat();
+          // 送信の成立を計測する（本文は送らず、送信時点の進捗区分のみ）。
+          // 自分会議の結論を自動送信する _triggerMeetingFollowup では送らない
+          // （ユーザーの発話ではないため）。
+          await AnalyticsService.instance
+              .logChatMessageSent(signalCount: signalCount, phase: phase);
         }
       }
       if (mounted && result != null && !_isShowingDialog) {

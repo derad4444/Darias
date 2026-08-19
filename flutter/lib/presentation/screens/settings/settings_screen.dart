@@ -66,7 +66,7 @@ class SettingsScreen extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: _PremiumUpgradeCard(
                     accentColor: accentColor,
-                    onTap: () => context.push('/premium'),
+                    onTap: () => context.push('/premium?source=settings'),
                   ),
                 ),
 

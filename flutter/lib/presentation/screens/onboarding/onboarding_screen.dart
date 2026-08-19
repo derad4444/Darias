@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/services/analytics_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 
@@ -66,12 +67,23 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    // オンボーディング到達数と、1枚目の閲覧を記録する。
+    // 2枚目以降は onPageChanged で記録するため、1枚目だけはここで送る。
+    AnalyticsService.instance.logTutorialBegin();
+    AnalyticsService.instance.logOnboardingSlideView(slideIndex: 0);
+  }
+
+  @override
   void dispose() {
     _pageController.dispose();
     super.dispose();
   }
 
-  Future<void> _complete() async {
+  /// オンボーディングを終了する。[skipped] はスキップボタン経由かどうか。
+  Future<void> _complete({required bool skipped}) async {
+    await AnalyticsService.instance.logTutorialComplete(skipped: skipped);
     final userId = ref.read(currentUserIdProvider) ?? '';
     if (userId.isNotEmpty) {
       await FirebaseFirestore.instance
@@ -99,7 +111,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
-                onPressed: () => _complete(),
+                onPressed: () => _complete(skipped: true),
                 child: const Text('スキップ', style: TextStyle(color: Colors.grey)),
               ),
             ),
@@ -109,7 +121,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: _pages.length,
-                onPageChanged: (i) => setState(() => _currentPage = i),
+                onPageChanged: (i) {
+                  setState(() => _currentPage = i);
+                  // 6枚のどこで離脱しているかを見るため1枚ごとに記録する
+                  AnalyticsService.instance.logOnboardingSlideView(slideIndex: i);
+                },
                 itemBuilder: (_, i) => _PageContent(page: _pages[i]),
               ),
             ),
@@ -142,7 +158,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 child: FilledButton(
                   onPressed: () {
                     if (isLast) {
-                      _complete();
+                      _complete(skipped: false);
                     } else {
                       _pageController.nextPage(
                         duration: const Duration(milliseconds: 300),

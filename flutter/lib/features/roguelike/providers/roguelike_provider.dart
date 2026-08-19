@@ -13,6 +13,7 @@ import '../models/equipment.dart';
 import '../models/bag_item.dart';
 import '../models/element_affinity.dart';
 import '../data/roguelike_datasource.dart';
+import '../../../data/services/analytics_service.dart';
 
 final roguelikeProvider =
     StateNotifierProvider<RoguelikeNotifier, GameState?>((ref) => RoguelikeNotifier());
@@ -105,6 +106,8 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
       characterName: characterName,
       dungeon: dungeon,
     );
+    // 冒険を1回始めたことを記録する（ダンジョン名や悩みの内容は送らない）
+    AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.adventure);
   }
 
   void resetGame() => state = null;

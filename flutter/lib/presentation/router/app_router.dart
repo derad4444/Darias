@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../data/services/analytics_service.dart';
 import '../../data/models/memo_model.dart';
 import '../../data/models/schedule_model.dart';
 import '../../data/models/todo_model.dart';
@@ -74,6 +75,9 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: '/splash',
     refreshListenable: notifier,
+    // 画面遷移を screen_view として自動送信する。
+    // 各 GoRoute に name を付けているため、画面名は path ではなく name で記録される。
+    observers: [AnalyticsService.instance.navigatorObserver],
     redirect: (context, state) {
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final isSplash = state.matchedLocation == '/splash';
@@ -215,7 +219,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/premium',
         name: 'premium',
-        builder: (context, state) => const PremiumUpgradeScreen(),
+        // source は「どの導線から課金画面に来たか」の計測用（個人情報ではない）
+        builder: (context, state) => PremiumUpgradeScreen(
+          source: state.uri.queryParameters['source'] ?? 'unknown',
+        ),
       ),
 
       // キャラクター詳細

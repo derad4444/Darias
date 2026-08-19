@@ -13,6 +13,7 @@ import '../../providers/ad_provider.dart';
 import '../../widgets/character_avatar_widget.dart';
 import 'compatibility_category_screen.dart' show CompatibilityChatBubble;
 import 'friend_ask_history_screen.dart';
+import '../../../data/services/analytics_service.dart';
 
 /// フレンドについてキャラクター会話形式で質問する画面
 class FriendAskScreen extends ConsumerStatefulWidget {
@@ -94,6 +95,8 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
           friendName: friendName,
           question: question,
         );
+    // 質問文・フレンド名・フレンドIDは送らず、使用回数だけを記録する
+    await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.friend);
 
     if (!mounted) return;
 
@@ -143,7 +146,7 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
             onPressed: () {
               Navigator.of(dialogContext).pop();
               // プレミアム画面へ遷移
-              context.push('/premium');
+              context.push('/premium?source=friend_limit');
             },
             style: ElevatedButton.styleFrom(backgroundColor: accentColor),
             child: const Text(

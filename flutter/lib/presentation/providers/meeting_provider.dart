@@ -8,6 +8,7 @@ import '../../data/models/meeting_history_model.dart';
 import '../../data/models/six_person_meeting_model.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
+import '../../data/services/analytics_service.dart';
 
 /// MeetingDatasourceのProvider
 final meetingDatasourceProvider = Provider<MeetingDatasource?>((ref) {
@@ -99,6 +100,8 @@ class MeetingController extends StateNotifier<AsyncValue<void>> {
         concern: concern,
         concernCategory: concernCategory,
       );
+      // 悩みの本文(concern)は送らず、機能を使ったという事実だけを記録する
+      await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.meeting);
       state = const AsyncValue.data(null);
       return response;
     } catch (e, st) {

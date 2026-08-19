@@ -4,6 +4,7 @@ import '../../data/models/todo_model.dart';
 // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
 // import '../../data/services/widget_data_service.dart';
 import 'auth_provider.dart';
+import '../../data/services/analytics_service.dart';
 
 /// TodoDatasourceのプロバイダー
 final todoDatasourceProvider = Provider<TodoDatasource>((ref) {
@@ -111,6 +112,7 @@ class TodoController extends StateNotifier<AsyncValue<void>> {
         userId: userId,
         todo: todo,
       );
+      await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.todo);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

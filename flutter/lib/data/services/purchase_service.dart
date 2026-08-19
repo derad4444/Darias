@@ -7,6 +7,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../../../core/constants/app_constants.dart';
 import '../datasources/remote/subscription_datasource.dart';
 import '../models/subscription_model.dart';
+import 'analytics_service.dart';
 
 /// アプリ内課金を管理するサービス
 class PurchaseService {
@@ -197,6 +198,8 @@ class PurchaseService {
         case PurchaseStatus.purchased:
           print('✅ PurchaseService: Purchase successful');
           await _handleSuccessfulPurchase(purchase);
+          // 新規の課金だけを数える。復元(restored)では送らない
+          await _logPurchase(purchase);
           break;
 
         case PurchaseStatus.restored:
@@ -232,6 +235,22 @@ class PurchaseService {
     }
 
     _purchases = purchases;
+  }
+
+  /// 購入完了を計測する。金額・通貨は取得済みの商品情報から補う
+  /// （購入者を特定しうる情報は送らない）。
+  Future<void> _logPurchase(PurchaseDetails purchase) async {
+    ProductDetails? product;
+    try {
+      product = _products.firstWhere((p) => p.id == purchase.productID);
+    } catch (_) {
+      product = null;
+    }
+    await AnalyticsService.instance.logPurchase(
+      itemId: purchase.productID,
+      value: product?.rawPrice,
+      currency: product?.currencyCode,
+    );
   }
 
   /// 購入成功時の処理

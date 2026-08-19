@@ -13,6 +13,7 @@ import '../../data/services/japanese_holiday_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
 import 'friend_provider.dart';
+import '../../data/services/analytics_service.dart';
 // import '../screens/settings/tag_management_screen.dart'; // 同上（tagsProvider/TagItem）
 
 /// CalendarDatasourceのプロバイダー
@@ -108,6 +109,7 @@ class CalendarController extends StateNotifier<AsyncValue<void>> {
         userId: userId,
         schedule: schedule,
       );
+      await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.calendar);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../../data/services/analytics_service.dart';
 
 /// プレミアム機能の種類
 enum PremiumFeature {
@@ -91,7 +92,11 @@ enum PremiumFeature {
 
 /// プレミアムアップグレード画面
 class PremiumUpgradeScreen extends ConsumerStatefulWidget {
-  const PremiumUpgradeScreen({super.key});
+  const PremiumUpgradeScreen({super.key, this.source = 'unknown'});
+
+  /// どの導線からこの画面へ来たかを表す計測用の識別子
+  /// （settings / voice / meeting_limit など）。
+  final String source;
 
   @override
   ConsumerState<PremiumUpgradeScreen> createState() =>
@@ -102,6 +107,8 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
   @override
   void initState() {
     super.initState();
+    // どの導線から課金画面に到達したかを計測する
+    AnalyticsService.instance.logPaywallView(source: widget.source);
     // 商品情報を読み込み
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(subscriptionControllerProvider.notifier).reloadProducts();
@@ -381,6 +388,13 @@ class _PremiumUpgradeScreenState extends ConsumerState<PremiumUpgradeScreen> {
             child: ElevatedButton(
               onPressed: monthlyProduct != null
                   ? () async {
+                      // 「押したが購入まで至らなかった」層を分けて見るため、
+                      // 購入完了(purchase)とは別に押下時点を記録する
+                      await AnalyticsService.instance.logBeginCheckout(
+                        itemId: monthlyProduct.id,
+                        value: monthlyProduct.rawPrice,
+                        currency: monthlyProduct.currencyCode,
+                      );
                       await ref
                           .read(subscriptionControllerProvider.notifier)
                           .purchaseMonthly();

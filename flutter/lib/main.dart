@@ -12,6 +12,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/theme/app_colors.dart';
 import 'data/services/ad_service.dart';
+import 'data/services/analytics_service.dart';
 import 'data/services/bgm_player.dart';
 import 'data/services/notification_service.dart';
 // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
@@ -65,6 +66,10 @@ void main() async {
       }
     }
   }
+
+  // 利用状況の分析（Firebase Analytics）を明示的に有効化する。
+  // 送信内容は AnalyticsService に集約しており、本文などの内容は一切送らない。
+  await AnalyticsService.instance.initialize();
 
   // Web版ではログイン状態をローカルストレージに永続化
   if (kIsWeb) {

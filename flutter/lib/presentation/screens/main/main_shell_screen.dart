@@ -28,6 +28,9 @@ import '../../../features/roguelike/widgets/adventure_door_transition.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
+import '../../providers/character_provider.dart';
+import '../../providers/subscription_provider.dart';
+import '../../../data/services/analytics_service.dart';
 // import '../../providers/notification_provider.dart'; // 同上（notificationSettingsProvider）
 // import '../../../data/services/notification_service.dart'; // 同上
 
@@ -53,6 +56,12 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.initState();
     // iOSのRootView.onAppearと同様にBGMを開始
     BGMPlayer.shared.playBGM('assets/audio/DARIAS BGM.mp3');
+    // Analyticsのセグメントを初期化する。
+    // ref.listen は初期値では発火しないため、ポストフレームで一度だけ補完する。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncAnalyticsSegment();
+    });
     // 音量設定プロバイダーを早期初期化してミュート状態をロードしておく
     ref.read(volumeSettingsProvider);
     // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
@@ -174,6 +183,17 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.dispose();
   }
 
+  /// Analyticsのユーザープロパティ（元素・成長段階・課金状態）を最新化する。
+  ///
+  /// 送るのは区分値のみで、uid や本文などの個人・内容に関わる情報は含めない。
+  void _syncAnalyticsSegment() {
+    AnalyticsService.instance.setUserSegment(
+      element: ref.read(characterDetailsProvider).valueOrNull?.element,
+      signalCount: ref.read(signalCountProvider).valueOrNull,
+      isPremium: ref.read(effectiveIsPremiumProvider),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedTab = ref.watch(selectedTabProvider);
@@ -182,6 +202,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
     // 手帳タブ廃止に伴いコメントアウト（復活時に戻す）。手帳バッジ用。
     // final hasNewDiary = ref.watch(hasNewDiaryProvider).valueOrNull ?? false;
+
+    // 元素の確定・成長段階の変化・課金状態の変化に追従してセグメントを更新する
+    ref.listen(signalCountProvider, (_, __) => _syncAnalyticsSegment());
+    ref.listen(characterDetailsProvider, (_, __) => _syncAnalyticsSegment());
+    ref.listen(effectiveIsPremiumProvider, (_, __) => _syncAnalyticsSegment());
 
     // アプリアイコンバッジ更新（iOS only）
     if (!kIsWeb) {

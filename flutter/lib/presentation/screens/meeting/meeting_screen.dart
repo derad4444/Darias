@@ -351,7 +351,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           SizedBox(
             width: double.infinity,
             child: GestureDetector(
-              onTap: () => context.push('/premium'),
+              onTap: () => context.push('/premium?source=meeting_banner'),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
@@ -721,7 +721,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
-              context.push('/premium');
+              context.push('/premium?source=meeting_web_limit');
             },
             child: const Text('プレミアムへ'),
           ),
@@ -913,7 +913,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              context.push('/premium');
+              context.push('/premium?source=meeting_limit');
             },
             child: const Text('アップグレード'),
           ),

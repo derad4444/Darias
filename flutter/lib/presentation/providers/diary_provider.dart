@@ -4,6 +4,7 @@ import '../../data/models/diary_model.dart';
 import '../../data/services/hint_service.dart';
 import 'auth_provider.dart';
 import 'character_provider.dart';
+import '../../data/services/analytics_service.dart';
 
 /// DiaryDatasourceのプロバイダー
 final diaryDatasourceProvider = Provider<DiaryDatasource>((ref) {
@@ -120,6 +121,8 @@ class DiaryController extends StateNotifier<AsyncValue<void>> {
         diaryId: diaryId,
         comment: comment,
       );
+      // コメント本文は送らない
+      await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.diary);
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);

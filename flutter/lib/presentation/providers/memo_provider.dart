@@ -4,6 +4,7 @@ import '../../data/models/memo_model.dart';
 // ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）
 // import '../../data/services/widget_data_service.dart';
 import 'auth_provider.dart';
+import '../../data/services/analytics_service.dart';
 
 /// MemoDatasourceのプロバイダー
 final memoDatasourceProvider = Provider<MemoDatasource>((ref) {
@@ -45,6 +46,7 @@ class MemoController extends StateNotifier<AsyncValue<void>> {
         userId: userId,
         memo: memo,
       );
+      await AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.memo);
       state = const AsyncValue.data(null);
       return id;
     } catch (e, st) {
