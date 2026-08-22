@@ -2,7 +2,7 @@ const OpenAI = require("openai");
 const admin = require("firebase-admin");
 const {generatePersonalityKey} = require("./generatePersonalityKey");
 const {generateBig5Analysis} = require("./generateBig5Analysis");
-const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
+const {OPTIMIZED_PROMPTS, stripQuotes} = require("../src/prompts/templates");
 const {normalizeDreamOptions, saveDreamOptions} = require("../src/utils/dreamStore");
 
 // Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
@@ -43,7 +43,12 @@ function pickAttributes(parsed) {
   for (const key of ATTRIBUTE_KEYS) {
     const value = parsed[key];
     if (typeof value === "string" && value.trim()) {
-      attributes[key] = value.trim();
+      // 口癖は鉤括弧込みで返ってくることがある（`「面白そう！」`）。
+      // そのまま保存すると日記プロンプトで二重に囲われ、本文に括弧ごと引用される。
+      const cleaned = key === "favorite_word" ?
+        stripQuotes(value) :
+        value.trim();
+      if (cleaned) attributes[key] = cleaned;
     }
   }
   return attributes;

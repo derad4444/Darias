@@ -695,6 +695,7 @@ Cloud Scheduler による定期実行バッチ。
   `posts` は**ユーザーが発言したときだけ1件作られる**（`content`＝ユーザー発言、`analysis_result`＝AIの返信を1ドキュメントに保存）ため、
   発言していないのにカウントされることはない
 - **キャラクター個性活用**: `details/current` から `favorite_word`(口癖) / `word_tendency`(話し方) / `strength`(強み) を、`dream/current` から `dream`(夢) を取得してプロンプトに反映（夢は本人限定サブコレクションに置く。未移行ユーザーは `details/current.dream` にフォールバック）
+- **口癖の扱い**: 口癖は**語り口の参考**として渡す。ai_comment はキャラクターの独白であり、口癖は相手への相づち（`面白いね！`）や単語（`安定`）であることが多く、そのまま差し込むと文脈に合わないため、「文章に自然に収まるときだけ1回まで」「鉤括弧で引用して埋め込まない」をプロンプトで指示している。埋め込み前に `stripQuotes()`（`src/prompts/templates.js`）で外側の鉤括弧・引用符を取り除く
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
 - **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）

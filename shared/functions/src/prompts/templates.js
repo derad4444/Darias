@@ -164,6 +164,28 @@ function getGenderCode(gender) {
   return "N";
 }
 
+/**
+ * 口癖などの短いフレーズから、外側の引用符（「」『』""）と空白を取り除く。
+ *
+ * CharacterDetailsTemplate には `「面白そう！」` のように鉤括弧込みで保存されている値があり、
+ * プロンプト側でも `口癖: 「...」` と囲うため二重括弧になっていた。
+ * その結果モデルが鉤括弧ごと本文に引用し、日記に `「安定」を保ちながら` のような
+ * 不自然な引用が現れていた。埋め込む前にここで剥がす。
+ *
+ * @param {string} text 元の値
+ * @return {string} 引用符を取り除いた値
+ */
+function stripQuotes(text) {
+  if (typeof text !== "string") return "";
+  const PAIRS = {"「": "」", "『": "』", "“": "”", "\"": "\"", "'": "'"};
+  let t = text.trim();
+  // 入れ子で囲われている場合もあるため、外側から繰り返し剥がす
+  while (t.length >= 2 && PAIRS[t[0]] === t[t.length - 1]) {
+    t = t.slice(1, -1).trim();
+  }
+  return t;
+}
+
 const OPTIMIZED_PROMPTS = {
   /**
    * Character Reply Generation - GPT-4o-mini optimized
@@ -290,7 +312,7 @@ ai_commentは以下のルールで250〜350文字で作成:
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
 
     const toneGuide = characterType === "AI"
-      ? "論理的・システム的な言い回しを使いつつ、時折感情がにじむクールなトーン。「処理完了」「セッション」などの語彙を自然に混ぜる。"
+      ? "論理的で落ち着いた言い回しを使いつつ、時折感情がにじむクールなトーン。「処理完了」「セッション」のような機械的な語彙を無理に混ぜず、日記として読める自然な日本語で書く。"
       : characterType === "Human"
       ? "感情豊かで共感的なトーン。喜び・心配・ほっとした気持ちなどを素直に言葉にする。"
       : "論理と感情が混在する学習中のトーン。冷静に分析しながら少し感情が出る。";
@@ -298,7 +320,8 @@ ai_commentは以下のルールで250〜350文字で作成:
     const personalityLines = [];
     if (traits) personalityLines.push(`性格特性: ${traits}`);
     if (wordTendency) personalityLines.push(`話し方: ${wordTendency}`);
-    if (favoriteWord) personalityLines.push(`口癖: 「${favoriteWord}」`);
+    const cleanFavoriteWord = stripQuotes(favoriteWord);
+    if (cleanFavoriteWord) personalityLines.push(`口癖: ${cleanFavoriteWord}`);
     if (dream) personalityLines.push(`夢: ${dream}`);
     if (strength) personalityLines.push(`強み: ${strength}`);
     const personalityText = personalityLines.join("\n");
@@ -317,7 +340,9 @@ ${activitiesText}
 「今日やったこと」の一覧はアプリ側が実データから作るため、ここでは出力しないこと。
 上記【今日の活動】に書かれていないことは、事実として書かないこと（推測・補完・創作は禁止）。
 ai_commentは以下のルールで250〜350文字で作成:
-- 上記の口癖・話し方・性格特性を必ず反映したキャラクターらしいトーンで書く
+- 上記の話し方・性格特性を語り口に反映し、キャラクターらしいトーンで書く
+- 口癖は「そのまま貼り付ける言葉」ではなく語り口の参考。相手への相づち（「面白いね！」など）や単語だけのことが多く、独白である日記に差し込むと不自然になる。文章に自然に収まるときだけ1回まで使い、収まらなければ使わなくてよい
+- 口癖や性格特性を鉤括弧で引用して本文に埋め込まない（例:「安定」を保ちながら…、のような書き方はしない）
 - 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
 - 冒険（心の迷宮）の記録があれば、その挑戦や気づき・克服に触れる
 - 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
@@ -333,6 +358,15 @@ ai_commentは以下のルールで250〜350文字で作成:
 以下の項目でキャラクター詳細を生成:
 
 dreamsは必ず5個。この性格に合う夢を、方向性を変えて挙げること（仕事/学び/人との関わり/暮らし/自己表現 など）。各20文字以内。
+
+favorite_wordはこのキャラクターの口癖。次の条件を守ること:
+- 12文字以内
+- 独り言としても会話の中でも自然に使える言い回しにする
+- 相手の発言への相づち（「面白いね！」「それいいね！」「うん、わかる！」など、会話相手がいないと成立しない言葉）は不可
+- 名詞や単語だけ（「安定」「挑戦」など）は不可。文として言い切る形にする
+- 性格に合ったトーンにする。外向的なら前向きで勢いのある言葉、内省的なら落ち着いた言葉
+- 迷い・不安の調子（「どうしよう」「また考えすぎた」）は、神経症傾向が高い性格のときだけ使う
+- 鉤括弧（「」）や引用符を含めない
 
 出力形式:
 {"favorite_color":"好きな色","favorite_place":"好きな場所","favorite_word":"口癖","word_tendency":"話し方の特徴","strength":"長所","weakness":"短所","skill":"特技","hobby":"趣味","aptitude":"適性","dreams":["夢1","夢2","夢3","夢4","夢5"],"favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
@@ -419,4 +453,5 @@ module.exports = {
   formatBig5WithTraits,
   buildPersonalityTraits,
   buildPersonalityTraitsFromAxes,
+  stripQuotes,
 };

@@ -95,9 +95,9 @@
 - **skill**: `string` - スキル
 - **favorite_place**: `string` - お気に入りの場所
 - **favorite_color**: `string` - 好きな色
-- **favorite_word**: `string` - 好きな言葉
+- **favorite_word**: `string` - 口癖。鉤括弧・引用符を含まない素のフレーズで保存する（12文字以内・独り言としても自然に使える言い切りの形）
 - **favorite_entertainment_genre**: `string` - 好きなエンターテイメントジャンル
-- **word_tendency**: `string` - 言葉の傾向
+- **word_tendency**: `string` - 話し方の特徴
 
 > 上記のキャラクター属性は `CharacterDetailsTemplate/{personalityKey}` から複製される（同じ性格キーのユーザー間で同一の値になる）。
 >
@@ -296,7 +296,7 @@
 - **diary_type**: `string` *(アクティビティ型のみ)* - 日記種別。`"activity"` 固定
 - **facts**: `array<string>` *(アクティビティ型のみ)* - 当日の活動を事実ベースでまとめた箇条書きリスト。`generateDiary.js` が実データから組み立てるため件数は変動し、活動がない日は空配列になる
   - 例: `["タスク「報告書作成」を完了した", "メモ「アイデアメモ」を記録した"]`
-- **ai_comment**: `string` *(アクティビティ型のみ)* - キャラクターが事実に基づいて生成した前向きな一言コメント（250〜350文字）。キャラクターの個性（口癖・話し方・夢・強み）とBIG5性格を反映
+- **ai_comment**: `string` *(アクティビティ型のみ)* - キャラクターが事実に基づいて生成した前向きな一言コメント（250〜350文字）。キャラクターの個性（口癖・話し方・夢・強み）とBIG5性格を反映する。口癖は語り口の参考として扱い、本文に必ず登場するとは限らない
 
 **diary_type の種別:**
 

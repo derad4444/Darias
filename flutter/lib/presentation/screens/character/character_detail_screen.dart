@@ -444,8 +444,8 @@ class _CharacterDetailBody extends ConsumerWidget {
                   children: [
                     _InfoRow(label: '好きな色', value: detail.favoriteColor, textColor: textColor),
                     _InfoRow(label: '好きな場所', value: detail.favoritePlace, textColor: textColor),
-                    _InfoRow(label: '好きな言葉', value: detail.favoriteWord, textColor: textColor),
-                    _InfoRow(label: '言葉の傾向', value: detail.wordTendency, textColor: textColor),
+                    _InfoRow(label: '口癖', value: detail.favoriteWord, textColor: textColor),
+                    _InfoRow(label: '話し方の特徴', value: detail.wordTendency, textColor: textColor),
                     _InfoRow(label: '短所', value: detail.weakness, textColor: textColor),
                     _InfoRow(label: '長所', value: detail.strength, textColor: textColor),
                     _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
