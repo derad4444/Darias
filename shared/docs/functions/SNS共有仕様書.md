@@ -35,6 +35,31 @@ https://dariasapp.web.app
 - SNSでのリンクカード表示用にOGPを設定する（画像はLP側の `images/logo.png` を参照）
 - LPとの重複ページのため `noindex` と `robots.txt` の `Disallow: /` を設定する
 
+#### 流入元の計測（`?from=`）
+
+SNSごとにプロフィールリンクを出し分けておくと、ストア側のレポートで「どこから来たDLか」を比較できる。
+
+| 置き場所 | URL |
+|---|---|
+| Instagram プロフィール | `https://dariasapp.web.app/?from=instagram` |
+| TikTok プロフィール | `https://dariasapp.web.app/?from=tiktok` |
+| Threads | `https://dariasapp.web.app/?from=threads` |
+
+受け付ける値は `instagram` / `tiktok` / `threads` / `x` / `youtube` / `line` / `note` のホワイトリスト。大文字小文字は吸収し、`utm_source` でも受ける。**リストに無い値は無視する**（任意の文字列がストアURLに入るのを防ぐため、また `ct` はレポートの軸になるので表記ゆれを避けるため）。
+
+判定した流入元は遷移先ごとに次の形で引き継ぐ。
+
+| 遷移先 | 付与するもの | 確認場所 |
+|---|---|---|
+| App Store | `?pt={ProviderID}&ct={流入元}&mt=8` | App Store Connect → App Analytics → キャンペーン |
+| Google Play | `&referrer=utm_source={流入元}&utm_medium=social&utm_campaign=sns` | Play Console → ユーザーの獲得 → 獲得レポート |
+| LP | `?from={流入元}` | LP側がApp Storeリンクに `pt`/`ct` を付け直す |
+
+- **App Store は `pt`（Provider ID）が無いと計測されない。** `dl/index.html` と LP の `APPLE_PROVIDER_TOKEN` に設定する。未設定の間は通常のストアリンクへ送る（計測されないだけで遷移は壊れない）
+- Google Play は `referrer` に載せるだけでよく、事前の発行作業は不要
+- LP（`~/dev/DARIASLP`）は別リポジトリ。`?from=` を受け取って `a[href*="apps.apple.com"]` のリンクに `pt`/`ct` を付け直す
+- 自動遷移が失敗したときの手動リンクにも同じURLを入れる
+
 ### iOS実機対応の共通実装ルール
 
 iOS 16+ で `UIActivityViewController` の `popoverPresentationController` が non-nil になる場合、origin を渡さないと `FlutterError` で無言に失敗する。  

@@ -57,19 +57,68 @@
 
     <!-- JSが無効／リダイレクトが失敗した場合の手動導線 -->
     <div class="links">
-      <a href="https://apps.apple.com/app/id6753144594">App Store で見る</a>
-      <a href="https://my-character-app.web.app/">DARIAS について</a>
+      <a id="manual-store" href="https://apps.apple.com/jp/app/id6753144594">App Store で見る</a>
+      <a id="manual-lp" href="https://my-character-app.web.app/">DARIAS について</a>
     </div>
 
     <script>
       (function () {
-        var APP_STORE = 'https://apps.apple.com/app/id6753144594';
-        var PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.darias.darias';
+        var APP_ID = '6753144594';
+        var PLAY_ID = 'com.darias.darias';
+        var APP_STORE = 'https://apps.apple.com/jp/app/id' + APP_ID;
+        var PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + PLAY_ID;
         var LP = 'https://my-character-app.web.app/';
 
         // Android版はPlay未公開のため当面LPへ送る。
         // Playリリース後にこのフラグを true にすれば PLAY_STORE へ切り替わる。
         var ANDROID_RELEASED = false;
+
+        // ── 流入元の計測 ────────────────────────────────
+        // 各SNSのプロフィールリンクを ?from=instagram のように出し分けておくと、
+        // ストア側のレポートで「どこから来たDLか」を比較できる。
+        //
+        // App Store: App Store Connect の App Analytics → キャンペーンで見る。
+        //   計測には Provider ID（pt）が必須。未設定の間は通常のストアリンクへ送る。
+        // Google Play: Play Console → ユーザーの獲得 → 獲得レポート で見る。
+        //   referrer に utm_source を載せるだけでよく、追加の発行作業は不要。
+        var APPLE_PROVIDER_TOKEN = '';   // ← App Store Connect の Provider ID を入れる
+        var CAMPAIGN = 'sns';            // ct / utm_campaign の値
+
+        // 受け付ける流入元。ここに無い値は無視する（任意の文字列がストアURLに
+        // 入るのを防ぐため。ct はレポートの軸になるので表記ゆれも避けたい）
+        var SOURCES = ['instagram', 'tiktok', 'threads', 'x', 'youtube', 'line', 'note'];
+
+        function getParam(name) {
+          var m = new RegExp('[?&]' + name + '=([^&#]*)').exec(location.search);
+          return m ? decodeURIComponent(m[1].replace(/\+/g, ' ')) : '';
+        }
+
+        function getSource() {
+          var v = (getParam('from') || getParam('utm_source') || '').toLowerCase();
+          for (var i = 0; i < SOURCES.length; i++) {
+            if (SOURCES[i] === v) return v;
+          }
+          return '';
+        }
+
+        function appStoreUrl(src) {
+          if (!src || !APPLE_PROVIDER_TOKEN) return APP_STORE;
+          return APP_STORE + '?pt=' + encodeURIComponent(APPLE_PROVIDER_TOKEN) +
+                 '&ct=' + encodeURIComponent(src) + '&mt=8';
+        }
+
+        function playStoreUrl(src) {
+          if (!src) return PLAY_STORE;
+          var referrer = 'utm_source=' + src + '&utm_medium=social&utm_campaign=' + CAMPAIGN;
+          return PLAY_STORE + '&referrer=' + encodeURIComponent(referrer);
+        }
+
+        function lpUrl(src) {
+          // LP側のストアボタンにも同じ計測を引き継がせる
+          return src ? LP + '?from=' + encodeURIComponent(src) : LP;
+        }
+
+        var src = getSource();
 
         var ua = navigator.userAgent || '';
         // iPadOS 13+ はUAがMacintoshになるため、タッチ有無で判別する
@@ -78,12 +127,18 @@
           (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
         var isAndroid = /Android/.test(ua);
 
-        var dest = LP;
+        var dest = lpUrl(src);
         if (isIOS) {
-          dest = APP_STORE;
+          dest = appStoreUrl(src);
         } else if (isAndroid) {
-          dest = ANDROID_RELEASED ? PLAY_STORE : LP;
+          dest = ANDROID_RELEASED ? playStoreUrl(src) : lpUrl(src);
         }
+
+        // 自動遷移が失敗したときの手動導線にも同じURLを入れておく
+        var manualStore = document.getElementById('manual-store');
+        var manualLp = document.getElementById('manual-lp');
+        if (manualStore) manualStore.href = isAndroid && ANDROID_RELEASED ? playStoreUrl(src) : appStoreUrl(src);
+        if (manualLp) manualLp.href = lpUrl(src);
 
         // 戻るボタンでこのページに戻ってループしないよう replace を使う
         location.replace(dest);
