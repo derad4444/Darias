@@ -41,54 +41,6 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-5851550594315289~6221721976"/>
 
-        <!-- ホーム画面ウィジェット機能の停止に伴いコメントアウト（不使用・復活時に戻す）。
-             receiverを外すとウィジェット追加メニューに表示されなくなる。
-             Kotlin実装（*WidgetProvider.kt）とレイアウトXMLはそのまま残している。 -->
-        <!--
-        <receiver
-            android:name=".TodoWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/todo_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".MemoWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/memo_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".CalendarWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/calendar_widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".CalendarGridWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/calendar_grid_widget_info" />
-        </receiver>
-        -->
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

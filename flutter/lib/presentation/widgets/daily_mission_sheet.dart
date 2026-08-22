@@ -43,16 +43,6 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
     _confettiController.play();
   }
 
-  // 手帳（カレンダー）廃止でスケジュール確認ミッションをコメントアウトしたため現在は未使用（復活時に再利用）。
-  // ignore: unused_element
-  void _goToTodaySheet() {
-    Navigator.pop(context);
-    if (context.mounted) {
-      ref.read(dailyMissionNavigationProvider.notifier).state =
-          DailyMissionNavigation.goToTodaySheet;
-    }
-  }
-
   void _goToYesterdaySheet() {
     Navigator.pop(context);
     if (context.mounted) {
@@ -199,17 +189,6 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
             subLabel: mission.chat6Done ? null : '現在の進捗: ${mission.chatCount} / 6',
             accentColor: accentColor,
           ),
-          // 手帳（カレンダー）廃止に伴い「スケジュール確認」ミッションをコメントアウト（復活時に戻す）。
-          /*
-          const SizedBox(height: 10),
-          _MissionRow(
-            label: '今日のスケジュールを確認する',
-            isDone: mission.diaryViewed,
-            subLabel: mission.diaryViewed ? null : 'タップして開く →',
-            accentColor: accentColor,
-            onTap: mission.diaryViewed ? null : _goToTodaySheet,
-          ),
-          */
           const SizedBox(height: 10),
           _MissionRow(
             label: '日記を確認する',
@@ -219,38 +198,6 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
             onTap: mission.diaryRead ? null : _goToYesterdaySheet,
           ),
 
-          // 手帳（カレンダー）廃止に伴い、全達成メッセージ（カレンダーに⭐）をコメントアウト（復活時に戻す）。
-          /*
-          // 全達成メッセージ
-          if (mission.allCompleted) ...[
-            const SizedBox(height: 14),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.amber.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.amber.shade300),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('⭐', style: TextStyle(fontSize: 14)),
-                  SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      '全ミッション達成！カレンダーに⭐がつくよ',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.amber,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          */
 
           const SizedBox(height: 16),
           Divider(color: accentColor.withValues(alpha: 0.15), height: 1),
@@ -355,11 +302,7 @@ class _MissionRow extends StatelessWidget {
 }
 
 // 画面遷移を通知するプロバイダー
-enum DailyMissionNavigation { none, goToCalendar, goToTodaySheet, goToYesterdaySheet }
+enum DailyMissionNavigation { none, goToYesterdaySheet }
 
 final dailyMissionNavigationProvider =
     StateProvider<DailyMissionNavigation>((ref) => DailyMissionNavigation.none);
-
-// カレンダーのボトムシートを開く日付トリガー（null = 何もしない）
-final dailyMissionBottomSheetTriggerProvider =
-    StateProvider<DateTime?>((ref) => null);

@@ -76,7 +76,7 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
       // 途中で引いた冒険は選択数が少なく、性格診断として意味のある材料にならないため。
       if (gameState.result == GameResult.retreat) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          ref.read(selectedTabProvider.notifier).state = 4; // 冒険タブ＝ダンジョン選択
+          ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
           context.go('/');
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => ref.read(roguelikeProvider.notifier).resetGame(),
@@ -139,7 +139,7 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
               // 状態クリアを先にやると state==null で単独ルート /roguelike へ
               // 誘導されるため、遷移を先に行いクリアは遷移後に回す。
               final notifier = ref.read(roguelikeProvider.notifier);
-              ref.read(selectedTabProvider.notifier).state = 4; // 冒険タブ＝ダンジョン選択
+              ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
               context.go('/');
               WidgetsBinding.instance.addPostFrameCallback((_) => notifier.resetGame());
             },
@@ -432,7 +432,7 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
   void _quitToSelection() {
     if (_adBusy) return;
     final notifier = ref.read(roguelikeProvider.notifier);
-    ref.read(selectedTabProvider.notifier).state = 4; // 冒険タブ＝ダンジョン選択
+    ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
     context.go('/');
     WidgetsBinding.instance.addPostFrameCallback((_) => notifier.resetGame());
   }

@@ -28,25 +28,8 @@ Object.defineProperty(exports, "generateAdventureDiagnosis", {
   enumerable: true,
 });
 
-Object.defineProperty(exports, "scheduledHolidays", {
-  get: () => require("./src/functions/scheduledTasks").scheduledHolidays,
-  enumerable: true,
-});
-
 Object.defineProperty(exports, "scheduledDiaryGeneration", {
   get: () => require("./src/functions/scheduledTasks").scheduledDiaryGeneration,
-  enumerable: true,
-});
-
-Object.defineProperty(exports, "generateMonthlyReview", {
-  get: () =>
-    require("./src/functions/generateMonthlyReview").generateMonthlyReview,
-  enumerable: true,
-});
-
-Object.defineProperty(exports, "generateMonthlyReviewHttp", {
-  get: () =>
-    require("./src/functions/generateMonthlyReview").generateMonthlyReviewHttp,
   enumerable: true,
 });
 
@@ -137,16 +120,6 @@ Object.defineProperty(exports, "removeFriend", {
 
 Object.defineProperty(exports, "askAboutFriend", {
   get: () => require("./const/askAboutFriend").askAboutFriend,
-  enumerable: true,
-});
-
-Object.defineProperty(exports, "getFriendSchedules", {
-  get: () => require("./const/getFriendSchedules").getFriendSchedules,
-  enumerable: true,
-});
-
-Object.defineProperty(exports, "extractFromImage", {
-  get: () => require("./const/extractFromImage").extractFromImage,
   enumerable: true,
 });
 

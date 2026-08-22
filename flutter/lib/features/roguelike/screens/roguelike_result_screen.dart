@@ -27,8 +27,8 @@ import '../../../presentation/screens/main/main_shell_screen.dart' show selected
 import '../../../presentation/widgets/character/element_effect_widget.dart' show characterGrowthAssetPath;
 
 /// メインタブ内の「冒険」タブのインデックス（main_shell_screen の並びと一致）。
-/// 並び: 0=ホーム / 1=手帳 / 2=詳細 / 3=フレンド / 4=冒険 / 5=設定
-const _adventureTabIndex = 4;
+/// 並び: 0=ホーム / 1=詳細 / 2=フレンド / 3=冒険 / 4=設定
+const _adventureTabIndex = 3;
 
 class RoguelikeResultScreen extends ConsumerStatefulWidget {
   const RoguelikeResultScreen({super.key});

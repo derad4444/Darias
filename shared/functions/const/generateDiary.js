@@ -76,51 +76,6 @@ async function generateDiary(characterId, userId) {
       `📆 集計範囲(JST基準): ${today.toISOString()} 〜 ${tomorrow.toISOString()}`,
   );
 
-  // 手帳（予定）機能の廃止に伴い、予定の取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
-  /*
-  // 今日のスケジュール取得 (ユーザー固有のスケジュール)
-  const scheduleSnap = await db.collection("users").doc(userId)
-      .collection("schedules")
-      .where("startDate", ">=", today)
-      .where("startDate", "<", tomorrow)
-      .limit(3)
-      .get();
-
-  // スケジュールの文字列整形
-  const scheduleSummary = scheduleSnap.docs.map((doc) => {
-    const data = doc.data();
-    const time = data.isAllDay ?
-  "終日" :
-  new Date(data.startDate.toDate()).toLocaleTimeString(
-      "ja-JP",
-      {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo"},
-  );
-    return `・${time} ${data.title}`;
-  }).join("\n");
-
-  // 翌日のスケジュール取得（明日への言及に使う）
-  const dayAfterTomorrow = new Date(tomorrow);
-  dayAfterTomorrow.setDate(tomorrow.getDate() + 1);
-
-  const tomorrowScheduleSnap = await db.collection("users").doc(userId)
-      .collection("schedules")
-      .where("startDate", ">=", tomorrow)
-      .where("startDate", "<", dayAfterTomorrow)
-      .orderBy("startDate", "asc")
-      .limit(3)
-      .get();
-
-  const tomorrowScheduleSummary = tomorrowScheduleSnap.docs.map((doc) => {
-    const data = doc.data();
-    const time = data.isAllDay ?
-  "終日" :
-  new Date(data.startDate.toDate()).toLocaleTimeString(
-      "ja-JP",
-      {hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tokyo"},
-  );
-    return `・${time} ${data.title}`;
-  }).join("\n");
-  */
 
   // 今日のチャット(Post)取得
   const postsQuery = db.collection("users").doc(userId)
@@ -147,55 +102,6 @@ async function generateDiary(characterId, userId) {
     return `・「${data.content}」`;
   }).join("\n");
 
-  // 手帳（タスク・メモ）機能の廃止に伴い、タスク・メモの取得を日記材料から除外（コメントアウトで残置・復活時に戻す）。
-  /*
-  // 今日完了したToDo取得（上位3件）
-  const completedTodoSnap = await db.collection("users").doc(userId)
-      .collection("todos")
-      .where("isCompleted", "==", true)
-      .where("updatedAt", ">=", today)
-      .where("updatedAt", "<", tomorrow)
-      .orderBy("updatedAt", "desc")
-      .limit(3)
-      .get();
-
-  // 完了ToDoの文字列整形
-  const completedTodoSummary = completedTodoSnap.docs.map((doc) => {
-    const data = doc.data();
-    return `・${data.title}`;
-  }).join("\n");
-
-  // 今日作成したToDo取得（上位3件）
-  const createdTodoSnap = await db.collection("users").doc(userId)
-      .collection("todos")
-      .where("createdAt", ">=", today)
-      .where("createdAt", "<", tomorrow)
-      .orderBy("createdAt", "desc")
-      .limit(3)
-      .get();
-
-  // 作成ToDoの文字列整形
-  const createdTodoSummary = createdTodoSnap.docs.map((doc) => {
-    const data = doc.data();
-    return `・${data.title}`;
-  }).join("\n");
-
-  // 今日作成・更新したメモ取得（上位3件）
-  const memoSnap = await db.collection("users").doc(userId)
-      .collection("characters").doc(characterId)
-      .collection("memos")
-      .where("createdAt", ">=", today)
-      .where("createdAt", "<", tomorrow)
-      .orderBy("createdAt", "desc")
-      .limit(3)
-      .get();
-
-  // メモの文字列整形
-  const memoSummary = memoSnap.docs.map((doc) => {
-    const data = doc.data();
-    return `・${data.title}`;
-  }).join("\n");
-  */
 
   // 今日の冒険（心の迷宮＝ローグライク）のプレイ記録（上位3件）
   let roguelikeSummary = "";
@@ -227,7 +133,6 @@ async function generateDiary(characterId, userId) {
   //
   // 保存済みの allCompleted は判定条件が変わる前の値が残っていることがあるため、
   // クライアント（daily_mission_model.dart）と同じ式で組み立て直す。
-  // 手帳廃止で「スケジュール確認(diaryViewed)」は条件から外れている。
   let dailyMissionSummary = "";
   let dailyMissionCleared = false;
   try {
@@ -329,15 +234,6 @@ async function generateDiary(characterId, userId) {
   // facts は実データから組み立てているため、活動がない日は空配列のままになる。
 
   // アクティビティベースのプロンプト作成
-  // 手帳廃止に伴い、引数から予定/タスク/メモ/明日の予定を外し roguelikeSummary を追加（旧はコメントで残置・復活時に戻す）:
-  /*
-  const prompt = OPTIMIZED_PROMPTS.activityDiary(
-      characterType, big5, gender,
-      scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary,
-      meetingSummary, big5ProgressSummary, tomorrowScheduleSummary,
-      favoriteWord, wordTendency, dream, strength,
-  );
-  */
   const prompt = OPTIMIZED_PROMPTS.activityDiary(
       characterType,
       big5,

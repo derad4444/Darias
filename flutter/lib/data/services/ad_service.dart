@@ -34,7 +34,6 @@ class AdConfig {
       _banner(iosId: 'ca-app-pub-5851550594315289/8287132245');
 
   // ─── ローグライク（冒険）画面バナー ─────────────────────────
-  // 予定追加画面（今後非表示になる予定）のバナーユニットを流用する。
   // 上/下で別ユニット（同一画面で上下が同時表示されるため）。5画面で共有。
   // Android本番は _banner のプレースホルダのまま（当面Androidは対象外）。
   static String get roguelikeTopBannerAdUnitId => scheduleAddTopBannerAdUnitId;
@@ -48,21 +47,9 @@ class AdConfig {
   static String get settingsBottomBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/3362000823');
 
-  /// カレンダー画面バナー
-  static String get calendarScreenBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/2539873743');
 
-  /// 予定詳細画面バナー
-  static String get scheduleDetailBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/8127350145');
 
-  /// 予定編集画面上部バナー
-  static String get scheduleEditTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/1805376571');
 
-  /// 予定編集画面下部バナー
-  static String get scheduleEditBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/2670191098');
 
   /// 予定追加画面上部バナー
   static String get scheduleAddTopBannerAdUnitId =>
@@ -128,9 +115,6 @@ class AdConfig {
   static String get meetingScreenBannerAdUnitId =>
       _banner(iosId: 'ca-app-pub-5851550594315289/4592485389');
 
-  /// 予定一覧画面バナー
-  static String get scheduleListBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/9018815555');
 
   /// 会議履歴画面バナー
   static String get meetingHistoryBannerAdUnitId =>
@@ -141,7 +125,6 @@ class AdConfig {
       _banner(iosId: 'ca-app-pub-5851550594315289/6680293379');
 
   // ─── フレンド・相性診断・冒険の性格 画面バナー ─────────────
-  // 手帳（メモ／タスク）機能の廃止で空いたバナーユニットを流用する。
   // 各画面で上/下は別ユニット（同一画面で上下が同時表示されるため）。
   static String get adventurePersonalityTopBannerAdUnitId => memoTopBannerAdUnitId;
   static String get adventurePersonalityBottomBannerAdUnitId => memoBottomBannerAdUnitId;

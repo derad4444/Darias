@@ -5,7 +5,7 @@ import '../../../presentation/providers/theme_provider.dart';
 
 /// 冒険（ゲーム）タブに重ねて表示する「開発中」ポップアップ。
 ///
-/// 手帳タブのアンケートポップアップと同じ様式（半透明の背景＋中央カード、テーマ色）。
+/// 半透明の背景＋中央カード（テーマ色）で表示する。
 /// 背景がすべてのポインタ操作を吸収するため、ゲームはプレイできない（他タブへは移動可）。
 /// 公開時はこのウィジェットの表示（[MainShellScreen] のタブ3の Stack 重ね）を外すだけでよい。
 class GameDevelopmentPopup extends ConsumerWidget {
@@ -74,7 +74,7 @@ class GameDevelopmentPopup extends ConsumerWidget {
                     ),
                     const SizedBox(height: 22),
                     Text(
-                      'ホーム・手帳など他のタブはご利用いただけます',
+                      'ホームなど他のタブはご利用いただけます',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 14, color: textSoft),
                     ),

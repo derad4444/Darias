@@ -2,14 +2,13 @@
 
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 
-let CONFIG; let Logger; let generateHolidaysForTwoYears; let generateDiary; let admin; let errorHandler;
+let CONFIG; let Logger; let generateDiary; let admin; let errorHandler;
 let logger;
 
 function initializeDependencies() {
   if (!CONFIG) {
     CONFIG = require("../config/config").CONFIG;
     Logger = require("../utils/logger").Logger;
-    generateHolidaysForTwoYears = require("../../const/generateHolidays").generateHolidaysForTwoYears;
     generateDiary = require("../../const/generateDiary").generateDiary;
     admin = require("firebase-admin");
     errorHandler = require("../utils/errorHandler");
@@ -162,46 +161,6 @@ const scheduledDiaryGeneration = onSchedule(
     },
 );
 
-/**
- * 祝日登録（毎年1月1日1:00 JST）
- */
-const scheduledHolidays = onSchedule(
-    {
-      schedule: "0 1 1 1 *",
-      region: "asia-northeast1",
-      timeZone: "Asia/Tokyo",
-      memory: "512MiB",
-      timeoutSeconds: 300,
-    },
-    async (event) => {
-      initializeDependencies();
-
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const nextYear = currentYear + 1;
-
-      logger.info("Starting holiday generation for two years", {
-        currentYear,
-        nextYear,
-      });
-
-      try {
-        await generateHolidaysForTwoYears();
-        logger.success("Holiday generation completed for two years", {
-          currentYear,
-          nextYear,
-        });
-      } catch (error) {
-        logger.error("Holiday generation failed", error, {
-          currentYear,
-          nextYear,
-        });
-        throw error;
-      }
-    },
-);
-
 module.exports = {
   scheduledDiaryGeneration,
-  scheduledHolidays,
 };

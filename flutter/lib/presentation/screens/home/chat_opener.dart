@@ -1,8 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../data/models/schedule_model.dart';
-import '../../../data/models/todo_model.dart';
 
-enum OpenerType { schedule, previousQuestion, daily }
+
+
+enum OpenerType { previousQuestion, daily }
 
 class ChatOpener {
   final String text;
@@ -72,30 +72,9 @@ const List<String> dailyPrompts = [
   '最近、誰かの言葉で心に残ったものある？',
 ];
 
-/// 優先度 G → F → A でオープナーを決定する
-Future<ChatOpener> computeChatOpener({
-  required List<ScheduleModel> allSchedules,
-  required List<TodoModel> allTodos,
-  required String userId,
-}) async {
-  // G: 今日の予定 or 期限が今日以前の未完了タスクがある
+/// 優先度 F → A でオープナーを決定する
+Future<ChatOpener> computeChatOpener({required String userId}) async {
   final today = DateTime.now();
-  final todaySchedules = allSchedules.where((s) {
-    final d = s.startDate;
-    return d.year == today.year && d.month == today.month && d.day == today.day;
-  }).toList();
-
-  final urgentTodos = allTodos.where((t) {
-    if (t.isCompleted) return false;
-    if (t.dueDate == null) return false;
-    final due = t.dueDate!;
-    // 今日期限 or 期限切れ
-    return due.isBefore(DateTime(today.year, today.month, today.day + 1));
-  }).toList();
-
-  if (todaySchedules.isNotEmpty || urgentTodos.isNotEmpty) {
-    return _buildScheduleOpener(todaySchedules, urgentTodos, today);
-  }
 
   // F: 使用済みでない前回の問いがある
   final prefs = await SharedPreferences.getInstance();
@@ -114,40 +93,6 @@ Future<ChatOpener> computeChatOpener({
   final dayIndex = today.difference(DateTime(2024, 1, 1)).inDays.abs();
   final prompt = dailyPrompts[dayIndex % dailyPrompts.length];
   return ChatOpener(type: OpenerType.daily, text: prompt);
-}
-
-ChatOpener _buildScheduleOpener(
-  List<ScheduleModel> schedules,
-  List<TodoModel> todos,
-  DateTime today,
-) {
-  final seed = today.day;
-
-  if (schedules.isNotEmpty) {
-    final s = schedules.first;
-    final templates = [
-      '今日「${s.title}」があるね。どんな気持ちで臨む？',
-      '${s.title}、今日だね。何か気になってることある？',
-      '今日の${s.title}に向けて、心の準備はどう？',
-      '${s.title}について、少し話してみない？',
-    ];
-    return ChatOpener(
-      type: OpenerType.schedule,
-      text: templates[seed % templates.length],
-    );
-  }
-
-  final t = todos.first;
-  final templates = [
-    '「${t.title}」の期限が近いね。今どんな状況？',
-    '${t.title}、気になってる？少し話そうか',
-    '「${t.title}」に取り掛かる前に、何か引っかかってることある？',
-    '${t.title}について、正直どう感じてる？',
-  ];
-  return ChatOpener(
-    type: OpenerType.schedule,
-    text: templates[seed % templates.length],
-  );
 }
 
 /// AI返答の末尾から問いかけ文を抽出してSharedPreferencesに保存する

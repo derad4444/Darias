@@ -4,7 +4,6 @@ class DailyMission {
   final String date; // YYYY-MM-DD
   final bool loginDone;
   final int chatCount; // 0〜6
-  final bool diaryViewed;  // 今日のスケジュール確認
   final bool diaryRead;    // 日記確認
   final bool allCompleted;
   final DateTime? completedAt;
@@ -13,7 +12,6 @@ class DailyMission {
     required this.date,
     this.loginDone = false,
     this.chatCount = 0,
-    this.diaryViewed = false,
     this.diaryRead = false,
     this.allCompleted = false,
     this.completedAt,
@@ -22,27 +20,22 @@ class DailyMission {
   bool get chat2Done => chatCount >= 2;
   bool get chat6Done => chatCount >= 6;
 
-  // 手帳（カレンダー）廃止で「スケジュール確認(diaryViewed)」ミッションを除外（復活時に diaryViewed を戻す）。
   int get completedCount =>
       (loginDone ? 1 : 0) + (chat2Done ? 1 : 0) + (chat6Done ? 1 : 0) + (diaryRead ? 1 : 0);
-  //  + (diaryViewed ? 1 : 0);
 
-  static const int total = 4; // 旧: 5（diaryViewed を含めていた）
+  static const int total = 4;
 
   factory DailyMission.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
     final loginDone = data['loginDone'] as bool? ?? false;
     final chatCount = (data['chatCount'] as num?)?.toInt() ?? 0;
-    final diaryViewed = data['diaryViewed'] as bool? ?? false;
     final diaryRead = data['diaryRead'] as bool? ?? false;
     // Firestoreの古いallCompletedを信頼せず、現在のフィールドから再計算する
-    // 手帳廃止で diaryViewed（スケジュール確認）を除外（復活時に && diaryViewed を戻す）。
     final allCompleted = loginDone && chatCount >= 2 && chatCount >= 6 && diaryRead;
     return DailyMission(
       date: doc.id,
       loginDone: loginDone,
       chatCount: chatCount,
-      diaryViewed: diaryViewed,
       diaryRead: diaryRead,
       allCompleted: allCompleted,
       completedAt: allCompleted ? (data['completedAt'] as Timestamp?)?.toDate() : null,
@@ -52,7 +45,6 @@ class DailyMission {
   Map<String, dynamic> toMap() => {
         'loginDone': loginDone,
         'chatCount': chatCount,
-        'diaryViewed': diaryViewed,
         'diaryRead': diaryRead,
         'allCompleted': allCompleted,
         if (completedAt != null)
@@ -62,7 +54,6 @@ class DailyMission {
   DailyMission copyWith({
     bool? loginDone,
     int? chatCount,
-    bool? diaryViewed,
     bool? diaryRead,
     bool? allCompleted,
     DateTime? completedAt,
@@ -71,7 +62,6 @@ class DailyMission {
         date: date,
         loginDone: loginDone ?? this.loginDone,
         chatCount: chatCount ?? this.chatCount,
-        diaryViewed: diaryViewed ?? this.diaryViewed,
         diaryRead: diaryRead ?? this.diaryRead,
         allCompleted: allCompleted ?? this.allCompleted,
         completedAt: completedAt ?? this.completedAt,

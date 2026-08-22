@@ -43,13 +43,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: '迷ったら、自分に聞けばいい',
       body: '「今の自分」「真逆の自分」「本音の自分」\n「理想の自分」「子供の頃の自分」\n「未来の自分」。\n\n6人のあなたが、\nあなたの悩みで本気で言い争います。\n\n他人の助言より、少しだけ刺さります。',
     ),
-    // 手帳（予定・メモ・タスク）機能の廃止に伴い、冒険（心の迷宮）の紹介に差し替え。
-    // 旧ページはコメントで残置（復活時に戻す）:
-    // _OnboardingPage(
-    //   icon: Icons.edit_calendar_outlined,
-    //   title: 'チャットで予定・メモ・タスクも',
-    //   body: '"明日14時に会議"と送ると予定を自動登録。\n"メモして""タスクに追加して"も\n話すだけでOK。\n\nアプリのことがわからなければ\nチャットで質問するとキャラクターが答えます。',
-    // ),
     _OnboardingPage(
       icon: Icons.explore_outlined,
       // 全ダンジョン共通ザコの「もやもや」（enemy.dart の commonMobs）

@@ -46,7 +46,6 @@ class DailyMissionNotifier extends StateNotifier<AsyncValue<DailyMission>> {
   // 返り値: 今回のアクションで新たに達成されたかどうか
   Future<bool> markLogin() => _update((ds) => ds.markLogin());
   Future<bool> incrementChat() => _update((ds) => ds.incrementChat());
-  Future<bool> markDiaryViewed() => _update((ds) => ds.markDiaryViewed());
   Future<bool> markDiaryRead() => _update((ds) => ds.markDiaryRead());
 
   Future<bool> _update(
@@ -68,7 +67,6 @@ class DailyMissionNotifier extends StateNotifier<AsyncValue<DailyMission>> {
     if (!before.loginDone && after.loginDone) return true;
     if (!before.chat2Done && after.chat2Done) return true;
     if (!before.chat6Done && after.chat6Done) return true;
-    if (!before.diaryViewed && after.diaryViewed) return true;
     if (!before.diaryRead && after.diaryRead) return true;
     return false;
   }

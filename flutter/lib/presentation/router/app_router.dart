@@ -4,16 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/services/analytics_service.dart';
-import '../../data/models/memo_model.dart';
-import '../../data/models/schedule_model.dart';
-import '../../data/models/todo_model.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
-import '../screens/todo/todo_detail_screen.dart';
-import '../screens/calendar/schedule_detail_screen.dart';
-import '../screens/memo/memo_detail_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
 import '../screens/settings/settings_screen.dart';
@@ -22,7 +16,6 @@ import '../screens/settings/theme_settings_screen.dart';
 import '../screens/character/character_detail_screen.dart';
 import '../screens/settings/feedback_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
-import '../screens/settings/tag_management_screen.dart';
 import '../screens/history/unified_history_screen.dart';
 import '../screens/settings/volume_settings_screen.dart';
 import '../screens/settings/terms_of_service_screen.dart';
@@ -136,57 +129,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CharacterSelectScreen(),
       ),
 
-      // Todo詳細
-      GoRoute(
-        path: '/todo/detail',
-        name: 'todo-detail',
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is TodoModel) {
-            return TodoDetailScreen(todo: extra);
-          }
-          final map = extra as Map<String, dynamic>?;
-          return TodoDetailScreen(
-            todo: null,
-            initialTag: map?['initialTag'] as String? ?? '',
-          );
-        },
-      ),
-
-      // スケジュール詳細
-      GoRoute(
-        path: '/calendar/detail',
-        name: 'schedule-detail',
-        builder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>?;
-          final schedule = extra?['schedule'] as ScheduleModel?;
-          final initialDate = extra?['initialDate'] as DateTime?;
-          final recurringEditMode = extra?['recurringEditMode'] as RecurringEditMode? ?? RecurringEditMode.single;
-          return ScheduleDetailScreen(
-            schedule: schedule,
-            initialDate: initialDate,
-            recurringEditMode: recurringEditMode,
-          );
-        },
-      ),
-
-      // メモ詳細
-      GoRoute(
-        path: '/memo/detail',
-        name: 'memo-detail',
-        builder: (context, state) {
-          final extra = state.extra;
-          if (extra is MemoModel) {
-            return MemoDetailScreen(memo: extra);
-          }
-          final map = extra as Map<String, dynamic>?;
-          return MemoDetailScreen(
-            memo: null,
-            initialTag: map?['initialTag'] as String? ?? '',
-          );
-        },
-      ),
-
       // 6人会議
       GoRoute(
         path: '/meeting',
@@ -259,13 +201,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ForgotPasswordScreen(),
       ),
 
-
-      // タグ管理
-      GoRoute(
-        path: '/tag-management',
-        name: 'tag-management',
-        builder: (context, state) => const TagManagementScreen(),
-      ),
 
       // 統合履歴
       GoRoute(

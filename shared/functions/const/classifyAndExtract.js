@@ -1,5 +1,5 @@
 // functions/const/classifyAndExtract.js
-// AIによるメッセージ分類＋内容抽出（memo/task/schedule/app_qa/chat）
+// AIによるメッセージ分類（app_qa/chat）＋性格シグナルタグの抽出
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {admin} = require("../src/utils/firebaseInit");
@@ -119,39 +119,6 @@ exports.classifyAndExtract = onCall(
           } catch (e) {
             console.error('⚠️ personalitySignal処理エラー:', e);
           }
-        }
-
-        if (type === "schedule") {
-          const rawSchedules = parsed.schedules;
-          if (!Array.isArray(rawSchedules) || rawSchedules.length === 0) {
-            return {type: "chat"};
-          }
-          const processedSchedules = rawSchedules.map((item) => {
-            const startDate = new Date(item.startDate);
-            const endDate = new Date(item.endDate);
-            return {
-              title: item.title || "",
-              isAllDay: item.isAllDay || false,
-              startDate: admin.firestore.Timestamp.fromDate(startDate),
-              endDate: admin.firestore.Timestamp.fromDate(endDate),
-              location: item.location || "",
-              tag: item.tag || "",
-              memo: item.memo || "",
-              repeatOption: item.repeatOption || "none",
-              remindValue: item.remindValue || 0,
-              remindUnit: item.remindUnit || "none",
-              created_at: admin.firestore.Timestamp.now(),
-            };
-          });
-          return {type: "schedule", schedules: processedSchedules};
-        }
-
-        if (type === "memo") {
-          return {type: "memo", items: Array.isArray(parsed.items) ? parsed.items : []};
-        }
-
-        if (type === "task") {
-          return {type: "task", items: Array.isArray(parsed.items) ? parsed.items : []};
         }
 
         if (type === "app_qa") {

@@ -1,12 +1,9 @@
 // functions/const/answerAppQuestion.js
-// アプリに関する質問 & ユーザーデータ参照に答えるCloud Function
+// アプリに関する質問に答えるCloud Function
 
 const {onCall, HttpsError} = require("firebase-functions/v2/https");
-const {getFirestore} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
-
-const db = getFirestore();
 
 // ============================================================
 // アプリガイド（システムプロンプトに埋め込む）
@@ -15,50 +12,18 @@ const APP_GUIDE = `
 # DARIASアプリ 機能ガイド
 
 ## 基本機能一覧
-- **チャット**: キャラクターと会話できる。メモ・タスク・予定の追加もチャットから可能。アプリの使い方もチャットで質問できる。
-- **手帳**: 予定（カレンダー）・メモ・タスクを管理する統合タブ。下部ナビゲーションの「手帳」から開く。
-- **メモ**: テキストメモを保存・管理できる。（手帳タブ → メモ）
-- **タスク（TODO）**: やることリストを管理できる。優先度・期日・タグ設定可能。（手帳タブ → タスク）
-- **予定（カレンダー）**: 日程を管理できる。月間カレンダーで確認可能。（手帳タブ → 予定）
+- **チャット**: キャラクターと会話できる。アプリの使い方もチャットで質問できる。
 - **日記**: アクティビティ型日記が毎日23:50に自動生成される。
 - **自分会議（6人会議）**: 自分の6つの分身キャラクターが悩みについてディスカッションしてくれる機能。
-- **フレンド**: アプリ内でフレンドを作り、予定を共有したり相性診断ができる。
+- **フレンド**: アプリ内でフレンドを作り、相性診断ができる。
 - **相性診断**: フレンドとのBIG5ベースのカテゴリ別相性診断（友情・恋愛・仕事・信頼）。
 - **プレミアム**: 月額課金でキャラクター返答のAIモデルが高品質になり、自分会議が無制限・相性診断が広告なしで利用可能になる。
 
 ## チャットでできること
 | 操作 | 入力例 |
 |------|--------|
-| メモを追加 | 「〇〇をメモして」「メモしといて：〇〇」|
-| タスクを追加 | 「〇〇をタスクに追加」「TODO：〇〇」|
-| 予定を追加 | 「明日14時に会議」「来週月曜に歯医者の予定」|
 | キャラクターと会話 | 自由にメッセージを送る |
 | アプリの使い方を質問 | 「〇〇はどうやるの？」|
-
-## メモの使い方
-- **チャットから追加**: 「〇〇をメモして」と入力 → 確認ダイアログ → 追加/編集/キャンセル
-- **手帳タブから追加**: 下部ナビゲーションの「手帳」→「メモ」タブ → 右下の＋ボタン → 新規メモ作成
-- **画像から読み取り（AI）**: メモ作成・編集画面のカメラアイコンをタップ → カメラ撮影かライブラリ選択 → AIがタイトルと内容を自動入力する（無料ユーザーは動画広告を視聴後に利用可能）
-- **編集**: メモ一覧からタップして編集（自動保存）
-- **タグ・ピン留め**: メモ詳細画面で設定可能
-- **メモからタスク登録**: メモ編集画面のツールバーにある「タスク」ボタン（✓アイコン）を押すと行頭にタスクマークが付く。タスクマーク付きの行が1件以上あると「タスクに登録」ボタンが表示され、チェックした行をタスク（TODO）に一括登録できる
-
-## タスクの使い方
-- **チャットから追加**: 「〇〇をタスクに追加」「TODO：〇〇」と入力
-- **手帳タブから追加**: 下部ナビゲーションの「手帳」→「タスク」タブ → 右下の＋ボタン
-- **画像から読み取り（AI）**: タスク作成・編集画面のカメラアイコンをタップ → カメラ撮影かライブラリ選択 → AIがタイトル・説明・期限・優先度を自動入力する（無料ユーザーは動画広告を視聴後に利用可能）
-- **完了にする**: タスク一覧でチェックボックスをタップ
-- **優先度**: 高・中・低 の3段階
-- **期限設定**: タスク編集画面でインラインカレンダーから日付・時刻を選択して設定できる
-
-## 予定の使い方
-- **チャットから追加**: 日時を含む文章を送ると自動検出 → 確認ダイアログ
-- **手帳タブから追加**: 下部ナビゲーションの「手帳」→「予定」タブ（カレンダー表示）→ 右下 ＋ボタン、または右上ハンバーガーメニュー（≡）→「予定を追加」
-- **画像から1件読み取り（AI）**: 予定作成・編集画面のカメラアイコンをタップ → AIがタイトル・日時・場所・メモを自動入力する（無料ユーザーは動画広告視聴後に利用可能）
-- **画像から複数予定を一括読み取り（AI）**: カレンダー画面のハンバーガーメニュー（≡）→「画像から予定を一括読み取り」→ カレンダーやイベントチラシを撮影すると複数の予定が検出され、チェックボックスで選んで一括保存できる（無料ユーザーは動画広告視聴後に利用可能）
-- **繰り返し設定**: 毎日・毎週・毎月・毎年などの繰り返しオプションあり
-- **リマインダー**: 予定編集画面で通知タイミングを設定できる（通知設定画面での通知許可も必要）
-- **フレンドの予定確認**: フレンドが予定を公開している場合、カレンダー画面でフレンドを選択してオン/オフ
 
 ## チャット履歴の確認
 - ホーム画面には最新の返答1件のみ吹き出しで表示される（過去のメッセージはそこでは見られない）
@@ -87,7 +52,7 @@ const APP_GUIDE = `
 - **無属性**: どんな状況にも自然に溶け込む適応型。強い主張より観察と受容を大切にする
 
 ## 日記（自動生成）
-- 毎日23:50に当日の活動（チャット・タスク・メモ・予定）をもとにアクティビティ型日記が自動生成される
+- 毎日23:50に当日の活動（チャット・自分会議・冒険）をもとにアクティビティ型日記が自動生成される
 - 日記は「履歴」ボタン → 日記タブで確認できる
 - 日記に自分のコメントを追記することもできる
 
@@ -104,11 +69,6 @@ const APP_GUIDE = `
 - **フレンド追加**: フレンド画面の検索ボタンから名前またはメールアドレスで検索 → フレンド申請を送る
 - **申請の承認**: 受信した申請はフレンド画面の通知バッジで確認 → 承認/拒否できる
 - **フレンド削除**: フレンド詳細画面またはフレンド一覧の長押しから削除できる
-- **予定共有レベルの設定**: フレンドごとに「非公開」「公開」「全公開」の3段階で設定できる
-  - 非公開: 予定を一切見せない
-  - 公開: 公開設定の予定のみ見せる
-  - 全公開: 非公開設定の予定も含めてすべて見せる
-- **フレンドの予定確認**: カレンダー画面でフレンドを選択してオンにすると、そのフレンドの予定がカレンダーに重ねて表示される
 
 ## 相性診断の使い方
 - **アクセス方法**: フレンドタブ → フレンド詳細 → 相性診断ボタン
@@ -126,19 +86,12 @@ const APP_GUIDE = `
   - 相性診断が広告なしで利用できる
 - **解約方法**: App Store/Google PlayアプリのサブスクリプションページからキャンセルできるURLを「設定」→「プレミアム」画面で確認できる
 
-## タグ管理
-- **アクセス方法**: 設定画面 → 「タグ管理」
-- **タグの追加**: タグ名と好きな色（カラーピッカー）を設定して追加できる
-- **用途**: メモ・タスク・予定に設定でき、色でカテゴリ分けして管理しやすくなる
-- **公開設定**: タグごとに「フレンドに公開するか」を設定できる（非公開タグの付いた予定はフレンドから見えない）
-
 ## 設定
 - **背景色・文字色**: 設定画面 → 「背景色・文字色」からアプリのメインカラーやグラデーションを変更できる
 - **音量設定**: 設定画面 → 「音量設定」でBGM音量とキャラクター音声の音量を個別に調整できる。ミュートボタンでワンタップ消音も可能
-- **通知設定**: 設定画面 → 「通知設定」で通知のオン/オフを切り替えられる。日記通知（毎晩の日記生成後にプッシュ通知が届く）と予定リマインダーを個別に設定できる
+- **通知設定**: 設定画面 → 「通知設定」で日記通知（毎晩の日記生成後にプッシュ通知が届く）のオン/オフを切り替えられる
 - **日記プッシュ通知**: 毎晩日記が生成された後（23:50頃）に自動でプッシュ通知が届く。アプリが閉じていても届く。「通知設定」でオフにすることもできる
 - **使い方ガイド**: 設定画面 → 「使い方ガイド」で各機能の操作方法を確認できる
-- **データエクスポート**: 設定画面 → 「データエクスポート」でメモ・タスクをエクスポートできる
 - **お問い合わせ**: 設定画面 → 「お問い合わせ」から問い合わせフォームを送れる
 
 ## アカウント管理
@@ -146,89 +99,6 @@ const APP_GUIDE = `
 - **プレミアムのまま退会する場合**: App Store/Google Playのサブスクリプションを先にキャンセルしてからアカウントを削除することを推奨
 - **性格診断リセット**: 設定画面の「性格診断をリセット」ですべての解析データと元素タイプを消去できる（元に戻せない）
 `;
-
-// ============================================================
-// ユーザーデータをFirestoreから取得
-// ============================================================
-async function fetchUserData(userId, dataTypes) {
-  const results = {};
-  const now = new Date();
-
-  if (dataTypes.includes("schedules")) {
-    try {
-      // 前後30日の予定を取得
-      const from = new Date(now);
-      from.setDate(from.getDate() - 1);
-      const to = new Date(now);
-      to.setDate(to.getDate() + 30);
-
-      const snap = await db
-          .collection("users").doc(userId)
-          .collection("schedules")
-          .where("startDate", ">=", from)
-          .where("startDate", "<=", to)
-          .orderBy("startDate")
-          .limit(20)
-          .get();
-
-      results.schedules = snap.docs.map((doc) => {
-        const d = doc.data();
-        return {
-          title: d.title,
-          startDate: d.startDate?.toDate()?.toLocaleDateString("ja-JP", {timeZone: "Asia/Tokyo"}),
-          endDate: d.endDate?.toDate()?.toLocaleDateString("ja-JP", {timeZone: "Asia/Tokyo"}),
-          isAllDay: d.isAllDay,
-          location: d.location || "",
-        };
-      });
-    } catch (e) {
-      console.warn("schedules fetch error:", e.message);
-    }
-  }
-
-  if (dataTypes.includes("todos")) {
-    try {
-      const snap = await db
-          .collection("users").doc(userId)
-          .collection("todos")
-          .where("isCompleted", "==", false)
-          .orderBy("createdAt", "desc")
-          .limit(20)
-          .get();
-
-      results.todos = snap.docs.map((doc) => {
-        const d = doc.data();
-        return {
-          title: d.title,
-          priority: d.priority || "中",
-          dueDate: d.dueDate?.toDate()?.toLocaleDateString("ja-JP", {timeZone: "Asia/Tokyo"}) || null,
-        };
-      });
-    } catch (e) {
-      console.warn("todos fetch error:", e.message);
-    }
-  }
-
-  if (dataTypes.includes("memos")) {
-    try {
-      const snap = await db
-          .collection("users").doc(userId)
-          .collection("memos")
-          .orderBy("updatedAt", "descending")
-          .limit(10)
-          .get();
-
-      results.memos = snap.docs.map((doc) => {
-        const d = doc.data();
-        return {title: d.title, tag: d.tag || ""};
-      });
-    } catch (e) {
-      console.warn("memos fetch error:", e.message);
-    }
-  }
-
-  return results;
-}
 
 // ============================================================
 // Cloud Function本体
@@ -246,7 +116,7 @@ exports.answerAppQuestion = onCall(
         throw new HttpsError("unauthenticated", "認証が必要です");
       }
       const {data} = request;
-      const {userId, userMessage, dataTypes = []} = data;
+      const {userId, userMessage} = data;
       if (request.auth.uid !== userId) {
         throw new HttpsError("permission-denied", "ユーザーIDが一致しません");
       }
@@ -257,16 +127,6 @@ exports.answerAppQuestion = onCall(
       const trimmedMessage = userMessage.substring(0, 100);
 
       try {
-        // 必要に応じてユーザーデータを取得
-        let userDataSection = "";
-        if (dataTypes.length > 0) {
-          const userData = await fetchUserData(userId, dataTypes);
-          if (Object.keys(userData).length > 0) {
-            userDataSection = "\n\n## あなたのデータ（参考情報）\n" +
-              JSON.stringify(userData, null, 2);
-          }
-        }
-
         // 日本時間の現在日時
         const nowStr = new Date().toLocaleDateString("ja-JP", {
           year: "numeric", month: "long", day: "numeric",
@@ -275,11 +135,10 @@ exports.answerAppQuestion = onCall(
 
         const systemPrompt =
           `あなたはDARIASというアプリのキャラクターです。` +
-          `ユーザーのアプリに関する質問や、データについての質問に答えてください。` +
+          `ユーザーのアプリに関する質問に答えてください。` +
           `回答は100文字以内で、フレンドリーに答えてください。` +
           `現在日時：${nowStr}` +
-          APP_GUIDE +
-          userDataSection;
+          APP_GUIDE;
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 

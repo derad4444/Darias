@@ -1,15 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
-import '../../models/memo_model.dart';
 import '../../models/post_model.dart';
-import '../../models/schedule_model.dart';
-import '../../models/todo_model.dart';
-
-/// アプリ関連ワード（app_qa向けデータ取得の判定に使用）
-const _scheduleDataKeywords = ['予定', 'スケジュール', 'カレンダー'];
-const _todoDataKeywords = ['タスク', 'TODO', 'todo', 'やること'];
-const _memoDataKeywords = ['メモ一覧', 'メモ見せて', 'メモある'];
 
 /// 悩み系キーワード（会議への誘導トリガー）
 const _concernKeywords = [
@@ -34,26 +26,10 @@ const _concernKeywords = [
 /// メッセージ送信結果
 class SendMessageResult {
   final String reply;
-  final List<ScheduleModel> detectedSchedules;
-  final MemoModel? detectedMemo;
-  final bool memoDetected;
-  final List<MemoModel> detectedMemos;
-  final TodoModel? detectedTodo;
-  final bool todoDetected;
-  final List<TodoModel> detectedTodos;
   final bool meetingSuggested;
-
-  bool get scheduleDetected => detectedSchedules.isNotEmpty;
 
   SendMessageResult({
     required this.reply,
-    this.detectedSchedules = const [],
-    this.detectedMemo,
-    this.memoDetected = false,
-    this.detectedMemos = const [],
-    this.detectedTodo,
-    this.todoDetected = false,
-    this.detectedTodos = const [],
     this.meetingSuggested = false,
   });
 }
@@ -68,15 +44,6 @@ class ChatDatasource {
     FirebaseFunctions? functions,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _functions = functions ?? FirebaseFunctions.instanceFor(region: 'asia-northeast1');
-
-  /// ユーザーデータ参照が必要なキーワードを検出（app_qa時のみ使用）
-  List<String> _detectDataTypes(String message) {
-    final types = <String>[];
-    if (_scheduleDataKeywords.any((kw) => message.contains(kw))) types.add('schedules');
-    if (_todoDataKeywords.any((kw) => message.contains(kw))) types.add('todos');
-    if (_memoDataKeywords.any((kw) => message.contains(kw))) types.add('memos');
-    return types;
-  }
 
   /// 悩み系キーワードが含まれているかチェック（会議への誘導トリガー）
   bool _containsConcernKeyword(String message) {
@@ -177,94 +144,10 @@ class ChatDatasource {
       classified = {'type': 'chat'};
     }
 
-    var type = classified['type'] as String? ?? 'chat';
+    final type = classified['type'] as String? ?? 'chat';
     debugPrint('✅ 分類結果: $type');
 
-    // 手帳（予定・メモ・タスク）機能の廃止に伴い、抽出・登録は行わない。
-    // classifyAndExtract は性格シグナル収集のため呼び続けるが、予定/メモ/タスクと
-    // 判定されても通常チャットとして返信する（復活時はこの remap を外す）。
-    if (type == 'memo' || type == 'task' || type == 'schedule') {
-      type = 'chat';
-    }
-
-    // ① メモ
-    if (type == 'memo') {
-      final rawItems = classified['items'] as List<dynamic>? ?? [];
-      final items = rawItems.map((e) => e.toString()).toList();
-      final now = DateTime.now();
-      final memos = items.map((content) => MemoModel(
-        id: '',
-        title: content,
-        content: '',
-        tag: '',
-        isPinned: false,
-        createdAt: now,
-        updatedAt: now,
-      )).toList();
-      return SendMessageResult(
-        reply: 'メモしておくね！',
-        detectedMemo: memos.isNotEmpty ? memos.first : null,
-        memoDetected: memos.isNotEmpty,
-        detectedMemos: memos,
-      );
-    }
-
-    // ② タスク
-    if (type == 'task') {
-      final rawItems = classified['items'] as List<dynamic>? ?? [];
-      final items = rawItems.map((e) => e.toString()).toList();
-      final now = DateTime.now();
-      final todos = items.map((title) => TodoModel(
-        id: '',
-        title: title,
-        description: '',
-        isCompleted: false,
-        dueDate: null,
-        priority: TodoPriority.medium,
-        tag: '',
-        createdAt: now,
-        updatedAt: now,
-      )).toList();
-      return SendMessageResult(
-        reply: 'タスクに追加しておくね！',
-        detectedTodo: todos.isNotEmpty ? todos.first : null,
-        todoDetected: todos.isNotEmpty,
-        detectedTodos: todos,
-      );
-    }
-
-    // ③ スケジュール
-    if (type == 'schedule') {
-      final scheduleList = classified['schedules'] as List<dynamic>? ?? [];
-      if (scheduleList.isNotEmpty) {
-        final schedules = scheduleList.map((item) {
-          final s = item as Map<String, dynamic>;
-          final startDate = _parseDateField(s['startDate']) ?? DateTime.now();
-          final endDate = _parseDateField(s['endDate']) ?? startDate;
-          return ScheduleModel(
-            id: '',
-            title: s['title'] as String? ?? '',
-            startDate: startDate,
-            endDate: endDate,
-            isAllDay: s['isAllDay'] as bool? ?? false,
-            location: s['location'] as String? ?? '',
-            tag: s['tag'] as String? ?? '',
-            memo: s['memo'] as String? ?? '',
-            repeatOption: s['repeatOption'] as String? ?? '',
-            remindValue: s['remindValue'] as int? ?? 0,
-            remindUnit: s['remindUnit'] as String? ?? '',
-          );
-        }).toList();
-        debugPrint('✅ 予定抽出成功: ${schedules.length}件');
-        return SendMessageResult(
-          reply: '予定楽しんでね！',
-          detectedSchedules: schedules,
-        );
-      }
-      debugPrint('ℹ️ 予定は検出されませんでした（chatにフォールバック）');
-    }
-
-    // ④ アプリQ&A
+    // アプリQ&A
     if (type == 'app_qa') {
       debugPrint('❓ app_qa ルート');
       final reply = await _answerAppQuestion(userId: userId, userMessage: trimmed);
@@ -315,12 +198,10 @@ class ChatDatasource {
     required String userMessage,
   }) async {
     try {
-      final dataTypes = _detectDataTypes(userMessage);
       final callable = _functions.httpsCallable('answerAppQuestion');
       final result = await callable.call<Map<String, dynamic>>({
         'userId': userId,
         'userMessage': userMessage,
-        'dataTypes': dataTypes,
       });
       return result.data['reply'] as String? ?? 'うまく答えられなかったよ、ごめんね。';
     } catch (e) {
@@ -329,25 +210,6 @@ class ChatDatasource {
     }
   }
 
-  /// 日付フィールドをパース（ISO文字列 or Timestampオブジェクト対応）
-  DateTime? _parseDateField(dynamic value) {
-    if (value == null) return null;
-    if (value is String) {
-      try {
-        return DateTime.parse(value);
-      } catch (_) {
-        return null;
-      }
-    }
-    // FirebaseのTimestampがMapとして返ってくる場合
-    if (value is Map) {
-      final seconds = value['_seconds'] as int? ?? value['seconds'] as int?;
-      if (seconds != null) {
-        return DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
-      }
-    }
-    return null;
-  }
 
   /// 最近のチャット履歴を取得（2件）
   Future<List<Map<String, String>>> _fetchRecentChatHistory(

@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
-import '../../data/models/schedule_model.dart';
 import '../../firebase_options.dart';
 import 'notification_web_helper_stub.dart'
     if (dart.library.html) 'notification_web_helper.dart';
@@ -23,13 +22,10 @@ class NotificationService {
   FlutterLocalNotificationsPlugin? _localPlugin;
 
   static const int _diaryNotificationId = 9999;
-  static const String _scheduleChannelId = 'schedule_channel';
   static const String _diaryChannelId = 'diary_channel';
 
   /// 予定通知を一度消したかどうかの記録キー（端末ごと・1回限りの後始末用）
   static const String _schedulePurgedKey = 'schedule_notifications_purged';
-
-  final Map<String, Timer> _webTimers = {};
 
   // ────────────────────────────────────────
   // 初期化
@@ -70,15 +66,6 @@ class NotificationService {
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(const AndroidNotificationChannel(
-          _scheduleChannelId,
-          'スケジュール通知',
-          description: '予定のリマインダー',
-          importance: Importance.high,
-        ));
-    await _localPlugin!
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(const AndroidNotificationChannel(
           _diaryChannelId,
           '日記通知',
           description: 'キャラクターの日記通知',
@@ -107,7 +94,7 @@ class NotificationService {
     FirebaseMessaging.onMessage.listen(_onForegroundMessage);
   }
 
-  /// 手帳（予定）機能の停止に伴う後始末。OSに予約済みの予定通知を一度だけ全消去する。
+  /// OSに予約済みの予定通知を一度だけ全消去する（端末ごとの後始末）。
   ///
   /// 予定通知はOS側が予約を保持しているため、アプリから登録処理を外すだけでは
   /// 過去に登録した予定の通知が届き続ける。そのため明示的に消す必要がある。
@@ -217,89 +204,6 @@ class NotificationService {
   }
 
   // ────────────────────────────────────────
-  // 予定通知（ローカル）
-  // ────────────────────────────────────────
-
-  Future<void> scheduleForSchedule(ScheduleModel schedule) async {
-    if (schedule.remindUnit.isEmpty) return;
-
-    final notifyAt = _calcNotifyTime(schedule);
-    if (notifyAt == null || notifyAt.isBefore(DateTime.now())) return;
-
-    if (kIsWeb) {
-      _cancelWebTimer(schedule.id);
-      final delay = notifyAt.difference(DateTime.now());
-      _webTimers[schedule.id] = Timer(delay, () {
-        showWebNotification('予定: ${schedule.title}',
-            body: _remindLabel(schedule.remindValue, schedule.remindUnit));
-      });
-      return;
-    }
-
-    await _localPlugin?.cancel(schedule.id.hashCode);
-    await _scheduleLocalNotification(schedule, notifyAt);
-  }
-
-  /// アプリ起動時に呼び出す: 今後の予定通知を近い順に最大60件再登録
-  /// iOSの上限(64件)を超えないよう、全キャンセル後に再登録する
-  Future<void> rescheduleUpcomingNotifications(List<ScheduleModel> schedules) async {
-    if (kIsWeb || _localPlugin == null) return;
-
-    final now = DateTime.now();
-
-    final targets = schedules
-        .where((s) => s.remindUnit.isNotEmpty)
-        .map((s) {
-          final notifyAt = _calcNotifyTime(s);
-          return notifyAt != null && notifyAt.isAfter(now)
-              ? (schedule: s, notifyAt: notifyAt)
-              : null;
-        })
-        .whereType<({ScheduleModel schedule, DateTime notifyAt})>()
-        .toList()
-      ..sort((a, b) => a.notifyAt.compareTo(b.notifyAt));
-
-    // 既存のローカル通知を全クリア（日記通知はFCMのためローカル通知なし）
-    await _localPlugin!.cancelAll();
-
-    // 近い予定から順に最大60件登録
-    for (final item in targets.take(60)) {
-      await _scheduleLocalNotification(item.schedule, item.notifyAt);
-    }
-  }
-
-  Future<void> _scheduleLocalNotification(ScheduleModel schedule, DateTime notifyAt) async {
-    final plugin = _localPlugin;
-    if (plugin == null) return;
-    await plugin.zonedSchedule(
-      schedule.id.hashCode,
-      '予定: ${schedule.title}',
-      _remindLabel(schedule.remindValue, schedule.remindUnit),
-      tz.TZDateTime.from(notifyAt, tz.local),
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          _scheduleChannelId,
-          'スケジュール通知',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: const DarwinNotificationDetails(),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-    );
-  }
-
-  Future<void> cancelScheduleNotification(String scheduleId) async {
-    if (kIsWeb) {
-      _cancelWebTimer(scheduleId);
-      return;
-    }
-    await _localPlugin?.cancel(scheduleId.hashCode);
-  }
-
-  // ────────────────────────────────────────
   // 日記通知（FCMベース。ローカル通知はキャンセルのみ残す）
   // ────────────────────────────────────────
 
@@ -331,41 +235,6 @@ class NotificationService {
   // ────────────────────────────────────────
   // プライベートヘルパー
   // ────────────────────────────────────────
-
-  DateTime? _calcNotifyTime(ScheduleModel schedule) {
-    switch (schedule.remindUnit) {
-      case 'minutes':
-        return schedule.startDate
-            .subtract(Duration(minutes: schedule.remindValue));
-      case 'hours':
-        return schedule.startDate
-            .subtract(Duration(hours: schedule.remindValue));
-      case 'days':
-        return schedule.startDate
-            .subtract(Duration(days: schedule.remindValue));
-      default:
-        return null;
-    }
-  }
-
-  String _remindLabel(int value, String unit) {
-    if (value == 0) return '時間通り';
-    switch (unit) {
-      case 'minutes':
-        return '$value分前';
-      case 'hours':
-        return '$value時間前';
-      case 'days':
-        return '$value日前';
-      default:
-        return '';
-    }
-  }
-
-  void _cancelWebTimer(String scheduleId) {
-    _webTimers[scheduleId]?.cancel();
-    _webTimers.remove(scheduleId);
-  }
 
   /// フォアグラウンド受信: Androidはローカル通知で表示（iOSはOS側で自動表示）
   Future<void> _onForegroundMessage(RemoteMessage message) async {

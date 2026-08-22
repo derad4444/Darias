@@ -11,9 +11,6 @@ import '../../widgets/ads/screen_banner.dart';
 import '../../../data/services/ad_service.dart';
 import 'friend_search_screen.dart';
 import 'compatibility_screen.dart';
-// 予定共有機能（手帳／予定廃止に伴い非表示）:
-// import 'friend_share_level_sheet.dart';
-
 class FriendScreen extends ConsumerWidget {
   const FriendScreen({super.key});
 
@@ -232,9 +229,6 @@ class _FriendCard extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 予定共有チップ（手帳／予定機能の廃止に伴いコメントアウトで残置）
-                  // _ShareLevelChip(friend: friend, accentColor: accentColor),
-                  // const SizedBox(width: 8),
                   Icon(Icons.chevron_right,
                       color: accentColor.withValues(alpha: 0.5), size: 20),
                 ],
@@ -247,51 +241,6 @@ class _FriendCard extends ConsumerWidget {
   }
 }
 
-/// 共有レベルチップ（手帳／予定機能の廃止に伴いコメントアウトで残置）
-/*
-class _ShareLevelChip extends ConsumerWidget {
-  final FriendModel friend;
-  final Color accentColor;
-
-  const _ShareLevelChip({required this.friend, required this.accentColor});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final color = _levelColor(friend.shareLevel);
-    return GestureDetector(
-      onTap: () => showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => FriendShareLevelSheet(
-          friend: friend,
-          accentColor: accentColor,
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
-        ),
-        child: Text(
-          friend.shareLevel.label,
-          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
-        ),
-      ),
-    );
-  }
-
-  Color _levelColor(FriendShareLevel level) {
-    switch (level) {
-      case FriendShareLevel.none:   return AppColors.textLight;
-      case FriendShareLevel.public: return Colors.blue;
-      case FriendShareLevel.full:   return Colors.green;
-    }
-  }
-}
-*/
 
 /// フレンドがいない時の表示
 class _EmptyFriendView extends StatelessWidget {

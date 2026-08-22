@@ -203,20 +203,6 @@ exports.generateCharacterReply = onCall(
           };
         }
 
-        // 予定問い合わせパターンの検出
-        const scheduleQueryPatterns = [
-          /今日.*予定/,
-          /今日.*何.*ある[？?]/,
-          /明日.*予定/,
-          /明日.*何.*ある[？?]/,
-          /予定.*教えて/,
-          /予定.*ある[？?]/,
-        ];
-
-        const isScheduleQuery = scheduleQueryPatterns.some((pattern) =>
-          pattern.test(userMessage.replace(/\s/g, "")),
-        );
-
         // キャラクター詳細はキャッシュ利用（5分TTL）
         const charDetailKey = `charDetail_${userId}_${characterId}`;
         let charData = firestoreCache.get(charDetailKey);
@@ -235,78 +221,6 @@ exports.generateCharacterReply = onCall(
           return {reply: "キャラクター情報が見つかりません。再起動してください。", voiceUrl: "", error: true};
         }
 
-        // 予定問い合わせの処理
-        if (isScheduleQuery) {
-          console.log("📅 Schedule query detected");
-
-          // 今日・明日を判定
-          const isToday = /今日/.test(userMessage);
-          const isTomorrow = /明日/.test(userMessage);
-
-          const now = new Date();
-          let targetDate = now;
-
-          if (isTomorrow) {
-            targetDate = new Date(now.getTime() + 24 * 60 * 60 * 1000);
-          }
-
-          // 対象日の開始と終了（00:00-23:59）
-          const startOfDay = new Date(targetDate);
-          startOfDay.setHours(0, 0, 0, 0);
-
-          const endOfDay = new Date(targetDate);
-          endOfDay.setHours(23, 59, 59, 999);
-
-          // Firestoreから予定を取得
-          const schedulesSnapshot = await db.collection("users").doc(userId)
-              .collection("schedules")
-              .where("startDate", ">=", admin.firestore.Timestamp.fromDate(startOfDay))
-              .where("startDate", "<=", admin.firestore.Timestamp.fromDate(endOfDay))
-              .orderBy("startDate", "asc")
-              .get();
-
-          const gender = charData.gender || "neutral";
-          const dateLabel = isToday ? "今日" : isTomorrow ? "明日" : "その日";
-
-          if (schedulesSnapshot.empty) {
-            const noScheduleReply = gender === "female" ?
-              `${dateLabel}は予定が入ってないみたい！何か予定を立てる？` :
-              `${dateLabel}は予定が入ってないみたいだね！何か予定を立てる？`;
-
-            return {
-              reply: noScheduleReply,
-              isBig5Question: false,
-              emotion: "",
-            };
-          }
-
-          // 予定をフォーマット
-          const schedules = schedulesSnapshot.docs.map((doc) => {
-            const data = doc.data();
-            const startDate = data.startDate.toDate();
-
-            // 日本時間（JST）で表示するため、toLocaleStringを使用
-            const timeStr = data.isAllDay ? "終日" :
-              startDate.toLocaleTimeString("ja-JP", {
-                timeZone: "Asia/Tokyo",
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: false,
-              });
-            return `${timeStr} ${data.title}`;
-          });
-
-          const scheduleList = schedules.join("、");
-          const scheduleReply = gender === "female" ?
-            `${dateLabel}の予定は${schedules.length}件あるよ！\n${scheduleList}` :
-            `${dateLabel}の予定は${schedules.length}件あるね！\n${scheduleList}`;
-
-          return {
-            reply: scheduleReply,
-            isBig5Question: false,
-            emotion: "",
-          };
-        }
 
         const big5 = charData.confirmedBig5Scores || {
           openness: 3,

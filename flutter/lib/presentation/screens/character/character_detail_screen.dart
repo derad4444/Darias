@@ -1371,7 +1371,7 @@ class _PersonalityTypeCard extends ConsumerWidget {
   }
 }
 
-/// 詳細画面のサブタブ切替（手帳タブのメモ/タスク切替と同じセグメントスタイル）。
+/// 詳細画面のサブタブ切替。
 class _DetailSegmentControl extends StatelessWidget {
   final int selected;
   final Color accentColor;

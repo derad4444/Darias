@@ -15,10 +15,8 @@
 3. [PersonalityStatsMetadata](#personalitystatsmetadata) - 性格統計メタデータ
 4. [shared_meetings](#shared_meetings) - 6人会議キャッシュ
 5. [contacts](#contacts) - お問い合わせデータ
-6. [techou_survey_responses](#techou_survey_responses) - 手帳タブ廃止アンケート（匿名回答）
-7. [holidays](#holidays) - 祝日データ
-8. [system](#system) - システム設定
-9. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
+6. [system](#system) - システム設定
+7. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
 
 ---
 
@@ -314,122 +312,15 @@
 | 6人会議 | `users/{uid}/characters/{cid}/meeting_history` | `createdAt` が当日（上位2件） |
 | 冒険（ローグライク） | `users/{uid}/roguelike_runs` | `createdAt` が当日（上位3件） |
 
-> 手帳（スケジュール・Todo・メモ）は機能停止に伴い日記の材料から外している。`generateDiary.js` に取得処理がコメントで残置されており、復活時に戻せる。
-
 **インデックス:**
 - `date` (DESC)
 
 ---
 
-#### `users/{userId}/characters/{characterId}/monthlyComments`
-
-**用途**: 月次コメント
-**ドキュメントID**: `YYYY-MM`（例: `2024-01`）
-
-**フィールド:**
-
-- **comment**: `string` - 月次コメント本文
-- **schedule_count**: `number` - その月の予定数
-- **review_month**: `timestamp` - レビュー対象月
-- **generated_at**: `timestamp` - 生成日時
-
 #### `users/{userId}/characters/{characterId}/generationStatus`
 
 **ドキュメントID**: `current` (固定)
 **用途**: キャラクター生成状態の追跡（detailsにも統合済み）
-
----
-
-### `users/{userId}/schedules`
-
-**用途**: ユーザーの予定管理
-**ドキュメントID**: 自動生成UUID
-
-**フィールド:**
-
-- **id**: `string` - 予定ID
-- **title**: `string` - タイトル
-- **date**: `timestamp` - 下位互換性用（startDateと同値）
-- **startDate**: `timestamp` - 開始日時
-- **endDate**: `timestamp` - 終了日時
-- **isAllDay**: `boolean` - 終日フラグ
-- **location**: `string` - 場所
-- **memo**: `string` - メモ
-- **tag**: `string` - タグ
-- **repeatOption**: `string` - 繰り返しオプション
-- **recurringGroupId**: `string` - 繰り返し予定のグループID
-- **remindValue**: `number` - リマインダー値
-- **remindUnit**: `string` - リマインダー単位
-- **notificationSettings**: `map` - 通知設定
-- **created_at**: `timestamp` - 作成日時
-- **isPublic**: `boolean` - フレンド公開フラグ（デフォルト: `true`）。`false` にすると `shareLevel = "full"` のフレンドのみ閲覧可。旧フィールド `isPrivate` との互換性あり（`isPublic` が存在しない場合は `isPrivate !== true` でフォールバック）
-
-**インデックス:**
-- `recurringGroupId` (ASC) + `startDate` (ASC)
-- `startDate` (ASC) + `endDate` (ASC)
-
----
-
-### `users/{userId}/todos`
-
-**用途**: Todoリスト
-**ドキュメントID**: 自動生成UUID
-
-**フィールド:**
-
-- **id**: `string` - TodoID
-- **title**: `string` - タイトル
-- **description**: `string` - 説明
-- **isCompleted**: `boolean` - 完了フラグ
-- **dueDate**: `timestamp` - 期限日時（オプショナル）
-- **priority**: `string` - 優先度（"高", "中", "低"）
-- **tag**: `string` - タグ
-- **createdAt**: `timestamp` - 作成日時
-- **updatedAt**: `timestamp` - 更新日時
-
-**インデックス:**
-- `isCompleted` (ASC) + `createdAt` (DESC)
-- `isCompleted` (ASC) + `updatedAt` (DESC)
-
----
-
-### `users/{userId}/memos`
-
-**用途**: メモ機能
-**ドキュメントID**: 自動生成UUID
-
-**フィールド:**
-
-- **id**: `string` - メモID
-- **title**: `string` - タイトル
-- **content**: `string` - 内容
-- **isPinned**: `boolean` - ピン留めフラグ
-- **showInWidget**: `boolean` - ウィジェット表示フラグ（デフォルト: `false`）。`true` のメモのみホーム画面ウィジェットに表示される
-- **tag**: `string` - タグ
-- **createdAt**: `timestamp` - 作成日時
-- **updatedAt**: `timestamp` - 更新日時
-
-**インデックス:**
-- `isPinned` (DESC) + `updatedAt` (DESC)
-
----
-
-### `users/{userId}/tags`
-
-**用途**: タグ設定（iOS/Flutter間で同期）
-**ドキュメントID**: 自動生成
-
-**フィールド:**
-
-- **name**: `string` - タグ名（例: "仕事", "プライベート"）
-- **colorHex**: `string` - タグ色（16進数、例: "#2196f3"）
-- **memo**: `string` - メモ（任意、デフォルト: ""）
-- **isPublic**: `boolean` - フレンド公開フラグ（デフォルト: `true`）。`false` にすると `shareLevel = "full"` のフレンドのみこのタグの予定を閲覧可。旧フィールド `isPrivate` との互換性あり（`isPublic` が存在しない場合は `isPrivate !== true` でフォールバック）
-
-**インデックス:**
-- `name` (ASC)
-
-**備考:** 以前はiOS側はUserDefaults、Flutter側はSharedPreferencesにローカル保存していたが、クロスプラットフォーム同期のためFirestoreに移行。
 
 ---
 
@@ -557,16 +448,14 @@
 
 - **loginDone**: `boolean` - ログインミッション達成フラグ
 - **chatCount**: `number` - 当日のチャット送信回数（上限6でカウント停止）
-- **diaryViewed**: `boolean` - 今日のスケジュールシートを開いたフラグ
-- **diaryRead**: `boolean` - カレンダーの日記アイコンをタップしたフラグ
-- **allCompleted**: `boolean` - 全5ミッション達成フラグ。達成時にカレンダーに⭐が表示される。読み込み時は `loginDone && chatCount >= 6 && diaryViewed && diaryRead` から再計算する（Firestoreの保存値は参照しない）
+- **diaryRead**: `boolean` - 日記を開いたフラグ
+- **allCompleted**: `boolean` - 全4ミッション達成フラグ。読み込み時は `loginDone && chatCount >= 6 && diaryRead` から再計算する（Firestoreの保存値は参照しない）
 - **completedAt**: `timestamp?` - 全達成した日時
 
 **書き込みタイミング:**
 - `loginDone`: アプリ初回起動時（`_checkAndShowDailyMission`）
 - `chatCount`: チャット送信成功後（`incrementChat()`）。chat6Done（chatCount >= 6）達成後はカウント停止
-- `diaryViewed`: カレンダー画面で今日の日付セルをタップしてスケジュールボトムシートを開いた時
-- `diaryRead`: カレンダー画面のスケジュールシートで日記アイコンをタップした時（`markDiaryRead()`）
+- `diaryRead`: デイリーミッションシートから日記を開いた時（`markDiaryRead()`）
 
 **ミッション定義:**
 | キー | 説明 | 達成条件 |
@@ -574,8 +463,7 @@
 | login | ログイン | 当日初回アプリ起動時に自動達成 |
 | chat2 | チャットを2回する | chatCount >= 2 |
 | chat6 | チャットを6回する | chatCount >= 6 |
-| schedule | 今日のスケジュールを確認する | 当日日付のカレンダーシートを開く |
-| diary | 日記を確認する | カレンダーのスケジュールシートで日記アイコンをタップ |
+| diary | 日記を確認する | デイリーミッションシートから日記を開く |
 
 **関連ファイル:**
 - `flutter/lib/data/models/daily_mission_model.dart`
@@ -608,14 +496,6 @@
 
 **用途**: ユーザーのアプリ設定（クロスデバイス・クロスプラットフォーム同期）
 **ドキュメントID**: 設定種別固定
-
-#### `users/{userId}/settings/calendarSettings`
-
-**フィールド:**
-
-- **selectedFriendIds**: `array<string>` - カレンダーに表示するフレンドIDのリスト。SharedPreferences/localStorage の代わりにFirestoreで永続化することで全プラットフォームで同期される
-
----
 
 ### `users/{userId}/diary`
 
@@ -906,52 +786,6 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 
 ---
 
-## `techou_survey_responses`
-
-**用途**: 手帳タブの廃止を検討するにあたり、ユーザーの意見を収集する匿名アンケートの回答を保存。手帳タブを開くと内容の上にポップアップ（`TechouSurveyPopup`）が**必須**で表示され、回答するまで手帳内容を操作できない。誰の回答かは保持しない（匿名）。
-**ドキュメントID**: 自動採番（`add`）
-
-**フィールド:**
-
-- **choice**: `string` - 選択された選択肢のキー（`keepAll` / `keepSchedule` / `keepTodo` / `keepMemo` / `removeAll` / `unsure`）。集計キー
-- **choiceLabel**: `string` - 選択肢の表示ラベル（例: "手帳タブは全部残してほしい"）
-- **comment**: `string` - 自由コメント（任意・最大500文字）
-- **appVersion**: `string` - アプリバージョン（例: "3.3.5 (23)"）
-- **platform**: `string` - プラットフォーム（"ios" / "android" / "web" / "other"）
-- **answeredAt**: `timestamp` - 回答日時（サーバー時刻）
-
-**アクセス権限**: 認証済みユーザーは作成のみ可、読み取り・更新・削除は不可（集計はコンソール/管理SDK）
-
-**関連実装:**
-- Flutter: `lib/data/datasources/remote/survey_datasource.dart`（送信）、`lib/presentation/providers/survey_provider.dart`（選択肢定義・回答済みフラグ）、`lib/presentation/screens/plan/techou_survey_screen.dart`（`TechouSurveyPopup` UI）、`lib/presentation/screens/plan/plan_screen.dart`（手帳内容にStackで重ねて表示）
-- **必須**: スキップ不可。回答（送信）して初めてポップアップが閉じ、手帳内容が使える。
-- 回答済みの再表示抑止は端末ローカル（SharedPreferences `techou_survey_answered_v1`）で管理。**同一端末では回答後に二度と表示されない**が、匿名コレクションのため再インストール・別端末をまたいだ重複防止はしていない（許容）。
-- 配色は他画面と同じテーマ（`accentColorProvider` / `colorSettingsProvider.textColor` / `backgroundGradientProvider`）に合わせている。
-- **施策終了後の後片付け**: このコレクションを削除し、`firestore.rules` の該当ブロックと上記Flutterのポップアップ表示を除去する
-
----
-
-## `holidays`
-
-> **⚠️ 注意**: このコレクションは現在 **アプリでは参照されていません**。祝日データは `lib/data/services/japanese_holiday_service.dart` および iOS の `CalendarWidgetView.swift` にローカルデータとして内蔵されています（2024〜2027年分）。Firestoreコレクションは旧設計の名残であり、将来的に削除される可能性があります。
-
-**用途**: 日本の祝日情報を保存（現在未使用）
-**ドキュメントID**: `YYYY-MM-DD` 形式
-
-**フィールド:**
-
-- **id**: `string` - 祝日ID（YYYY-MM-DD）
-- **name**: `string` - 祝日名（例: "元日", "成人の日"）
-- **dateString**: `string` - 日付文字列（YYYY-MM-DD）
-
-**アクセス権限**: 全ユーザー読み取り可、書き込みは不可（管理者のみ）
-
-**現在の実装:**
-- Flutter: `JapaneseHolidayService`（ローカル Map で管理）
-- iOS ウィジェット: `CalendarWidgetView.swift` 内のローカル関数で管理
-
----
-
 ## `system`
 
 **用途**: アプリケーション全体の設定を格納
@@ -1046,8 +880,6 @@ users/{userId}
 │   ├── posts/{docId}
 │   ├── meeting_history/{docId}
 │   │   └── sharedMeetingId → shared_meetings/{id} 参照
-│   ├── monthlyComments/{YYYY-MM}
-│   ├── memos/{docId}
 │   └── diary/{docId}
 │       ├── [従来型] content
 │       └── [アクティビティ型] diary_type / facts[] / ai_comment
@@ -1061,10 +893,6 @@ users/{userId}
 │   ├── （タイプ変化時のみ）pendingTypeChangeNotification / newElement / newTypeName
 │   └── （初回詳細生成時）pendingFirstDreamSelection / firstDreamReadyAt
 ├── subscription/current
-├── schedules/{docId}           ← isPublic フィールド追加（2026-04-17）
-├── todos/{docId}
-├── memos/{docId}
-├── tags/{docId}                ← isPublic フィールド追加（2026-04-17）
 ├── friends/{friendUserId}                  ← 新規（2026-04-17）フレンド共有設定
 ├── incomingRequests/{fromUserId}           ← 新規（2026-04-17）受信フレンド申請
 ├── outgoingRequests/{toUserId}             ← 新規（2026-04-17）送信フレンド申請
@@ -1072,7 +900,6 @@ users/{userId}
 │   ├── scores {}
 │   ├── unlockedCategories []
 │   └── {category}: { comment, advice, conversation[], big5Key, createdAt }
-├── settings/calendarSettings               ← 新規（2026-04-17）カレンダー設定
 ├── askHistory/{docId}                      ← 新規（2026-05-10）フレンドのことを聞く履歴
 │   ├── friendId / friendName / question
 │   ├── recommendation
@@ -1114,7 +941,6 @@ Big5Analysis/{personalityKey}
 | `PersonalityStatsMetadata` | 認証ユーザー | Cloud Functionのみ |
 | `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
-| `holidays` | 全員 | 管理者のみ |
 | `system` | 全員 | 不可 |
 | `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
 

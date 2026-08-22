@@ -247,58 +247,6 @@ ${instruction}`;
    * Activity-based Diary Generation
    * Summarizes user's in-app activities as facts + character's encouraging comment
    */
-  // 手帳（予定・タスク・メモ）機能の廃止に伴い、旧 activityDiary をコメントアウトで残置し、
-  // 冒険（心の迷宮）を材料にする新版に差し替え（復活時に戻す）。
-  /*
-  activityDiary: (characterType, big5, gender, scheduleSummary, chatSummary, completedTodoSummary, createdTodoSummary, memoSummary, meetingSummary, big5ProgressSummary, tomorrowScheduleSummary, favoriteWord, wordTendency, dream, strength) => {
-    const parts = [];
-    if (scheduleSummary) parts.push(`今日の予定: ${scheduleSummary}`);
-    if (chatSummary) parts.push(`会話: ${chatSummary}`);
-    if (completedTodoSummary) parts.push(`完了タスク: ${completedTodoSummary}`);
-    if (createdTodoSummary) parts.push(`作成タスク: ${createdTodoSummary}`);
-    if (memoSummary) parts.push(`メモ: ${memoSummary}`);
-    if (meetingSummary) parts.push(`相談: ${meetingSummary}`);
-    if (big5ProgressSummary) parts.push(`性格診断: ${big5ProgressSummary}`);
-    const activitiesText = parts.length > 0 ? parts.join("\n") : "特になし";
-
-    const traits = buildPersonalityTraits(big5);
-    const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
-
-    // キャラクタータイプ別の口調指示
-    const toneGuide = characterType === "AI"
-      ? "論理的・システム的な言い回しを使いつつ、時折感情がにじむクールなトーン。「処理完了」「セッション」などの語彙を自然に混ぜる。"
-      : characterType === "Human"
-      ? "感情豊かで共感的なトーン。喜び・心配・ほっとした気持ちなどを素直に言葉にする。"
-      : "論理と感情が混在する学習中のトーン。冷静に分析しながら少し感情が出る。";
-
-    const personalityLines = [];
-    if (traits) personalityLines.push(`性格特性: ${traits}`);
-    if (wordTendency) personalityLines.push(`話し方: ${wordTendency}`);
-    if (favoriteWord) personalityLines.push(`口癖: 「${favoriteWord}」`);
-    if (dream) personalityLines.push(`夢: ${dream}`);
-    if (strength) personalityLines.push(`強み: ${strength}`);
-    const personalityText = personalityLines.join("\n");
-
-    return `【キャラクター情報】
-性別: ${genderText}
-${personalityText}
-口調: ${toneGuide}
-
-【今日の活動】
-${activitiesText}
-${tomorrowScheduleSummary ? `\n【明日の予定】\n${tomorrowScheduleSummary}` : ""}
-
-以下のJSON形式のみで出力:
-{"facts":["事実1","事実2"],"ai_comment":"コメント"}
-
-factsは今日の活動を事実ベースで2〜5件。「タスク」「メモ」「予定」「会話」「性格診断」のいずれかのラベルを使い、「ルーチン」「習慣」などのラベルは使わないこと（例:「タスク『報告書』を完了した」「メモ『アイデア』を記録した」「予定『ミーティング』があった」）。
-ai_commentは以下のルールで250〜350文字で作成:
-- 上記の口癖・話し方・性格特性を必ず反映したキャラクターらしいトーンで書く
-- 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
-- 明日の予定がある場合はそれに自然に触れる（「明日は〇〇だね」など）
-- 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
-  },
-  */
   activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, roguelikeSummary, favoriteWord, wordTendency, dream, strength) => {
     const parts = [];
     // デイリーミッションの達成が一番の成果なので先頭に置く
@@ -377,49 +325,18 @@ favorite_wordはこのキャラクターの口癖。次の条件を守ること:
    * Classifies user intent and extracts structured data in a single call
    */
   classifyAndExtract: (currentDate, currentTime, userMessage) => {
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24*60*60*1000).toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
-    const today = now.toLocaleDateString('ja-JP', {timeZone: 'Asia/Tokyo'});
-
     return `現在:${currentDate} ${currentTime}
-今日=${today} 明日=${tomorrow}
 
 ユーザーメッセージ:"${userMessage}"
 
-以下の5種類に分類し、必要なデータを抽出してJSONで返答せよ。
+以下の2種類に分類し、性格シグナルタグを付けてJSONで返答せよ。
 
 ## 分類ルール
-1. **schedule** - 日時＋行動の組み合わせが含まれる（例:「4/10に米米」「明日14時に会議」「来週月曜にジム」）
-2. **memo** - メモ・記録の依頼（例:「メモして」「メモしておいて」「〜を記録して」）
-3. **task** - タスク・やること登録の依頼（例:「タスクに追加」「やることリストに入れて」「〜をTODOに」「ジョギングと買い物をタスクに入れて」）
-4. **app_qa** - アプリの使い方・機能に関する質問（例:「予定の編集方法は？」「タスクはどこで見れる？」）
-5. **chat** - 上記以外の会話・相談・雑談
-
-## 出力形式（JSONのみ。説明不要）
-
-scheduleの場合:
-{"type":"schedule","tags":[],"schedules":[{"title":"行動内容","isAllDay":bool,"startDate":"ISO+09:00","endDate":"ISO+09:00","location":"","tag":"","memo":"","repeatOption":"none","remindValue":0,"remindUnit":"none"}]}
-
-時間なし→00:00-23:59,isAllDay:true / 時間あり→1h継続,isAllDay:false
-startDate/endDateは必ずタイムゾーン+09:00を付けること(例:2025-04-10T00:00:00+09:00)
-予定が0件の場合: {"type":"chat","tags":[],"schedules":[]}
-
-memoの場合（複数可）:
-{"type":"memo","tags":[],"items":["メモ内容1","メモ内容2"]}
-キーワード（メモして等）は除去してコンテンツのみ抽出
-
-taskの場合（複数可）:
-{"type":"task","tags":[],"items":["タスク内容1","タスク内容2"]}
-キーワード（タスクに追加等）は除去してコンテンツのみ抽出
-
-app_qaの場合:
-{"type":"app_qa","tags":[]}
-
-chatの場合:
-{"type":"chat","tags":["該当タグ"]}
+1. **app_qa** - アプリの使い方・機能に関する質問（例:「日記はどこで見れる？」「自分会議って何？」）
+2. **chat** - 上記以外の会話・相談・雑談
 
 ## 性格シグナルタグ
-上記分類に加え、発言から読み取れる性格の傾向を0〜3個のタグで付与すること。
+発言から読み取れる性格の傾向を0〜3個のタグで付与すること。
 
 使用可能なタグ:
 social_reference/solo_preference/group_activity/initiating/quiet_environment/
@@ -430,8 +347,10 @@ independent_stance/self_paced/change_seeking/worry_anxiety
 タグの判定基準（抜粋）:
 - self_paced: 自分のペースや方法を優先する発言（「自分でやった方が早い」「合わせるのが苦手」「マイペースに」「人に頼まずに」）
 
+## 出力形式（JSONのみ。説明不要）
 タグなし例:{"type":"chat","tags":[]}
 タグあり例:{"type":"chat","tags":["emotional_expression","social_reference"]}
+アプリの質問:{"type":"app_qa","tags":[]}
 
 JSONのみ出力。`;
   },

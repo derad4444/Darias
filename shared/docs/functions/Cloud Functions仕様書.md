@@ -103,8 +103,7 @@
 **処理の振り分けロジック（優先順）:**
 
 1. **無意味な入力検出** → フォールバック返答を返す（3文字未満・記号のみ・繰り返し文字等）
-2. **予定照会** (`今日/明日の予定`) → `users/{uid}/schedules` を照会して返答
-3. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
+2. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
 
 > **レガシーBIG5 100問診断（後方互換性のため維持）:**
 > - BIG5診断トリガー (`性格診断して` / `性格解析して`) → 次の質問を `questionText` フィールドで返し `big5Progress` を更新
@@ -113,9 +112,8 @@
 > ※ 現在の主要な性格解析は `classifyAndExtract` が自動抽出するパーソナリティタグ（チャットシグナル方式）で行われる。
 
 > **Flutter側の振り分け（Cloud Function呼び出し前）:**
-> - アプリ操作ワード（予定・タスク・メモ等）を含む「使い方」系の質問 → `answerAppQuestion` へ
-> - メモ/タスク/スケジュールキーワードを含む → ローカル抽出してFirestoreに保存
-> - それ以外 → `generateCharacterReply` の通常チャット（5）へ
+> - `classifyAndExtract` が `app_qa` と判定 → `answerAppQuestion` へ
+> - それ以外 → `generateCharacterReply` の通常チャットへ
 
 **モデル選択:**
 - Premium ユーザー: `gpt-4o-2024-11-20`
@@ -130,7 +128,7 @@
 #### 2. `classifyAndExtract`
 - **ソース**: `const/classifyAndExtract.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: チャット入力メッセージを AI（gpt-4o-mini）で5種類に分類し、memo/task/schedule の場合はその内容も同時に抽出して返す。全チャット送信時に必ず呼び出される振り分けゲートウェイ
+- **概要**: チャット入力メッセージを AI（gpt-4o-mini）で `app_qa` / `chat` に分類し、あわせて性格シグナルタグを抽出する。全チャット送信時に必ず呼び出される振り分けゲートウェイ
 - **リソース**: memory `256MiB` / timeout `60秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
@@ -146,36 +144,10 @@
 **返却値（分類別）:**
 
 ```javascript
-// memo（複数件対応）
-{ "type": "memo", "items": ["メモ内容1", "メモ内容2"] }
-
-// task（複数件対応）
-{ "type": "task", "items": ["タスク内容1", "タスク内容2"] }
-
-// schedule（複数件対応）
-{
-  "type": "schedule",
-  "schedules": [
-    {
-      "title": string,
-      "isAllDay": boolean,
-      "startDate": Timestamp,   // +09:00 付き ISO 文字列 → Firestore Timestamp に変換済み
-      "endDate": Timestamp,
-      "location": string,
-      "tag": string,
-      "memo": string,
-      "repeatOption": "none",
-      "remindValue": 0,
-      "remindUnit": "none",
-      "created_at": Timestamp
-    }
-  ]
-}
-
-// app_qa（内容抽出なし）
+// app_qa（アプリの使い方の質問）
 { "type": "app_qa" }
 
-// chat（内容抽出なし）
+// chat（通常の会話）
 { "type": "chat" }
 ```
 
@@ -183,9 +155,6 @@
 
 | 分類 | 判定基準 |
 |------|---------|
-| `schedule` | 日時＋行動の組み合わせ（例: 「明日14時に会議」） |
-| `memo` | メモ・記録の依頼（例: 「〇〇をメモして」） |
-| `task` | タスク・TODO登録の依頼（例: 「〇〇をタスクに追加」） |
 | `app_qa` | アプリの使い方・機能に関する質問 |
 | `chat` | 上記以外の会話・相談・雑談 |
 
@@ -193,16 +162,14 @@
 
 **プロンプト**: `OPTIMIZED_PROMPTS.classifyAndExtract(currentDate, currentTime, userMessage)` を使用
 
-**副作用**: なし（Firestore への書き込みは行わない）
-
-> **設計方針**: 旧バージョンではキーワードベース（contains）の静的判定を Flutter クライアント側で行っていたが、「4/10に米米」などの日付パターンだけのメッセージを schedule として検出できない・誤検知が多い等の問題があったため、AI ベースの分類（本関数）に移行した。
+**副作用**: 抽出した性格シグナルタグを `personalitySignals` に保存し、10件ごとに軸スコアを再計算する
 
 ---
 
 #### 3. `answerAppQuestion`
 - **ソース**: `const/answerAppQuestion.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: アプリの使い方に関する質問、またはユーザー自身のデータ（予定・タスク・メモ）に関する質問に回答する
+- **概要**: アプリの使い方に関する質問に回答する
 - **リソース**: memory `256MiB` / timeout `60秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
@@ -214,7 +181,6 @@
 |-----------|-----|------|
 | `userId` | `string` | Firebase Auth UID |
 | `userMessage` | `string` | ユーザーのメッセージ（Cloud Function 側で **100文字** に切り詰め） |
-| `dataTypes` | `array<string>` | Firestoreから取得するデータ種別（`"schedules"` / `"todos"` / `"memos"`） |
 
 **返却値:**
 
@@ -223,12 +189,8 @@
 | `reply` | `string` | 回答テキスト（100文字以内） |
 
 **処理内容:**
-1. `dataTypes` に指定されたコレクションから必要なデータを Firestore より取得
-   - `schedules`: 前後30日の予定（最大20件）
-   - `todos`: 未完了タスク（最大20件）
-   - `memos`: 最新メモ（最大10件）
-2. アプリガイド + 取得データをシステムプロンプトに組み込んで `gpt-4o-mini` で回答生成
-3. Firestore への書き込みは行わない（読み取り専用）
+1. アプリガイドをシステムプロンプトに組み込んで `gpt-4o-mini` で回答生成
+2. Firestore へのアクセスは行わない
 
 **モデル:** `gpt-4o-mini`（固定。質問応答はプレミアム/フリー問わず同一モデル）
 
@@ -279,60 +241,6 @@
 - **リソース**: 未指定（v1 デフォルト）
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし（`process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY`、`process.env.GOOGLE_PLAY_PACKAGE_NAME` を実行時に参照）
-
-#### 8. `getFriendSchedules`
-- **ソース**: `const/getFriendSchedules.js`
-- **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: フレンドの共有スケジュールを取得する。呼び出し元ユーザーのIDとフレンドIDを元に、フレンドが設定した `shareLevel` に従ってフィルタリングして返す
-- **リソース**: memory `256MiB` / timeout `30秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: なし
-- **その他**: `enforceAppCheck: false`
-
-**入力パラメータ:**
-
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| `friendId` | `string` | スケジュールを取得したいフレンドのユーザーID |
-| `year` | `number` | 取得対象年 |
-| `month` | `number` | 取得対象月（1〜12） |
-
-**返却値:**
-
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `schedules` | `array<map>` | フィルタリング済みスケジュール一覧 |
-
-各スケジュールオブジェクト:
-
-| フィールド | 型 | 説明 |
-|-----------|-----|------|
-| `id` | `string` | スケジュールID |
-| `title` | `string` | タイトル |
-| `startDate` | `string` | 開始日時（ISO文字列） |
-| `endDate` | `string` | 終了日時（ISO文字列） |
-| `isAllDay` | `boolean` | 終日フラグ |
-| `tag` | `string` | タグ名 |
-| `tagColorHex` | `string \| null` | タグの色（フレンドのタグ設定から取得） |
-| `location` | `string` | 場所 |
-| `memo` | `string` | メモ |
-| `isPublic` | `boolean` | 公開フラグ |
-| `recurringGroupId` | `string \| null` | 繰り返しグループID |
-
-**フィルタリングロジック:**
-
-1. `users/{friendId}/friends/{callerId}` の `shareLevel` を取得
-2. `shareLevel = "none"` → 空配列を返す
-3. `shareLevel = "public"` → `isPublic = false` の予定と、`isPublic = false` タグの予定を除外
-4. `shareLevel = "full"` → 全件返す
-
-**フィールド互換性（旧 `isPrivate` → 新 `isPublic`）:**
-- スケジュール: `isPublic` フィールドが存在すればそちらを優先、なければ `isPrivate !== true` でフォールバック
-- タグ: `isPublic` フィールドが存在すればそちらを優先、なければ `isPrivate !== true` でフォールバック
-
-**副作用**: なし（読み取り専用）
-
----
 
 #### 10. `diagnoseCompatibility`
 - **ソース**: `const/diagnoseCompatibility.js`
@@ -591,56 +499,6 @@
 
 ---
 
-#### 18. `extractFromImage`
-- **ソース**: `const/extractFromImage.js`
-- **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: 画像（JPEG base64）を GPT-4o-mini Vision で解析し、メモ・タスク・予定・複数予定のいずれかの JSON データを抽出して返す。無料ユーザーはクライアント側でリワード広告を表示した上で呼び出す
-- **リソース**: memory `512MiB` / timeout `60秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: `OPENAI_API_KEY`
-- **その他**: `minInstances: 0`, `enforceAppCheck: false`
-- **モデル**: `gpt-4o-mini`（Vision）/ temperature `0` / `response_format: json_object`
-
-**入力パラメータ:**
-
-| パラメータ | 型 | 説明 |
-|-----------|-----|------|
-| `imageBase64` | `string` | JPEG 画像の base64 文字列（クライアント側で最大 1024px・品質 75% に圧縮済み。Cloud Function 側で **2MB 上限**チェックあり。超過時は `invalid-argument` エラー） |
-| `targetType` | `string` | 抽出タイプ: `"schedule"` / `"memo"` / `"todo"` / `"schedules"`（複数予定一括） |
-
-**返却値（targetType 別）:**
-
-```javascript
-// schedule（単件）
-{ "result": { "title", "isAllDay", "startDate": Timestamp, "endDate": Timestamp, "location", "memo" } }
-
-// memo
-{ "result": { "title", "content" } }
-
-// todo
-{ "result": { "title", "description", "dueDate": Timestamp | null, "priority": "low"|"medium"|"high" } }
-
-// schedules（複数件一括）
-{ "result": { "schedules": [ { "title", "isAllDay", "startDate": Timestamp, "endDate": Timestamp, "location", "memo" }, ... ] } }
-```
-
-**エラー時:**
-```javascript
-{ "error": "Missing required fields" | "Invalid targetType" | "AI processing failed" | "Failed to parse AI response" }
-```
-
-**Timestamp 変換:**
-- `schedule` / `schedules` の `startDate` / `endDate`、`todo` の `dueDate` は Firestore `Timestamp` 形式に変換して返す
-
-**副作用**: なし（Firestore への書き込みは行わない）
-
-**Flutter 側の対応ファイル:**
-- `lib/data/datasources/remote/image_extraction_datasource.dart` — `extractFromImage()` / `extractSchedulesFromImage()`
-- `lib/presentation/widgets/image_scan_button.dart` — メモ・タスク・予定の単件スキャン UI
-- `lib/presentation/screens/calendar/bulk_schedule_confirmation_screen.dart` — 複数予定の確認・一括保存 UI
-
----
-
 #### 17. `deleteUserAccount`
 - **ソース**: `deleteUserAccount.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
@@ -662,18 +520,9 @@
 
 ---
 
-### Scheduled Tasks (`onSchedule`) - 5 関数
+### Scheduled Tasks (`onSchedule`) - 4 関数
 
 Cloud Scheduler による定期実行バッチ。
-
-#### 9. `scheduledHolidays`
-- **ソース**: `src/functions/scheduledTasks.js`
-- **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
-- **概要**: 当年＋翌年の日本の祝日を Firestore に登録
-- **スケジュール**: `0 1 1 1 *` (毎年1月1日 01:00 JST)
-- **リソース**: memory `512MiB` / timeout `300秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: なし
 
 #### 10. `scheduledDiaryGeneration`
 - **ソース**: `src/functions/scheduledTasks.js` → `const/generateDiary.js`
@@ -683,13 +532,13 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **収集データ**: デイリーミッション達成状況 / チャット（本文は上位5件、件数は `count()` で実数取得）/ 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）。手帳廃止に伴いスケジュール・Todo・メモは対象外
+- **収集データ**: デイリーミッション達成状況 / チャット（本文は上位5件、件数は `count()` で実数取得）/ 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）
 - **集計範囲は JST の 0時〜24時**（修正: 2026-08-12）
   - Cloud Functions の Node は既定でUTC動作するため、`new Date().setHours(0,0,0,0)` は**UTCの0時**になる。
     以前はそれを使っていたため集計範囲が **JST 9:00〜翌9:00** となり、
     **JST 0:00〜9:00 の会話・会議・冒険が日記に反映されていなかった**
     （日記の日付 `created_date` はJSTで算出していたため、範囲だけが9時間ずれていた）
-  - 現在は `created_date` と同じJST日付から範囲を作り、**チャット・会議・冒険・ToDo・メモの全ての集計で共有**する
+  - 現在は `created_date` と同じJST日付から範囲を作り、**チャット・会議・冒険の全ての集計で共有**する
   - バッチは JST 23:50 実行のため、前日分が混ざる方向のズレは元々起きていない（取りこぼしのみだった）
 - **「会話した」の判定**: `posts` の実件数が1件以上のときだけ facts に載せる。
   `posts` は**ユーザーが発言したときだけ1件作られる**（`content`＝ユーザー発言、`analysis_result`＝AIの返信を1ドキュメントに保存）ため、
@@ -724,15 +573,6 @@ Cloud Scheduler による定期実行バッチ。
   - アプリアイコンのバッジ: `main_shell_screen.dart` の `_updateAppBadge()` が `フレンド申請数 + 未読の日記の件数` を設定
   - ホーム画面の「履歴」ボタン: 未読件数をボタン右上に赤丸バッジ（`_CountBadge`）で表示。100件以上は `99+`
   - 既読化: 履歴画面の「日記」タブを開いたときに `clearDiaryBadge()` が `lastSeenDiaryDate` を更新し、アプリアイコンのバッジも更新する（`unified_history_screen.dart`）
-
-#### 11. `generateMonthlyReview`
-- **ソース**: `src/functions/generateMonthlyReview.js`
-- **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
-- **概要**: 前月のスケジュールからキャラ別月次レビューを生成
-- **スケジュール**: `0 9 1 * *` (毎月1日 09:00 JST)
-- **リソース**: memory `1GiB` / timeout `540秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: なし
 
 #### 12. `checkSubscriptionStatus`
 - **ソース**: `validateReceipt.js`
@@ -779,7 +619,7 @@ Firestore ドキュメント作成時に自動実行。
 
 ---
 
-### HTTP Endpoints (`onRequest`) - 4 関数
+### HTTP Endpoints (`onRequest`) - 3 関数
 
 REST API として直接アクセス可能。
 
@@ -802,14 +642,6 @@ REST API として直接アクセス可能。
 | その他 | ログ記録のみ（スキップ） |
 
 ---
-
-#### 27. `generateMonthlyReviewHttp`
-- **ソース**: `src/functions/generateMonthlyReview.js`
-- **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: 月次レビューのテスト・手動実行用 HTTP エンドポイント
-- **リソース**: memory `1GiB` / timeout `300秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: なし
 
 #### 28. `health`
 - **ソース**: `health.js`
@@ -884,7 +716,6 @@ shared/functions/
 │   ├── generateCharacterReply.js     # キャラクター返信生成
 │   ├── classifyAndExtract.js         # メッセージ分類・抽出（振り分けゲートウェイ）＋シグナル保存
 │   ├── answerAppQuestion.js          # アプリ Q&A 回答
-│   ├── extractFromImage.js           # 画像→メモ/タスク/予定 AI抽出（Vision）
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateDiary.js              # アクティビティ型日記生成
 │   ├── generateAdventureDiagnosis.js # 冒険（ローグライク）の性格診断
@@ -893,8 +724,6 @@ shared/functions/
 │   ├── generatePersonalityKey.js     # personalityKey 生成（Math.round で整数化）
 │   ├── generatePersonalityNarrative.js # 週次ナラティブ生成
 │   ├── recalculatePersonalityStats.js  # 性格タイプ統計の再集計
-│   ├── generateHolidays.js           # 祝日データ生成
-│   ├── getFriendSchedules.js         # フレンド共有スケジュール取得
 │   ├── diagnoseCompatibility.js      # カテゴリ別相性診断
 │   ├── askAboutFriend.js             # フレンドの好みをキャラクター会話で回答
 │   ├── searchUsers.js                # フレンド追加用ユーザー検索
@@ -907,7 +736,6 @@ shared/functions/
     │   └── config.js                 # defineSecret 定義（OPENAI_API_KEY, GMAIL_USER 等）
     ├── functions/                    # スケジュール系・複合関数
     │   ├── scheduledTasks.js         # 祝日登録 + 日記自動生成
-    │   ├── generateMonthlyReview.js  # 月次レビュー
     │   ├── generateSixPersonMeeting.js # 6人会議
     │   └── sendRegistrationEmail.js  # 登録メール
     ├── personality/

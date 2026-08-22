@@ -31,7 +31,6 @@ const CONFIG = {
   schedules: {
     diaryGeneration: "every day 23:50", // 日記生成
     characterDetails: "every day 00:00", // キャラクター詳細生成
-    holidayGeneration: "0 1 1 1 *", // 祝日登録（毎年1月1日）
   },
 
   // タイムアウト設定（秒）

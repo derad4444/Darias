@@ -372,9 +372,7 @@ class _CategoryDropdown extends StatelessWidget {
             Expanded(
               child: ListView(
                 controller: scrollController,
-                // 手帳（カレンダー・予定）廃止に伴い calendar カテゴリを一覧から除外（enum 定義は残置・復活時に .where を外す）。
                 children: ContactCategory.values
-                    .where((c) => c != ContactCategory.calendar)
                     .map((category) => ListTile(
                       title: Text(category.displayName),
                       trailing: selectedCategory == category
@@ -401,7 +399,6 @@ enum ContactCategory {
   usage,
   account,
   personality,
-  calendar,
   character,
   premium,
   other;
@@ -418,8 +415,6 @@ enum ContactCategory {
         return 'アカウント・ログイン';
       case ContactCategory.personality:
         return 'AI性格診断について';
-      case ContactCategory.calendar:
-        return 'カレンダー・予定管理';
       case ContactCategory.character:
         return 'キャラクター機能';
       case ContactCategory.premium:

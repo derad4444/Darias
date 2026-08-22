@@ -58,14 +58,6 @@ class DailyMissionDatasource {
     return updated;
   }
 
-  Future<DailyMission> markDiaryViewed() async {
-    final mission = await fetchToday();
-    if (mission.diaryViewed) return mission;
-    final updated = _checkAllCompleted(mission.copyWith(diaryViewed: true));
-    await save(updated);
-    return updated;
-  }
-
   Future<DailyMission> markDiaryRead() async {
     final mission = await fetchToday();
     if (mission.diaryRead) return mission;
@@ -75,7 +67,6 @@ class DailyMissionDatasource {
   }
 
   DailyMission _checkAllCompleted(DailyMission m) {
-    // 手帳廃止で diaryViewed（スケジュール確認）を除外（復活時に && m.diaryViewed を戻す）。
     if (m.loginDone && m.chat2Done && m.chat6Done && m.diaryRead && !m.allCompleted) {
       return m.copyWith(allCompleted: true, completedAt: DateTime.now());
     }
