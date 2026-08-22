@@ -33,15 +33,42 @@
       ]
     },
     {
-      "collectionGroup": "details",
-      "queryScope": "COLLECTION_GROUP",
+      "collectionGroup": "shared_meetings",
+      "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "element",
+          "fieldPath": "personalityKey",
           "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "usageCount",
+          "order": "DESCENDING"
         }
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "details",
+      "fieldPath": "element",
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
+      ]
+    }
+  ]
 }
