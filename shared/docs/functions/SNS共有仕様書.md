@@ -51,13 +51,16 @@ SNSごとにプロフィールリンクを出し分けておくと、ストア�
 
 | 遷移先 | 付与するもの | 確認場所 |
 |---|---|---|
-| App Store | `?pt={ProviderID}&ct={流入元}&mt=8` | App Store Connect → App Analytics → キャンペーン |
+| App Store | `https://apps.apple.com/app/apple-store/id{AppID}?pt={ProviderID}&ct={流入元}&mt=8` | App Store Connect → App Analytics → キャンペーン |
 | Google Play | `&referrer=utm_source={流入元}&utm_medium=social&utm_campaign=sns` | Play Console → ユーザーの獲得 → 獲得レポート |
 | LP | `?from={流入元}` | LP側がApp Storeリンクに `pt`/`ct` を付け直す |
 
-- **App Store は `pt`（Provider ID）が無いと計測されない。** `dl/index.html` と LP の `APPLE_PROVIDER_TOKEN` に設定する。未設定の間は通常のストアリンクへ送る（計測されないだけで遷移は壊れない）
+- **App Store は `pt`（Provider ID）が無いと計測されない。** `dl/index.html` と LP の `APPLE_PROVIDER_TOKEN` に設定する（現在: `127951957`）。未設定の間は通常のストアリンクへ送る（計測されないだけで遷移は壊れない）
+- 計測付きリンクは **App Store Connect が生成する `/app/apple-store/id{AppID}` 形式をそのまま使う**。通常リンクの `/jp/app/id{AppID}` にパラメータを追記する形は挙動を確認していないため使わない
+- `ct` は App Store Connect 側で作成したキャンペーン名と一致させる（半角小文字・30文字以内）。ズレると同じ流入元がレポート上で別行に分かれる
+- **各キャンペーンで5インストールに達するまでレポートに表示されない**（Apple のプライバシー閾値）。反映にも1〜2日かかる
 - Google Play は `referrer` に載せるだけでよく、事前の発行作業は不要
-- LP（`~/dev/DARIASLP`）は別リポジトリ。`?from=` を受け取って `a[href*="apps.apple.com"]` のリンクに `pt`/`ct` を付け直す
+- LP（`~/dev/DARIASLP`）は別リポジトリ。`?from=` を受け取って `a[href*="apps.apple.com"]` のリンクを計測付きリンクへ差し替える
 - 自動遷移が失敗したときの手動リンクにも同じURLを入れる
 
 ### iOS実機対応の共通実装ルール

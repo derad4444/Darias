@@ -66,6 +66,8 @@
         var APP_ID = '6753144594';
         var PLAY_ID = 'com.darias.darias';
         var APP_STORE = 'https://apps.apple.com/jp/app/id' + APP_ID;
+        // 計測付きリンクは App Store Connect が生成する形式をそのまま使う
+        var APP_STORE_CAMPAIGN = 'https://apps.apple.com/app/apple-store/id' + APP_ID;
         var PLAY_STORE = 'https://play.google.com/store/apps/details?id=' + PLAY_ID;
         var LP = 'https://my-character-app.web.app/';
 
@@ -81,7 +83,7 @@
         //   計測には Provider ID（pt）が必須。未設定の間は通常のストアリンクへ送る。
         // Google Play: Play Console → ユーザーの獲得 → 獲得レポート で見る。
         //   referrer に utm_source を載せるだけでよく、追加の発行作業は不要。
-        var APPLE_PROVIDER_TOKEN = '';   // ← App Store Connect の Provider ID を入れる
+        var APPLE_PROVIDER_TOKEN = '127951957';  // App Store Connect の Provider ID
         var CAMPAIGN = 'sns';            // ct / utm_campaign の値
 
         // 受け付ける流入元。ここに無い値は無視する（任意の文字列がストアURLに
@@ -103,7 +105,7 @@
 
         function appStoreUrl(src) {
           if (!src || !APPLE_PROVIDER_TOKEN) return APP_STORE;
-          return APP_STORE + '?pt=' + encodeURIComponent(APPLE_PROVIDER_TOKEN) +
+          return APP_STORE_CAMPAIGN + '?pt=' + encodeURIComponent(APPLE_PROVIDER_TOKEN) +
                  '&ct=' + encodeURIComponent(src) + '&mt=8';
         }
 
