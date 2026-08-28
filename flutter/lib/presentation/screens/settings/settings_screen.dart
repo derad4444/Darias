@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/services/last_login_method.dart';
+import '../../../data/services/social_auth_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -432,8 +434,38 @@ class SettingsScreen extends ConsumerWidget {
       );
 
       if (finalConfirm == true && context.mounted) {
-        final password = await _showPasswordDialog(context);
-        if (password == null || !context.mounted) return;
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) return;
+
+        // 本人確認はログイン方法ごとに変える。Google・Appleで登録した人は
+        // パスワードを持っていないため、それぞれのサインインをやり直してもらう
+        final providerIds = user.providerData.map((e) => e.providerId).toSet();
+        try {
+          if (providerIds.contains('password') && user.email != null) {
+            final password = await _showPasswordDialog(context);
+            if (password == null || !context.mounted) return;
+            await user.reauthenticateWithCredential(
+              EmailAuthProvider.credential(email: user.email!, password: password),
+            );
+          } else if (providerIds.contains('google.com')) {
+            final googleCredential = await SocialAuthService.googleCredential();
+            if (googleCredential == null || !context.mounted) return;
+            await user.reauthenticateWithCredential(googleCredential);
+          } else if (providerIds.contains('apple.com')) {
+            await user.reauthenticateWithProvider(SocialAuthService.appleProvider());
+          } else {
+            throw Exception('ログイン方法を確認できませんでした');
+          }
+        } on FirebaseAuthException catch (e) {
+          debugPrint('❌ 退会時の本人確認に失敗: ${e.code}');
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(_getDeleteErrorMessage(e.code))),
+            );
+          }
+          return;
+        }
+        if (!context.mounted) return;
 
         try {
           showDialog(
@@ -443,17 +475,6 @@ class SettingsScreen extends ConsumerWidget {
               child: CircularProgressIndicator(),
             ),
           );
-
-          final user = FirebaseAuth.instance.currentUser;
-          if (user == null || user.email == null) {
-            throw Exception('ユーザーが見つかりません');
-          }
-
-          final credential = EmailAuthProvider.credential(
-            email: user.email!,
-            password: password,
-          );
-          await user.reauthenticateWithCredential(credential);
 
           // Cloud Function でFirestoreデータ全削除 + Google Playキャンセル
           // Auth削除より先に実行（Auth削除後はFirestoreにアクセスできなくなるため）
@@ -671,6 +692,17 @@ class _UserInfoCard extends ConsumerWidget {
 
   const _UserInfoCard({required this.user, required this.userId});
 
+  /// いまのログイン方法（連携している場合は両方出す）
+  String _loginMethodLabel() {
+    final labels = FirebaseAuth.instance.currentUser?.providerData
+            .map((info) => LoginMethod.fromProviderId(info.providerId)?.label)
+            .whereType<String>()
+            .toList() ??
+        const <String>[];
+    if (labels.isEmpty) return '';
+    return '${labels.join('・')}でログイン中';
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final name = user?.name as String?;
@@ -717,6 +749,16 @@ class _UserInfoCard extends ConsumerWidget {
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (_loginMethodLabel().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      _loginMethodLabel(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

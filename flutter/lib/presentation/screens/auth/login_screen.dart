@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/services/last_login_method.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../widgets/auth/social_sign_in_buttons.dart';
 import '../main/main_shell_screen.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,6 +19,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   String _errorMessage = '';
   bool _isLoading = false;
+
+  /// 前回のログイン方法（端末に残しているもの。入れ直した直後は null）
+  LoginMethod? _lastMethod;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastMethod();
+  }
+
+  Future<void> _loadLastMethod() async {
+    final method = await LastLoginMethodStore.load();
+    if (mounted) setState(() => _lastMethod = method);
+  }
 
   @override
   void dispose() {
@@ -171,6 +187,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         ),
                       ),
 
+                    // 前回この方法でログインしたことを伝える
+                    if (_lastMethod == LoginMethod.email)
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 8),
+                        child: LastLoginBadge(),
+                      ),
+
                     // ログインボタン
                     SizedBox(
                       width: double.infinity,
@@ -202,6 +225,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                               ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+
+                    // Google / Apple でのログイン
+                    SocialSignInButtons(lastMethod: _lastMethod),
                     const SizedBox(height: 16),
 
                     // 新規登録リンク

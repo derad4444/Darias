@@ -35,6 +35,13 @@
 				<string>darias</string>
 			</array>
 		</dict>
+		<dict>
+			<!-- Googleサインインの戻り先。GoogleService-Info.plist の REVERSED_CLIENT_ID と同じ値 -->
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.881831618841-6c6581ubbavfaobbl5qtt02hpafqffo6</string>
+			</array>
+		</dict>
 	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>

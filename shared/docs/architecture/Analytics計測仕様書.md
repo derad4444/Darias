@@ -82,8 +82,8 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 | イベント名 | 種別 | 発火点 | パラメータ |
 |-----------|------|--------|-----------|
 | `screen_view` | 標準 | `app_router.dart` の `observers` に `FirebaseAnalyticsObserver` を登録 | `screen_name`（各 `GoRoute` の `name`） |
-| `sign_up` | 標準 | `auth_provider.dart` `signUp()` 成功時 | `method`（現状 `email` のみ） |
-| `login` | 標準 | `auth_provider.dart` `signIn()` 成功時 | `method`（現状 `email` のみ） |
+| `sign_up` | 標準 | `auth_provider.dart` の初回サインイン成功時 | `method`（`email` / `google` / `apple`） |
+| `login` | 標準 | `auth_provider.dart` のサインイン成功時 | `method`（`email` / `google` / `apple`） |
 | `tutorial_begin` | 標準 | `onboarding_screen.dart` `initState()` | なし |
 | `onboarding_slide_view` | カスタム | `onboarding_screen.dart` `initState()`（0枚目）と `onPageChanged` | `slide_index`（0〜5） |
 | `tutorial_complete` | 標準 | `onboarding_screen.dart` `_complete()` | `skipped`（`true` / `false`） |

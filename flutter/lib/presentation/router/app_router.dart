@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/services/analytics_service.dart';
+import '../providers/auth_provider.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
+import '../screens/auth/character_gender_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
@@ -81,11 +83,21 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isSplash) return null;
       if (state.matchedLocation == '/onboarding') return null;
 
+      // 初回サインインの性別選択は、終わるまで他の画面へ行かせない
+      // （ユーザードキュメントが無いままホームへ進むと、中身が空で表示が壊れる）
+      if (state.matchedLocation == '/character-gender') {
+        return isLoggedIn ? null : '/login';
+      }
+
       if (!isLoggedIn && !isAuthRoute) {
         return '/login';
       }
 
       if (isLoggedIn && isAuthRoute) {
+        // Google / Apple の処理中は画面側が行き先を決める
+        // （初回なら性別選択へ、2回目以降はホームへ）
+        if (ref.read(socialSignInInProgressProvider)) return null;
+
         if (ref.read(needsOnboardingProvider)) {
           Future.microtask(() => ref.read(needsOnboardingProvider.notifier).state = false);
           return '/onboarding';
@@ -120,6 +132,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/register',
         name: 'register',
         builder: (context, state) => const RegisterScreen(),
+      ),
+
+      // 初回サインイン時のキャラクター性別選択（Google / Apple で登録した人向け）
+      GoRoute(
+        path: '/character-gender',
+        name: 'character-gender',
+        builder: (context, state) => const CharacterGenderScreen(),
       ),
 
       // キャラクター選択

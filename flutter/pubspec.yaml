@@ -98,6 +98,7 @@ dependencies:
 
   # Charts (ローグライク結果画面のレーダーチャート等)
   fl_chart: ^0.69.2
+  google_sign_in: ^7.2.0
 
 dev_dependencies:
   flutter_test:

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../router/app_router.dart';
+import '../../widgets/auth/social_sign_in_buttons.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -294,6 +295,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             ),
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  // Google / Apple でのアカウント作成（初回は性別選択へ進む）
+                  const SocialSignInButtons(),
                   const SizedBox(height: 16),
 
                   // ログインリンク
