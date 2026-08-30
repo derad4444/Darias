@@ -110,8 +110,6 @@ class RoguelikeNotifier extends StateNotifier<GameState?> {
     AnalyticsService.instance.logFeatureUsed(AnalyticsFeature.adventure);
   }
 
-  void resetGame() => state = null;
-
   // 行動ログに traitDelta を加算する
   ActionLog _mergeTrait(ActionLog base, ActionLog d) => base.copyWith(
     challenge: d.challenge,

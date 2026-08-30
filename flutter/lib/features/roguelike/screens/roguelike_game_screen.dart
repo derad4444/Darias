@@ -78,9 +78,6 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
           context.go('/');
-          WidgetsBinding.instance.addPostFrameCallback(
-            (_) => ref.read(roguelikeProvider.notifier).resetGame(),
-          );
         });
         return const Scaffold(body: Center(child: CircularProgressIndicator()));
       }
@@ -136,12 +133,12 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
             onPressed: () {
               Navigator.pop(ctx);
               // ダンジョン選択（冒険タブ・タブバーあり）へ戻る。
-              // 状態クリアを先にやると state==null で単独ルート /roguelike へ
-              // 誘導されるため、遷移を先に行いクリアは遷移後に回す。
-              final notifier = ref.read(roguelikeProvider.notifier);
+              // **ここで冒険の状態をクリアしない**。遷移が終わるまでこの画面は
+              // 残っており、クリアすると state==null の分岐が走って、タブバーの無い
+              // 単独ルート /roguelike へ引き戻されてしまう。状態は次に冒険を
+              // 始めたとき startGame() が丸ごと入れ替えるので、残しておいて問題ない。
               ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
               context.go('/');
-              WidgetsBinding.instance.addPostFrameCallback((_) => notifier.resetGame());
             },
             child: const Text('中断する', style: TextStyle(color: Colors.red)),
           ),
@@ -431,10 +428,9 @@ class _BattleViewState extends ConsumerState<_BattleView> with TickerProviderSta
   /// 「進まない／見ない」: 記録せずダンジョン選択（冒険タブ）へ戻る。
   void _quitToSelection() {
     if (_adBusy) return;
-    final notifier = ref.read(roguelikeProvider.notifier);
+    // 冒険の状態はクリアしない（_confirmQuit と同じ理由）
     ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
     context.go('/');
-    WidgetsBinding.instance.addPostFrameCallback((_) => notifier.resetGame());
   }
 
   @override

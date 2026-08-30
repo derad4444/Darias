@@ -913,12 +913,12 @@ class _Buttons extends StatelessWidget {
             ),
             onPressed: () {
               // ホーム（冒険タブ＝ダンジョン選択・アプリのタブバーあり）へ戻る。
-              // 状態クリアを先にやると結果画面が state==null で単独ルート /roguelike
-              // （タブバーなし）へ誘導してしまうため、遷移を先に行い、クリアは遷移後に回す。
-              final notifier = ref.read(roguelikeProvider.notifier);
+              // **ここで冒険の状態をクリアしない**。遷移が終わるまで結果画面は残って
+              // おり、クリアすると state==null の分岐が走って、タブバーの無い単独ルート
+              // /roguelike へ引き戻されてしまう。状態は次に冒険を始めたとき
+              // startGame() が丸ごと入れ替えるので、残しておいて問題ない。
               ref.read(selectedTabProvider.notifier).state = _adventureTabIndex; // 冒険タブ＝ダンジョン選択
               context.go('/');
-              WidgetsBinding.instance.addPostFrameCallback((_) => notifier.resetGame());
             },
             child: const Text('🏠 ホーム', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
           ),
