@@ -86,6 +86,14 @@ class SettingsScreen extends ConsumerWidget {
 
                     const SizedBox(height: 8),
 
+                    // ログイン方法
+                    _SettingsCard(
+                      title: 'ログイン方法',
+                      subtitle: 'Google・Apple・メールの連携を管理',
+                      icon: Icons.key_outlined,
+                      onTap: () => context.push('/login-methods'),
+                    ),
+
                     // 通知設定
                     _SettingsCard(
                       title: '通知設定',

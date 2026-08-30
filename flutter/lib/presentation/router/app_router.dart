@@ -14,6 +14,7 @@ import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/settings/notification_settings_screen.dart';
+import '../screens/settings/login_methods_screen.dart';
 import '../screens/settings/theme_settings_screen.dart';
 import '../screens/character/character_detail_screen.dart';
 import '../screens/settings/feedback_screen.dart';
@@ -163,6 +164,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // 通知設定
+      // ログイン方法の管理（連携・解除）
+      GoRoute(
+        path: '/login-methods',
+        name: 'login-methods',
+        builder: (context, state) => const LoginMethodsScreen(),
+      ),
+
       GoRoute(
         path: '/notification-settings',
         name: 'notification-settings',

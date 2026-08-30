@@ -240,6 +240,73 @@ class AuthController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
+  /// ログイン中のアカウントに Google を追加する
+  ///
+  /// ログイン中は本人確認が済んでいるので、パスワードを聞かずに紐づけられる。
+  /// ユーザーが途中でやめたら false を返す。
+  Future<bool> linkGoogle() async {
+    final user = _requireUser();
+    final credential = await SocialAuthService.googleCredential();
+    if (credential == null) return false;
+    await user.linkWithCredential(credential);
+    await user.reload();
+    return true;
+  }
+
+  /// ログイン中のアカウントに Apple を追加する
+  Future<bool> linkApple() async {
+    final user = _requireUser();
+    try {
+      await user.linkWithProvider(SocialAuthService.appleProvider());
+    } on FirebaseAuthException catch (e) {
+      if (_isCanceled(e.code)) return false;
+      rethrow;
+    }
+    await user.reload();
+    return true;
+  }
+
+  /// ログイン中のアカウントに、メールアドレスとパスワードでのログインを追加する
+  ///
+  /// Google や Apple で作ったアカウントにはパスワードが無い。ここで設定すると
+  /// メールアドレスでもログインできるようになる。
+  Future<void> linkEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    final user = _requireUser();
+    await user.linkWithCredential(
+      EmailAuthProvider.credential(email: email, password: password),
+    );
+    await user.reload();
+  }
+
+  /// ログイン方法の連携を解除する
+  ///
+  /// 最後の1つは解除させない（解除するとログインできなくなるため）。
+  Future<void> unlinkProvider(String providerId) async {
+    final user = _requireUser();
+    if (user.providerData.length <= 1) {
+      throw FirebaseAuthException(
+        code: 'last-provider',
+        message: 'ログイン方法が1つだけのため解除できません',
+      );
+    }
+    await user.unlink(providerId);
+    await user.reload();
+  }
+
+  User _requireUser() {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw FirebaseAuthException(
+        code: 'no-current-user',
+        message: 'ログイン状態が確認できませんでした',
+      );
+    }
+    return user;
+  }
+
   /// 初回サインインのユーザーに、選んでもらった性別でデータを作る
   Future<void> completeInitialSetup({required String characterGender}) async {
     final user = _auth.currentUser;
