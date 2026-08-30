@@ -78,26 +78,41 @@ async function generateDiary(characterId, userId) {
 
 
   // 今日のチャット(Post)取得
+  //
+  // **起動時のオープナー（キャラクターからの問いかけ）も posts に入っている**が、
+  // これは content が空で、ユーザーはまだ何も答えていない（chat_datasource の
+  // saveOpenerPost）。これを数に入れると、話しかけていない日でも
+  // 「会話を1件やりとりした」と書かれ、本文にも空の引用が混ざってしまうため、
+  // content が空の投稿は集計からも本文からも外す。
   const postsQuery = db.collection("users").doc(userId)
       .collection("characters").doc(characterId)
       .collection("posts")
       .where("timestamp", ">=", today)
       .where("timestamp", "<", tomorrow);
 
-  const postSnap = await postsQuery.limit(5).get();
+  // 本文に使うのは5件だけだが、オープナーを除いたうえで5件残す必要があるので多めに読む
+  const POSTS_FETCH_LIMIT = 30;
+  const postSnap = await postsQuery.limit(POSTS_FETCH_LIMIT).get();
+  const userPosts = postSnap.docs.filter(
+      (doc) => ((doc.data().content || "").trim() !== ""),
+  );
 
-  // facts用の件数は実数を使う（AIに渡す本文は5件までに絞るため、docs.lengthでは足りない）
-  let chatCount = 0;
-  try {
-    const chatCountSnap = await postsQuery.count().get();
-    chatCount = chatCountSnap.data().count;
-  } catch (e) {
-    // count()が使えない環境では取得済みの件数で代替する
-    chatCount = postSnap.size;
+  let chatCount = userPosts.length;
+  if (postSnap.size === POSTS_FETCH_LIMIT) {
+    // 読み込み上限に達した日は総数で補正する（オープナーは1日1件なので、
+    // 読んだ範囲で見つかった空投稿の数を引けば足りる）
+    try {
+      const chatCountSnap = await postsQuery.count().get();
+      chatCount = chatCountSnap.data().count -
+        (postSnap.size - userPosts.length);
+    } catch (e) {
+      // count()が使えない環境では読み込んだ範囲の件数で代替する
+      chatCount = userPosts.length;
+    }
   }
 
   // チャットの文字列整形
-  const chatSummary = postSnap.docs.map((doc) => {
+  const chatSummary = userPosts.slice(0, 5).map((doc) => {
     const data = doc.data();
     return `・「${data.content}」`;
   }).join("\n");
