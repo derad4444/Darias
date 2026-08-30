@@ -133,7 +133,11 @@ class _RoguelikeResultScreenState extends ConsumerState<RoguelikeResultScreen> {
     final state = ref.watch(roguelikeProvider);
 
     if (state == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/roguelike'));
+      // 冒険の状態が無い（直接この画面へ来た）ときは、タブバーのある冒険タブへ戻す
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(selectedTabProvider.notifier).state = _adventureTabIndex;
+        context.go('/');
+      });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 

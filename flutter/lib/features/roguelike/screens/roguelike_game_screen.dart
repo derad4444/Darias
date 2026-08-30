@@ -68,7 +68,11 @@ class _RoguelikeGameScreenState extends ConsumerState<RoguelikeGameScreen> {
     final gameState = ref.watch(roguelikeProvider);
 
     if (gameState == null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => context.go('/roguelike'));
+      // 冒険の状態が無い（直接この画面へ来た）ときは、タブバーのある冒険タブへ戻す
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(selectedTabProvider.notifier).state = 3; // 冒険タブ＝ダンジョン選択
+        context.go('/');
+      });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (gameState.phase == GamePhase.victory || gameState.phase == GamePhase.gameOver) {

@@ -12,11 +12,9 @@ import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
-import '../screens/settings/settings_screen.dart';
 import '../screens/settings/notification_settings_screen.dart';
 import '../screens/settings/login_methods_screen.dart';
 import '../screens/settings/theme_settings_screen.dart';
-import '../screens/character/character_detail_screen.dart';
 import '../screens/settings/feedback_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
 import '../screens/history/unified_history_screen.dart';
@@ -28,7 +26,6 @@ import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 import '../screens/character/personality_history_screen.dart';
 // [ローグライク試作] 削除時はこのimport4行とルート4行を消す
-import '../../features/roguelike/screens/roguelike_home_screen.dart';
 import '../../features/roguelike/screens/roguelike_game_screen.dart';
 import '../../features/roguelike/screens/roguelike_result_screen.dart';
 import '../../features/roguelike/screens/roguelike_history_screen.dart';
@@ -156,13 +153,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const MeetingScreen(),
       ),
 
-      // 設定
-      GoRoute(
-        path: '/settings',
-        name: 'settings',
-        builder: (context, state) => const SettingsScreen(),
-      ),
-
       // 通知設定
       // ログイン方法の管理（連携・解除）
       GoRoute(
@@ -192,16 +182,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => PremiumUpgradeScreen(
           source: state.uri.queryParameters['source'] ?? 'unknown',
         ),
-      ),
-
-      // キャラクター詳細
-      GoRoute(
-        path: '/character/:id',
-        name: 'character-detail',
-        builder: (context, state) {
-          final characterId = state.pathParameters['id']!;
-          return CharacterDetailScreen(characterId: characterId);
-        },
       ),
 
       // 性格変動履歴
@@ -284,12 +264,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
 
-      // [ローグライク試作] 削除時はこのGoRoute3つを消す
-      GoRoute(
-        path: '/roguelike',
-        name: 'roguelike',
-        builder: (context, state) => const RoguelikeHomeScreen(),
-      ),
+      // [ローグライク試作] 削除時はこのGoRouteを消す
+      //
+      // ダンジョン選択（RoguelikeHomeScreen）は冒険タブ（`/` のシェル内）だけに置く。
+      // 単独ルートとしても開けるようにすると、そこへ入った人はタブバーを失って
+      // 他の画面へ移動できなくなる。
       GoRoute(
         path: '/roguelike/game',
         name: 'roguelike-game',
