@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/bgm_player.dart';
 import '../../providers/auth_provider.dart';
+import '../../router/app_router.dart';
 import '../../providers/theme_provider.dart';
 import '../home/home_screen.dart';
 import '../character/character_detail_screen.dart';
@@ -42,9 +44,18 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _syncAnalyticsSegment();
+      _showOnboardingIfNeeded();
     });
     // 音量設定プロバイダーを早期初期化してミュート状態をロードしておく
     ref.read(volumeSettingsProvider);
+  }
+
+  /// 初回ユーザーにはホームの上へオンボーディングをダイアログとして重ねる。
+  /// ホームを下に敷いたまま出すため、go ではなく push で開く。
+  void _showOnboardingIfNeeded() {
+    if (!ref.read(needsOnboardingProvider)) return;
+    ref.read(needsOnboardingProvider.notifier).state = false;
+    context.push('/onboarding');
   }
 
   void _updateAppBadge(WidgetRef ref) {

@@ -2,17 +2,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-class SplashScreen extends StatefulWidget {
+import '../../router/app_router.dart';
+
+class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
+  ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends ConsumerState<SplashScreen> {
   String _version = '';
 
   @override
@@ -43,7 +46,12 @@ class _SplashScreenState extends State<SplashScreen> {
           .get();
       final hasSeenSlides = doc.data()?['hasSeenOnboardingSlides'] as bool? ?? false;
       if (mounted) {
-        context.go(hasSeenSlides ? '/' : '/onboarding');
+        // 未視聴ならフラグだけ立てて必ずホームへ行く。
+        // オンボーディングは MainShellScreen がホームの上にダイアログとして重ねる。
+        if (!hasSeenSlides) {
+          ref.read(needsOnboardingProvider.notifier).state = true;
+        }
+        context.go('/');
         return;
       }
     }

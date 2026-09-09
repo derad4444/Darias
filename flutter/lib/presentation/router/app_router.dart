@@ -34,7 +34,7 @@ import '../../features/roguelike/screens/roguelike_enemy_detail_screen.dart';
 import '../../features/roguelike/models/enemy.dart' show Enemy;
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
-/// redirect内で読み取られ、/onboardingへのリダイレクト後にクリアされる
+/// MainShellScreen が読み取り、ホームの上に /onboarding を push した時点でクリアされる
 final needsOnboardingProvider = StateProvider<bool>((ref) => false);
 
 /// Auth状態変化をGoRouterに通知するChangeNotifier
@@ -96,10 +96,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         // （初回なら性別選択へ、2回目以降はホームへ）
         if (ref.read(socialSignInInProgressProvider)) return null;
 
-        if (ref.read(needsOnboardingProvider)) {
-          Future.microtask(() => ref.read(needsOnboardingProvider.notifier).state = false);
-          return '/onboarding';
-        }
+        // オンボーディングはホームの上に重ねるため、ここではホームへ送るだけにする。
+        // フラグは MainShellScreen が読み取り、/onboarding を push する。
         return '/';
       }
 
@@ -250,10 +248,20 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // オンボーディング
+      // ホーム画面の上にダイアログとして重ねるため、背景が透ける非不透明ページで開く。
+      // 必ず push で開くこと（go だとホームが下に残らず、背景が黒くなる）。
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const OnboardingScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          opaque: false,
+          barrierDismissible: false,
+          transitionDuration: const Duration(milliseconds: 200),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+              FadeTransition(opacity: animation, child: child),
+          child: const OnboardingScreen(),
+        ),
       ),
 
       // 使い方ガイド
