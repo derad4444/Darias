@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-08-06
+**最終更新日**: 2026-09-09
 **ランタイム**: Node.js 22
-**関数数**: 32
+**関数数**: 33
 
 ---
 
@@ -599,9 +599,9 @@ Cloud Scheduler による定期実行バッチ。
 
 ---
 
-### Firestore Triggers (`onDocumentCreated`) - 2 関数
+### Firestore Triggers - 3 関数
 
-Firestore ドキュメント作成時に自動実行。
+Firestore ドキュメントの作成・更新時に自動実行。
 
 #### 14. `sendRegistrationEmail`
 - **ソース**: `src/functions/sendRegistrationEmail.js`
@@ -620,6 +620,31 @@ Firestore ドキュメント作成時に自動実行。
 - **リソース**: 未指定（v2 デフォルト）
 - **リージョン**: 未指定（v2 デフォルト）
 - **secrets**: `GMAIL_USER`, `GMAIL_APP_PASSWORD`（オブジェクト参照）
+
+#### 16. `notifySubscriptionChange`
+- **ソース**: `notifySubscriptionChange.js`
+- **API バージョン**: v2 (`firebase-functions/v2/firestore` の `onDocumentWritten`)
+- **トリガーパス**: `users/{userId}/subscription/current`
+- **概要**: プレミアムプランの課金・自動更新・解約を運営（`darias.app4@gmail.com`）へメール通知
+- **通知条件**:
+  - `active` 以外 → `active`：新規課金・再開（件名「プレミアムプランの課金がありました」）
+  - `active` → `active` かつ `end_date` が変化：自動更新（件名「プレミアムプランが自動更新されました」）
+  - `active` → `active` 以外：解約・失効（件名「プレミアムプランが解約・失効しました」）
+  - `end_date` が変わらない `active` → `active` の書き込みは通知しない
+    （通知後の `adminNotifyKey` 書き戻しがこれに当たる）
+- **二重送信防止**: `イベント種別:transaction_id:end_date` を `adminNotifyKey` として
+  サブスクドキュメントに記録し、同じキーなら送信しない
+  （記録の書き戻しでトリガーが再発火するが、ステータスが変わらないため即 return する）
+- **メール本文**: ユーザー名／メール／ユーザーID／ステータス／プラン／ストア／商品ID／
+  開始日／次回更新日（解約時は終了日）／自動更新／取引ID／検知日時
+- **リソース**: 未指定（v2 デフォルト）
+- **リージョン**: `asia-northeast1`（Firestore のトリガーリージョンに合わせて自動配置。
+  先行の `sendRegistrationEmail` / `sendContactEmail` は `us-central1` に置かれているため、
+  デプロイ時にクロスリージョンの警告が出るが動作に影響はない）
+- **secrets**: `GMAIL_USER`, `GMAIL_APP_PASSWORD`（オブジェクト参照）
+
+> iOS / Android / Apple のサーバー通知はいずれも `users/{userId}/subscription/current` を
+> 書き換えるため、このトリガー1本で全経路の課金・解約を拾える。
 
 ---
 
@@ -714,6 +739,7 @@ shared/functions/
 ├── health.js                         # ヘルスチェック
 ├── validateReceipt.js                # サブスク検証（Apple/Google/Apple通知/日次チェック）
 ├── sendContactEmail.js               # 問い合わせメール送信
+├── notifySubscriptionChange.js       # 課金・解約を運営へメール通知
 ├── deleteUserAccount.js              # アカウント削除
 │
 ├── const/                            # callable 関数の実装
@@ -789,8 +815,8 @@ shared/functions/
 | 変数名 | 用途 | 使用関数 |
 |--------|------|---------|
 | `OPENAI_API_KEY` | OpenAI API 認証 | generateCharacterReply, classifyAndExtract, answerAppQuestion, generateBig5Analysis, generateOrReuseMeeting, scheduledDiaryGeneration, diagnoseCompatibility, extractFromImage, askAboutFriend |
-| `GMAIL_USER` | Gmail 送信元アドレス | sendRegistrationEmail, sendContactEmail |
-| `GMAIL_APP_PASSWORD` | Gmail アプリパスワード | sendRegistrationEmail, sendContactEmail |
+| `GMAIL_USER` | Gmail 送信元アドレス | sendRegistrationEmail, sendContactEmail, notifySubscriptionChange |
+| `GMAIL_APP_PASSWORD` | Gmail アプリパスワード | sendRegistrationEmail, sendContactEmail, notifySubscriptionChange |
 
 ### 環境変数 (`process.env` / `.env`)
 

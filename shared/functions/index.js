@@ -43,6 +43,11 @@ Object.defineProperty(exports, "sendContactEmail", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "notifySubscriptionChange", {
+  get: () => require("./notifySubscriptionChange").notifySubscriptionChange,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "validateAppStoreReceipt", {
   get: () => require("./validateReceipt").validateAppStoreReceipt,
   enumerable: true,
