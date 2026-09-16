@@ -297,58 +297,6 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
     );
   }
 
-  /// 質問例を選ばせて入力欄に入れる
-  Future<void> _pickExample(Color accentColor) async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => SafeArea(
-        child: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(sheetContext).cardColor,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
-                child: Row(
-                  children: [
-                    Text(
-                      '質問の例',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: accentColor,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              for (final example in _examples) ...[
-                const Divider(height: 1),
-                ListTile(
-                  dense: true,
-                  title: Text(example, style: const TextStyle(fontSize: 14)),
-                  onTap: () => Navigator.pop(sheetContext, example),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-    if (selected == null || !mounted) return;
-    _controller.text = selected;
-    _controller.selection = TextSelection.fromPosition(
-      TextPosition(offset: selected.length),
-    );
-    setState(() {});
-  }
-
   // ─────────────────────────────────────────
   // 入力セクション
   // ─────────────────────────────────────────
@@ -368,30 +316,76 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
             ),
           ),
           const SizedBox(height: 8),
-          // 質問例（選ぶと入力欄に入る）
-          InkWell(
-            onTap: () => _pickExample(accentColor),
-            borderRadius: BorderRadius.circular(10),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: accentColor.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '質問の例から選ぶ',
-                      style: TextStyle(fontSize: 12, color: accentColor),
+          // 質問例（押すとすぐ下に選択肢が開き、選ぶと入力欄に入る）
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return MenuAnchor(
+                style: MenuStyle(
+                  // 開いたメニューの幅をプルダウンに合わせる
+                  minimumSize: WidgetStatePropertyAll(
+                    Size(constraints.maxWidth, 0),
+                  ),
+                  maximumSize: WidgetStatePropertyAll(
+                    Size(constraints.maxWidth, double.infinity),
+                  ),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  Icon(Icons.expand_more, color: accentColor, size: 20),
-                ],
-              ),
-            ),
+                ),
+                menuChildren: _examples
+                    .map(
+                      (example) => MenuItemButton(
+                        onPressed: () {
+                          _controller.text = example;
+                          _controller.selection = TextSelection.fromPosition(
+                            TextPosition(offset: example.length),
+                          );
+                          setState(() {});
+                        },
+                        child: SizedBox(
+                          width: constraints.maxWidth - 32,
+                          child: Text(
+                            example,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+                builder: (context, controller, child) {
+                  return InkWell(
+                    onTap: () =>
+                        controller.isOpen ? controller.close() : controller.open(),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
+                        border:
+                            Border.all(color: accentColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '質問の例から選ぶ',
+                              style:
+                                  TextStyle(fontSize: 12, color: accentColor),
+                            ),
+                          ),
+                          Icon(Icons.expand_more, color: accentColor, size: 20),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
           ),
           const SizedBox(height: 8),
           Row(
