@@ -143,7 +143,6 @@ exports.acceptFriendRequest = onCall(
             id: fromUserId,
             name: reqData.fromUserName ?? "",
             email: reqData.fromUserEmail ?? "",
-            shareLevel: "none",
             createdAt: now,
           },
       );
@@ -156,7 +155,6 @@ exports.acceptFriendRequest = onCall(
             id: toUserId,
             name: myData.name ?? "",
             email: myData.email ?? "",
-            shareLevel: "none",
             createdAt: now,
           },
       );

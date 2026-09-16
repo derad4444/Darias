@@ -1,23 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// フレンドとの共有レベル
-enum FriendShareLevel {
-  none('none', '非公開'),
-  public('public', '公開'),
-  full('full', '全公開');
-
-  const FriendShareLevel(this.value, this.label);
-  final String value;
-  final String label;
-
-  static FriendShareLevel fromString(String value) {
-    return FriendShareLevel.values.firstWhere(
-      (e) => e.value == value,
-      orElse: () => FriendShareLevel.none,
-    );
-  }
-}
-
 /// フレンド申請ステータス
 enum FriendRequestStatus {
   pending('pending'),
@@ -89,7 +71,6 @@ class FriendModel {
   final String id; // friendUserId
   final String name;
   final String email;
-  final FriendShareLevel shareLevel;
   final DateTime createdAt;
 
   // Firestore外から取得する追加情報（省略可）
@@ -99,7 +80,6 @@ class FriendModel {
     required this.id,
     required this.name,
     required this.email,
-    required this.shareLevel,
     required this.createdAt,
     this.big5Scores,
   });
@@ -110,7 +90,6 @@ class FriendModel {
       id: doc.id,
       name: data['name'] as String? ?? '',
       email: data['email'] as String? ?? '',
-      shareLevel: FriendShareLevel.fromString(data['shareLevel'] as String? ?? 'none'),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
@@ -119,7 +98,6 @@ class FriendModel {
     return {
       'name': name,
       'email': email,
-      'shareLevel': shareLevel.value,
       'createdAt': Timestamp.fromDate(createdAt),
     };
   }
@@ -128,7 +106,6 @@ class FriendModel {
     String? id,
     String? name,
     String? email,
-    FriendShareLevel? shareLevel,
     DateTime? createdAt,
     Map<String, double>? big5Scores,
   }) {
@@ -136,7 +113,6 @@ class FriendModel {
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
-      shareLevel: shareLevel ?? this.shareLevel,
       createdAt: createdAt ?? this.createdAt,
       big5Scores: big5Scores ?? this.big5Scores,
     );

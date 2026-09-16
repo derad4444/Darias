@@ -392,20 +392,15 @@
 
 ### `users/{userId}/friends`
 
-**用途**: フレンド（相互登録ユーザー）の管理と予定共有レベル設定
+**用途**: フレンド（相互登録ユーザー）の管理
 **ドキュメントID**: フレンドのFirebase Auth UID
 
 **フィールド:**
 
 - **id**: `string` - フレンドのユーザーID
 - **name**: `string` - フレンドの表示名
-- **shareLevel**: `string` - フレンドへの予定公開レベル（`"none"` / `"public"` / `"full"`）
-  - `none`: 予定を一切共有しない
-  - `public`: `isPublic = true` かつ `isPublic = true` のタグの予定を共有
-  - `full`: 非公開予定・非公開タグの予定を含めてすべて共有
+- **email**: `string` - フレンドのメールアドレス
 - **createdAt**: `timestamp` - フレンド登録日時
-
-**重要**: `users/{A}/friends/{B}.shareLevel` は「AがBに対して自分の予定をどのレベルで見せるか」を意味する。`getFriendSchedules` Cloud Function はこのフィールドを参照してフィルタリングを行う。
 
 ---
 

@@ -375,7 +375,7 @@
 
 **副作用（Firestore書き込み）:**
 - `incomingRequests/{fromUserId}`・`outgoingRequests/{toUserId}` を削除
-- 双方の `friends/{相手のUID}` にドキュメントを作成（`shareLevel: "none"` で初期化）
+- 双方の `friends/{相手のUID}` にドキュメントを作成
 
 ---
 

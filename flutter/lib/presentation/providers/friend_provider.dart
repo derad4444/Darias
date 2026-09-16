@@ -177,19 +177,6 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
     }
   }
 
-  /// フレンドの共有レベルを更新
-  Future<void> updateShareLevel(String friendId, FriendShareLevel level) async {
-    if (_userId == null) return;
-    try {
-      await _firestore
-          .collection('users').doc(_userId)
-          .collection('friends').doc(friendId)
-          .update({'shareLevel': level.value});
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-    }
-  }
-
   /// 保存済み相性診断結果を取得
   Future<CompatibilityResult?> fetchCompatibilityResult({
     required String friendId,
