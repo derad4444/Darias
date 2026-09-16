@@ -36,7 +36,7 @@ class DailyMissionNotifier extends StateNotifier<AsyncValue<DailyMission>> {
       return;
     }
     try {
-      final mission = await _ds!.fetchToday();
+      final mission = await _ds.fetchToday();
       state = AsyncValue.data(mission);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
@@ -53,7 +53,7 @@ class DailyMissionNotifier extends StateNotifier<AsyncValue<DailyMission>> {
     if (_ds == null) return false;
     final before = state.valueOrNull;
     try {
-      final updated = await action(_ds!);
+      final updated = await action(_ds);
       state = AsyncValue.data(updated);
       // 新たにいずれかのミッションが達成されたか判定
       return _newlyCompleted(before, updated);

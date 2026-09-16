@@ -39,10 +39,6 @@ class _DailyMissionDialogState extends ConsumerState<_DailyMissionDialog> {
     super.dispose();
   }
 
-  void _celebrate() {
-    _confettiController.play();
-  }
-
   void _goToYesterdaySheet() {
     Navigator.pop(context);
     if (context.mounted) {

@@ -1053,7 +1053,6 @@ class _LightP5 extends CustomPainter {
     final flareAngle = t * pi * .4;
     final spread = pi * .6;
     for (int i = 0; i < _n; i++) {
-      final seed = i * 2.399;
       final ph = (t * 1.1 + i / _n) % 1.0;
       final angle = flareAngle - spread / 2 + spread * (i / _n);
       final r = s.width * (.15 + .38 * ph);

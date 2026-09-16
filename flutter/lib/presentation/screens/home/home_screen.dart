@@ -32,7 +32,6 @@ import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/daily_mission_provider.dart';
 import '../../widgets/daily_mission_sheet.dart';
 import '../../../data/models/daily_mission_model.dart';
-import '../main/main_shell_screen.dart';
 import 'chat_opener.dart';
 import '../../../data/services/analytics_service.dart';
 
