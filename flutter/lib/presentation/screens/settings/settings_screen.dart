@@ -17,6 +17,14 @@ import '../../widgets/ads/banner_ad_widget.dart';
 import '../../widgets/character_avatar_widget.dart';
 import '../../../data/services/ad_service.dart';
 import '../../../data/services/hint_service.dart';
+import 'login_methods_screen.dart';
+import 'notification_settings_screen.dart';
+import 'volume_settings_screen.dart';
+import 'theme_settings_screen.dart';
+import 'help_guide_screen.dart';
+import 'feedback_screen.dart';
+import 'terms_of_service_screen.dart';
+import 'privacy_policy_screen.dart';
 
 /// iOS版OptionViewと同じデザインの設定画面
 class SettingsScreen extends ConsumerWidget {
@@ -90,7 +98,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: 'ログイン方法',
                       subtitle: 'Google・Apple・メールの連携を管理',
                       icon: Icons.key_outlined,
-                      onTap: () => context.push('/login-methods'),
+                      onTap: () => _open(context, const LoginMethodsScreen()),
                     ),
 
                     // 通知設定
@@ -98,7 +106,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: '通知設定',
                       subtitle: '日記の通知を管理',
                       icon: Icons.notifications_outlined,
-                      onTap: () => context.push('/notification-settings'),
+                      onTap: () => _open(context, const NotificationSettingsScreen()),
                     ),
 
                     // 音量設定
@@ -106,7 +114,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: '音量設定',
                       subtitle: 'BGM・キャラクター音声の音量調整',
                       icon: Icons.volume_up_outlined,
-                      onTap: () => context.push('/volume-settings'),
+                      onTap: () => _open(context, const VolumeSettingsScreen()),
                     ),
 
                     // 背景色・文字色
@@ -114,7 +122,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: '背景色・文字色',
                       subtitle: colorSettings.useGradient ? 'グラデーション' : '一色',
                       icon: Icons.palette_outlined,
-                      onTap: () => context.push('/theme-settings'),
+                      onTap: () => _open(context, const ThemeSettingsScreen()),
                     ),
 
                     // 使い方ガイド
@@ -122,7 +130,7 @@ class SettingsScreen extends ConsumerWidget {
                       title: '使い方ガイド',
                       subtitle: '機能の説明・操作方法を確認',
                       icon: Icons.help_outline,
-                      onTap: () => context.push('/help-guide'),
+                      onTap: () => _open(context, const HelpGuideScreen()),
                     ),
 
                     const SizedBox(height: 16),
@@ -130,7 +138,7 @@ class SettingsScreen extends ConsumerWidget {
                     // SNS・サポート
                     _SocialSupportCard(
                       onInstagramTap: () => _openInstagram(),
-                      onContactTap: () => context.push('/feedback'),
+                      onContactTap: () => _open(context, const FeedbackScreen()),
                       onCompanySiteTap: () => _openCompanySite(),
                       onWebAppTap: () => _openWebApp(),
                     ),
@@ -212,11 +220,16 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   void _openTermsOfService(BuildContext context) {
-    context.push('/terms');
+    _open(context, const TermsOfServiceScreen());
   }
 
   void _openPrivacyPolicy(BuildContext context) {
-    context.push('/privacy');
+    _open(context, const PrivacyPolicyScreen());
+  }
+
+  /// タブバーを残したまま開くため、root ではなくタブ内の Navigator に積む。
+  void _open(BuildContext context, Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
   Future<void> _confirmResetDiagnosis(BuildContext context, WidgetRef ref) async {

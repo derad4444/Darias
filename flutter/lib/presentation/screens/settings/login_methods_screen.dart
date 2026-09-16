@@ -1,7 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../data/services/last_login_method.dart';
 import '../../../data/services/social_auth_service.dart';
 import '../../providers/auth_provider.dart';
@@ -226,7 +225,7 @@ class _LoginMethodsScreenState extends ConsumerState<LoginMethodsScreen> {
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => context.pop(),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text('ログイン方法', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,

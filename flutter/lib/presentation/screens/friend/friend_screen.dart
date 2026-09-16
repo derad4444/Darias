@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
@@ -61,73 +62,39 @@ class FriendScreen extends ConsumerWidget {
                       tooltip: '元素の相性について',
                       onPressed: () => _showElementChartSheet(context, accentColor),
                     ),
-                    const SizedBox(width: 8),
-                    // フレンド検索・申請管理ボタン（申請バッジ付き）
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const FriendSearchScreen()),
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: accentColor,
-                            ),
-                            child: const Icon(Icons.person_search, color: Colors.white, size: 22),
-                          ),
-                          if (pendingCount > 0)
-                            Positioned(
-                              top: -4,
-                              right: -4,
-                              child: Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: const BoxDecoration(
-                                  color: Colors.red,
-                                  shape: BoxShape.circle,
-                                ),
-                                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
-                                child: Text(
-                                  pendingCount > 99 ? '99+' : '$pendingCount',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
 
-              // フレンド一覧
+              // フレンド一覧（追加ボタンはこの領域の上に重ねる。
+              // 下のバナー広告やヘッダーに被らせないため Stack はここに置く）
               Expanded(
-                child: friendsAsync.when(
-                  loading: () => const Center(child: CircularProgressIndicator()),
-                  error: (e, _) => Center(child: Text('エラー: $e')),
-                  data: (friends) {
-                    if (friends.isEmpty) {
-                      return _EmptyFriendView(accentColor: accentColor);
-                    }
-                    return ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: friends.length,
-                      itemBuilder: (context, index) {
-                        return _FriendCard(
-                          friend: friends[index],
-                          accentColor: accentColor,
+                child: Stack(
+                  children: [
+                    friendsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('エラー: $e')),
+                      data: (friends) {
+                        if (friends.isEmpty) {
+                          return _EmptyFriendView(accentColor: accentColor);
+                        }
+                        return ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 88),
+                          itemCount: friends.length,
+                          itemBuilder: (context, index) {
+                            return _FriendCard(
+                              friend: friends[index],
+                              accentColor: accentColor,
+                            );
+                          },
                         );
                       },
-                    );
-                  },
+                    ),
+                    _DraggableFriendAddButton(
+                      accentColor: accentColor,
+                      pendingCount: pendingCount,
+                    ),
+                  ],
                 ),
               ),
               // 下部バナー広告
@@ -243,6 +210,247 @@ class _FriendCard extends ConsumerWidget {
 
 
 /// フレンドがいない時の表示
+/// フレンド追加ボタンを押したときの選択肢
+enum _FriendAddAction { search, requests }
+
+/// 「フレンドを追加」「申請の管理」を選ぶシート
+class _FriendAddActionMenu extends StatelessWidget {
+  final Color accentColor;
+  final int pendingCount;
+
+  const _FriendAddActionMenu({
+    required this.accentColor,
+    required this.pendingCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.person_add_alt_1, color: accentColor),
+              title: const Text('フレンドを追加'),
+              subtitle: const Text('IDやQRコードで探して申請する'),
+              onTap: () => Navigator.pop(context, _FriendAddAction.search),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.mail_outline, color: accentColor),
+              title: const Text('申請の管理'),
+              subtitle: const Text('受け取った申請・送った申請を確認する'),
+              trailing: pendingCount > 0
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+                      alignment: Alignment.center,
+                      child: Text(
+                        pendingCount > 99 ? '99+' : '$pendingCount',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : null,
+              onTap: () => Navigator.pop(context, _FriendAddAction.requests),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// フレンド検索・申請管理を開く丸ボタン。
+///
+/// ドラッグで好きな位置へ動かせる。位置は「置ける範囲に対する割合」で端末に保存するため、
+/// 画面サイズが違う端末や回転後でも同じ相対位置に出る。
+class _DraggableFriendAddButton extends StatefulWidget {
+  final Color accentColor;
+  final int pendingCount;
+
+  const _DraggableFriendAddButton({
+    required this.accentColor,
+    required this.pendingCount,
+  });
+
+  @override
+  State<_DraggableFriendAddButton> createState() => _DraggableFriendAddButtonState();
+}
+
+class _DraggableFriendAddButtonState extends State<_DraggableFriendAddButton> {
+  static const _prefsKeyX = 'friend_add_button_ratio_x';
+  static const _prefsKeyY = 'friend_add_button_ratio_y';
+  static const _size = 56.0;
+  static const _margin = 16.0;
+
+  /// 置ける範囲に対する割合(0.0〜1.0)。未設定のあいだは null で、既定の右下に出す。
+  Offset? _ratio;
+  bool _dragging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPosition();
+  }
+
+  Future<void> _loadPosition() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final x = prefs.getDouble(_prefsKeyX);
+      final y = prefs.getDouble(_prefsKeyY);
+      if (!mounted || x == null || y == null) return;
+      setState(() => _ratio = Offset(x.clamp(0.0, 1.0), y.clamp(0.0, 1.0)));
+    } catch (_) {
+      // 読めなければ既定位置のままでよい
+    }
+  }
+
+  /// 「フレンドを追加」か「申請の管理」かを選ばせてから遷移する。
+  Future<void> _showActionMenu() async {
+    final action = await showModalBottomSheet<_FriendAddAction>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FriendAddActionMenu(
+        accentColor: widget.accentColor,
+        pendingCount: widget.pendingCount,
+      ),
+    );
+    if (action == null || !mounted) return;
+    switch (action) {
+      case _FriendAddAction.search:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FriendSearchScreen()),
+        );
+      case _FriendAddAction.requests:
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const FriendRequestsScreen()),
+        );
+    }
+  }
+
+  Future<void> _savePosition(Offset ratio) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_prefsKeyX, ratio.dx);
+      await prefs.setDouble(_prefsKeyY, ratio.dy);
+    } catch (_) {
+      // 保存に失敗しても操作は妨げない
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // ボタンの中心が動ける幅・高さ（余白ぶんを除いた範囲）
+        final rangeX =
+            (constraints.maxWidth - _size - _margin * 2).clamp(1.0, double.infinity);
+        final rangeY =
+            (constraints.maxHeight - _size - _margin * 2).clamp(1.0, double.infinity);
+        final ratio = _ratio ?? const Offset(1, 1); // 既定は右下
+
+        return Padding(
+          padding: const EdgeInsets.all(_margin),
+          child: Align(
+            // 割合(0〜1) を Alignment(-1〜1) に変換する
+            alignment: Alignment(ratio.dx * 2 - 1, ratio.dy * 2 - 1),
+            child: GestureDetector(
+              onTap: _showActionMenu,
+              onPanStart: (_) => setState(() => _dragging = true),
+              onPanUpdate: (details) {
+                setState(() {
+                  _ratio = Offset(
+                    (ratio.dx + details.delta.dx / rangeX).clamp(0.0, 1.0),
+                    (ratio.dy + details.delta.dy / rangeY).clamp(0.0, 1.0),
+                  );
+                });
+              },
+              onPanEnd: (_) {
+                setState(() => _dragging = false);
+                final saved = _ratio;
+                if (saved != null) _savePosition(saved);
+              },
+              child: AnimatedScale(
+                scale: _dragging ? 1.1 : 1.0,
+                duration: const Duration(milliseconds: 120),
+                child: SizedBox(
+                  width: _size,
+                  height: _size,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: _size,
+                        height: _size,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: widget.accentColor,
+                          boxShadow: [
+                            BoxShadow(
+                              color:
+                                  Colors.black.withValues(alpha: _dragging ? 0.3 : 0.18),
+                              blurRadius: _dragging ? 12 : 6,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(Icons.person_search,
+                            color: Colors.white, size: 26),
+                      ),
+                      if (widget.pendingCount > 0)
+                        Positioned(
+                          top: -2,
+                          right: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints:
+                                const BoxConstraints(minWidth: 20, minHeight: 20),
+                            child: Text(
+                              widget.pendingCount > 99
+                                  ? '99+'
+                                  : '${widget.pendingCount}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _EmptyFriendView extends StatelessWidget {
   final Color accentColor;
   const _EmptyFriendView({required this.accentColor});
@@ -258,7 +466,7 @@ class _EmptyFriendView extends StatelessWidget {
           Text('フレンドがまだいません',
               style: TextStyle(fontSize: 16, color: AppColors.textLight)),
           const SizedBox(height: 8),
-          Text('右上のボタンからフレンドを検索しましょう',
+          Text('フレンド追加ボタンからフレンドを検索しましょう',
               style: TextStyle(fontSize: 13, color: AppColors.textLight.withValues(alpha: 0.7))),
         ],
       ),
@@ -267,16 +475,16 @@ class _EmptyFriendView extends StatelessWidget {
 }
 
 // ============================================================
-// 申請管理シート（受信・送信タブ）
+// 申請管理画面（受信・送信タブ）
 // ============================================================
-class FriendRequestsSheet extends ConsumerStatefulWidget {
-  const FriendRequestsSheet({super.key});
+class FriendRequestsScreen extends ConsumerStatefulWidget {
+  const FriendRequestsScreen({super.key});
 
   @override
-  ConsumerState<FriendRequestsSheet> createState() => _FriendRequestsSheetState();
+  ConsumerState<FriendRequestsScreen> createState() => _FriendRequestsScreenState();
 }
 
-class _FriendRequestsSheetState extends ConsumerState<FriendRequestsSheet>
+class _FriendRequestsScreenState extends ConsumerState<FriendRequestsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
@@ -301,31 +509,31 @@ class _FriendRequestsSheetState extends ConsumerState<FriendRequestsSheet>
 
     final incomingCount = incomingAsync.valueOrNull?.length ?? 0;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.65,
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(gradient: gradient),
+        child: SafeArea(
+          child: Column(
         children: [
-          const SizedBox(height: 12),
-          Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
+          // ヘッダー
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-            child: Text(
-              '申請管理',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: accentColor,
-              ),
+            padding: const EdgeInsets.fromLTRB(4, 12, 8, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: Icon(Icons.arrow_back_ios, color: accentColor),
+                ),
+                Text(
+                  '申請管理',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: accentColor,
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -404,6 +612,8 @@ class _FriendRequestsSheetState extends ConsumerState<FriendRequestsSheet>
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

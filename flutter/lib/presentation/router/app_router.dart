@@ -11,19 +11,11 @@ import '../screens/auth/character_gender_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
-import '../screens/settings/notification_settings_screen.dart';
-import '../screens/settings/login_methods_screen.dart';
-import '../screens/settings/theme_settings_screen.dart';
-import '../screens/settings/feedback_screen.dart';
 import '../screens/auth/forgot_password_screen.dart';
-import '../screens/history/unified_history_screen.dart';
-import '../screens/settings/volume_settings_screen.dart';
 import '../screens/settings/terms_of_service_screen.dart';
 import '../screens/settings/privacy_policy_screen.dart';
 import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
-import '../screens/settings/help_guide_screen.dart';
-import '../screens/character/personality_history_screen.dart';
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// MainShellScreen が読み取り、ホームの上に /onboarding を push した時点でクリアされる
@@ -140,26 +132,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CharacterSelectScreen(),
       ),
 
-      // 通知設定
-      // ログイン方法の管理（連携・解除）
-      GoRoute(
-        path: '/login-methods',
-        name: 'login-methods',
-        builder: (context, state) => const LoginMethodsScreen(),
-      ),
 
-      GoRoute(
-        path: '/notification-settings',
-        name: 'notification-settings',
-        builder: (context, state) => const NotificationSettingsScreen(),
-      ),
 
-      // テーマ設定
-      GoRoute(
-        path: '/theme-settings',
-        name: 'theme-settings',
-        builder: (context, state) => const ThemeSettingsScreen(),
-      ),
 
       // プレミアムアップグレード
       GoRoute(
@@ -171,22 +145,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // 性格変動履歴
-      GoRoute(
-        path: '/character/:id/personality-history',
-        name: 'personality-history',
-        builder: (context, state) {
-          final characterId = state.pathParameters['id']!;
-          return PersonalityHistoryScreen(characterId: characterId);
-        },
-      ),
 
-      // フィードバック
-      GoRoute(
-        path: '/feedback',
-        name: 'feedback',
-        builder: (context, state) => const FeedbackScreen(),
-      ),
 
       // パスワードリセット
       GoRoute(
@@ -196,31 +155,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
 
-      // 統合履歴
-      GoRoute(
-        path: '/history',
-        name: 'history',
-        builder: (context, state) {
-          final extra = state.extra;
-          final String? characterId;
-          final int initialTab;
-          if (extra is Map<String, dynamic>) {
-            characterId = extra['characterId'] as String?;
-            initialTab = extra['initialTab'] as int? ?? 0;
-          } else {
-            characterId = extra as String?;
-            initialTab = 0;
-          }
-          return UnifiedHistoryScreen(characterId: characterId, initialTab: initialTab);
-        },
-      ),
 
-      // 音量設定
-      GoRoute(
-        path: '/volume-settings',
-        name: 'volume-settings',
-        builder: (context, state) => const VolumeSettingsScreen(),
-      ),
 
       // 利用規約
       GoRoute(
@@ -253,12 +188,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
 
-      // 使い方ガイド
-      GoRoute(
-        path: '/help-guide',
-        name: 'help-guide',
-        builder: (context, state) => const HelpGuideScreen(),
-      ),
 
     ],
     errorBuilder: (context, state) => Scaffold(

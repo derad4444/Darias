@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../providers/theme_provider.dart';
 
 /// iOS版ColorSettingsViewと同じデザインのカラー設定画面
@@ -18,14 +17,14 @@ class ThemeSettingsScreen extends ConsumerWidget {
       appBar: AppBar(
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => context.pop(),
+          onPressed: () => Navigator.pop(context),
         ),
         title: Text('カラー設定', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
           TextButton(
-            onPressed: () => context.pop(),
+            onPressed: () => Navigator.pop(context),
             child: Text(
               '完了',
               style: TextStyle(

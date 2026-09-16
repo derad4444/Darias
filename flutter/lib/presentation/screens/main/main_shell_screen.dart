@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,6 +42,47 @@ class MainShellScreen extends ConsumerStatefulWidget {
 }
 
 class _MainShellScreenState extends ConsumerState<MainShellScreen> {
+  /// タブごとの画面スタック。タブの中から開いた画面もタブバーの上に載せるため、
+  /// 各タブに専用の Navigator を持たせている。
+  /// （root の Navigator に積むと画面が全面を覆い、タブバーが消えてしまう）
+  final List<GlobalKey<NavigatorState>> _tabNavigatorKeys =
+      List.generate(5, (_) => GlobalKey<NavigatorState>());
+
+  /// タブの中身を、そのタブ専用の Navigator の最初のルートとして表示する。
+  Widget _tabNavigator(int index, Widget child) {
+    return Navigator(
+      key: _tabNavigatorKeys[index],
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        settings: settings,
+        builder: (_) => child,
+      ),
+    );
+  }
+
+  /// タブをタップしたとき。同じタブをもう一度押したら、そのタブの最初の画面まで戻す。
+  void _onTabTapped(int index) {
+    if (ref.read(selectedTabProvider) == index) {
+      _tabNavigatorKeys[index].currentState?.popUntil((route) => route.isFirst);
+      return;
+    }
+    ref.read(selectedTabProvider.notifier).state = index;
+  }
+
+  /// Android の戻る操作。まず今いるタブの中を戻り、戻れなければホームタブへ、
+  /// ホームタブの最初の画面まで来ていたらアプリを閉じる。
+  void _handleSystemBack(int selectedTab) {
+    final navigator = _tabNavigatorKeys[selectedTab].currentState;
+    if (navigator != null && navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    if (selectedTab != homeTabIndex) {
+      ref.read(selectedTabProvider.notifier).state = homeTabIndex;
+      return;
+    }
+    SystemNavigator.pop();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -92,7 +134,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   Widget build(BuildContext context) {
     final selectedTab = ref.watch(selectedTabProvider);
     final accentColor = ref.watch(accentColorProvider);
-    final userAsync = ref.watch(userDocProvider);
     final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
 
     // 元素の確定・成長段階の変化・課金状態の変化に追従してセグメントを更新する
@@ -106,26 +147,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       ref.listen<AsyncValue<int>>(unreadDiaryCountProvider, (_, __) => _updateAppBadge(ref));
     }
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleSystemBack(selectedTab);
+      },
+      child: Scaffold(
       body: IndexedStack(
         index: selectedTab,
         children: [
           // homeTabIndex: ホーム
-          const HomeScreen(),
+          _tabNavigator(homeTabIndex, const HomeScreen()),
           // characterTabIndex: 詳細（キャラクター詳細）
-          userAsync.when(
-            data: (user) => CharacterDetailScreen(
-              characterId: user?.characterId ?? '',
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Center(child: Text('エラー')),
-          ),
+          _tabNavigator(characterTabIndex, const _CharacterTabRoot()),
           // friendTabIndex: フレンド
-          const FriendScreen(),
+          _tabNavigator(friendTabIndex, const FriendScreen()),
           // meetingTabIndex: 自分会議
-          const MeetingScreen(),
+          _tabNavigator(meetingTabIndex, const MeetingScreen()),
           // settingsTabIndex: 設定
-          const SettingsScreen(),
+          _tabNavigator(settingsTabIndex, const SettingsScreen()),
         ],
       ),
       // iOS風の半透明タブバー
@@ -156,7 +197,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: 'ホーム',
                       isSelected: selectedTab == homeTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = homeTabIndex,
+                      onTap: () => _onTabTapped(homeTabIndex),
                     ),
                     _TabItem(
                       icon: Icons.person_outline,
@@ -164,7 +205,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: '詳細',
                       isSelected: selectedTab == characterTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = characterTabIndex,
+                      onTap: () => _onTabTapped(characterTabIndex),
                     ),
                     _TabItem(
                       icon: Icons.people_outline,
@@ -173,7 +214,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       isSelected: selectedTab == friendTabIndex,
                       accentColor: accentColor,
                       badgeCount: pendingFriendCount,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = friendTabIndex,
+                      onTap: () => _onTabTapped(friendTabIndex),
                     ),
                     _TabItem(
                       icon: Icons.groups_outlined,
@@ -181,7 +222,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: '自分会議',
                       isSelected: selectedTab == meetingTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = meetingTabIndex,
+                      onTap: () => _onTabTapped(meetingTabIndex),
                     ),
                     _TabItem(
                       icon: Icons.settings_outlined,
@@ -189,7 +230,7 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       label: '設定',
                       isSelected: selectedTab == settingsTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = settingsTabIndex,
+                      onTap: () => _onTabTapped(settingsTabIndex),
                     ),
                   ],
                 ),
@@ -198,6 +239,27 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
           ),
         ),
       ),
+      ),
+    );
+  }
+}
+
+/// 詳細タブの中身。
+///
+/// タブ内 Navigator の最初のルートは一度しか作られないため、
+/// ログイン中ユーザーの変化に追従できるようウィジェットとして切り出している。
+class _CharacterTabRoot extends ConsumerWidget {
+  const _CharacterTabRoot();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userAsync = ref.watch(userDocProvider);
+    return userAsync.when(
+      data: (user) => CharacterDetailScreen(
+        characterId: user?.characterId ?? '',
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => const Center(child: Text('エラー')),
     );
   }
 }

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_app_badger/flutter_app_badger.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/diary_model.dart';
@@ -95,7 +94,7 @@ class _UnifiedHistoryScreenState extends ConsumerState<UnifiedHistoryScreen>
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () => Navigator.pop(context),
         ),
         title: const Text('履歴', style: TextStyle(color: AppColors.textPrimary)),
         backgroundColor: Colors.transparent,

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
@@ -11,6 +10,7 @@ import '../../widgets/dream_select_sheet.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
+import 'personality_history_screen.dart';
 
 /// Big5解析カテゴリー
 enum Big5AnalysisCategory {
@@ -269,7 +269,12 @@ class _CharacterDetailScreenState extends ConsumerState<CharacterDetailScreen> {
         leading: IconButton(
           icon: Icon(Icons.history, color: textColor),
           tooltip: '性格変動履歴',
-          onPressed: () => context.push('/character/$characterId/personality-history'),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PersonalityHistoryScreen(characterId: characterId),
+            ),
+          ),
         ),
         title: Text('キャラ詳細', style: TextStyle(color: textColor)),
         backgroundColor: Colors.transparent,

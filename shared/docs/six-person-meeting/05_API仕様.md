@@ -1,6 +1,6 @@
 # API仕様（Cloud Functions）
 
-> **最終更新**: 2026-07-20
+> **最終更新**: 2026-09-16
 
 ---
 
@@ -40,10 +40,13 @@ exports.generateOrReuseMeeting = onCall(
 {
   userId: string;         // Firebase Auth UID
   characterId: string;    // キャラクターID
-  concern: string;        // ユーザーの悩み
+  concern: string;        // ユーザーの悩み（クライアントの入力欄は最大500文字）
   concernCategory?: string; // 省略時はAIで自動判定
 }
 ```
+
+Flutter は `concernCategory` を送らない（`meeting_datasource.dart` は引数が null のとき
+パラメータ自体を付けない）ため、カテゴリ判定は実質毎回実行される。
 
 ### レスポンス
 
@@ -54,10 +57,20 @@ exports.generateOrReuseMeeting = onCall(
   conversation: Conversation,
   statsData: StatsData,
   cacheHit: boolean,    // 常に false（毎回新規生成のため）
-  usageCount: number,   // 生成した会議の利用回数（保存時は 1）
+  usageCount: number,   // 常に 2（保存時の usageCount 1 に +1 して返すため）
   duration: number,     // 処理時間(ms)
 }
 ```
+
+`usageCount` は Flutter 側で無料ユーザー向けバナーの状態（`_usageCount >= 1` で
+「利用制限に達しました」表示）に使われる。
+
+### クライアント側のエラー変換
+
+`meeting_datasource.dart` は例外メッセージに「無料ユーザーは1回のみ」「プレミアムに
+アップグレード」「プレミアムに」のいずれかが含まれる場合 `MeetingErrorType.premiumRequired`
+に変換し、画面はアップグレードダイアログを出す。それ以外は
+`MeetingErrorType.networkError` として SnackBar にメッセージを表示する。
 
 ### 処理フロー
 
@@ -149,12 +162,16 @@ async function generateConversationWithAI(concern, category, personalities, stat
 - `response_format: { type: "json_object" }` でJSON出力を強制（AI がテキストで返すバグ防止）
 - systemプロンプトでJSON専用アシスタントとして定義
 - マークダウン記法（```json）除去ロジックも実装済み
+- `max_tokens` は指定していない。出力長はプロンプトの指示（Phaseごとの発言数・
+  1発言60〜120文字・summary 200〜300文字）だけで決まる
+- OpenAIクライアントは `timeout: 60000` / `maxRetries: 3`（`clients/openai.js`）
+- JSONのパースに失敗した場合はエラーを投げる（フォールバックの会話は用意していない）
 
 ---
 
 ## 🗄️ 4. shared_meetings への保存
 
-生成した会議は `shared_meetings` コレクションに保存される。保存は履歴・分析・評価のために残っているが、後続リクエストでの再利用（読み出し）は行われない。
+生成した会議は `shared_meetings` コレクションに保存される。保存は履歴・分析のために残っているが、後続リクエストでの再利用（読み出し）は行われない。
 
 ```javascript
 const sharedMeetingRef = await db.collection("shared_meetings").add({
@@ -220,7 +237,7 @@ async function incrementMonthlyMeetingCount(userId) {
 
 ```
 shared_meetings/{id}（add）
-├── personalityKey: "O3_C3_E3_A4_N3_男性"
+├── personalityKey: "O4_C4_E2_A4_N3_female"
 ├── concernCategory: "career"
 ├── conversation: { rounds, conclusion }
 ├── statsData: { similarCount, totalUsers, ... }
@@ -233,10 +250,17 @@ users/{userId}/characters/{characterId}/meeting_history/{id}（add）
 ├── sharedMeetingId: "..."（上で生成したドキュメントID）
 ├── userConcern: "転職どうしよう"
 ├── concernCategory: "career"
-├── userBIG5: { openness: 3, ... }
+├── userBIG5: { openness: 4, ... }
 ├── cacheHit: false
 └── createdAt: Timestamp
+
+users/{userId}（update・プレミアムユーザーのみ）
+├── usage_tracking.meeting_count_this_month
+└── usage_tracking.last_meeting_month
 ```
+
+読み取りは subscription/current・details/current・PersonalityStatsMetadata/summary・
+meeting_history（全件）。無料ユーザーは meeting_history の件数集計も行う。
 
 ---
 
@@ -251,6 +275,31 @@ logger.info("Meeting generation completed", {
   sharedMeetingId,
 });
 ```
+
+---
+
+## 🔁 8. backfillSixPersonalities（スケジュール関数）
+
+`details/current` に `sixPersonalities` が無いユーザーを補完する保険処理。
+
+```javascript
+exports.backfillSixPersonalities = onSchedule(
+  {
+    schedule: "0 3 * * *",   // 毎日午前3時
+    timeZone: "Asia/Tokyo",
+    region: "asia-northeast1",
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async (event) => { ... }
+);
+```
+
+処理内容:
+- `collectionGroup("details")` を `analysis_level == 100` で検索
+- `sixPersonalities` が既にある、または `confirmedBig5Scores` が無いドキュメントはスキップ
+- `generateSixPersonalities(confirmedBig5Scores, gender || "male")` を書き込む
+- 500件ごとにバッチコミット
 
 ---
 
@@ -269,3 +318,7 @@ logger.info("Meeting generation completed", {
 ✅ プレミアムユーザー: 無制限
 ✅ 毎日3時のバックフィルスケジューラ（sixPersonalities補完）
 ```
+
+---
+
+次のステップ: コスト試算 (`06_コスト試算.md`)

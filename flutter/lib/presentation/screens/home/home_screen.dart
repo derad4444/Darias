@@ -34,6 +34,7 @@ import '../../widgets/daily_mission_sheet.dart';
 import '../../../data/models/daily_mission_model.dart';
 import 'chat_opener.dart';
 import '../../../data/services/analytics_service.dart';
+import '../history/unified_history_screen.dart';
 
 /// iOS版HomeViewと同じデザインのホーム画面
 class HomeScreen extends ConsumerStatefulWidget {
@@ -262,7 +263,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
         // 「日記を確認する」→ 履歴画面の日記タブ（index 2）を開く。
         ref.read(dailyMissionNavigationProvider.notifier).state = DailyMissionNavigation.none;
         final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
-        context.push('/history', extra: {'characterId': characterId, 'initialTab': 2});
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => UnifiedHistoryScreen(
+              characterId: characterId,
+              initialTab: 2,
+            ),
+          ),
+        );
       }
     });
 
@@ -449,7 +458,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             accentColor: accentColor,
                             isOutlined: true,
                             badgeCount: unreadDiaryCount,
-                            onTap: () => context.push('/history', extra: characterId),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    UnifiedHistoryScreen(characterId: characterId),
+                              ),
+                            ),
                           ),
                         ],
                       ),
