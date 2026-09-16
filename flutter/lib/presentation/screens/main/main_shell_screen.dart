@@ -21,8 +21,8 @@ import '../../providers/character_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../../data/services/analytics_service.dart';
 
-/// タブのインデックス。IndexedStack の children の並びと一致させること。
-/// タブバーの表示順とは別（表示順は下の _TabItem の並び）。
+/// タブのインデックス。IndexedStack の children の並びと、
+/// タブバーに並べる _TabItem の順序をこの順に揃えること。
 const int homeTabIndex = 0;
 const int characterTabIndex = 1;
 const int friendTabIndex = 2;
@@ -159,14 +159,6 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       onTap: () => ref.read(selectedTabProvider.notifier).state = homeTabIndex,
                     ),
                     _TabItem(
-                      icon: Icons.groups_outlined,
-                      selectedIcon: Icons.groups,
-                      label: '自分会議',
-                      isSelected: selectedTab == meetingTabIndex,
-                      accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = meetingTabIndex,
-                    ),
-                    _TabItem(
                       icon: Icons.person_outline,
                       selectedIcon: Icons.person,
                       label: '詳細',
@@ -182,6 +174,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       accentColor: accentColor,
                       badgeCount: pendingFriendCount,
                       onTap: () => ref.read(selectedTabProvider.notifier).state = friendTabIndex,
+                    ),
+                    _TabItem(
+                      icon: Icons.groups_outlined,
+                      selectedIcon: Icons.groups,
+                      label: '自分会議',
+                      isSelected: selectedTab == meetingTabIndex,
+                      accentColor: accentColor,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = meetingTabIndex,
                     ),
                     _TabItem(
                       icon: Icons.settings_outlined,
