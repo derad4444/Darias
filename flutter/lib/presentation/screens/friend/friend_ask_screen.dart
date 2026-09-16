@@ -297,6 +297,58 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
     );
   }
 
+  /// 質問例を選ばせて入力欄に入れる
+  Future<void> _pickExample(Color accentColor) async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(sheetContext).cardColor,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Row(
+                  children: [
+                    Text(
+                      '質問の例',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: accentColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              for (final example in _examples) ...[
+                const Divider(height: 1),
+                ListTile(
+                  dense: true,
+                  title: Text(example, style: const TextStyle(fontSize: 14)),
+                  onTap: () => Navigator.pop(sheetContext, example),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+    if (selected == null || !mounted) return;
+    _controller.text = selected;
+    _controller.selection = TextSelection.fromPosition(
+      TextPosition(offset: selected.length),
+    );
+    setState(() {});
+  }
+
   // ─────────────────────────────────────────
   // 入力セクション
   // ─────────────────────────────────────────
@@ -316,38 +368,29 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
             ),
           ),
           const SizedBox(height: 8),
-          // 例チップ
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: _examples
-                  .map((e) => Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: GestureDetector(
-                          onTap: () {
-                            _controller.text = e;
-                            _controller.selection = TextSelection.fromPosition(
-                              TextPosition(offset: e.length),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: accentColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                  color: accentColor.withValues(alpha: 0.3)),
-                            ),
-                            child: Text(
-                              e,
-                              style: TextStyle(
-                                  fontSize: 11, color: accentColor),
-                            ),
-                          ),
-                        ),
-                      ))
-                  .toList(),
+          // 質問例（選ぶと入力欄に入る）
+          InkWell(
+            onTap: () => _pickExample(accentColor),
+            borderRadius: BorderRadius.circular(10),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: accentColor.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      '質問の例から選ぶ',
+                      style: TextStyle(fontSize: 12, color: accentColor),
+                    ),
+                  ),
+                  Icon(Icons.expand_more, color: accentColor, size: 20),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
