@@ -1,3 +1,10 @@
+<!--
+  このファイルが本アプリの利用規約の正本。
+  同じ内容をアプリ内でも表示している:
+  flutter/lib/presentation/screens/settings/terms_of_service_screen.dart
+  片方だけを更新しないこと（見出し番号・文言・最終更新日を常に一致させる）。
+-->
+
 # 利用規約（Terms of Use / EULA）
 
 最終更新日: 2026年5月10日
