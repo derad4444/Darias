@@ -13,8 +13,7 @@ import '../home/home_screen.dart';
 import '../character/character_detail_screen.dart';
 import '../settings/settings_screen.dart';
 import '../friend/friend_screen.dart';
-import '../../../features/roguelike/screens/roguelike_home_screen.dart';
-import '../../../features/roguelike/widgets/adventure_door_transition.dart';
+import '../meeting/meeting_screen.dart';
 import '../settings/volume_settings_screen.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/diary_provider.dart';
@@ -22,8 +21,16 @@ import '../../providers/character_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../../data/services/analytics_service.dart';
 
+/// タブのインデックス。IndexedStack の children の並びと一致させること。
+/// タブバーの表示順とは別（表示順は下の _TabItem の並び）。
+const int homeTabIndex = 0;
+const int characterTabIndex = 1;
+const int friendTabIndex = 2;
+const int meetingTabIndex = 3;
+const int settingsTabIndex = 4;
+
 /// 現在選択されているタブのインデックス
-final selectedTabProvider = StateProvider<int>((ref) => 0);
+final selectedTabProvider = StateProvider<int>((ref) => homeTabIndex);
 
 /// iOS版と同じ5タブ構成のメイン画面
 class MainShellScreen extends ConsumerStatefulWidget {
@@ -103,9 +110,9 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       body: IndexedStack(
         index: selectedTab,
         children: [
-          // タブ0: ホーム
+          // homeTabIndex: ホーム
           const HomeScreen(),
-          // タブ1: 詳細（キャラクター詳細）
+          // characterTabIndex: 詳細（キャラクター詳細）
           userAsync.when(
             data: (user) => CharacterDetailScreen(
               characterId: user?.characterId ?? '',
@@ -113,14 +120,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const Center(child: Text('エラー')),
           ),
-          // タブ2: フレンド
+          // friendTabIndex: フレンド
           const FriendScreen(),
-          // タブ3: 冒険（ローグライク）※タブを開くと扉が開く演出を重ねる
-          const AdventureDoorTransition(
-            adventureTabIndex: 3,
-            child: RoguelikeHomeScreen(),
-          ),
-          // タブ4: 設定
+          // meetingTabIndex: 自分会議
+          const MeetingScreen(),
+          // settingsTabIndex: 設定
           const SettingsScreen(),
         ],
       ),
@@ -150,42 +154,42 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
                       icon: Icons.home_outlined,
                       selectedIcon: Icons.home,
                       label: 'ホーム',
-                      isSelected: selectedTab == 0,
+                      isSelected: selectedTab == homeTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 0,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = homeTabIndex,
                     ),
                     _TabItem(
-                      icon: Icons.explore_outlined,
-                      selectedIcon: Icons.explore,
-                      label: '冒険',
-                      isSelected: selectedTab == 3,
+                      icon: Icons.groups_outlined,
+                      selectedIcon: Icons.groups,
+                      label: '自分会議',
+                      isSelected: selectedTab == meetingTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 3,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = meetingTabIndex,
                     ),
                     _TabItem(
                       icon: Icons.person_outline,
                       selectedIcon: Icons.person,
                       label: '詳細',
-                      isSelected: selectedTab == 1,
+                      isSelected: selectedTab == characterTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 1,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = characterTabIndex,
                     ),
                     _TabItem(
                       icon: Icons.people_outline,
                       selectedIcon: Icons.people,
                       label: 'フレンド',
-                      isSelected: selectedTab == 2,
+                      isSelected: selectedTab == friendTabIndex,
                       accentColor: accentColor,
                       badgeCount: pendingFriendCount,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 2,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = friendTabIndex,
                     ),
                     _TabItem(
                       icon: Icons.settings_outlined,
                       selectedIcon: Icons.settings,
                       label: '設定',
-                      isSelected: selectedTab == 4,
+                      isSelected: selectedTab == settingsTabIndex,
                       accentColor: accentColor,
-                      onTap: () => ref.read(selectedTabProvider.notifier).state = 4,
+                      onTap: () => ref.read(selectedTabProvider.notifier).state = settingsTabIndex,
                     ),
                   ],
                 ),

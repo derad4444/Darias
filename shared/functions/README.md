@@ -78,9 +78,7 @@ if (cached === undefined) firestoreCache.set(key, value);
 - `generateCharacterReply` - キャラクターの返答生成
 - `classifyAndExtract` - チャット入力の分類とメモ/タスク/予定の抽出
 - `answerAppQuestion` - アプリの使い方への回答
-- `extractFromImage` - 画像からの情報抽出
 - `generateVoice` - テキストから音声生成
-- `generateAdventureDiagnosis` - 冒険（ローグライク）の性格診断
 - `generateOrReuseMeeting` - 6人会議の生成
 
 ### 性格解析

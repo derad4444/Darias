@@ -52,7 +52,7 @@ class _SocialSignInButtonsState extends ConsumerState<SocialSignInButtons> {
       case SocialSignInStatus.canceled:
         return;
       case SocialSignInStatus.signedIn:
-        ref.read(selectedTabProvider.notifier).state = 0;
+        ref.read(selectedTabProvider.notifier).state = homeTabIndex;
         context.go('/');
         return;
       case SocialSignInStatus.needsInitialSetup:

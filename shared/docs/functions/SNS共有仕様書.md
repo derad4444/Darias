@@ -1,6 +1,6 @@
 # DARIAS SNS共有仕様書
 
-**最終更新日**: 2026-08-10
+**最終更新日**: 2026-09-16
 
 ---
 
@@ -18,7 +18,7 @@ https://dariasapp.web.app
 ```
 
 **定数**: `lib/core/constants/app_links.dart` の `AppLinks.share`。  
-6箇所の共有テキストから参照するため、URL変更時はこの1箇所のみ修正する。
+4箇所の共有テキストから参照するため、URL変更時はこの1箇所のみ修正する。
 
 **リダイレクトページ**: リポジトリ直下の `dl/`（Firebase Hosting サイト `dariasapp`）。  
 ストアURLをそのまま載せるとiOS/Androidで出し分けが必要になるため、UA判定で振り分ける静的HTMLを1枚挟む。
@@ -94,8 +94,7 @@ await Share.share(text, sharePositionOrigin: origin);
 | `diary_share_card.dart` | `DiaryShareCard` と `buildDiaryShareText()` |
 | `compatibility_share_card.dart` | `CompatibilityShareCard` と `buildCompatibilityShareText()` |
 
-> 進化ダイアログ（`home_screen.dart`）、ローグライク結果（`roguelike_result_screen.dart`）、
-> 冒険の性格診断（`adventure_personality_tab.dart`）は個別実装のまま。
+> 進化ダイアログ（`home_screen.dart`）は個別実装のまま。
 > 配色は揃えてあるので、変更が必要になったらこの共通部品へ寄せる。
 
 ---
@@ -170,7 +169,7 @@ https://dariasapp.web.app
 #### 画像生成の仕組み
 
 画面ルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを
-`RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（進化ダイアログ・ローグライク結果と同方式）。
+`RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（進化ダイアログと同方式）。
 会話アニメーション中の画面をそのまま撮ると崩れるため、共有用のカードを別に描いている。
 カードは結論表示後（`_showConclusion == true`）にのみツリーへ追加する。
 
@@ -383,97 +382,6 @@ https://dariasapp.web.app
 
 ---
 
-### 5. ローグライク冒険結果（RoguelikeResultScreen）
-
-**ソース**: `lib/features/roguelike/screens/roguelike_result_screen.dart`
-**ボタン**: 結果画面ヘッダー右上の「シェア」ボタン（`Icons.ios_share`、`_shareButtonKey` 付き）
-**メソッド**: `_captureAndShare()`
-**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
-
-#### 画像生成の仕組み
-
-結果画面ルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを `RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（進化ダイアログと同方式）。
-
-```
-Stack
- ├── SingleChildScrollView（結果本体）
- └── Positioned(left: -9999) → RepaintBoundary(key: _shareCardKey) → _ShareCard
-```
-
-キャプチャ後は `getTemporaryDirectory()` に `darias_roguelike.png` として保存し `XFile` として渡す。
-
-#### シェアカードデザイン（`_ShareCard`・width 360）
-
-```
-┌──────────────────────────────┐
-│      心の迷宮 — Inner Quest      │
-│        「◯◯」を克服！  (リボン)   │
-│            🧑 (アバター丸)         │
-│      🏅 称号 / ◯◯              │
-│        🔥 炎タイプ              │
-│   ⚔️挑戦性86  💗利他性72  🔍好奇心64 │
-│  ┌────────────────────────┐  │
-│  │ 危ない道でも自分から踏み込 │  │  ← 日常へのヒント（短縮版）
-│  │ んでいました。それが挑戦性 │  │
-│  │ です。「やってみたいけど…  │  │
-│  └────────────────────────┘  │
-│            DARIAS              │
-└──────────────────────────────┘
-背景: パステル縦グラデ(#FFF1F6→#F1F7FF)
-```
-
-- 共有中は `_isSharing = true` → スピナー表示＋ボタン無効化（多重タップ防止）
-- iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
-- **日常へのヒント**（`TraitAdvice.messageFor(trait, compact: true)`）を最上位特性1つで載せる。
-  数値だけのカードだと共有先で意味が伝わらないため、「この人がどういう人か」が
-  一目で分かる一文を入れる。カードに収めるためテキストは短縮版を使う
-
-**共有テキスト**: `DARIAS 心の迷宮 — 「{worry}」を克服しました！\n称号「{title}」／際立った傾向: {topTrait}／元素:{element}\n#DARIAS #心の迷宮\nhttps://dariasapp.web.app`
-**ハッシュタグ**: `#DARIAS #心の迷宮`
-
----
-
-### 6. 冒険の性格診断タブ（AdventurePersonalityTab）
-
-**ソース**: `lib/features/roguelike/screens/adventure_personality_tab.dart`
-**ボタン**: 診断カード下の「シェア」ボタン（`Icons.ios_share`、`_shareButtonKey` 付き）
-**メソッド**: `_share(diagnosis)`
-**共有タイプ**: PNG画像 + テキスト（`Share.shareXFiles`）。画像取得失敗時（web等）はテキストのみにフォールバック
-
-全ダンジョン踏破後に出る総合診断（`RoguelikeDiagnosis`）を共有する。ローグライク結果画面（5番）が
-1回の冒険の結果を出すのに対し、こちらは**全踏破時の総合診断**である点が異なる。
-
-#### 画像生成の仕組み
-
-タブルートの `Stack` に、画面外（`Positioned(left: -9999)`）の静的シェアカードを
-`RepaintBoundary`（`_shareCardKey`）で配置してキャプチャする（他画面と同方式）。
-カードは `diagnosis != null` のときのみツリーへ追加する。
-
-キャプチャ後は `getTemporaryDirectory()` に `darias_diagnosis.png` として保存し `XFile` として渡す。
-
-#### シェアカードデザイン（`_ShareCard`・width 360）
-
-```
-┌──────────────────────────────┐
-│    心の迷宮 — 全踏破 総合診断     │
-│        🔥 炎タイプ              │  ← 元素絵文字＋タイプ名（無=「型なし」）
-│    挑戦性 ・ 利他性 ・ 好奇心      │  ← 上位3傾向（値>0のみ）
-│  ┌────────────────────────┐  │
-│  │ {diagnosis.summary 全文} │  │
-│  └────────────────────────┘  │
-│            DARIAS             │
-└──────────────────────────────┘
-背景: パステル縦グラデ(#FFF1F6→#F1F7FF)
-```
-
-- 共有中は `_sharing = true` → ボタンをスピナーにして無効化（多重タップ防止）
-- iOS の `sharePositionOrigin` を `_shareButtonKey` から算出して渡す
-
-**共有テキスト**: `DARIAS 心の迷宮 — 全踏破！ 私の冒険の性格診断\n「{summary}」\n#DARIAS #心の迷宮\nhttps://dariasapp.web.app`
-**ハッシュタグ**: `#DARIAS #心の迷宮`
-
----
-
 ## ハッシュタグ一覧
 
 | 機能 | ハッシュタグ |
@@ -482,8 +390,6 @@ Stack
 | 自分会議 | `#DARIAS #自分会議` |
 | 性格診断（進化ダイアログ） | `#DARIAS #性格診断` |
 | 相性診断 | `#DARIAS #相性診断` |
-| ローグライク（心の迷宮） | `#DARIAS #心の迷宮` |
-| 冒険の性格診断（全踏破） | `#DARIAS #心の迷宮` |
 
 ---
 
@@ -503,5 +409,3 @@ Stack
 | `presentation/screens/history/unified_history_screen.dart` | 会議履歴からのシェア（`_MeetingDetailSheet._shareMeeting`） |
 | `presentation/screens/home/home_screen.dart` | 進化ダイアログシェア（`_captureAndShare`、`_buildShareCard`） |
 | `presentation/screens/friend/compatibility_category_screen.dart` | 相性診断シェア（`_share`） |
-| `features/roguelike/screens/roguelike_result_screen.dart` | ローグライク結果シェア（`_captureAndShare`、`_ShareCard`・画像+テキスト） |
-| `features/roguelike/screens/adventure_personality_tab.dart` | 冒険の性格診断シェア（`_share`、`_ShareCard`・画像+テキスト） |

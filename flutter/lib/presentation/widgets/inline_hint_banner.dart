@@ -112,10 +112,6 @@ class _HomeHintBannerState extends State<HomeHintBanner>
     with SingleTickerProviderStateMixin {
   static const _steps = [
     (
-      icon: Icons.explore_outlined,
-      text: '「冒険」タブのダンジョン「心の迷宮」に挑戦。悩みを乗り越えると、あなたの選び方から心の傾向を診断します',
-    ),
-    (
       icon: Icons.help_outline,
       text: '"この機能の使い方は？"とチャットで聞くとアプリの操作方法を教えてくれます。設定 → 使い方ガイドからもいつでも確認できます',
     ),

@@ -10,7 +10,6 @@ import 'package:flutter/foundation.dart';
 enum AnalyticsFeature {
   diary('diary'),
   meeting('meeting'),
-  adventure('adventure'),
   friend('friend');
 
   const AnalyticsFeature(this.value);

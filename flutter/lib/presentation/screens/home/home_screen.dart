@@ -18,7 +18,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/chat_provider.dart';
-import '../../providers/meeting_provider.dart';
+import '../main/main_shell_screen.dart';
 import '../../../data/services/ad_service.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
@@ -69,7 +69,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     // 機能案内
     'チャットを続けると性格タイプが解析されてキャラクターが変わるよ！',
     'キャラクター詳細画面でどんな性格か確認してみてね',
-    '「冒険」タブの「心の迷宮」に挑戦すると、選択の傾向からあなたの心を診断できるよ！',
     'アプリの使い方がわからないことがあったら何でも話しかけてみて！できる限り答えるよ',
     '日記は毎日自動で書かれるよ。履歴ボタンから確認してみてね！',
     '自分会議では6人の私があなたの悩みを多角的に議論するよ。悩みがあったら試してみてね！',
@@ -319,8 +318,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
     final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
-    // 自分会議を一度も使っていない間だけ New バッジを出す（読み込み中は出さない）
-    final hasUsedMeeting = ref.watch(hasUsedMeetingProvider).valueOrNull ?? true;
     // 未読の日記の件数を履歴ボタンの右上にバッジ表示する
     final unreadDiaryCount = ref.watch(unreadDiaryCountProvider).valueOrNull ?? 0;
     final size = MediaQuery.of(context).size;
@@ -392,7 +389,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                               accentColor: accentColor,
                               onOpen: () {
                                 setState(() => _showMeetingBanner = false);
-                                context.push('/meeting');
+                                ref.read(selectedTabProvider.notifier).state =
+                                    meetingTabIndex;
                               },
                               onDismiss: () => setState(() => _showMeetingBanner = false),
                             )
@@ -404,21 +402,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Row(
                         children: [
-                          // 自分会議ボタン（signalCount >= 30 で解放。未使用のうちだけ New）
-                          _ActionButton(
-                            icon: signalCount >= 30 ? Icons.groups : Icons.lock,
-                            label: '自分会議',
-                            accentColor: accentColor,
-                            isEnabled: signalCount >= 30,
-                            showNewBadge: signalCount >= 30 && !hasUsedMeeting,
-                            onTap: () {
-                              if (signalCount >= 30) {
-                                context.push('/meeting');
-                              } else {
-                                _showMeetingLockedDialog(context, signalCount);
-                              }
-                            },
-                          ),
                           const Spacer(),
                           // デイリーミッションボタン
                           ref.watch(dailyMissionProvider).maybeWhen(
@@ -468,15 +451,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                             badgeCount: unreadDiaryCount,
                             onTap: () => context.push('/history', extra: characterId),
                           ),
-                          // [ローグライク試作] 非表示中（リリース時に復活予定）
-                          // const SizedBox(width: 8),
-                          // _ActionButton(
-                          //   icon: Icons.explore,
-                          //   label: '冒険',
-                          //   accentColor: accentColor,
-                          //   isOutlined: true,
-                          //   onTap: () => context.push('/roguelike'),
-                          // ),
                         ],
                       ),
                     ),
@@ -935,44 +909,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
     if (mounted) setState(() => _isShowingFirstDreamDialog = false);
   }
-
-  void _showMeetingLockedDialog(BuildContext context, int signalCount) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.lock, color: ref.read(accentColorProvider)),
-            const SizedBox(width: 8),
-            const Flexible(child: Text('機能がロックされています')),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('「自分会議」機能を利用するには、チャットをもう少し続けて性格タイプを確定させる必要があります。'),
-            const SizedBox(height: 16),
-            Text('現在の進捗: $signalCount / 30'),
-            const SizedBox(height: 8),
-            LinearProgressIndicator(
-              value: signalCount / 30,
-              backgroundColor: Colors.grey[200],
-              valueColor: AlwaysStoppedAnimation(ref.read(accentColorProvider)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('閉じる'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// キャラクター成長段階表示
@@ -1074,9 +1010,7 @@ class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final Color accentColor;
-  final bool isEnabled;
   final bool isOutlined;
-  final bool showNewBadge;
 
   /// 0より大きいとき、ボタン右上にアプリアイコン風の件数バッジを出す
   final int badgeCount;
@@ -1086,9 +1020,7 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.accentColor,
-    this.isEnabled = true,
     this.isOutlined = false,
-    this.showNewBadge = false,
     this.badgeCount = 0,
     required this.onTap,
   });
@@ -1119,7 +1051,7 @@ class _ActionButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: isOutlined
               ? Colors.white.withValues(alpha: 0.3)
-              : accentColor.withValues(alpha: isEnabled ? 0.85 : 0.5),
+              : accentColor.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -1146,24 +1078,6 @@ class _ActionButton extends StatelessWidget {
                 fontWeight: FontWeight.w500,
               ),
             ),
-            if (showNewBadge) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.red,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Text(
-                  'New',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
           ],
         ),
     );

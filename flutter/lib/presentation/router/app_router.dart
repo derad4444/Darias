@@ -10,7 +10,6 @@ import '../screens/auth/register_screen.dart';
 import '../screens/auth/character_gender_screen.dart';
 import '../screens/main/main_shell_screen.dart';
 import '../screens/character/character_select_screen.dart';
-import '../screens/meeting/meeting_screen.dart';
 import '../screens/premium/premium_upgrade_screen.dart';
 import '../screens/settings/notification_settings_screen.dart';
 import '../screens/settings/login_methods_screen.dart';
@@ -25,13 +24,6 @@ import '../screens/splash/splash_screen.dart';
 import '../screens/onboarding/onboarding_screen.dart';
 import '../screens/settings/help_guide_screen.dart';
 import '../screens/character/personality_history_screen.dart';
-// [ローグライク試作] 削除時はこのimport4行とルート4行を消す
-import '../../features/roguelike/screens/roguelike_game_screen.dart';
-import '../../features/roguelike/screens/roguelike_result_screen.dart';
-import '../../features/roguelike/screens/roguelike_history_screen.dart';
-import '../../features/roguelike/screens/roguelike_codex_screen.dart';
-import '../../features/roguelike/screens/roguelike_enemy_detail_screen.dart';
-import '../../features/roguelike/models/enemy.dart' show Enemy;
 
 /// 新規登録直後にオンボーディングへ誘導するフラグ
 /// MainShellScreen が読み取り、ホームの上に /onboarding を push した時点でクリアされる
@@ -112,6 +104,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
 
       // メイン（5タブ構成）
+      //
+      // タブの中身（ホーム・自分会議・詳細・フレンド・設定）は単独ルートを持たせない。
+      // 単独ルートとしても開けるようにすると、そこへ入った人はタブバーを失って
+      // 他の画面へ移動できなくなる。
       GoRoute(
         path: '/',
         name: 'main',
@@ -142,13 +138,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/character-select',
         name: 'character-select',
         builder: (context, state) => const CharacterSelectScreen(),
-      ),
-
-      // 6人会議
-      GoRoute(
-        path: '/meeting',
-        name: 'meeting',
-        builder: (context, state) => const MeetingScreen(),
       ),
 
       // 通知設定
@@ -269,42 +258,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/help-guide',
         name: 'help-guide',
         builder: (context, state) => const HelpGuideScreen(),
-      ),
-
-
-      // [ローグライク試作] 削除時はこのGoRouteを消す
-      //
-      // ダンジョン選択（RoguelikeHomeScreen）は冒険タブ（`/` のシェル内）だけに置く。
-      // 単独ルートとしても開けるようにすると、そこへ入った人はタブバーを失って
-      // 他の画面へ移動できなくなる。
-      GoRoute(
-        path: '/roguelike/game',
-        name: 'roguelike-game',
-        builder: (context, state) => const RoguelikeGameScreen(),
-      ),
-      GoRoute(
-        path: '/roguelike/result',
-        name: 'roguelike-result',
-        builder: (context, state) => const RoguelikeResultScreen(),
-      ),
-      GoRoute(
-        path: '/roguelike/history',
-        name: 'roguelike-history',
-        builder: (context, state) => const RoguelikeHistoryScreen(),
-      ),
-      GoRoute(
-        path: '/roguelike/codex',
-        name: 'roguelike-codex',
-        builder: (context, state) => const RoguelikeCodexScreen(),
-      ),
-      GoRoute(
-        path: '/roguelike/codex/enemy',
-        name: 'roguelike-codex-enemy',
-        builder: (context, state) {
-          final enemy = state.extra as Enemy?;
-          if (enemy == null) return const RoguelikeCodexScreen();
-          return RoguelikeEnemyDetailScreen(enemy: enemy);
-        },
       ),
 
     ],

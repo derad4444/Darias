@@ -96,7 +96,7 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
           ),
           child: Stack(
             children: [
-              // 画面外に静的シェアカードを配置してキャプチャする（会議・冒険と同方式）
+              // 画面外に静的シェアカードを配置してキャプチャする（会議と同方式）
               Positioned(
                 left: -9999,
                 top: 0,

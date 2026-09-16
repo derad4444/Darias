@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-09-09
+**最終更新日**: 2026-09-16
 **ランタイム**: Node.js 22
-**関数数**: 33
+**関数数**: 27
 
 ---
 
@@ -61,7 +61,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 18 関数
+### HTTP Callable (`onCall`) - 17 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -532,13 +532,13 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: memory `1GiB` / timeout `540秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **収集データ**: デイリーミッション達成状況 / チャット（`posts` を30件読み、オープナーを除いた上位5件を本文に使う）/ 6人会議（上位2件）/ 冒険＝ローグライク（上位3件）
+- **収集データ**: デイリーミッション達成状況 / チャット（`posts` を30件読み、オープナーを除いた上位5件を本文に使う）/ 6人会議（上位2件）
 - **集計範囲は JST の 0時〜24時**（修正: 2026-08-12）
   - Cloud Functions の Node は既定でUTC動作するため、`new Date().setHours(0,0,0,0)` は**UTCの0時**になる。
     以前はそれを使っていたため集計範囲が **JST 9:00〜翌9:00** となり、
-    **JST 0:00〜9:00 の会話・会議・冒険が日記に反映されていなかった**
+    **JST 0:00〜9:00 の会話・会議が日記に反映されていなかった**
     （日記の日付 `created_date` はJSTで算出していたため、範囲だけが9時間ずれていた）
-  - 現在は `created_date` と同じJST日付から範囲を作り、**チャット・会議・冒険の全ての集計で共有**する
+  - 現在は `created_date` と同じJST日付から範囲を作り、**チャット・会議の全ての集計で共有**する
   - バッチは JST 23:50 実行のため、前日分が混ざる方向のズレは元々起きていない（取りこぼしのみだった）
 - **「会話した」の判定**: `posts` のうち **`content` が空でないものだけ**を数え、1件以上のときだけ facts に載せる。
   `posts` は `content`＝ユーザー発言、`analysis_result`＝AIの返信を1ドキュメントに保存するが、
@@ -552,7 +552,7 @@ Cloud Scheduler による定期実行バッチ。
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
 - **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
-- **facts の並び順**: `デイリーミッションをクリアした` → `会話を{n}件やりとりした` → `「{悩み}」について相談した`（会議数ぶん）→ `冒険で{結果}`（最大3件）。デイリーミッションは他に何件あっても先頭に置く
+- **facts の並び順**: `デイリーミッションをクリアした` → `会話を{n}件やりとりした` → `「{悩み}」について相談した`（会議数ぶん）。デイリーミッションは他に何件あっても先頭に置く
 - **活動なし時の挙動**: 活動が無くても OpenAI API を呼び出し、キャラクターからの声がけのみの日記を保存する（`facts: []`, `ai_comment` あり）。以前は `hasActivity` フラグで API 呼び出しをスキップし `ai_comment: ""` で保存していたが、履歴に空の日記カードが並ぶため変更（2026-07-29）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
 - **生成パラメータ**: `max_tokens: 600` / `temperature: 0.8`。
@@ -748,7 +748,6 @@ shared/functions/
 │   ├── answerAppQuestion.js          # アプリ Q&A 回答
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateDiary.js              # アクティビティ型日記生成
-│   ├── generateAdventureDiagnosis.js # 冒険（ローグライク）の性格診断
 │   ├── generateCharacterDetails.js   # キャラクター属性＋夢の候補生成（性格ごとに共有）
 │   ├── generateBig5Analysis.js       # BIG5 解析テキスト生成（性格ごとに共有）
 │   ├── generatePersonalityKey.js     # personalityKey 生成（Math.round で整数化）

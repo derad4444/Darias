@@ -18,6 +18,7 @@ import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/hint_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/character_provider.dart';
 import '../../widgets/share/meeting_share_card.dart';
 import '../../widgets/share/share_card_capture.dart';
 import '../../widgets/app_review_dialog.dart';
@@ -32,10 +33,13 @@ class MeetingScreen extends ConsumerStatefulWidget {
 }
 
 class _MeetingScreenState extends ConsumerState<MeetingScreen> {
+  /// 自分会議が解放されるのに必要なシグナル数（性格タイプの確定ライン）
+  static const int _requiredSignalCount = 30;
+
   final _topicController = TextEditingController();
   final _scrollController = ScrollController();
   final _shareButtonKey = GlobalKey();
-  // 画面外に置くシェアカードのキー（進化ダイアログ・ローグライク結果と同方式）
+  // 画面外に置くシェアカードのキー（進化ダイアログと同方式）
   final _shareCardKey = GlobalKey();
   bool _isSharing = false;
   late final FocusNode _topicFocusNode;
@@ -60,7 +64,6 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
     super.initState();
     _topicController.addListener(_onTextChanged);
     _loadUsageCount();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _showHelpIfFirstVisit());
     _topicFocusNode = FocusNode(
       onKeyEvent: (node, event) {
         if (event is KeyDownEvent &&
@@ -83,6 +86,23 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
 
   void _onTextChanged() {
     setState(() {});
+  }
+
+  /// 会議を終えたあと、次にタブを開いたときトピック入力から始められるようにする。
+  /// タブの中身は破棄されないので、明示的に初期状態へ戻す必要がある。
+  void _resetToTopicInput() {
+    _animationVersion++; // 実行中のメッセージアニメーションを止める
+    _topicController.clear();
+    setState(() {
+      _meetingResponse = null;
+      _displayedMessages = [];
+      _allMessages = [];
+      _isAnimating = false;
+      _isLoading = false;
+      _showConclusion = false;
+      _concern = '';
+    });
+    _loadUsageCount();
   }
 
   Future<void> _showHelpIfFirstVisit() async {
@@ -122,14 +142,20 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   Widget build(BuildContext context) {
     final backgroundGradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
+    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+
+    // タブの中身は起動時にまとめて作られるため、初回ヘルプと使用回数の更新は
+    // 「自分会議タブが開かれた瞬間」に行う。
+    ref.listen<int>(selectedTabProvider, (prev, next) {
+      if (next != meetingTabIndex || prev == meetingTabIndex) return;
+      _showHelpIfFirstVisit();
+      _loadUsageCount();
+    });
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () => context.go('/'),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text('自分会議'),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -150,7 +176,9 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                   ? _buildLoading()
                   : _meetingResponse != null
                       ? _buildMeetingRoom(accentColor)
-                      : _buildTopicInput(accentColor),
+                      : signalCount < _requiredSignalCount
+                          ? _buildLocked(accentColor, signalCount)
+                          : _buildTopicInput(accentColor),
 
               // 画面外に静的シェアカードを配置してキャプチャする
               // （アニメーション中の画面をそのまま撮ると崩れるため、専用カードを別に描く）
@@ -176,6 +204,43 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   // ============================================================
   // Phase 1: 入力画面
   // ============================================================
+
+  /// 性格タイプが確定していないうちはトピック入力を出さず、進捗を案内する。
+  Widget _buildLocked(Color accentColor, int signalCount) {
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.lock, size: 48, color: accentColor),
+            const SizedBox(height: 16),
+            const Text(
+              'もう少しでひらきます',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '「自分会議」を利用するには、チャットをもう少し続けて性格タイプを確定させる必要があります。',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.6),
+            ),
+            const SizedBox(height: 24),
+            Text('現在の進捗: $signalCount / $_requiredSignalCount'),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: signalCount / _requiredSignalCount,
+                backgroundColor: Colors.grey.withValues(alpha: 0.3),
+                valueColor: AlwaysStoppedAnimation(accentColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildTopicInput(Color accentColor) {
     final isPremium = ref.watch(effectiveIsPremiumProvider);
@@ -685,8 +750,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                 ref.read(meetingFollowupConclusionProvider.notifier).state =
                     _meetingResponse!.conversation.conclusion.summary;
               }
-              ref.read(selectedTabProvider.notifier).state = 0;
-              context.go('/');
+              _resetToTopicInput();
+              ref.read(selectedTabProvider.notifier).state = homeTabIndex;
             },
             style: FilledButton.styleFrom(
               backgroundColor: Colors.blue.withValues(alpha: 0.85),

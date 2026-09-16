@@ -247,13 +247,12 @@ ${instruction}`;
    * Activity-based Diary Generation
    * Summarizes user's in-app activities as facts + character's encouraging comment
    */
-  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, roguelikeSummary, favoriteWord, wordTendency, dream, strength) => {
+  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, favoriteWord, wordTendency, dream, strength) => {
     const parts = [];
     // デイリーミッションの達成が一番の成果なので先頭に置く
     if (dailyMissionSummary) parts.push(`デイリーミッション: ${dailyMissionSummary}`);
     if (chatSummary) parts.push(`会話: ${chatSummary}`);
     if (meetingSummary) parts.push(`相談: ${meetingSummary}`);
-    if (roguelikeSummary) parts.push(`冒険（心の迷宮）: ${roguelikeSummary}`);
     const activitiesText = parts.length > 0 ? parts.join("\n") : "特になし";
 
     const traits = buildPersonalityTraits(big5);
@@ -292,7 +291,6 @@ ai_commentは以下のルールで250〜350文字で作成:
 - 口癖は「そのまま貼り付ける言葉」ではなく語り口の参考。相手への相づち（「面白いね！」など）や単語だけのことが多く、独白である日記に差し込むと不自然になる。文章に自然に収まるときだけ1回まで使い、収まらなければ使わなくてよい
 - 口癖や性格特性を鉤括弧で引用して本文に埋め込まない（例:「安定」を保ちながら…、のような書き方はしない）
 - 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
-- 冒険（心の迷宮）の記録があれば、その挑戦や気づき・克服に触れる
 - 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
   },
 

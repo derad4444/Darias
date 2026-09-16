@@ -45,7 +45,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       icon: Icons.local_fire_department,
       imagePath: 'assets/images/character_growth/赤ちゃん.png',
       clipImageToCircle: true,
-      // 本文が6枚の中で一番長く、既定の配置では下が切れるため詰めて上へ寄せる
+      // 本文が5枚の中で一番長く、既定の配置では下が切れるため詰めて上へ寄せる
       compactLayout: true,
       title: '30回話すと、\nあなたの元素が決まる',
       body:
@@ -56,13 +56,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       title: '迷ったら、自分に聞けばいい',
       body:
           '「今の自分」「真逆の自分」「本音の自分」\n「理想の自分」「子供の頃の自分」\n「未来の自分」。\n\n6人のあなたが、\nあなたの悩みで本気で言い争います。\n\n他人の助言より、少しだけ刺さります。',
-    ),
-    _OnboardingPage(
-      icon: Icons.explore_outlined,
-      // 全ダンジョン共通ザコの「もやもや」（enemy.dart の commonMobs）
-      imagePath: 'assets/images/roguelike_enemies/haze.png',
-      title: '悩みは、倒せる',
-      body: '「完璧主義」「孤独」「評価への恐怖」。\nあなたの悩みがダンジョンになり、\n敵として立ちはだかります。\n\nどう戦うかの選び方に、\nあなた自身の癖が表れます。',
     ),
     _OnboardingPage(
       icon: Icons.send_outlined,
@@ -149,7 +142,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                               itemCount: _pages.length,
                               onPageChanged: (i) {
                                 setState(() => _currentPage = i);
-                                // 6枚のどこで離脱しているかを見るため1枚ごとに記録する
+                                // 5枚のどこで離脱しているかを見るため1枚ごとに記録する
                                 AnalyticsService.instance.logOnboardingSlideView(slideIndex: i);
                               },
                               itemBuilder: (_, i) => _PageContent(page: _pages[i]),

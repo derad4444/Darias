@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 /// シェアカード共通の枠
 ///
 /// 幅360・パステル縦グラデ・末尾に DARIAS 表記。
-/// 進化ダイアログ（home_screen）とローグライク結果のカードも同じ配色で作られており、
+/// 進化ダイアログ（home_screen）のカードも同じ配色で作られており、
 /// 新しいカードはこの枠を使って見た目を揃える。
 class ShareCardScaffold extends StatelessWidget {
   /// カード上部の小見出し（例: '自分会議 — 6人の私'）

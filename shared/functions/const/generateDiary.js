@@ -63,7 +63,7 @@ async function generateDiary(characterId, userId) {
   //
   // Cloud Functions の Node は既定でUTC動作するため、`new Date().setHours(0,0,0,0)` は
   // **UTCの0時**になる。以前はそれを使っていたため集計範囲が JST 9:00〜翌9:00 となり、
-  // **JST 0:00〜9:00 に行った会話・会議・冒険が日記に反映されなかった**
+  // **JST 0:00〜9:00 に行った会話・会議が日記に反映されなかった**
   // （日記の日付 createdDate はJSTなので、範囲だけが9時間ずれていた）。
   //
   // createdDate と同じJSTの日付から範囲を作り、全ての集計で共有する。
@@ -117,32 +117,6 @@ async function generateDiary(characterId, userId) {
     return `・「${data.content}」`;
   }).join("\n");
 
-
-  // 今日の冒険（心の迷宮＝ローグライク）のプレイ記録（上位3件）
-  let roguelikeSummary = "";
-  const roguelikeFacts = [];
-  try {
-    const runSnap = await db.collection("users").doc(userId)
-        .collection("roguelike_runs")
-        .where("createdAt", ">=", today)
-        .where("createdAt", "<", tomorrow)
-        .orderBy("createdAt", "desc")
-        .limit(3)
-        .get();
-    roguelikeSummary = runSnap.docs.map((doc) => {
-      const d = doc.data();
-      const worry = d.worry || "悩み";
-      const resultText = d.result === "clear" ? `「${worry}」を克服した` :
-        d.result === "retreat" ? `「${worry}」から撤退した` :
-        d.result === "failed" ? `「${worry}」に挑んで力尽きた` :
-        `「${worry}」に挑戦した`;
-      const defeated = d.enemiesDefeated ? `（敵${d.enemiesDefeated}体撃破）` : "";
-      roguelikeFacts.push(`冒険で${resultText}`);
-      return `・${resultText}${defeated}`;
-    }).join("\n");
-  } catch (e) {
-    // roguelike_runs が無い/未整備の場合はスキップ
-  }
 
   // 今日のデイリーミッション達成状況
   //
@@ -223,7 +197,6 @@ async function generateDiary(characterId, userId) {
   if (dailyMissionCleared) facts.push("デイリーミッションをクリアした");
   if (chatCount > 0) facts.push(`会話を${chatCount}件やりとりした`);
   facts.push(...meetingFacts);
-  facts.push(...roguelikeFacts);
 
   // Android度を計算（協調性、外向性、神経症傾向の低さでAndroid度を判定）
   const androidScore =
@@ -256,7 +229,6 @@ async function generateDiary(characterId, userId) {
       chatSummary,
       meetingSummary,
       dailyMissionSummary,
-      roguelikeSummary,
       favoriteWord,
       wordTendency,
       dream,

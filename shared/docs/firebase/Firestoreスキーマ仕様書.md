@@ -2,9 +2,8 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-08-14
+**最終更新日**: 2026-09-16
 **トップレベルコレクション**: 11
-**主な更新**: `details/current` に `personalityKey` を明記し、保存キーとスコアがずれる条件・小数キーの是正（2026-08-14 バックフィル）を追記
 
 ---
 
@@ -310,7 +309,6 @@
 | デイリーミッション | `users/{uid}/dailyMissions/{YYYY-MM-DD}` | JSTの当日。`loginDone && chatCount >= 6 && diaryRead` で達成を判定 |
 | チャット | `users/{uid}/characters/{cid}/posts` | `timestamp` が当日（本文はAIへ上位5件。件数は `count()` で実数） |
 | 6人会議 | `users/{uid}/characters/{cid}/meeting_history` | `createdAt` が当日（上位2件） |
-| 冒険（ローグライク） | `users/{uid}/roguelike_runs` | `createdAt` が当日（上位3件） |
 
 **インデックス:**
 - `date` (DESC)
@@ -529,95 +527,6 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 - **purchase_token**: `string` - Google Play の購入トークン（Play Developer API での再検証に使用）
 
 > レシート検証（`shared/functions/validateReceipt.js`）を経由せずクライアントがフォールバック更新した場合は、`end_date` を含む上記の一部が書き込まれない。詳細は [サブスクリプション仕様書](../architecture/サブスクリプション仕様書.md) を参照。
-
----
-
-### `users/{userId}/roguelike_runs`
-
-**用途**: ローグライク冒険ゲーム「心の迷宮」の冒険履歴（試作機能）
-**ドキュメントID**: 自動採番（`add`）
-**書き込み**: 冒険終了時に結果画面で1件保存（`RoguelikeDatasource.saveRun`）
-**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
-
-**フィールド:**
-
-- **characterName**: `string` - 冒険したキャラクター名
-- **element**: `string` - 本編での元素タイプ
-- **inferredElement**: `string` - 冒険中の行動から推定した元素（「無」あり）
-- **result**: `string` - 終了種別（`clear` / `retreat` / `timeUp` / `failed`、中断時は `retreat`）
-- **title**: `string` - 獲得した称号
-- **topTrait**: `string` - 最も高かった行動特性名
-- **traits**: `map<string,int>` - 10特性のスコア
-- **growthStage**: `string` - 成長段階（`baby` / `young` / `adult`）
-- **dungeonId**: `string` - 挑戦したダンジョン（悩み）のID
-- **worry**: `string` - 挑戦した悩みの名前
-- **enemiesDefeated**: `int` - 倒した敵の数
-- **visitedCount**: `int` - 訪れたノード数（枝道式マップで通過したノードの数）
-- **finalHp / finalFood / finalMoney / finalItems / finalBond**: `int` - 終了時の各リソース（`finalItems` は回復薬の所持数。`finalBond` は相棒がいた時のみ意味を持つ。相棒不在時は0）
-- **hadCompanion**: `bool` - 冒険終了時点で相棒（仲間）がいたか
-- **companionName**: `string` - 相棒の名前（不在時は空文字）
-- **createdAt**: `timestamp` - 保存時刻（サーバ時刻）
-
-> 詳細なゲーム仕様は `shared/docs/game/ローグライク冒険ゲーム仕様書.md` を参照。
-
----
-
-### `users/{userId}/roguelike_clears`
-
-**用途**: ローグライク「心の迷宮」で**克服した悩み（ダンジョン）の記録（心の図鑑）**
-**ドキュメントID**: `dungeonId`（悩みのID。1悩み1ドキュメントで冪等）
-**書き込み**: ボス撃破でダンジョンをクリアした時に結果画面で記録（`RoguelikeDatasource.recordClear`、`set(merge:true)`）
-**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
-
-**フィールド:**
-
-- **worry**: `string` - 克服した悩みの名前
-- **clearedAt**: `timestamp` - 克服した時刻（サーバ時刻）
-
-> 用途: タイトルのダンジョン選択画面で「克服済み」表示・最終ダンジョン解禁判定に使う。
-
----
-
-### `users/{userId}/roguelike_meta/codex`
-
-**用途**: ローグライク「心の迷宮」の**図鑑（出会ったイベント・敵・獲得した称号の累積）**。結果画面の「冒険で解放したもの」表示に使う。
-**ドキュメントID**: 固定 `codex`（ユーザーごとに1件）
-**書き込み**: 冒険終了時に結果画面で `arrayUnion` 追記（`RoguelikeDatasource.recordCodex`、`set(merge:true)`）
-**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
-
-**フィールド:**
-
-- **events**: `array<string>` - 出会ったイベントIDの累積
-- **enemies**: `array<string>` - 出会った敵IDの累積
-- **titles**: `array<string>` - 獲得した称号の累積
-
-### `users/{userId}/roguelike_meta/diagnosis`
-
-**用途**: 全踏破後の**冒険の総合診断（AI生成）**。詳細画面「冒険の性格」タブに表示。
-**ドキュメントID**: 固定 `diagnosis`（ユーザーごとに1件）
-**書き込み**: 「冒険の性格」タブの生成/更新ボタンで、`generateAdventureDiagnosis`（Cloud Function）の結果を保存（`RoguelikeDatasource.saveDiagnosis`、`set(merge:true)`）
-**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加なし）
-
-**フィールド:**
-
-- **summary**: `string` - 「あなたはこういう選択を多く取る」診断文
-- **advice**: `string` - 「この傾向をこう活かす」助言文
-- **element**: `string` - 生成時の総合推定元素
-- **topTrait**: `string` - 生成時の最上位の行動特性
-- **updatedAt**: `timestamp` - 生成/更新日時
-
-### `users/{userId}/roguelike_meta/stamina`
-
-**用途**: ダンジョン挑戦の**スタミナ**（無料は基本1回＋広告で+1回＝最大2回／プレミアムは無制限）。
-**ドキュメントID**: 固定 `stamina`（ユーザーごとに1件）
-**書き込み**: 「出発する」時に記録（`RoguelikeDatasource.setStamina`）。回復判定は `basePlayAt` から**24時間経過**でクライアントが行う。広告+1回は同サイクル内で有効。
-**アクセス制御**: `users/{userId}/{subcollection=**}` ルールで本人のみ read/write（専用ルール追加不要）
-
-**フィールド:**
-
-- **basePlayAt**: `timestamp` - 基本1回を使った時刻。ここから24時間で回復（未使用/回復済みは未設定）
-- **adPlayUsed**: `bool` - 現在のサイクル（基本プレイ後24時間）で広告+1回を使ったか
-- **updatedAt**: `timestamp` - 更新日時
 
 ---
 

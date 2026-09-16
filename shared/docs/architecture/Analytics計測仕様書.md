@@ -1,7 +1,7 @@
 # Analytics計測仕様書
 
 **作成日**: 2026-08-19
-**最終更新日**: 2026-08-19
+**最終更新日**: 2026-09-16
 **対象プラットフォーム**: Flutter（iOS / Android / Web）
 
 ---
@@ -125,7 +125,6 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 |-----------|--------|
 | `diary` | `diary_provider.dart` `saveUserComment()` 成功時 |
 | `meeting` | `meeting_provider.dart` `generateOrReuseMeeting()` 成功時 |
-| `adventure` | `roguelike_provider.dart` `startGame()` |
 | `friend` | `friend_ask_screen.dart` `_onAsk()` の質問送信後 |
 
 ---

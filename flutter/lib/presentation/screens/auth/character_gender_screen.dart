@@ -35,7 +35,7 @@ class _CharacterGenderScreenState extends ConsumerState<CharacterGenderScreen> {
           .read(authControllerProvider.notifier)
           .completeInitialSetup(characterGender: _selectedGender);
       if (!mounted) return;
-      ref.read(selectedTabProvider.notifier).state = 0;
+      ref.read(selectedTabProvider.notifier).state = homeTabIndex;
       context.go('/');
     } catch (e) {
       debugPrint('初期設定エラー: $e');

@@ -54,7 +54,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           );
       if (mounted) {
         // タブをホームにリセット
-        ref.read(selectedTabProvider.notifier).state = 0;
+        ref.read(selectedTabProvider.notifier).state = homeTabIndex;
         context.go('/');
       }
     } catch (e) {
