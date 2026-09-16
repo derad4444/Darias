@@ -15,6 +15,7 @@ import '../../widgets/ads/screen_banner.dart';
 import '../../../data/services/ad_service.dart';
 import 'compatibility_category_screen.dart';
 import 'friend_ask_screen.dart';
+import 'friend_ask_history_screen.dart';
 /// カテゴリ定義
 class CompatibilityCategoryMeta {
   final String key;
@@ -76,7 +77,9 @@ class CompatibilityScreen extends ConsumerStatefulWidget {
       _CompatibilityScreenState();
 }
 
-class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
+class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   CompatibilityDocument? _document;
   bool _isInitialLoading = true;
   String? _processingCategoryKey;
@@ -92,6 +95,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    // 右上のボタンをタブに合わせて出し分けるため、切り替えを拾う
+    _tabController.addListener(() => setState(() {}));
     _loadDocument();
     _markCompatibilityNotificationRead();
     // プレミアムは広告を出さないので事前ロードもしない（無駄な広告リクエストを避ける）
@@ -146,6 +152,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
   @override
   void dispose() {
+    _tabController.dispose();
     _rewardedAdManager.dispose();
     super.dispose();
   }
@@ -439,11 +446,34 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.red),
-            onPressed: () => _confirmRemoveFriend(context, ref),
-          ),
+          if (_tabController.index == 0)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.red),
+              onPressed: () => _confirmRemoveFriend(context, ref),
+              tooltip: 'フレンドを削除',
+            )
+          else
+            IconButton(
+              icon: Icon(Icons.history, color: accentColor),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => FriendAskHistoryScreen(friend: widget.friend),
+                ),
+              ),
+              tooltip: '過去の質問',
+            ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: accentColor,
+          unselectedLabelColor: accentColor.withValues(alpha: 0.5),
+          indicatorColor: accentColor,
+          tabs: const [
+            Tab(text: '相性診断'),
+            Tab(text: '聞いてみる'),
+          ],
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(gradient: gradient),
@@ -452,7 +482,11 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
             children: [
               ScreenBanner(adUnitId: AdConfig.friendDetailTopBannerAdUnitId),
               Expanded(
-                child: _isInitialLoading
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // 相性診断タブ
+                    _isInitialLoading
               ? Center(child: CircularProgressIndicator(color: accentColor))
               : ListView(
                   physics: const BouncingScrollPhysics(),
@@ -586,9 +620,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
                       _buildOverallCard(accentColor),
                     ],
 
-                    // フレンドに聞くボタン
-                    const SizedBox(height: 20),
-                    _buildAskButton(accentColor),
+                  ],
+                ),
+                    // 聞いてみるタブ
+                    FriendAskView(friend: widget.friend),
                   ],
                 ),
               ),
@@ -602,34 +637,6 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen> {
 
   bool get _isAllUnlocked =>
       kCompatibilityCategories.every((c) => _isUnlocked(c.key));
-
-  // ─────────────────────────────────────────
-  // フレンドに聞くボタン
-  // ─────────────────────────────────────────
-  Widget _buildAskButton(Color accentColor) {
-    final friendName = widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
-    return OutlinedButton.icon(
-      onPressed: () => Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => FriendAskScreen(friend: widget.friend),
-        ),
-      ),
-      icon: const Text('💬', style: TextStyle(fontSize: 16)),
-      label: Text(
-        '$friendNameのことを聞いてみる',
-        style: TextStyle(fontSize: 14, color: accentColor),
-      ),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 48),
-        side: BorderSide(color: accentColor.withValues(alpha: 0.5)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        backgroundColor: Colors.white.withValues(alpha: 0.7),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────
 
   // ─────────────────────────────────────────
   // アバター行

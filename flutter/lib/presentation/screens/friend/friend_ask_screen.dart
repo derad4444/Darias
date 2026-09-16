@@ -10,22 +10,23 @@ import '../../providers/theme_provider.dart';
 import '../../providers/friend_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../providers/ad_provider.dart';
-import '../../widgets/character_avatar_widget.dart';
 import 'compatibility_category_screen.dart' show CompatibilityChatBubble;
-import 'friend_ask_history_screen.dart';
 import '../../../data/services/analytics_service.dart';
 
-/// フレンドについてキャラクター会話形式で質問する画面
-class FriendAskScreen extends ConsumerStatefulWidget {
+/// フレンドについてキャラクター会話形式で質問するビュー。
+///
+/// フレンド詳細画面（`CompatibilityScreen`）の「聞いてみる」タブの中身として使う。
+/// 背景・AppBar・過去の質問への導線は親が持つ。
+class FriendAskView extends ConsumerStatefulWidget {
   final FriendModel friend;
 
-  const FriendAskScreen({super.key, required this.friend});
+  const FriendAskView({super.key, required this.friend});
 
   @override
-  ConsumerState<FriendAskScreen> createState() => _FriendAskScreenState();
+  ConsumerState<FriendAskView> createState() => _FriendAskViewState();
 }
 
-class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
+class _FriendAskViewState extends ConsumerState<FriendAskView> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   bool _isLoading = false;
@@ -235,62 +236,13 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
     final myUserId = ref.watch(currentUserIdProvider) ?? '';
     final myName = ref.watch(userDocProvider).valueOrNull?.name ?? '自分';
     final friendName =
         widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
 
-    return Scaffold(
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        leading: IconButton(
-          onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.arrow_back_ios, color: accentColor),
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            CharacterAvatarWidget(
-              userId: widget.friend.id,
-              size: 28,
-              fallbackText: friendName.isNotEmpty ? friendName[0] : '?',
-              fallbackBackgroundColor: Colors.indigo.withValues(alpha: 0.2),
-              fallbackTextColor: Colors.indigo,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '$friendNameのことを聞く',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: accentColor,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => FriendAskHistoryScreen(friend: widget.friend),
-                ),
-              );
-            },
-            icon: Icon(Icons.history, color: accentColor),
-            tooltip: '過去の質問',
-          ),
-        ],
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Container(
-        decoration: BoxDecoration(gradient: gradient),
-        child: SafeArea(
-          child: Column(
+    return Column(
             children: [
               // ── 入力エリア ──
               _buildInputSection(accentColor, friendName),
@@ -342,9 +294,6 @@ class _FriendAskScreenState extends ConsumerState<FriendAskScreen> {
                 ),
               ),
             ],
-          ),
-        ),
-      ),
     );
   }
 
