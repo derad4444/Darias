@@ -132,7 +132,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           ),
           SizedBox(height: 24),
           Text(
-            '最終更新日：2026年8月19日',
+            '最終更新日：2026年9月16日',
             style: TextStyle(fontSize: 12, color: AppColors.textLight),
           ),
           SizedBox(height: 40),

@@ -119,7 +119,7 @@ class ChatDatasource {
   }
 
   /// メッセージを送信して検出結果も含めて返す
-  /// AIによる分類 → memo/task/schedule/app_qa/chat にルーティング
+  /// AIによる分類 → app_qa/chat にルーティング
   Future<SendMessageResult> sendMessageWithScheduleDetection({
     required String userId,
     required String characterId,

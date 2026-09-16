@@ -10,9 +10,6 @@ import 'package:flutter/foundation.dart';
 enum AnalyticsFeature {
   diary('diary'),
   meeting('meeting'),
-  todo('todo'),
-  calendar('calendar'),
-  memo('memo'),
   adventure('adventure'),
   friend('friend');
 

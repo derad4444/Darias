@@ -7,11 +7,9 @@ class HintService {
 
   // ── キー定義 ──────────────────────────────────────────
   static const kHome = 'home';
-  static const kMemo = 'memo';
   static const kMeeting = 'meeting';
   static const kFriend = 'friend';
   static const kCompatibility = 'compatibility';
-  static const kCalendarDiary = 'calendar_diary';
 
   final String userId;
 

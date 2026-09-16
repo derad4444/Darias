@@ -683,7 +683,7 @@ REST API として直接アクセス可能。
 #### 29. `recalculatePersonalityStats`
 - **ソース**: `const/recalculatePersonalityStats.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。Google Spreadsheet の Apps Script から呼び出される
+- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。定期実行はなく、必要なときに管理者がエンドポイントを直接呼び出す
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **認証**: なし（集計データのみ・機密情報なし）

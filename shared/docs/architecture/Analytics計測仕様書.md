@@ -125,9 +125,6 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 |-----------|--------|
 | `diary` | `diary_provider.dart` `saveUserComment()` 成功時 |
 | `meeting` | `meeting_provider.dart` `generateOrReuseMeeting()` 成功時 |
-| `todo` | `todo_provider.dart` `addTodo()` 成功時 |
-| `calendar` | `calendar_provider.dart` `addSchedule()` 成功時 |
-| `memo` | `memo_provider.dart` `addMemo()` 成功時 |
 | `adventure` | `roguelike_provider.dart` `startGame()` |
 | `friend` | `friend_ask_screen.dart` `_onAsk()` の質問送信後 |
 
