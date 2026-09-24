@@ -53,3 +53,8 @@ functions/keys/
 *.mobileprovision
 *.cer
 *.p12
+
+# ストア画像の素材と成果物（容量が大きいためGit管理しない）
+# 生成スクリプトも含めてローカルのみ。場所と使い方は
+# shared/docs/release/リリース手順書.md を参照
+画像/
