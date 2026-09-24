@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-09-16
+**最終更新日**: 2026-09-24
 **トップレベルコレクション**: 11
 
 ---
@@ -44,7 +44,7 @@
   - **last_meeting_month**: `string` - 最後に会議を利用した月（YYYY-MM形式）。現在月と異なる場合はカウントをリセット
 - **lastLoginAt**: `timestamp` - 最終ログイン日時。アプリ起動時に Flutter クライアント（`lastLoginAtSyncProvider`）が `FieldValue.serverTimestamp()` で書き込む。`scheduledDiaryGeneration` が7日以上未更新のユーザーの日記生成をスキップする際に参照。フィールドなしの既存ユーザーはスキップ対象外
 - **fcmToken**: `string` - Firebase Cloud Messaging デバイストークン。ログイン後・通知許可付与後に `notification_service.dart` の `saveFcmToken()` が書き込む。`scheduledDiaryGeneration` が日記生成後にFCMプッシュ通知を送信する際に参照。トークンはデバイス再インストールや OS の更新で変わるため `onTokenRefresh` で自動更新。フィールドなしの場合は通知を送信しない
-- **diaryNotificationsEnabled**: `boolean` - 日記通知のON/OFF設定。通知設定画面のトグルで書き込み（デフォルト: フィールドなし = 通知ON扱い）。`scheduledDiaryGeneration` が `false` の場合はFCM通知をスキップ
+- **diaryNotificationsEnabled**: `boolean` - **キャラクターからの通知**（日記・今週のふりかえり）のON/OFF設定。通知設定画面のトグルで書き込み（デフォルト: フィールドなし = 通知ON扱い）。`scheduledDiaryGeneration`（毎日23:50）と `generatePersonalityNarrative`（日曜9:00）が `false` の場合はFCM通知をスキップする。フィールド名は日記通知のみだった頃の互換のため据え置いている
 
 **アクセス権限**: ユーザー自身のデータのみ読み書き可
 
@@ -147,6 +147,26 @@
 **なぜ `details` と分けているか**: `details` は firestore.rules でフレンドのアバター表示のため認証済みユーザーの単体取得が許可されている。夢はユーザーが自由入力でき、かつ他ユーザーが参照する必要がないため、本人限定ルール（`users/{userId}/{subcollection=**}`）が適用されるこのサブコレクションに置く。
 
 **`dream` は再生成で上書きされない**: 性格タイプが変わって候補が作り直されても、ユーザーが選んだ夢はそのまま維持される。詳細は [性格解析仕様書の夢の選択フロー](../functions/性格解析仕様書.md#夢の選択フロー) を参照。
+
+#### `users/{userId}/characters/{characterId}/memory`
+
+**ドキュメントID**: `current` (固定)
+**用途**: キャラクターが覚えていること（本人限定）。チャットに渡る会話履歴は直近2往復しかないため、昨日以前の話題はここでしか思い出せない
+
+**フィールド:**
+
+- **items**: `array<map>` - 記憶。**新しい順、最大10件**。超えた古い記憶は捨てる
+  - **text**: `string` - 記憶の内容（最大40文字）
+  - **date**: `string` - 記憶した日（`YYYY-MM-DD`・JST）
+- **opener**: `string` - 翌朝ホーム画面でキャラクターが話しかける問いかけ（最大40文字）。例:「昨日言ってた面接、どうだった？」
+- **openerDate**: `string` - `opener` を表示する日（`YYYY-MM-DD`・JST）。この日以外は表示しない
+- **updated_at**: `timestamp` - 更新日時
+
+**誰が書くか**: `generateDiary`（毎晩23:50 JST）のみ。日記と同じ1回のAI呼び出しで `ai_comment`・`memories`・`opener` を生成するため、**AI呼び出しは増えていない**。クライアントは読み取りのみ。
+
+**なぜ `details` と分けているか**: 夢と同じ理由。`details` は認証済みユーザーの単体取得が許可されているが、記憶はユーザーの発言から作られる私的な内容のため、本人限定ルール（`users/{userId}/{subcollection=**}`）が適用されるサブコレクションに置く。`firestore.rules` の変更は不要。
+
+**件数が固定である理由**: 記憶はチャットのプロンプトに毎回載る（最大5件）。無制限に貯めるとプロンプトが伸び続けてコストが肥大化するため、保持10件・プロンプト5件で頭打ちにしている。詳細は [チャット機能仕様書のキャラクターの記憶](../functions/チャット機能仕様書.md#キャラクターの記憶) を参照。
 
 #### `users/{userId}/characters/{characterId}/personalityHistory`
 
@@ -780,6 +800,10 @@ users/{userId}
 │   │   ├── dreamOptions []        ← 候補5個
 │   │   ├── dreamSource            ← "user" / "ai"
 │   │   └── pendingDreamProposal   ← 新候補ができたことを示すフラグ
+│   ├── memory/current             ← 覚えていること（本人限定。generateDiary が書く）
+│   │   ├── items []               ← {text, date} 最大10件・新しい順
+│   │   ├── opener                 ← 翌朝の問いかけ
+│   │   └── openerDate             ← opener を出す日（JST）
 │   ├── big5Progress/current
 │   ├── posts/{docId}
 │   ├── meeting_history/{docId}

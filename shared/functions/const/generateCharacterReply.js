@@ -5,6 +5,7 @@ const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS, buildPersonalityTraitsFromAxes} = require("../src/prompts/templates");
 const firestoreCache = require("../src/utils/firestoreCache");
 const {getDream} = require("../src/utils/dreamStore");
+const {getMemory, formatMemoriesForPrompt} = require("../src/utils/memoryStore");
 
 // 感情判定関数
 async function detectEmotion(openai, messageText) {
@@ -83,7 +84,7 @@ function getMaxTokensForPhase(phase) {
 }
 
 // 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
-function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null) {
+function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null) {
   // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -109,7 +110,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingConte
   }
 
   // BIG5詳細形式を使用した新しいプロンプト（5軸スコアがある場合はtraitsOverrideを優先）
-  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext);
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext, memoryContext);
 }
 
 // 無意味な入力を検出する関数
@@ -249,9 +250,21 @@ exports.generateCharacterReply = onCall(
         `なお、このキャラクターの夢は「${dreamValue}」です。` :
         "なお、このキャラクターの夢はまだ決まっていません。";
 
+        // キャラクターが覚えていること（日記生成時に抽出したもの）。
+        // 会話履歴は直近2往復しか渡していないため、昨日以前の話はここでしか思い出せない。
+        // 件数を固定しているので、使い続けてもプロンプトは伸びない。
+        const memoryCacheKey = `memory_${userId}_${characterId}`;
+        let memoryContext = firestoreCache.get(memoryCacheKey);
+        if (memoryContext === undefined) {
+          const memory = await getMemory(userId, characterId);
+          memoryContext = formatMemoriesForPrompt(memory.items);
+          firestoreCache.set(memoryCacheKey, memoryContext);
+        }
+
         // Android度を計算し、プロンプトを生成（5軸スコアがある場合は5軸特性を優先）
         const prompt = buildCharacterPrompt(
-            big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase, openerContext);
+            big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase, openerContext,
+            memoryContext || null);
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 

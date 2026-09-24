@@ -26,6 +26,7 @@ import '../../providers/diary_provider.dart';
 import '../../providers/dream_provider.dart';
 import '../../widgets/dream_select_sheet.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../../data/services/notification_service.dart';
 import '../../../data/services/voice_service.dart';
 import '../../providers/subscription_provider.dart';
 import '../../widgets/character/element_effect_widget.dart';
@@ -63,6 +64,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   String _openerLoadedDate = '';
   // 会話のきっかけテキスト（AIに文脈として渡す）
   String? _openerContext;
+  // 通知タップの監視（dispose で外すため保持する）
+  late final VoidCallback _notificationListener;
 
 
   /// 初期メッセージリスト
@@ -102,11 +105,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     } else {
       _displayedMessage = _initialMessages[Random().nextInt(_initialMessages.length)];
     }
+    // 通知タップの遷移。アプリ起動中のタップはリスナーで、
+    // 通知から起動した場合は下のポストフレームで拾う。
+    _notificationListener = () => _handleTappedNotification();
+    NotificationService.tappedNotificationType.addListener(_notificationListener);
+
     // スマートオープナーをポストフレームで非同期ロード
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _handleTappedNotification();
       await _loadChatOpener();
       await _checkAndShowDailyMission();
     });
+  }
+
+  /// 通知タップの遷移先へ移動する
+  ///
+  /// - `diary`（日記を書きました） → 履歴画面の日記タブ
+  /// - `weekly`（今週のふりかえり） → ホーム画面（タブを戻すだけ）
+  ///
+  /// 遷移を NotificationService 側でやらないのは、アプリ終了状態から通知で
+  /// 起動したときにまだ Navigator も Riverpod のスコープも無いため。
+  Future<void> _handleTappedNotification() async {
+    final type = NotificationService.tappedNotificationType.value;
+    if (type == null || type.isEmpty || !mounted) return;
+    // 同じ通知で二度遷移しないよう、先に消費する
+    NotificationService.tappedNotificationType.value = null;
+
+    // どの通知から来てもまずホームタブに戻す
+    ref.read(selectedTabProvider.notifier).state = homeTabIndex;
+
+    if (type != 'diary') return;
+
+    final characterId = await _waitForCharacterId();
+    if (!mounted || characterId.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => UnifiedHistoryScreen(
+          characterId: characterId,
+          initialTab: 2,
+        ),
+      ),
+    );
   }
 
   @override
@@ -127,7 +167,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final now = DateTime.now();
     _openerLoadedDate = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final userId = ref.read(currentUserIdProvider) ?? '';
-    final opener = await computeChatOpener(userId: userId);
+    // 記憶から作られたオープナーを読むために characterId が要る
+    final characterId = await _waitForCharacterId();
+    if (!mounted) return;
+    final opener = await computeChatOpener(
+      userId: userId,
+      characterId: characterId,
+    );
     if (mounted) {
       setState(() {
         _displayedMessage = opener.text;
@@ -159,6 +205,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
   }
 
+  /// userDocProvider のロードを最大3秒待って characterId を返す
+  ///
+  /// 起動直後は userDoc がまだ届いていないことがある。取れなければ空文字を返し、
+  /// 呼び出し側はその処理を諦める（次の起動でやり直す）。
+  Future<String> _waitForCharacterId() async {
+    String characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+    if (characterId.isNotEmpty) return characterId;
+    for (int i = 0; i < 6 && mounted; i++) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
+      if (characterId.isNotEmpty) break;
+    }
+    return characterId;
+  }
+
   Future<void> _saveOpenerIfNeeded(String openerText) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -167,15 +228,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       final savedDate = prefs.getString('chat_opener_saved_date') ?? '';
       if (savedDate == today) return;
 
-      // userDocProvider がまだロード中の場合、最大3秒待つ
-      String characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
-      if (characterId.isEmpty) {
-        for (int i = 0; i < 6 && mounted; i++) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
-          if (characterId.isNotEmpty) break;
-        }
-      }
+      final characterId = await _waitForCharacterId();
       if (characterId.isEmpty) return;
 
       await ref.read(chatControllerProvider.notifier).saveOpener(
@@ -191,6 +244,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void dispose() {
     _loadingDotsTimer?.cancel();
+    NotificationService.tappedNotificationType
+        .removeListener(_notificationListener);
     WidgetsBinding.instance.removeObserver(this);
     _chatController.dispose();
     super.dispose();

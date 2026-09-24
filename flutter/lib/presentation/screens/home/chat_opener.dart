@@ -1,8 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 
 
-enum OpenerType { previousQuestion, daily }
+enum OpenerType { memory, previousQuestion, daily }
 
 class ChatOpener {
   final String text;
@@ -12,6 +14,7 @@ class ChatOpener {
 
 String _sharedPrefKeyQuestion(String userId) => 'chat_last_question_$userId';
 String _sharedPrefKeyUsed(String userId) => 'chat_question_used_$userId';
+String _sharedPrefKeyMemoryUsed(String userId) => 'memory_opener_used_date_$userId';
 
 // バリエーション豊富なデイリープロンプト（日付ハッシュで毎日1つ選ぶ）
 const List<String> dailyPrompts = [
@@ -72,9 +75,23 @@ const List<String> dailyPrompts = [
   '最近、誰かの言葉で心に残ったものある？',
 ];
 
-/// 優先度 F → A でオープナーを決定する
-Future<ChatOpener> computeChatOpener({required String userId}) async {
+/// 優先度 M → F → A でオープナーを決定する
+///
+/// [characterId] を渡すと、前夜の日記生成で用意された「昨日の続き」の問いかけ
+/// （M）を最優先で使う。取得できない場合は従来の F → A にフォールバックする。
+Future<ChatOpener> computeChatOpener({
+  required String userId,
+  String? characterId,
+}) async {
   final today = DateTime.now();
+
+  // M: 日記生成が用意した、昨日までの話題に触れる問いかけ
+  if (userId.isNotEmpty && characterId != null && characterId.isNotEmpty) {
+    final memoryOpener = await _fetchMemoryOpener(userId, characterId);
+    if (memoryOpener != null) {
+      return ChatOpener(type: OpenerType.memory, text: memoryOpener);
+    }
+  }
 
   // F: 使用済みでない前回の問いがある
   final prefs = await SharedPreferences.getInstance();
@@ -93,6 +110,48 @@ Future<ChatOpener> computeChatOpener({required String userId}) async {
   final dayIndex = today.difference(DateTime(2024, 1, 1)).inDays.abs();
   final prompt = dailyPrompts[dayIndex % dailyPrompts.length];
   return ChatOpener(type: OpenerType.daily, text: prompt);
+}
+
+/// 前夜の日記生成が用意したオープナーを取得する
+///
+/// `memory/current.opener` は「いつ出すか」を `openerDate`（JSTの YYYY-MM-DD）
+/// で持っている。その日のうちに1回だけ使い、使ったことは端末側に記録する
+/// （Firestoreを書き換えないので、機内モードや読み取り失敗でも壊れない）。
+///
+/// 取得できない場合は null を返し、呼び出し側が従来のオープナーへ進む。
+Future<String?> _fetchMemoryOpener(String userId, String characterId) async {
+  final now = DateTime.now();
+  final today = '${now.year}-'
+      '${now.month.toString().padLeft(2, '0')}-'
+      '${now.day.toString().padLeft(2, '0')}';
+
+  final prefs = await SharedPreferences.getInstance();
+  // 今日はもう出した
+  if (prefs.getString(_sharedPrefKeyMemoryUsed(userId)) == today) return null;
+
+  try {
+    final snap = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .collection('characters')
+        .doc(characterId)
+        .collection('memory')
+        .doc('current')
+        .get();
+    if (!snap.exists) return null;
+
+    final data = snap.data();
+    final opener = (data?['opener'] as String? ?? '').trim();
+    final openerDate = data?['openerDate'] as String? ?? '';
+    // 日付が違うものは出さない（前に使い残したオープナーを何日も出さないため）
+    if (opener.isEmpty || openerDate != today) return null;
+
+    await prefs.setString(_sharedPrefKeyMemoryUsed(userId), today);
+    return opener;
+  } catch (e) {
+    debugPrint('記憶オープナーの取得に失敗: $e');
+    return null;
+  }
 }
 
 /// AI返答の末尾から問いかけ文を抽出してSharedPreferencesに保存する

@@ -1336,7 +1336,7 @@ class _DiaryHistoryTabState extends ConsumerState<_DiaryHistoryTab> {
                 return _EmptyState(
                   icon: Icons.menu_book_outlined,
                   title: '日記がありません',
-                  subtitle: '毎日23:55に日記が届きます',
+                  subtitle: '毎日23:50頃に日記が届きます',
                   accentColor: widget.accentColor,
                 );
               }

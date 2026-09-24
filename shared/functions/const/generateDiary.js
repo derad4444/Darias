@@ -4,6 +4,14 @@ const admin = require("firebase-admin");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 const {getDream} = require("../src/utils/dreamStore");
+const {
+  MEMORY_MAX_ITEMS,
+  getMemory,
+  formatMemoriesForPrompt,
+  normalizeMemories,
+  saveMemory,
+  OPENER_MAX_LENGTH,
+} = require("../src/utils/memoryStore");
 
 // Firebase Admin初期化（デフォルトアプリの存在を確認して初期化）
 try { admin.app(); } catch (e) { admin.initializeApp(); }
@@ -221,6 +229,11 @@ async function generateDiary(characterId, userId) {
   // （プロンプト側の「活動がない場合は性格特性に基づいた温かい声がけ」指示を使う）
   // facts は実データから組み立てているため、活動がない日は空配列のままになる。
 
+  // これまでキャラクターが覚えていること。
+  // 同じ記憶を何度も作らせないよう、既に覚えている内容をプロンプトに渡す。
+  const memory = await getMemory(userId, characterId);
+  const memorySummary = formatMemoriesForPrompt(memory.items, MEMORY_MAX_ITEMS);
+
   // アクティビティベースのプロンプト作成
   const prompt = OPTIMIZED_PROMPTS.activityDiary(
       characterType,
@@ -233,6 +246,7 @@ async function generateDiary(characterId, userId) {
       wordTendency,
       dream,
       strength,
+      memorySummary,
   );
 
   // OpenAI呼び出し
@@ -243,13 +257,33 @@ async function generateDiary(characterId, userId) {
   // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
   const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
 
-  // AIが返すのは ai_comment のみ。facts は上でFirestoreの実データから組み立て済み。
+  // AIが返すのは ai_comment・memories・opener の3つ。
+  // facts は上でFirestoreの実データから組み立て済み。
   //
   // **壊れた出力を絶対にユーザーへ出さない。**
   // 以前は JSON.parse に失敗すると生の応答をそのまま ai_comment にしていたため、
   // モデルが暴走したときの多言語トークンの羅列が日記に保存されていた。
   // 1度だけ再試行し、それでも駄目なら安全な定型文にする。
-  const aiComment = await requestAiComment(openai, model, prompt);
+  const {comment: aiComment, memories, opener} =
+    await requestAiComment(openai, model, prompt);
+
+  // キャラクターが覚えていることと、翌日の問いかけを保存する。
+  // 日記と同じ1回の生成で得ているため、AI呼び出しは増えていない。
+  try {
+    await saveMemory(userId, characterId, {
+      newMemories: memories,
+      existingItems: memory.items,
+      date: createdDate,
+      // 記憶に残ることが何も無かった日はオープナーを保存しない。
+      // 具体的な話題に触れないオープナーしか作れないなら、
+      // クライアントが持つ47種のデイリープロンプトのほうが練られているため。
+      opener: memories.length > 0 ? opener : "",
+      openerDate: nextDate(createdDate),
+    });
+  } catch (e) {
+    // 記憶を保存できなくても日記は残す
+    console.warn("記憶の保存に失敗:", e.message);
+  }
 
   // Firestoreに保存
   const diaryRef = db.collection("users").doc(userId)
@@ -302,13 +336,32 @@ function isUsableComment(text) {
 }
 
 /**
- * ai_comment をAIに生成させる。壊れていたら1度だけ再試行し、
+ * YYYY-MM-DD の翌日を返す（オープナーを出す日の算出に使う）
+ * @param {string} date 基準日（YYYY-MM-DD）
+ * @return {string} 翌日（YYYY-MM-DD）
+ */
+function nextDate(date) {
+  const [y, m, d] = date.split("-").map(Number);
+  // 月末・年末をまたぐ計算は Date に任せる（UTCで組み立てるのでTZの影響を受けない）
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return `${next.getUTCFullYear()}-` +
+    `${String(next.getUTCMonth() + 1).padStart(2, "0")}-` +
+    `${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+/**
+ * ai_comment・memories・opener をAIに生成させる。壊れていたら1度だけ再試行し、
  * それでも駄目なら安全な定型文を返す（生の応答は絶対に返さない）。
+ *
+ * 判定の基準は ai_comment だけ。memories と opener は日記本文と違って
+ * ユーザーへ即座に出るものではなく、欠けても空で保存すれば済むため、
+ * これらが空でも再試行はしない。
  *
  * @param {object} openai OpenAIクライアント
  * @param {string} model モデル名
  * @param {string} prompt プロンプト
- * @return {Promise<string>} 日記に載せるコメント
+ * @return {Promise<{comment: string, memories: string[], opener: string}>}
+ *   日記に載せるコメントと、記憶・翌日の問いかけ
  */
 async function requestAiComment(openai, model, prompt) {
   for (let attempt = 1; attempt <= 2; attempt++) {
@@ -318,22 +371,29 @@ async function requestAiComment(openai, model, prompt) {
         messages: [{role: "user", content: prompt}],
         response_format: {type: "json_object"},
         // 上限を切らないと暴走時に延々と生成し続ける。
-        // ai_comment は250〜350文字（日本語 ~1.5chars/token）なので 600 で十分。
-        max_tokens: 600,
+        // ai_comment は250〜350文字（日本語 ~1.5chars/token）で 600、
+        // memories（40字×3）と opener（40字）の分を足して 800 にしている。
+        max_tokens: 800,
         // 既定の 1.0 は出力が不安定になりやすい。日記は堅実さを優先する。
         temperature: 0.8,
       });
 
       const raw = (response.choices[0].message.content || "").trim();
       let comment = "";
+      let memories = [];
+      let opener = "";
       try {
         const parsed = JSON.parse(raw);
         comment = typeof parsed.ai_comment === "string" ? parsed.ai_comment : "";
+        memories = normalizeMemories(parsed.memories);
+        opener = sanitizeOpener(parsed.opener);
       } catch (e) {
         console.warn(`日記コメントのJSON解析に失敗 (${attempt}回目):`, e.message);
       }
 
-      if (isUsableComment(comment)) return comment.trim();
+      if (isUsableComment(comment)) {
+        return {comment: comment.trim(), memories, opener};
+      }
       console.warn(`日記コメントが不正 (${attempt}回目). 長さ=${comment.length}`);
     } catch (e) {
       console.warn(`日記コメントの生成に失敗 (${attempt}回目):`, e.message);
@@ -343,8 +403,30 @@ async function requestAiComment(openai, model, prompt) {
   // 2回とも駄目だった。**生の応答は使わない。**
   // 日記が空になるより、当たり障りのない一文が入っているほうが体験として良い。
   console.error("日記コメントの生成に2回とも失敗したため定型文を使用");
-  return "今日もおつかれさま。うまく言葉にできない日もあるけれど、" +
-    "こうして一日を振り返れたこと自体が積み重ねになるよ。また明日、話そう。";
+  return {
+    comment: "今日もおつかれさま。うまく言葉にできない日もあるけれど、" +
+      "こうして一日を振り返れたこと自体が積み重ねになるよ。また明日、話そう。",
+    memories: [],
+    opener: "",
+  };
+}
+
+/**
+ * オープナーを安全な形に整える。
+ *
+ * ホーム画面でキャラクターの吹き出しにそのまま表示され、次のチャットの
+ * `openerContext` としてプロンプトにも渡るため、長さと制御文字を制限する。
+ *
+ * @param {*} value AI出力の opener
+ * @return {string} 正規化されたオープナー（不正なら空文字）
+ */
+function sanitizeOpener(value) {
+  if (typeof value !== "string") return "";
+  const collapsed = value.replace(/\s+/g, " ").trim();
+  if (!collapsed) return "";
+  const points = Array.from(collapsed);
+  return points.length <= OPENER_MAX_LENGTH ?
+    collapsed : points.slice(0, OPENER_MAX_LENGTH).join("");
 }
 
 exports.generateDiary = generateDiary;

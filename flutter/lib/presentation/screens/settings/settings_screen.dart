@@ -104,7 +104,7 @@ class SettingsScreen extends ConsumerWidget {
                     // 通知設定
                     _SettingsCard(
                       title: '通知設定',
-                      subtitle: '日記の通知を管理',
+                      subtitle: 'キャラクターからの通知を管理',
                       icon: Icons.notifications_outlined,
                       onTap: () => _open(context, const NotificationSettingsScreen()),
                     ),

@@ -1,4 +1,4 @@
-// 週次ナラティブ生成 - 毎週日曜日 2:00 AM JST に実行
+// 週次ナラティブ生成 - 毎週日曜日 9:00 JST に実行し、生成できた人へ通知する
 const {onSchedule} = require('firebase-functions/v2/scheduler');
 const {getOpenAIClient, safeOpenAICall} = require('../src/clients/openai');
 const {OPENAI_API_KEY} = require('../src/config/config');
@@ -34,9 +34,64 @@ async function generateNarrativeText(openai, axisScores, typeName) {
   return completion.choices[0].message.content.trim();
 }
 
+/**
+ * 週次ナラティブをFCMで通知する
+ *
+ * 通知の可否は日記通知と同じ `diaryNotificationsEnabled` で制御する
+ * （設定画面のトグルは「キャラクターからの通知」1つで両方を兼ねている）。
+ * 送信に失敗しても生成処理は止めない。
+ *
+ * @param {string} userId ユーザーID
+ * @param {string} narrative 生成した週次ナラティブ（100〜150文字）
+ * @return {Promise<void>}
+ */
+async function sendWeeklyNotification(userId, narrative) {
+  try {
+    const userSnap = await db.collection('users').doc(userId).get();
+    const userData = userSnap.exists ? userSnap.data() : null;
+    const fcmToken = userData ? userData.fcmToken : null;
+
+    if (!fcmToken) {
+      console.log(`週次通知スキップ（FCMトークンなし） userId=${userId}`);
+      return;
+    }
+    if (userData.diaryNotificationsEnabled === false) {
+      console.log(`週次通知スキップ（ユーザーが通知をオフ） userId=${userId}`);
+      return;
+    }
+
+    await admin.messaging().send({
+      token: fcmToken,
+      notification: {
+        title: '今週のふりかえり',
+        // 本文にナラティブをそのまま載せる。通知を開かなくても読める
+        body: narrative,
+      },
+      data: {
+        type: 'weekly',
+        userId,
+      },
+      apns: {payload: {aps: {sound: 'default'}}},
+      android: {notification: {sound: 'default'}},
+    });
+    console.log(`🔔 週次通知を送信 userId=${userId}`);
+  } catch (e) {
+    // 無効なトークンは消してクリーンアップする（日記通知と同じ扱い）
+    if (e.code === 'messaging/registration-token-not-registered') {
+      await db.collection('users').doc(userId)
+          .update({fcmToken: admin.firestore.FieldValue.delete()})
+          .catch(() => {});
+      console.warn(`週次通知スキップ（無効なFCMトークンを削除） userId=${userId}`);
+    } else {
+      console.error(`⚠️ 週次通知の送信に失敗 userId=${userId}:`, e.message);
+    }
+  }
+}
+
 exports.generatePersonalityNarrative = onSchedule(
     {
-      schedule: '0 2 * * 0',
+      // 生成した直後に通知を送るため、深夜2時ではなく日曜の朝に動かす
+      schedule: '0 9 * * 0',
       timeZone: 'Asia/Tokyo',
       region: 'asia-northeast1',
       memory: '512MiB',
@@ -79,6 +134,9 @@ exports.generatePersonalityNarrative = onSchedule(
 
           console.log(`✅ ナラティブ生成完了 userId=${userId}`);
           successCount++;
+
+          // 今週のふりかえりを通知する（タップするとホーム画面が開く）
+          await sendWeeklyNotification(userId, narrative);
 
           // 変化通知フラグのクリア（FCM送信は将来実装）
           const metaRef = db.collection('users').doc(userId)

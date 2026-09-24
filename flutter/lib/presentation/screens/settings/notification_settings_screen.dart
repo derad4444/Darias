@@ -53,11 +53,11 @@ class NotificationSettingsScreen extends ConsumerWidget {
               const SizedBox(height: 16),
 
 
-              // 日記の通知
+              // キャラクターからの通知（日記・今週のふりかえり）
               _NotificationToggle(
                 icon: Icons.book_outlined,
-                title: '日記の通知',
-                subtitle: '毎日23:55に日記作成を通知',
+                title: 'キャラクターからの通知',
+                subtitle: '毎日の日記（23:50頃）と今週のふりかえり（日曜9:00頃）',
                 value: settings.diaryNotifications,
                 accentColor: accentColor,
                 textColor: textColor,
@@ -282,6 +282,8 @@ class _InfoCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           _bullet('日記の通知：キャラクターが日記を書いたことを毎日お知らせします', textColor),
+          const SizedBox(height: 6),
+          _bullet('今週のふりかえり：毎週日曜の朝に、最近の性格の傾向をお知らせします', textColor),
           const SizedBox(height: 6),
           _bullet('通知をオフにしても、アプリ内で日記を確認できます', textColor),
         ],

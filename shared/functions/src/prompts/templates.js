@@ -193,7 +193,7 @@ const OPTIMIZED_PROMPTS = {
    * phase 2: 150文字, 受け止め+性格仮説+質問（あたってるかも体験）
    * phase 3: 220文字, 受け止め+性格言語化+質問任意（なるほど体験）
    */
-  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null) => {
+  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null) => {
     const traits = traitsOverride || buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
@@ -201,6 +201,10 @@ const OPTIMIZED_PROMPTS = {
       ? `【過去の自分会議】${meetingContext}\n（会話に関連する場合はこの文脈を踏まえてください）`
       : "";
     const opener = openerContext ? `会話のきっかけ: ${openerContext}` : "";
+    // 過去の会話から覚えていること（日記生成時に抽出したもの）
+    const memory = memoryContext
+      ? `【覚えていること】\n${memoryContext}\n（今の話題に関係するときだけ自然に触れる。関係ないときは持ち出さない。覚えている内容を並べ立てない）`
+      : "";
 
     let instruction;
     if (phase === 2) {
@@ -234,6 +238,7 @@ const OPTIMIZED_PROMPTS = {
 性別: ${genderText}
 ${dream}
 ${meeting}
+${memory}
 ${opener}
 
 【最優先ルール】
@@ -247,7 +252,7 @@ ${instruction}`;
    * Activity-based Diary Generation
    * Summarizes user's in-app activities as facts + character's encouraging comment
    */
-  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, favoriteWord, wordTendency, dream, strength) => {
+  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, favoriteWord, wordTendency, dream, strength, memorySummary = "") => {
     const parts = [];
     // デイリーミッションの達成が一番の成果なので先頭に置く
     if (dailyMissionSummary) parts.push(`デイリーミッション: ${dailyMissionSummary}`);
@@ -273,6 +278,9 @@ ${instruction}`;
     if (strength) personalityLines.push(`強み: ${strength}`);
     const personalityText = personalityLines.join("\n");
 
+    // 既に覚えていること。重複した記憶を作らせないために渡す。
+    const memoryText = memorySummary || "特になし";
+
     return `【キャラクター情報】
 性別: ${genderText}
 ${personalityText}
@@ -281,17 +289,40 @@ ${personalityText}
 【今日の活動】
 ${activitiesText}
 
+【これまで覚えていること】
+${memoryText}
+
 以下のJSON形式のみで出力:
-{"ai_comment":"コメント"}
+{"ai_comment":"コメント","memories":["覚えておくこと"],"opener":"明日の問いかけ"}
 
 「今日やったこと」の一覧はアプリ側が実データから作るため、ここでは出力しないこと。
 上記【今日の活動】に書かれていないことは、事実として書かないこと（推測・補完・創作は禁止）。
+
 ai_commentは以下のルールで250〜350文字で作成:
 - 上記の話し方・性格特性を語り口に反映し、キャラクターらしいトーンで書く
 - 口癖は「そのまま貼り付ける言葉」ではなく語り口の参考。相手への相づち（「面白いね！」など）や単語だけのことが多く、独白である日記に差し込むと不自然になる。文章に自然に収まるときだけ1回まで使い、収まらなければ使わなくてよい
 - 口癖や性格特性を鉤括弧で引用して本文に埋め込まない（例:「安定」を保ちながら…、のような書き方はしない）
 - 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
-- 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く`;
+- 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く
+
+memoriesは「明日以降もあなたが覚えておく価値のあること」を0〜3件:
+- **【今日の活動】の会話でユーザーが実際に言ったことだけを書く。**
+  会話に出ていない事情・理由・気持ち・結果・日付・固有名詞を、推測で補ってはいけない
+- 会話に出てきた言葉をそのまま使う。言い換えて意味を足さない
+- 予定・出来事・悩み・好み・目標など、後日また話題にできる事実を書く。感想や評価・励ましは書かない
+- 1件40文字以内。「何を・どうした（どうする）」が分かる書き方にする
+- 日付・曜日・場所・人名は、**会話に出てきたときだけ**書く
+- 【これまで覚えていること】と**一字一句同じ内容**は繰り返さない。ただし、そこに書かれた話題が
+  会話の中で進展した・具体的になった・結果が出た場合は、新しい事実として書く
+  （例: すでに「転職活動をしている」を覚えていても、会話に「来週水曜に最終面接」と出てきたなら書く）
+- 会話が雑談だけだった、または会話が無かったときは空配列 [] にする。**無理に埋めない**
+- **迷ったら書かない。** 確実に会話に出てきたことだけを残す
+
+openerは「明日ユーザーがアプリを開いたとき、あなたから最初に話しかける一言」:
+- 40文字以内。短い問いかけにする
+- **memories に書いた話題にだけ触れる。** 会話に出ていないことを想像して話しかけない
+- 上記の話し方・口調を反映する
+- memories が空配列のときは、触れられる具体的な話題が無いということなので、必ず空文字 "" にする`;
   },
 
   /**

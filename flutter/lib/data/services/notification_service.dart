@@ -24,6 +24,14 @@ class NotificationService {
   static const int _diaryNotificationId = 9999;
   static const String _diaryChannelId = 'diary_channel';
 
+  /// タップされた通知の種類（`type`）。遷移先を決めるために保持する。
+  ///
+  /// 通知タップは画面が用意される前（アプリ終了状態からの起動）にも起きるため、
+  /// ここに置いておき、ホーム画面が拾って遷移したら null に戻す。
+  /// 値は Cloud Functions が送る `data.type`（`diary` / `weekly`）。
+  static final ValueNotifier<String?> tappedNotificationType =
+      ValueNotifier<String?>(null);
+
   /// 予定通知を一度消したかどうかの記録キー（端末ごと・1回限りの後始末用）
   static const String _schedulePurgedKey = 'schedule_notifications_purged';
 
@@ -35,6 +43,16 @@ class NotificationService {
     if (kIsWeb) {
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
       return;
+    }
+
+    // 通知タップ（アプリが生きている間）
+    FirebaseMessaging.onMessageOpenedApp.listen(_onNotificationTapped);
+
+    // 通知タップでアプリが起動した場合（終了状態から）。
+    // ホーム画面が拾うまで tappedNotificationType に保持される。
+    final initialMessage = await _messaging.getInitialMessage();
+    if (initialMessage != null) {
+      _onNotificationTapped(initialMessage);
     }
 
     tz_data.initializeTimeZones();
@@ -59,6 +77,14 @@ class NotificationService {
         android: androidSettings,
         iOS: iosSettings,
       ),
+      // Androidのフォアグラウンド通知（_onForegroundMessage が出すもの）のタップ。
+      // payload には FCM の data.type を入れている。
+      onDidReceiveNotificationResponse: (response) {
+        final type = response.payload;
+        if (type != null && type.isNotEmpty) {
+          tappedNotificationType.value = type;
+        }
+      },
     );
 
     // Android 通知チャンネル
@@ -255,9 +281,22 @@ class NotificationService {
           importance: Importance.defaultImportance,
         ),
       ),
+      // タップ時に遷移先を判定するため type を持たせる
+      payload: message.data['type'] as String?,
     );
   }
 
+  /// 通知がタップされた。遷移はホーム画面（`home_screen.dart`）が行う。
+  ///
+  /// ここで直接画面遷移しないのは、アプリ終了状態からの起動では
+  /// まだ Navigator も Riverpod のスコープも用意されていないため。
+  void _onNotificationTapped(RemoteMessage message) {
+    final type = message.data['type'];
+    if (type is String && type.isNotEmpty) {
+      tappedNotificationType.value = type;
+      debugPrint('🔔 通知タップ: type=$type');
+    }
+  }
 }
 
 /// バックグラウンドメッセージハンドラ（トップレベル・別isolate）

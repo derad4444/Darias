@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-09-16
+**最終更新日**: 2026-09-24
 **ランタイム**: Node.js 22
 **関数数**: 27
 
@@ -12,10 +12,11 @@
 
 1. [アーキテクチャ概要](#アーキテクチャ概要)
 2. [関数一覧（詳細）](#関数一覧詳細)
-3. [ファイル構成](#ファイル構成)
-4. [依存パッケージ](#依存パッケージ)
-5. [環境変数・シークレット](#環境変数シークレット)
-6. [設計パターン](#設計パターン)
+3. [通知タップ時の遷移](#通知タップ時の遷移)
+4. [ファイル構成](#ファイル構成)
+5. [依存パッケージ](#依存パッケージ)
+6. [環境変数・シークレット](#環境変数シークレット)
+7. [設計パターン](#設計パターン)
 
 ---
 
@@ -551,12 +552,20 @@ Cloud Scheduler による定期実行バッチ。
 - **口癖の扱い**: 口癖は**語り口の参考**として渡す。ai_comment はキャラクターの独白であり、口癖は相手への相づち（`面白いね！`）や単語（`安定`）であることが多く、そのまま差し込むと文脈に合わないため、「文章に自然に収まるときだけ1回まで」「鉤括弧で引用して埋め込まない」をプロンプトで指示している。埋め込み前に `stripQuotes()`（`src/prompts/templates.js`）で外側の鉤括弧・引用符を取り除く
 - **BIG5スコア形式**: 数値のまま渡すのではなく `buildPersonalityTraits()` で自然言語テキストに変換してプロンプトに渡す
 - **出力形式**: `diary_type: "activity"`, `facts: string[]`, `ai_comment: string`（250〜350文字）を Firestore に保存
-- **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"..."}` のみ）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
+- **facts の生成方法**: `generateDiary.js` が収集データから直接組み立てる。**AIは `facts` を出力しない**（AIの応答は `{"ai_comment":"...","memories":[...],"opener":"..."}`）。AIに書かせると件数指示を満たすため実在しない活動を捏造するため（修正: 2026-07-29）
+- **キャラクターの記憶とオープナーも同時に生成する**（追加: 2026-09-24）
+  - この関数はもともと当日のユーザー発言を最大5件プロンプトに渡しているため、**出力項目を増やすだけでAI呼び出しは増えない**
+  - `memories`（0〜3件・各40文字以内）: 明日以降も覚えておく価値のある事実。`users/{uid}/characters/{cid}/memory/current` に新しい順で積み、**最大10件**を超えた古い記憶は捨てる
+  - `opener`（40文字以内）: 翌朝ホーム画面でキャラクターが話しかける問いかけ。`openerDate` に翌日（JST）を入れて保存し、その日のうちに1回だけ表示される
+  - 重複した記憶を作らせないため、**既に覚えている内容（最大10件）をプロンプトに渡す**。それでも重複したものは `saveMemory()` が弾く
+  - 保存に失敗しても日記の保存は続行する（記憶は翌日また作られるが、日記はその日限りのため）
+  - 実装は `src/utils/memoryStore.js`。仕様は [チャット機能仕様書のキャラクターの記憶](チャット機能仕様書.md#キャラクターの記憶)
 - **facts の並び順**: `デイリーミッションをクリアした` → `会話を{n}件やりとりした` → `「{悩み}」について相談した`（会議数ぶん）。デイリーミッションは他に何件あっても先頭に置く
 - **活動なし時の挙動**: 活動が無くても OpenAI API を呼び出し、キャラクターからの声がけのみの日記を保存する（`facts: []`, `ai_comment` あり）。以前は `hasActivity` フラグで API 呼び出しをスキップし `ai_comment: ""` で保存していたが、履歴に空の日記カードが並ぶため変更（2026-07-29）
 - **モデル選択**: premium ユーザー → `gpt-4o-2024-11-20` / free ユーザー → `gpt-4o-mini`（`response_format: json_object` 指定）
-- **生成パラメータ**: `max_tokens: 600` / `temperature: 0.8`。
-  上限を切らないと暴走時に延々と生成し続ける（ai_comment は250〜350文字＝日本語 ~1.5chars/token なので600で十分）。
+- **生成パラメータ**: `max_tokens: 800` / `temperature: 0.8`。
+  上限を切らないと暴走時に延々と生成し続ける（ai_comment は250〜350文字＝日本語 ~1.5chars/token なので600、
+  これに `memories`(40字×3) と `opener`(40字) の分を足して **800**。変更: 2026-09-24）。
   既定の `temperature: 1.0` は出力が不安定になりやすいため下げている（修正: 2026-08-12）
 - **壊れた出力を絶対にユーザーへ出さない**（`requestAiComment` / `isUsableComment`、修正: 2026-08-12）
   - 以前は `JSON.parse` 失敗時に**生の応答をそのまま `ai_comment` にしていた**ため、
@@ -566,6 +575,8 @@ Cloud Scheduler による定期実行バッチ。
     2回とも駄目なら**安全な定型文**を入れる。生の応答は決して使わない
   - 内容チェック（`isUsableComment`）: 40〜800文字 / **日本語（かな・漢字）が5割以上** /
     JSONの破片が混ざっていない。モデルが暴走すると多言語トークンが並ぶため日本語比率で弾く
+  - **再試行の判定基準は `ai_comment` だけ**。`memories` と `opener` はユーザーに即座に出るものではなく、
+    空で保存すれば済むため、これらが空でも再試行しない。定型文フォールバック時は両方とも空で保存される
 - **FCM通知の前提条件（クライアント側）**: FCM通知を受信するにはFlutter側で `FirebaseMessaging.requestPermission()` を呼び出し、取得した `fcmToken` を Firestore `users/{userId}.fcmToken` に保存されていること。`diaryNotificationsEnabled` が `false` の場合は送信しない。通知許可後に `saveFcmToken()` を再実行してトークンを更新する必要あり（`notification_service.dart` / `notification_settings_screen.dart` 参照）
 - **FCM通知ログ出力**: 通知の送信結果は以下のレベルで Functions ログに記録される（Firebase Console > Functions ログで確認可能）
   - `INFO "Diary notification sent"` — 送信成功
@@ -577,6 +588,26 @@ Cloud Scheduler による定期実行バッチ。
   - アプリアイコンのバッジ: `main_shell_screen.dart` の `_updateAppBadge()` が `フレンド申請数 + 未読の日記の件数` を設定
   - ホーム画面の「履歴」ボタン: 未読件数をボタン右上に赤丸バッジ（`_CountBadge`）で表示。100件以上は `99+`
   - 既読化: 履歴画面の「日記」タブを開いたときに `clearDiaryBadge()` が `lastSeenDiaryDate` を更新し、アプリアイコンのバッジも更新する（`unified_history_screen.dart`）
+- **通知タップ時の遷移**: 履歴画面の日記タブが開く（[通知タップ時の遷移](#通知タップ時の遷移)）
+
+#### 11. `generatePersonalityNarrative`
+- **ソース**: `const/generatePersonalityNarrative.js`
+- **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
+- **概要**: 5軸スコアから「最近〜な傾向があります」の週次ナラティブ（100〜150文字）を生成し、`details/current.personalityNarrative` に保存する。保存後に「今週のふりかえり」をFCMで通知する
+- **スケジュール**: `0 9 * * 0`（毎週日曜 9:00 JST）
+  - 以前は 2:00 だったが、**生成した直後に通知を送るため朝に移した**（変更: 2026-09-24）
+- **リソース**: memory `512MiB` / timeout `540秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: `OPENAI_API_KEY`
+- **モデル**: `gpt-4o-mini` / `max_completion_tokens: 200`
+- **対象**: `collectionGroup('details')` で `element` が9元素のいずれかのドキュメント（＝元素が確定した人だけ）。`axisScores` が無ければスキップ
+- **通知**（`sendWeeklyNotification`）
+  - タイトル `今週のふりかえり` / 本文は**生成したナラティブそのまま**（通知を開かなくても読める）
+  - `data: {type: "weekly", userId}`。**タップするとホーム画面が開く**（[通知タップ時の遷移](#通知タップ時の遷移)）
+  - 可否は日記通知と同じ `users/{uid}.diaryNotificationsEnabled` で判定する。設定画面のトグルは「キャラクターからの通知」1つで日記と週次の両方を兼ねる
+  - `fcmToken` が無ければスキップ。無効トークンは日記通知と同じく Firestore から削除する
+  - **送信に失敗してもナラティブの生成・保存は続行する**
+- **タイプ変化通知フラグ**: `personalityMeta/current.pendingTypeChangeNotification` が立っていればクリアする（FCM送信は未実装）
 
 #### 12. `checkSubscriptionStatus`
 - **ソース**: `validateReceipt.js`
@@ -728,6 +759,40 @@ REST API として直接アクセス可能。
 
 ---
 
+## 通知タップ時の遷移
+
+FCMメッセージの `data.type` で遷移先を決める（実装: 2026-09-24）。
+
+| `type` | 送信元 | タップ後に開く画面 |
+|--------|-------|-----------------|
+| `diary` | `scheduledDiaryGeneration`（毎日23:50） | 履歴画面の**日記タブ**（`UnifiedHistoryScreen(initialTab: 2)`）|
+| `weekly` | `generatePersonalityNarrative`（日曜9:00） | **ホーム画面** |
+| `friend_request` | `sendFriendRequest` | 遷移なし（ホームのまま）|
+
+### クライアント側の仕組み
+
+| 受信経路 | ハンドラ | 実装場所 |
+|---------|---------|---------|
+| アプリ起動中にタップ | `FirebaseMessaging.onMessageOpenedApp` | `notification_service.dart` |
+| 終了状態から通知で起動 | `FirebaseMessaging.getInitialMessage`（`initialize()` 内で1回） | 同上 |
+| Androidのフォアグラウンド通知をタップ | `onDidReceiveNotificationResponse`（`payload` に `data.type` を入れて渡す） | 同上 |
+
+いずれも `NotificationService.tappedNotificationType`（`ValueNotifier<String?>`）に `type` を入れるだけで、**画面遷移は行わない**。アプリ終了状態から通知で起動した場合、この時点では Navigator も Riverpod のスコープもまだ無いため。
+
+遷移するのは `home_screen.dart` の `_handleTappedNotification()`:
+
+1. `initState` で `tappedNotificationType` を監視（起動中のタップ用）
+2. ポストフレームでも1回読む（通知から起動した場合用）
+3. 値を読んだら**すぐ null に戻して消費する**（同じ通知で二度遷移しないため）
+4. どの `type` でもまず `selectedTabProvider` をホームタブに戻す
+5. `diary` のときだけ、`characterId` を待ってから履歴画面をホームタブの Navigator に push する
+
+> 履歴画面は GoRouter のルートを持たず、ホームタブ専用の Navigator に push される（タブバーを残すため）。`_tabNavigatorKeys` は `MainShellScreen` の private フィールドで外部から触れないため、**ホーム画面自身に遷移させるのが唯一の経路**になっている。
+
+> **スプラッシュは挟まる**: 通知から起動しても `/splash` の「画面をタップしてはじめる」を経由する（既存仕様）。遷移はその後に行われる。
+
+---
+
 ## ファイル構成
 
 ```
@@ -780,6 +845,7 @@ shared/functions/
         ├── firebaseInit.js           # Admin SDK 遅延初期化
         ├── firestoreCache.js         # 5分TTLのメモリキャッシュ
         ├── logger.js                 # ログヘルパー
+        ├── memoryStore.js            # キャラクターの記憶・翌日のオープナー
         └── sixPersonMeeting.js
 ```
 
