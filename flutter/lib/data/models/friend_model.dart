@@ -69,9 +69,17 @@ class FriendRequestModel {
 /// フレンドモデル（承認済みのフレンド関係）
 class FriendModel {
   final String id; // friendUserId
-  final String name;
+  final String name; // 相手のアカウント名
   final String email;
   final DateTime createdAt;
+
+  /// 自分だけが付けたあだ名（未設定なら空文字）
+  ///
+  /// `users/{自分}/friends/{相手}` の `nickname` に保存する。このサブコレクションは
+  /// 本人しか読み書きできない（firestore.rules）ため、相手や他のユーザーには見えない。
+  /// サーバー（Cloud Functions）には送らない。AI の生成文や相手にも保存される結果に
+  /// 混ざらないよう、画面の表示にだけ使う。
+  final String nickname;
 
   // Firestore外から取得する追加情報（省略可）
   final Map<String, double>? big5Scores;
@@ -81,8 +89,18 @@ class FriendModel {
     required this.name,
     required this.email,
     required this.createdAt,
+    this.nickname = '',
     this.big5Scores,
   });
+
+  /// 画面に出す名前（あだ名があればあだ名、なければアカウント名）
+  String get displayName {
+    if (nickname.isNotEmpty) return nickname;
+    return name.isNotEmpty ? name : '名前未設定';
+  }
+
+  /// あだ名を設定しているか
+  bool get hasNickname => nickname.isNotEmpty;
 
   factory FriendModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -91,6 +109,7 @@ class FriendModel {
       name: data['name'] as String? ?? '',
       email: data['email'] as String? ?? '',
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      nickname: (data['nickname'] as String? ?? '').trim(),
     );
   }
 
@@ -99,6 +118,7 @@ class FriendModel {
       'name': name,
       'email': email,
       'createdAt': Timestamp.fromDate(createdAt),
+      if (nickname.isNotEmpty) 'nickname': nickname,
     };
   }
 
@@ -107,6 +127,7 @@ class FriendModel {
     String? name,
     String? email,
     DateTime? createdAt,
+    String? nickname,
     Map<String, double>? big5Scores,
   }) {
     return FriendModel(
@@ -114,6 +135,7 @@ class FriendModel {
       name: name ?? this.name,
       email: email ?? this.email,
       createdAt: createdAt ?? this.createdAt,
+      nickname: nickname ?? this.nickname,
       big5Scores: big5Scores ?? this.big5Scores,
     );
   }

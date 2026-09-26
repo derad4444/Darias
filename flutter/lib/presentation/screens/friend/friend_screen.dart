@@ -121,7 +121,7 @@ class _FriendCard extends ConsumerWidget {
       builder: (_) => AlertDialog(
         title: const Text('フレンドを削除'),
         content: Text(
-          '${friend.name.isNotEmpty ? friend.name : 'このフレンド'}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+          '${friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
         ),
         actions: [
           TextButton(
@@ -169,7 +169,7 @@ class _FriendCard extends ConsumerWidget {
               CharacterAvatarWidget(
                 userId: friend.id,
                 size: 48,
-                fallbackText: friend.name.isNotEmpty ? friend.name[0] : '?',
+                fallbackText: friend.displayName.isNotEmpty ? friend.displayName[0] : '?',
                 fallbackBackgroundColor: accentColor.withValues(alpha: 0.15),
                 fallbackTextColor: accentColor,
               ),
@@ -178,18 +178,27 @@ class _FriendCard extends ConsumerWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // あだ名を大きく出し、下にアカウント名を添える。
+                    // あだ名が無い人はアカウント名だけを出す。
+                    // メールアドレスは一覧に出さない（画面の写り込みで他人に見えてしまうため）
                     Text(
-                      friend.name.isNotEmpty ? friend.name : '名前未設定',
+                      friend.displayName,
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 17,
                         fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      friend.email,
-                      style: TextStyle(fontSize: 12, color: AppColors.textLight),
-                    ),
+                    if (friend.hasNickname && friend.name.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        friend.name,
+                        style: TextStyle(fontSize: 12, color: AppColors.textLight),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               ),

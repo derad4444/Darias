@@ -79,6 +79,7 @@ class _CompatibilityCategoryScreenState
         text: buildCompatibilityShareText(
           category: widget.category,
           diagnosis: widget.diagnosis,
+          // シェアする文章は相手や他の人も見るので、あだ名ではなくアカウント名を使う
           friendName: widget.friend.name,
         ),
         fileName: 'darias_compatibility.png',
@@ -240,6 +241,7 @@ class _CompatibilityCategoryScreenState
                   myUserId: myUserId,
                   myName: myName,
                   friendUserId: widget.friend.id,
+                  // シェアする画像は相手や他の人も見るので、あだ名ではなくアカウント名を使う
                   friendName: widget.friend.name,
                 ),
               ),
@@ -338,7 +340,8 @@ class _CompatibilityCategoryScreenState
               myUserId: myUserId,
               friendUserId: widget.friend.id,
               myName: myName,
-              friendName: widget.friend.name,
+              // 画面の吹き出しは自分だけが見るのであだ名で出す
+              friendName: widget.friend.displayName,
               accentColor: accentColor,
             ),
           ),

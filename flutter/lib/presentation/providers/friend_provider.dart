@@ -21,6 +21,23 @@ final friendsProvider = StreamProvider<List<FriendModel>>((ref) {
       .map((snap) => snap.docs.map(FriendModel.fromFirestore).toList());
 });
 
+/// 最新のフレンド情報（あだ名の変更をすぐ画面に反映するため）
+///
+/// 画面間では FriendModel を引数で渡しているため、そのままだと詳細画面で
+/// あだ名を変えても古い値が表示され続ける。一覧のストリームから id で引き直す。
+/// 見つからない（読み込み中・削除直後）ときは null を返すので、呼び出し側で
+/// 渡された FriendModel にフォールバックする。
+final liveFriendProvider = Provider.family<FriendModel?, String>((ref, friendId) {
+  final friends = ref.watch(friendsProvider).valueOrNull ?? const [];
+  for (final f in friends) {
+    if (f.id == friendId) return f;
+  }
+  return null;
+});
+
+/// あだ名の最大文字数
+const int kFriendNicknameMaxLength = 20;
+
 /// 受信したフレンド申請プロバイダー（自分のサブコレクション）
 final incomingFriendRequestsProvider = StreamProvider<List<FriendRequestModel>>((ref) {
   final userId = ref.watch(currentUserIdProvider);
@@ -174,6 +191,31 @@ class FriendController extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+    }
+  }
+
+  /// フレンドにあだ名を付ける（空文字なら外す）
+  ///
+  /// 自分の `users/{自分}/friends/{相手}` にだけ書く。相手側のドキュメントや
+  /// サーバーには一切送らないので、相手・他のユーザーには見えない。
+  Future<bool> setFriendNickname({
+    required String friendId,
+    required String nickname,
+  }) async {
+    if (_userId == null) return false;
+    final value = nickname.trim();
+    if (value.length > kFriendNicknameMaxLength) return false;
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_userId)
+          .collection('friends')
+          .doc(friendId)
+          .update({'nickname': value.isEmpty ? FieldValue.delete() : value});
+      return true;
+    } catch (e) {
+      debugPrint('❌ setFriendNickname error: $e');
+      return false;
     }
   }
 

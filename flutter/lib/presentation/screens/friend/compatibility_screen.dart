@@ -157,6 +157,30 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
     super.dispose();
   }
 
+  /// 最新のフレンド情報（あだ名を変えたらすぐ反映させるため、一覧から引き直す）
+  FriendModel get _friend =>
+      ref.read(liveFriendProvider(widget.friend.id)) ?? widget.friend;
+
+  // ─────────────────────────────────────────
+  // あだ名の編集ダイアログ
+  // ─────────────────────────────────────────
+  Future<void> _editNickname(BuildContext context, FriendModel friend) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _NicknameDialog(friend: friend),
+    );
+    if (result == null || result.trim() == friend.nickname) return;
+    final ok = await ref.read(friendControllerProvider.notifier).setFriendNickname(
+          friendId: friend.id,
+          nickname: result,
+        );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(content: Text('あだ名を保存できませんでした')),
+      );
+    }
+  }
+
   // ─────────────────────────────────────────
   // フレンド削除確認ダイアログ
   // ─────────────────────────────────────────
@@ -166,7 +190,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       builder: (_) => AlertDialog(
         title: const Text('フレンドを削除'),
         content: Text(
-          '${widget.friend.name.isNotEmpty ? widget.friend.name : 'このフレンド'}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+          '${_friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
         ),
         actions: [
           TextButton(
@@ -266,7 +290,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
         context,
         MaterialPageRoute(
           builder: (_) => CompatibilityCategoryScreen(
-            friend: widget.friend,
+            friend: _friend,
             category: cat,
             diagnosis: existingDiagnosis,
             animateOnEntry: false,
@@ -323,7 +347,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       context,
       MaterialPageRoute(
         builder: (_) => CompatibilityCategoryScreen(
-          friend: widget.friend,
+          friend: _friend,
           category: cat,
           diagnosis: diagnosis,
           animateOnEntry: true,
@@ -381,7 +405,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       context,
       MaterialPageRoute(
         builder: (_) => CompatibilityCategoryScreen(
-          friend: widget.friend,
+          friend: _friend,
           category: cat,
           diagnosis: diagnosis,
           animateOnEntry: true,
@@ -402,8 +426,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
 
     final myName = myUser?.name ?? '自分';
     final myInitial = myName.isNotEmpty ? myName[0] : 'M';
+    // あだ名を変えたらすぐ反映させるため、一覧のストリームから最新の値を引く
+    final friend = ref.watch(liveFriendProvider(widget.friend.id)) ?? widget.friend;
     final friendInitial =
-        widget.friend.name.isNotEmpty ? widget.friend.name[0] : 'F';
+        friend.displayName.isNotEmpty ? friend.displayName[0] : 'F';
 
     // 予定共有設定で使用していたが、機能廃止に伴い不使用（コメントアウトで残置）:
     // final friends = ref.watch(friendsProvider).valueOrNull ?? [];
@@ -458,7 +484,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => FriendAskHistoryScreen(friend: widget.friend),
+                  builder: (_) => FriendAskHistoryScreen(friend: friend),
                 ),
               ),
               tooltip: '過去の質問',
@@ -492,9 +518,19 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
                   physics: const BouncingScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   children: [
-                    _buildAvatarRow(
-                        accentColor, myUserId, myName, myInitial, friendInitial),
-                    const SizedBox(height: 12),
+                    _buildAvatarRow(accentColor, myUserId, myName, myInitial,
+                        friendInitial, friend),
+                    const SizedBox(height: 4),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () => _editNickname(context, friend),
+                        icon: Icon(Icons.edit_outlined, size: 16, color: accentColor),
+                        label: Text(
+                          friend.hasNickname ? 'あだ名を変更' : 'あだ名を付ける',
+                          style: TextStyle(fontSize: 13, color: accentColor),
+                        ),
+                      ),
+                    ),
 
                     const SizedBox(height: 12),
 
@@ -531,10 +567,10 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
                             Expanded(
                               child: Text(
                                 (!myBig5Done && !friendBig5Done)
-                                    ? '診断には自分と${widget.friend.name}さん双方の性格解析が必要です。チャットを30回以上続けてください'
+                                    ? '診断には自分と${friend.displayName}さん双方の性格解析が必要です。チャットを30回以上続けてください'
                                     : !myBig5Done
                                         ? '診断にはあなたの性格解析が必要です。チャットを30回以上続けてください'
-                                        : '診断には${widget.friend.name}さんの性格解析完了が必要です',
+                                        : '診断には${friend.displayName}さんの性格解析完了が必要です',
                                 style: const TextStyle(fontSize: 12),
                               ),
                             ),
@@ -623,7 +659,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
                   ],
                 ),
                     // 聞いてみるタブ
-                    FriendAskView(friend: widget.friend),
+                    FriendAskView(friend: friend),
                   ],
                 ),
               ),
@@ -642,7 +678,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
   // アバター行
   // ─────────────────────────────────────────
   Widget _buildAvatarRow(Color accentColor, String myUserId, String myName,
-      String myInitial, String friendInitial) {
+      String myInitial, String friendInitial, FriendModel friend) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -673,7 +709,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
             fallbackBackgroundColor: Colors.indigo.withValues(alpha: 0.2),
             fallbackTextColor: Colors.indigo,
           ),
-          label: widget.friend.name,
+          label: friend.displayName,
           color: Colors.indigo,
         ),
       ],
@@ -997,6 +1033,68 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
 
 // ─────────────────────────────────────────
 // ラベル付きアバター
+// ─────────────────────────────────────────
+// あだ名の入力ダイアログ
+// ─────────────────────────────────────────
+/// 入力欄のコントローラーはダイアログ自身が持ち、ダイアログが画面から消えたときに
+/// 破棄する（呼び出し側で showDialog の直後に破棄すると、閉じるアニメーションの
+/// 途中でまだ使われていてエラーになる）
+class _NicknameDialog extends StatefulWidget {
+  final FriendModel friend;
+
+  const _NicknameDialog({required this.friend});
+
+  @override
+  State<_NicknameDialog> createState() => _NicknameDialogState();
+}
+
+class _NicknameDialogState extends State<_NicknameDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.friend.nickname);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('あだ名を付ける'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            maxLength: kFriendNicknameMaxLength,
+            decoration: InputDecoration(
+              hintText: widget.friend.name.isNotEmpty ? widget.friend.name : 'あだ名',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'あだ名はあなたにだけ表示されます。相手や他の人には表示されません。\n空欄にするとアカウント名の表示に戻ります。',
+            style: TextStyle(fontSize: 12, color: AppColors.textLight, height: 1.5),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('キャンセル'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, _controller.text),
+          child: const Text('保存'),
+        ),
+      ],
+    );
+  }
+}
+
 // ─────────────────────────────────────────
 class _LabeledAvatar extends StatelessWidget {
   final Widget avatar;

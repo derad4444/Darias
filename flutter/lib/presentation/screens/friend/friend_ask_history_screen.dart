@@ -17,7 +17,7 @@ class FriendAskHistoryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
-    final friendName = friend.name.isNotEmpty ? friend.name : 'フレンド';
+    final friendName = friend.displayName;
     final historyAsync = ref.watch(askHistoryProvider);
 
     return Scaffold(
@@ -111,7 +111,7 @@ class _HistoryCardState extends ConsumerState<_HistoryCard> {
     final dateStr = DateFormat('M/d HH:mm').format(entry.createdAt);
     final myUserId = ref.watch(currentUserIdProvider) ?? '';
     final myName = ref.watch(userDocProvider).valueOrNull?.name ?? '自分';
-    final friendName = widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
+    final friendName = widget.friend.displayName;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),

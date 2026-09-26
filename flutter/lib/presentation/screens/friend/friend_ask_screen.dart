@@ -86,6 +86,8 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
     });
     _messageTimer?.cancel();
 
+    // サーバーにはあだ名を送らない（あだ名は本人だけの情報で、履歴などに
+    // 保存される名前はアカウント名にしておく）
     final friendName =
         widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
 
@@ -239,8 +241,8 @@ class _FriendAskViewState extends ConsumerState<FriendAskView> {
     final accentColor = ref.watch(accentColorProvider);
     final myUserId = ref.watch(currentUserIdProvider) ?? '';
     final myName = ref.watch(userDocProvider).valueOrNull?.name ?? '自分';
-    final friendName =
-        widget.friend.name.isNotEmpty ? widget.friend.name : 'フレンド';
+    // 画面に出す名前はあだ名（未設定ならアカウント名）
+    final friendName = widget.friend.displayName;
 
     return Column(
             children: [
