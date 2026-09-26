@@ -168,18 +168,22 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
   Future<void> _confirmRemoveFriend(BuildContext context, WidgetRef ref) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      // ダイアログのボタンは必ずダイアログ自身の context で閉じる。外側の context で
+      // Navigator.pop すると、ダイアログではなくタブ内の画面（一覧の場合はタブの
+      // いちばん下の画面）が閉じ、タブが真っ白になる（その後タブを切り替えると
+      // '_history.isNotEmpty' のエラー画面になる）
+      builder: (dialogContext) => AlertDialog(
         title: const Text('フレンドを削除'),
         content: Text(
           '${_friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除されます。',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogContext, false),
             child: const Text('キャンセル'),
           ),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('削除', style: TextStyle(color: Colors.red)),
           ),
         ],

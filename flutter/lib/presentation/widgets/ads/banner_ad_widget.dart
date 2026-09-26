@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -21,6 +23,10 @@ class BannerAdWidget extends StatefulWidget {
 class _BannerAdWidgetState extends State<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
+  Timer? _retryTimer;
+
+  /// 読み込みに失敗したとき、読み込み直すまでの時間
+  static const _retryDelay = Duration(seconds: 60);
 
   @override
   void initState() {
@@ -30,6 +36,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _bannerAd?.dispose();
     super.dispose();
   }
@@ -54,8 +61,25 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
           print('✅ BannerAd: Loaded');
         },
         onAdFailedToLoad: (ad, error) {
-          ad.dispose();
           print('❌ BannerAd: Failed to load - ${error.message}');
+          // 表示中の広告の自動更新が失敗したときもここに来る。破棄した広告を
+          // AdWidget に表示し続けると画面が壊れる（白・グレーになる）ため、
+          // 先に「読み込み中」の表示へ戻してから破棄し、少し待って読み込み直す
+          if (mounted) {
+            setState(() {
+              _isLoaded = false;
+              _bannerAd = null;
+            });
+            // AdWidget が画面から外れるのは次の描画なので、破棄はそのあとにする
+            WidgetsBinding.instance.addPostFrameCallback((_) => ad.dispose());
+          } else {
+            _bannerAd = null;
+            ad.dispose();
+          }
+          _retryTimer?.cancel();
+          _retryTimer = Timer(_retryDelay, () {
+            if (mounted) _loadAd();
+          });
         },
         onAdOpened: (ad) {
           print('📱 BannerAd: Opened');
