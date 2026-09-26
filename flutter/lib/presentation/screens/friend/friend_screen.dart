@@ -12,6 +12,7 @@ import '../../widgets/ads/screen_banner.dart';
 import '../../../data/services/ad_service.dart';
 import 'friend_search_screen.dart';
 import 'compatibility_screen.dart';
+import 'friend_nickname_dialogs.dart';
 class FriendScreen extends ConsumerWidget {
   const FriendScreen({super.key});
 
@@ -108,6 +109,9 @@ class FriendScreen extends ConsumerWidget {
 
 }
 
+/// 一覧の長押しメニューで選べる操作
+enum _FriendAction { editNickname, deleteNickname, remove }
+
 /// フレンドカード
 class _FriendCard extends ConsumerWidget {
   final FriendModel friend;
@@ -121,7 +125,7 @@ class _FriendCard extends ConsumerWidget {
       builder: (_) => AlertDialog(
         title: const Text('フレンドを削除'),
         content: Text(
-          '${friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+          '${friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除されます。',
         ),
         actions: [
           TextButton(
@@ -135,8 +139,73 @@ class _FriendCard extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
-    await ref.read(friendControllerProvider.notifier).removeFriend(friend.id);
+    if (confirmed != true || !context.mounted) return;
+    // 削除はサーバーで数秒かかる。その間に同じフレンドを開いたり、もう一度削除したり
+    // できないよう、閉じられない処理中表示を出しておく
+    final navigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+    try {
+      await ref.read(friendControllerProvider.notifier).removeFriend(friend.id);
+    } finally {
+      navigator.pop();
+    }
+  }
+
+  /// 長押しメニュー（あだ名を付ける・変更／あだ名を削除／フレンドを削除）
+  Future<void> _showActions(BuildContext context, WidgetRef ref) async {
+    final action = await showModalBottomSheet<_FriendAction>(
+      context: context,
+      // 下のタブバーより手前に出す（タブバーの裏に項目が隠れないように）
+      useRootNavigator: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+              child: Text(
+                friend.displayName,
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: accentColor),
+              title: Text(friend.hasNickname ? 'あだ名を変更' : 'あだ名を付ける'),
+              onTap: () => Navigator.pop(sheetContext, _FriendAction.editNickname),
+            ),
+            if (friend.hasNickname)
+              ListTile(
+                leading: Icon(Icons.close, color: AppColors.textLight),
+                title: const Text('あだ名を削除'),
+                onTap: () => Navigator.pop(sheetContext, _FriendAction.deleteNickname),
+              ),
+            ListTile(
+              leading: const Icon(Icons.person_remove_outlined, color: Colors.red),
+              title: const Text('フレンドを削除', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(sheetContext, _FriendAction.remove),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !context.mounted) return;
+    switch (action) {
+      case _FriendAction.editNickname:
+        await showFriendNicknameEditor(context, friend);
+      case _FriendAction.deleteNickname:
+        await confirmDeleteFriendNickname(context, friend);
+      case _FriendAction.remove:
+        await _confirmRemoveFriend(context, ref);
+    }
   }
 
   @override
@@ -148,7 +217,7 @@ class _FriendCard extends ConsumerWidget {
           builder: (_) => CompatibilityScreen(friend: friend),
         ),
       ),
-      onLongPress: () => _confirmRemoveFriend(context, ref),
+      onLongPress: () => _showActions(context, ref),
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(

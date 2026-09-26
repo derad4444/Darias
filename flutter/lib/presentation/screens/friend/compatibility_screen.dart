@@ -16,6 +16,7 @@ import '../../../data/services/ad_service.dart';
 import 'compatibility_category_screen.dart';
 import 'friend_ask_screen.dart';
 import 'friend_ask_history_screen.dart';
+import 'friend_nickname_dialogs.dart';
 /// カテゴリ定義
 class CompatibilityCategoryMeta {
   final String key;
@@ -162,26 +163,6 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       ref.read(liveFriendProvider(widget.friend.id)) ?? widget.friend;
 
   // ─────────────────────────────────────────
-  // あだ名の編集ダイアログ
-  // ─────────────────────────────────────────
-  Future<void> _editNickname(BuildContext context, FriendModel friend) async {
-    final result = await showDialog<String>(
-      context: context,
-      builder: (_) => _NicknameDialog(friend: friend),
-    );
-    if (result == null || result.trim() == friend.nickname) return;
-    final ok = await ref.read(friendControllerProvider.notifier).setFriendNickname(
-          friendId: friend.id,
-          nickname: result,
-        );
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(this.context).showSnackBar(
-        const SnackBar(content: Text('あだ名を保存できませんでした')),
-      );
-    }
-  }
-
-  // ─────────────────────────────────────────
   // フレンド削除確認ダイアログ
   // ─────────────────────────────────────────
   Future<void> _confirmRemoveFriend(BuildContext context, WidgetRef ref) async {
@@ -190,7 +171,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       builder: (_) => AlertDialog(
         title: const Text('フレンドを削除'),
         content: Text(
-          '${_friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除され、予定の共有も解除されます。',
+          '${_friend.displayName}をフレンドから削除しますか？\n\n相手のフレンド一覧からも削除されます。',
         ),
         actions: [
           TextButton(
@@ -205,7 +186,22 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
       ),
     );
     if (confirmed != true || !context.mounted) return;
-    await ref.read(friendControllerProvider.notifier).removeFriend(widget.friend.id);
+    // 削除はサーバーで数秒かかる。その間にほかの操作ができないよう、
+    // 閉じられない処理中表示を出しておく
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const PopScope(
+        canPop: false,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+    try {
+      await ref.read(friendControllerProvider.notifier).removeFriend(widget.friend.id);
+    } finally {
+      rootNavigator.pop();
+    }
     if (!context.mounted) return;
     Navigator.pop(context);
   }
@@ -521,15 +517,28 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
                     _buildAvatarRow(accentColor, myUserId, myName, myInitial,
                         friendInitial, friend),
                     const SizedBox(height: 4),
-                    Center(
-                      child: TextButton.icon(
-                        onPressed: () => _editNickname(context, friend),
-                        icon: Icon(Icons.edit_outlined, size: 16, color: accentColor),
-                        label: Text(
-                          friend.hasNickname ? 'あだ名を変更' : 'あだ名を付ける',
-                          style: TextStyle(fontSize: 13, color: accentColor),
+                    // あだ名の設定。付けていれば「変更」と「削除」を並べる
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () => showFriendNicknameEditor(context, friend),
+                          icon: Icon(Icons.edit_outlined, size: 16, color: accentColor),
+                          label: Text(
+                            friend.hasNickname ? 'あだ名を変更' : 'あだ名を付ける',
+                            style: TextStyle(fontSize: 13, color: accentColor),
+                          ),
                         ),
-                      ),
+                        if (friend.hasNickname)
+                          TextButton.icon(
+                            onPressed: () => confirmDeleteFriendNickname(context, friend),
+                            icon: Icon(Icons.close, size: 16, color: AppColors.textLight),
+                            label: Text(
+                              'あだ名を削除',
+                              style: TextStyle(fontSize: 13, color: AppColors.textLight),
+                            ),
+                          ),
+                      ],
                     ),
 
                     const SizedBox(height: 12),
@@ -1033,68 +1042,6 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
 
 // ─────────────────────────────────────────
 // ラベル付きアバター
-// ─────────────────────────────────────────
-// あだ名の入力ダイアログ
-// ─────────────────────────────────────────
-/// 入力欄のコントローラーはダイアログ自身が持ち、ダイアログが画面から消えたときに
-/// 破棄する（呼び出し側で showDialog の直後に破棄すると、閉じるアニメーションの
-/// 途中でまだ使われていてエラーになる）
-class _NicknameDialog extends StatefulWidget {
-  final FriendModel friend;
-
-  const _NicknameDialog({required this.friend});
-
-  @override
-  State<_NicknameDialog> createState() => _NicknameDialogState();
-}
-
-class _NicknameDialogState extends State<_NicknameDialog> {
-  late final TextEditingController _controller =
-      TextEditingController(text: widget.friend.nickname);
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('あだ名を付ける'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            maxLength: kFriendNicknameMaxLength,
-            decoration: InputDecoration(
-              hintText: widget.friend.name.isNotEmpty ? widget.friend.name : 'あだ名',
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'あだ名はあなたにだけ表示されます。相手や他の人には表示されません。\n空欄にするとアカウント名の表示に戻ります。',
-            style: TextStyle(fontSize: 12, color: AppColors.textLight, height: 1.5),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('キャンセル'),
-        ),
-        TextButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('保存'),
-        ),
-      ],
-    );
-  }
-}
-
 // ─────────────────────────────────────────
 class _LabeledAvatar extends StatelessWidget {
   final Widget avatar;
