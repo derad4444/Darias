@@ -411,7 +411,7 @@ class _CharacterDetailBody extends ConsumerWidget {
                     _InfoRow(label: '長所', value: detail.strength, textColor: textColor),
                     _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
                     _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
-                    _InfoRow(label: '適正', value: detail.aptitude, textColor: textColor),
+                    _InfoRow(label: '適性', value: detail.aptitude, textColor: textColor),
                     _DreamRow(
                       textColor: textColor,
                       accentColor: accentColor,
