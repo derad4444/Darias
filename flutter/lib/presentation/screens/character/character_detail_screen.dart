@@ -524,9 +524,9 @@ class _TraitTabsSectionState extends State<_TraitTabsSection> {
       );
     }
 
-    final traits = kCharacterTraits
-        .where((t) => t.tab == _tab && detail.traitValues.containsKey(t.key))
-        .toList();
+    final isCaution = _tab == TraitTab.caution;
+    final hasCaution = kCharacterTraits.any(
+        (t) => t.tab == TraitTab.caution && detail.traitValues.containsKey(t.key));
 
     return Column(
       children: [
@@ -537,26 +537,72 @@ class _TraitTabsSectionState extends State<_TraitTabsSection> {
           onChanged: (tab) => setState(() => _tab = tab),
         ),
         const SizedBox(height: 12),
-        for (final trait in traits)
-          _TraitCard(
-            // タブを切り替えたときに開閉状態を持ち越さない
-            key: ValueKey(trait.key),
-            label: trait.label,
-            value: detail.traitValues[trait.key]!,
-            reason: detail.traitReasons[trait.key] ?? '',
-            textColor: widget.textColor,
-            dark: _tab == TraitTab.caution,
-          ),
         // 苦手・注意の項目は 2026-10 の拡張で増えたため、作り直し前のデータには無い
-        if (_tab == TraitTab.caution && traits.isEmpty)
-          const _TraitPlaceholder(),
-        if (_tab == TraitTab.positive)
-          _DreamRow(
-            textColor: widget.textColor,
-            accentColor: widget.accentColor,
-            legacyDream: detail.dream,
-          ),
+        if (isCaution && !hasCaution)
+          const _TraitPlaceholder()
+        else
+          for (final (positiveKey, cautionKey) in kTraitPairs)
+            _buildPairRow(positiveKey, cautionKey),
       ],
+    );
+  }
+
+  /// 対になる2項目のうち、選択中のタブ側を表示する
+  ///
+  /// 反対側のカードを見えない状態で重ねておき、行の高さを2枚のうち高いほうに揃える。
+  /// これでタブを切り替えても、対の項目が同じ高さに並ぶ。
+  Widget _buildPairRow(String positiveKey, String cautionKey) {
+    final isCaution = _tab == TraitTab.caution;
+    final active = isCaution ? _cautionCard(cautionKey) : _positiveCard(positiveKey);
+    final other = isCaution ? _positiveCard(positiveKey, ghost: true) : _cautionCard(cautionKey, ghost: true);
+    if (active == null && other == null) return const SizedBox.shrink();
+
+    return Stack(
+      children: [
+        if (other != null)
+          Visibility(
+            visible: false,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: other,
+          ),
+        ?active,
+      ],
+    );
+  }
+
+  /// 得意・好き側のカード（夢は専用の行）
+  Widget? _positiveCard(String key, {bool ghost = false}) {
+    final detail = widget.detail;
+    if (key == kDreamPairKey) {
+      return _DreamRow(
+        key: ValueKey('${ghost ? 'ghost' : 'card'}:dream'),
+        textColor: widget.textColor,
+        accentColor: widget.accentColor,
+        legacyDream: detail.dream,
+      );
+    }
+    return _traitCard(key, ghost: ghost, dark: false);
+  }
+
+  /// 苦手・注意側のカード
+  Widget? _cautionCard(String key, {bool ghost = false}) =>
+      _traitCard(key, ghost: ghost, dark: true);
+
+  Widget? _traitCard(String key, {required bool ghost, required bool dark}) {
+    final detail = widget.detail;
+    final value = detail.traitValues[key];
+    final trait = traitDefinitionOf(key);
+    if (value == null || trait == null) return null;
+    return _TraitCard(
+      // タブを切り替えたときに開閉状態を持ち越さない
+      key: ValueKey('${ghost ? 'ghost' : 'card'}:$key'),
+      label: trait.label,
+      value: value,
+      reason: detail.traitReasons[key] ?? '',
+      textColor: widget.textColor,
+      dark: dark,
     );
   }
 }
@@ -827,6 +873,7 @@ class _DreamRow extends ConsumerWidget {
   final String? legacyDream;
 
   const _DreamRow({
+    super.key,
     required this.textColor,
     required this.accentColor,
     this.legacyDream,

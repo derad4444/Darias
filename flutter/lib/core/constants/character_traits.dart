@@ -55,6 +55,34 @@ const List<TraitDefinition> kCharacterTraits = [
   TraitDefinition('stress_trigger', 'ストレスを感じる瞬間', TraitTab.caution),
 ];
 
+/// 夢を表すペアのキー（夢は `details/current` ではなく `dream/current` から読む）
+const String kDreamPairKey = 'dream';
+
+/// 詳細画面の行の並び（得意・好き ↔ 苦手・注意 の対）
+///
+/// タブを切り替えても対の項目が同じ高さに来るよう、この順で並べて各行の高さを揃える。
+/// 好きな色には対がないため、嫌いなことを同じ行に置く。
+const List<(String, String)> kTraitPairs = [
+  ('favorite_color', 'dislike'),
+  ('favorite_place', 'uneasy_place'),
+  ('favorite_word', 'trigger_word'),
+  ('word_tendency', 'disliked_approach'),
+  ('strength', 'weakness'),
+  ('skill', 'weak_task'),
+  ('hobby', 'uninterested'),
+  ('aptitude', 'unsuited_environment'),
+  ('energizer', 'stress_trigger'),
+  (kDreamPairKey, 'feared_self'),
+];
+
+/// キーから定義を引く
+TraitDefinition? traitDefinitionOf(String key) {
+  for (final t in kCharacterTraits) {
+    if (t.key == key) return t;
+  }
+  return null;
+}
+
 /// 性格のリセットで消すフィールド（値と理由）
 List<String> get kCharacterTraitFieldsToReset => [
       for (final t in kCharacterTraits) ...[t.key, t.reasonKey],
