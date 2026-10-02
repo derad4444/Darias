@@ -4,6 +4,7 @@ const admin = require("firebase-admin");
 const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS} = require("../src/prompts/templates");
 const {getDream} = require("../src/utils/dreamStore");
+const {buildTraitReferenceBlock, DIARY_TRAIT_KEYS} = require("../src/utils/characterTraits");
 const {
   MEMORY_MAX_ITEMS,
   getMemory,
@@ -247,6 +248,7 @@ async function generateDiary(characterId, userId) {
       dream,
       strength,
       memorySummary,
+      buildTraitReferenceBlock(charData, DIARY_TRAIT_KEYS),
   );
 
   // OpenAI呼び出し

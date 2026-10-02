@@ -105,15 +105,17 @@ async function getDream(userId, characterId, detailsData = null) {
  * @param {string} characterId - キャラクターID
  * @param {string[]} options - 夢の候補（正規化済み）
  * @param {string} legacyDream - 旧保存先 details/current.dream の値（移行用）
+ * @param {string[]} reasons - 候補ごとの理由（options と同じ並び）
  * @return {Promise<void>}
  */
-async function saveDreamOptions(userId, characterId, options, legacyDream = "") {
+async function saveDreamOptions(userId, characterId, options, legacyDream = "", reasons = []) {
   const ref = dreamRef(userId, characterId);
   const snap = await ref.get();
   const current = snap.exists ? snap.data() : null;
 
   const payload = {
     dreamOptions: options,
+    dreamOptionReasons: alignReasons(options, reasons),
     dreamOptionsUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
     updated_at: admin.firestore.FieldValue.serverTimestamp(),
   };
@@ -139,7 +141,42 @@ async function saveDreamOptions(userId, characterId, options, legacyDream = "") 
   await ref.set(payload, {merge: true});
 }
 
+/**
+ * 理由の並びを候補の数に揃える（足りない分は空文字）
+ * @param {string[]} options - 夢の候補
+ * @param {*} reasons - 理由の配列
+ * @return {string[]} - 候補と同じ長さの理由
+ */
+function alignReasons(options, reasons) {
+  const list = Array.isArray(reasons) ? reasons : [];
+  return options.map((_, i) => (typeof list[i] === "string" ? list[i] : ""));
+}
+
+/**
+ * 提示中の候補に理由だけを足す（既存テンプレートの作り直し用）
+ *
+ * 候補・選択中の夢・再提案フラグには触らない。提示中の候補が作り直したテンプレートと
+ * 違う（性格が変わって別の候補を持っている）場合は何もしない。
+ *
+ * @param {string} userId - ユーザーID
+ * @param {string} characterId - キャラクターID
+ * @param {string[]} options - テンプレートの夢の候補
+ * @param {string[]} reasons - 候補ごとの理由
+ * @return {Promise<boolean>} - 書き込んだら true
+ */
+async function saveDreamOptionReasons(userId, characterId, options, reasons) {
+  const ref = dreamRef(userId, characterId);
+  const snap = await ref.get();
+  if (!snap.exists) return false;
+  const current = snap.data().dreamOptions || [];
+  const same = current.length === options.length && current.every((d, i) => d === options[i]);
+  if (!same) return false;
+  await ref.set({dreamOptionReasons: alignReasons(options, reasons)}, {merge: true});
+  return true;
+}
+
 module.exports = {
+  saveDreamOptionReasons,
   DREAM_MAX_LENGTH,
   DREAM_OPTION_COUNT,
   dreamRef,

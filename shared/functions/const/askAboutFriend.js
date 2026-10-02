@@ -5,6 +5,7 @@ const {onCall, HttpsError} = require("firebase-functions/v2/https");
 const {getFirestore} = require("../src/utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../src/clients/openai");
 const {OPENAI_API_KEY} = require("../src/config/config");
+const {buildTraitReferenceBlock, FRIEND_TRAIT_KEYS} = require("../src/utils/characterTraits");
 
 const db = getFirestore();
 
@@ -42,6 +43,7 @@ async function fetchCharacterInfo(userId) {
       agreeableness: scores.agreeableness ?? 3,
       neuroticism: scores.neuroticism ?? 3,
       gender,
+      details: detail, // 趣味・嫌いなことなどの属性（相手キャラの好み・苦手として渡す）
     };
   } catch (e) {
     console.warn("fetchCharacterInfo error:", e.message);
@@ -124,7 +126,7 @@ exports.askAboutFriend = onCall(
 - 会話は4〜5ターン（交互に話す）
 - 各キャラクターは指定された口調・一人称を必ず守る
 - キャラクターの名前は「自分」「相手」とだけ呼ぶ（固有名詞は使わない）
-- 「相手キャラ」の発言はBIG5の特性から自然に導き出した好みや傾向を反映させる
+- 「相手キャラ」の発言はBIG5の特性から自然に導き出した好みや傾向を反映させる。【相手キャラの好み・苦手】があれば、テーマに関係する項目だけ踏まえる
 - 「自分キャラ」は質問・掘り下げ・まとめ役として振る舞い、最後に具体的な提案をする
 - 会話は「自分キャラ」の発言から始める
 - recommendation は相手の性格から導き出した具体的な提案（60文字以内）
@@ -138,10 +140,14 @@ exports.askAboutFriend = onCall(
   "recommendation": "具体的なおすすめや傾向（60文字以内）"
 }`;
 
+      // 相手の趣味・嫌いなことなど。詳細画面に出ている内容と提案が食い違わないように渡す
+      const friendTraits = buildTraitReferenceBlock(
+          friendInfo.details, FRIEND_TRAIT_KEYS, "【相手キャラの好み・苦手】");
+
       const userPrompt = `${mySpeech}
 
 ${friendSpeech}
-
+${friendTraits ? `\n${friendTraits}\n` : ""}
 【テーマ】${question}
 
 この2人が上記テーマについて、相手キャラの性格・好みを探りながら自然に語り合う会話を生成してください。`;

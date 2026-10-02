@@ -5,6 +5,7 @@ const {OPENAI_API_KEY} = require("../src/config/config");
 const {OPTIMIZED_PROMPTS, buildPersonalityTraitsFromAxes} = require("../src/prompts/templates");
 const firestoreCache = require("../src/utils/firestoreCache");
 const {getDream} = require("../src/utils/dreamStore");
+const {buildTraitReferenceBlock, CHAT_TRAIT_KEYS} = require("../src/utils/characterTraits");
 const {getMemory, formatMemoriesForPrompt} = require("../src/utils/memoryStore");
 
 // 感情判定関数
@@ -84,7 +85,7 @@ function getMaxTokensForPhase(phase) {
 }
 
 // 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
-function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null) {
+function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null) {
   // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -110,7 +111,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingConte
   }
 
   // BIG5詳細形式を使用した新しいプロンプト（5軸スコアがある場合はtraitsOverrideを優先）
-  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext, memoryContext);
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext, memoryContext, traitContext);
 }
 
 // 無意味な入力を検出する関数
@@ -261,10 +262,14 @@ exports.generateCharacterReply = onCall(
           firestoreCache.set(memoryCacheKey, memoryContext);
         }
 
+        // 趣味・元気が出ること・嫌いなことなど（性格タイプから生成した属性）。
+        // 話題に関係するときだけ使う条件を同じブロックに書いている
+        const traitContext = buildTraitReferenceBlock(charData, CHAT_TRAIT_KEYS);
+
         // Android度を計算し、プロンプトを生成（5軸スコアがある場合は5軸特性を優先）
         const prompt = buildCharacterPrompt(
             big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase, openerContext,
-            memoryContext || null);
+            memoryContext || null, traitContext || null);
 
         const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
 

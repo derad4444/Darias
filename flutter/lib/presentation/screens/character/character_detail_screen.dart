@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/constants/character_traits.dart';
 import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/character_provider.dart';
@@ -84,6 +85,12 @@ class CharacterDetailData {
   final String? typeName;
   final String? personalityNarrative;
 
+  /// 得意・好き／苦手・注意の属性（キー → 値）。キーは [kCharacterTraits] と同じ
+  final Map<String, String> traitValues;
+
+  /// 属性ごとの理由（キー → 理由）。拡張前に作られたデータには無い
+  final Map<String, String> traitReasons;
+
   CharacterDetailData({
     this.favoriteColor,
     this.favoritePlace,
@@ -104,6 +111,8 @@ class CharacterDetailData {
     this.element,
     this.typeName,
     this.personalityNarrative,
+    this.traitValues = const {},
+    this.traitReasons = const {},
   });
 
   factory CharacterDetailData.fromMap(Map<String, dynamic> data) {
@@ -137,7 +146,19 @@ class CharacterDetailData {
       axisScores = rawAxisScores.map((k, v) => MapEntry(k, (v as num).toDouble()));
     }
 
+    final traitValues = <String, String>{};
+    final traitReasons = <String, String>{};
+    for (final trait in kCharacterTraits) {
+      final value = (data[trait.key] as String?)?.trim() ?? '';
+      if (value.isEmpty || value == '未設定') continue;
+      traitValues[trait.key] = value;
+      final reason = (data[trait.reasonKey] as String?)?.trim() ?? '';
+      if (reason.isNotEmpty) traitReasons[trait.key] = reason;
+    }
+
     return CharacterDetailData(
+      traitValues: traitValues,
+      traitReasons: traitReasons,
       favoriteColor: data['favorite_color'] as String?,
       favoritePlace: data['favorite_place'] as String?,
       favoriteWord: data['favorite_word'] as String?,
@@ -398,26 +419,13 @@ class _CharacterDetailBody extends ConsumerWidget {
                   ),
                 ),
 
-              // 情報エリア（値がある場合のみ表示）
+              // 得意・好き／苦手・注意のタブ（値がある項目だけ表示）
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    _InfoRow(label: '好きな色', value: detail.favoriteColor, textColor: textColor),
-                    _InfoRow(label: '好きな場所', value: detail.favoritePlace, textColor: textColor),
-                    _InfoRow(label: '口癖', value: detail.favoriteWord, textColor: textColor),
-                    _InfoRow(label: '話し方の特徴', value: detail.wordTendency, textColor: textColor),
-                    _InfoRow(label: '短所', value: detail.weakness, textColor: textColor),
-                    _InfoRow(label: '長所', value: detail.strength, textColor: textColor),
-                    _InfoRow(label: '特技', value: detail.skill, textColor: textColor),
-                    _InfoRow(label: '趣味', value: detail.hobby, textColor: textColor),
-                    _InfoRow(label: '適性', value: detail.aptitude, textColor: textColor),
-                    _DreamRow(
-                      textColor: textColor,
-                      accentColor: accentColor,
-                      legacyDream: detail.dream,
-                    ),
-                  ],
+                child: _TraitTabsSection(
+                  detail: detail,
+                  textColor: textColor,
+                  accentColor: accentColor,
                 ),
               ),
 
@@ -484,60 +492,299 @@ class _CharacterImage extends StatelessWidget {
   }
 }
 
-/// 情報行ウィジェット（iOS版infoRowと同じデザイン）
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String? value;
+/// 得意・好き／苦手・注意のタブと、各項目のアコーディオンカード
+class _TraitTabsSection extends StatefulWidget {
+  final CharacterDetailData detail;
   final Color textColor;
+  final Color accentColor;
 
-  const _InfoRow({
-    required this.label,
-    required this.value,
+  const _TraitTabsSection({
+    required this.detail,
     required this.textColor,
+    required this.accentColor,
+  });
+
+  @override
+  State<_TraitTabsSection> createState() => _TraitTabsSectionState();
+}
+
+class _TraitTabsSectionState extends State<_TraitTabsSection> {
+  TraitTab _tab = TraitTab.positive;
+
+  @override
+  Widget build(BuildContext context) {
+    final detail = widget.detail;
+
+    // 性格が確定する前は属性が無い。夢の行だけ従来どおり出す（夢も無ければ行ごと隠れる）
+    if (detail.traitValues.isEmpty) {
+      return _DreamRow(
+        textColor: widget.textColor,
+        accentColor: widget.accentColor,
+        legacyDream: detail.dream,
+      );
+    }
+
+    final traits = kCharacterTraits
+        .where((t) => t.tab == _tab && detail.traitValues.containsKey(t.key))
+        .toList();
+
+    return Column(
+      children: [
+        _TraitTabSwitcher(
+          selected: _tab,
+          textColor: widget.textColor,
+          accentColor: widget.accentColor,
+          onChanged: (tab) => setState(() => _tab = tab),
+        ),
+        const SizedBox(height: 12),
+        for (final trait in traits)
+          _TraitCard(
+            // タブを切り替えたときに開閉状態を持ち越さない
+            key: ValueKey(trait.key),
+            label: trait.label,
+            value: detail.traitValues[trait.key]!,
+            reason: detail.traitReasons[trait.key] ?? '',
+            textColor: widget.textColor,
+          ),
+        // 苦手・注意の項目は 2026-10 の拡張で増えたため、作り直し前のデータには無い
+        if (_tab == TraitTab.caution && traits.isEmpty)
+          _TraitPlaceholder(textColor: widget.textColor),
+        if (_tab == TraitTab.positive)
+          _DreamRow(
+            textColor: widget.textColor,
+            accentColor: widget.accentColor,
+            legacyDream: detail.dream,
+          ),
+      ],
+    );
+  }
+}
+
+/// 「得意・好き」「苦手・注意」の切り替え
+class _TraitTabSwitcher extends StatelessWidget {
+  final TraitTab selected;
+  final Color textColor;
+  final Color accentColor;
+  final ValueChanged<TraitTab> onChanged;
+
+  const _TraitTabSwitcher({
+    required this.selected,
+    required this.textColor,
+    required this.accentColor,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    // 空の値の場合は非表示
-    if (value == null || value!.isEmpty || value == '未設定' || value!.trim().isEmpty) {
-      return const SizedBox.shrink();
+    Widget tab(TraitTab value, String label) {
+      final isSelected = selected == value;
+      return Expanded(
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => onChanged(value),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: isSelected ? accentColor : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : textColor.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+        ),
+      );
     }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          tab(TraitTab.positive, '得意・好き'),
+          tab(TraitTab.caution, '苦手・注意'),
+        ],
+      ),
+    );
+  }
+}
+
+/// 属性のカード。タップで理由が開く（理由が無い項目は開かない）
+class _TraitCard extends StatefulWidget {
+  final String label;
+  final String value;
+  final String reason;
+  final Color textColor;
+
+  /// 値の色（未設定の表示などで薄くするとき）
+  final Color? valueColor;
+
+  /// 枠線の色（未設定を目立たせるときなど）
+  final Color? borderColor;
+
+  /// 右端に置くボタンなど
+  final Widget? trailing;
+
+  const _TraitCard({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.reason,
+    required this.textColor,
+    this.valueColor,
+    this.borderColor,
+    this.trailing,
+  });
+
+  @override
+  State<_TraitCard> createState() => _TraitCardState();
+}
+
+class _TraitCardState extends State<_TraitCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasReason = widget.reason.isNotEmpty;
+    final textColor = widget.textColor;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.3),
+          color: widget.borderColor ?? Colors.white.withValues(alpha: 0.3),
         ),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                color: textColor.withValues(alpha: 0.7),
-              ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: hasReason ? () => setState(() => _expanded = !_expanded) : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.label,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: textColor.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.value,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w500,
+                              color: widget.valueColor ?? textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (widget.trailing != null) widget.trailing!,
+                    if (hasReason)
+                      AnimatedRotation(
+                        turns: _expanded ? 0.5 : 0,
+                        duration: const Duration(milliseconds: 200),
+                        child: Icon(
+                          Icons.expand_more,
+                          size: 22,
+                          color: textColor.withValues(alpha: 0.6),
+                        ),
+                      ),
+                  ],
+                ),
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  alignment: Alignment.topCenter,
+                  child: _expanded && hasReason
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 10),
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Icon(
+                                  Icons.lightbulb_outline,
+                                  size: 16,
+                                  color: textColor.withValues(alpha: 0.7),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    widget.reason,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      height: 1.5,
+                                      color: textColor.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : const SizedBox(width: double.infinity),
+                ),
+              ],
             ),
           ),
-          Expanded(
-            child: Text(
-              value!,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: textColor,
-              ),
-            ),
-          ),
-        ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 苦手・注意の項目がまだ無いときの案内
+class _TraitPlaceholder extends StatelessWidget {
+  final Color textColor;
+
+  const _TraitPlaceholder({required this.textColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        '性格が更新されると表示されます',
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 13, color: textColor.withValues(alpha: 0.7)),
       ),
     );
   }
@@ -546,7 +793,7 @@ class _InfoRow extends StatelessWidget {
 /// 夢の行（他の属性と違い、ユーザーが候補から選び直せる）
 ///
 /// 夢は本人限定の `characters/{characterId}/dream/current` に保存されるため、
-/// `details/current` を見る `_InfoRow` ではなく専用のプロバイダーから読む。
+/// `details/current` ではなく専用のプロバイダーから読む。AIの候補から選んだ夢には理由がある。
 class _DreamRow extends ConsumerWidget {
   final Color textColor;
   final Color accentColor;
@@ -596,44 +843,17 @@ class _DreamRow extends ConsumerWidget {
     final isUnset = currentDream.isEmpty;
     final canChange = dream.hasOptions;
 
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isUnset
-              ? accentColor.withValues(alpha: 0.8)
-              : Colors.white.withValues(alpha: 0.3),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '夢',
-              style: TextStyle(
-                fontSize: 13,
-                color: textColor.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              isUnset ? 'まだ決まっていません' : currentDream,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w500,
-                color: isUnset ? textColor.withValues(alpha: 0.6) : textColor,
-              ),
-            ),
-          ),
-          if (canChange)
-            TextButton(
+    return _TraitCard(
+      // 夢を選び直したら理由の開閉状態を持ち越さない
+      key: ValueKey('dream:$currentDream'),
+      label: '夢',
+      value: isUnset ? 'まだ決まっていません' : currentDream,
+      reason: isUnset ? '' : dream.dreamReason,
+      textColor: textColor,
+      valueColor: isUnset ? textColor.withValues(alpha: 0.6) : null,
+      borderColor: isUnset ? accentColor.withValues(alpha: 0.8) : null,
+      trailing: canChange
+          ? TextButton(
               onPressed: () => _openSheet(context, dream, currentDream),
               style: TextButton.styleFrom(
                 foregroundColor: accentColor,
@@ -642,9 +862,8 @@ class _DreamRow extends ConsumerWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: Text(isUnset ? '選ぶ' : '変更'),
-            ),
-        ],
-      ),
+            )
+          : null,
     );
   }
 }

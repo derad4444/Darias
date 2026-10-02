@@ -45,9 +45,10 @@ function getCategoryConclusion(category, concern) {
  * @param {string} category - カテゴリ
  * @param {Array<Object>} personalities - 6人のキャラクター情報
  * @param {Object} statsData - 統計データ
+ * @param {string} selfProfile - 今の自分・本音の自分の自己像（夢・長所・苦手など。無ければ空文字）
  * @return {string} - プロンプト
  */
-function createMeetingPrompt(concern, category, personalities, statsData) {
+function createMeetingPrompt(concern, category, personalities, statsData, selfProfile = "") {
   // buildPersonalityTraits（チャットと同じ方式）で各キャラクターの性格特性を生成
   const characterDescriptions = personalities.map((p) => {
     const traits = p.big5 ? buildPersonalityTraits(p.big5) : "バランスの取れた性格";
@@ -57,6 +58,17 @@ function createMeetingPrompt(concern, category, personalities, statsData) {
   }).join("\n\n");
 
   const categoryConclusion = getCategoryConclusion(category, concern);
+
+  // 今の自分・本音の自分だけが持つ自己像。ほかの人格には当てはめない
+  const selfProfileBlock = selfProfile ?
+    `
+【今の自分・本音の自分の自己像】
+${selfProfile}
+- これは今の自分（original）の自己像。主に original と shadow（本音の自分）が使う。ほかの人格が触れるときは「今のあなたの夢・苦手」として扱い、自分自身の好みや性格として語らない（真逆の自分などは性格が違うため）
+- 悩み「${concern}」と直接つながる項目があれば、original か shadow の発言で1〜2回、その人らしい本音として自然に踏まえる（例: 仕事の悩みなら夢・苦手な場面・なりたくない自分）。つながらない項目は一切触れない
+- 夢は、悩みが仕事・将来・生き方そのものに関わるときだけ持ち出す。それ以外の悩み（運動・買い物・人付き合いなど）で夢と結びつけない
+- 項目名や文言をそのまま言わない。結論で苦手・嫌いなことを勧めない
+` : "";
 
   return `あなたは人間の内面を描く脚本家です。
 1人の人間の中にいる6つの人格が、本音でぶつかり合う会議を生成してください。
@@ -76,7 +88,7 @@ function createMeetingPrompt(concern, category, personalities, statsData) {
 【各人格のプロフィールと発言スタイル】
 
 ${characterDescriptions}
-
+${selfProfileBlock}
 【参考データの使い方】
 - 類似性格者${statsData.similarCount}人のデータがあります
 - これを会話の中で自然に言及してください（統計の押し付けは禁止）

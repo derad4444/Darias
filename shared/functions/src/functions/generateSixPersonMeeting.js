@@ -5,6 +5,8 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {getFirestore} = require("../utils/firebaseInit");
 const {getOpenAIClient, safeOpenAICall} = require("../clients/openai");
 const {OPENAI_API_KEY} = require("../config/config");
+const {getDream, sanitizeDream} = require("../utils/dreamStore");
+const {traitLines, MEETING_TRAIT_KEYS} = require("../utils/characterTraits");
 const {Logger} = require("../utils/logger");
 const {
   generateSixPersonalities,
@@ -116,7 +118,12 @@ exports.generateOrReuseMeeting = onCall(
           throw new HttpsError("not-found", "キャラクターデータが見つかりません");
         }
 
-        const {big5, gender, personalityKey, sixPersonalities} = characterData;
+        const {big5, gender, personalityKey, sixPersonalities, details} = characterData;
+
+        // 今の自分・本音の自分にだけ渡す自己像（夢・長所・嫌いなことなど）。
+        // ほかの人格は BIG5 を作り替えた別人格なので当てはまらない
+        const dream = await getDream(userId, characterId, details);
+        const selfProfile = buildMeetingSelfProfile(details, dream);
 
         // 4. カテゴリの自動検出（AIで判定）
         const apiKey = OPENAI_API_KEY.value().trim();
@@ -191,6 +198,7 @@ exports.generateOrReuseMeeting = onCall(
               personalities,
               statsData,
               isPremium,
+              selfProfile,
           );
 
           // shared_meetingsに保存（キャッシュ化）
@@ -399,10 +407,24 @@ async function getMeetingUsageCount(userId, characterId) {
 }
 
 /**
+ * 今の自分・本音の自分にだけ渡す自己像を作る
+ * @param {Object} details - details/current のデータ
+ * @param {string} dream - 現在の夢
+ * @return {string} - 「表示名: 値」の行（無ければ空文字）
+ */
+function buildMeetingSelfProfile(details, dream) {
+  const lines = [];
+  const cleanDream = sanitizeDream(dream);
+  if (cleanDream) lines.push(`夢: ${cleanDream}`);
+  lines.push(...traitLines(details, MEETING_TRAIT_KEYS));
+  return lines.join("\n");
+}
+
+/**
  * キャラクターデータを取得
  * @param {string} userId - ユーザーID
  * @param {string} characterId - キャラクターID
- * @return {Promise<Object>} - {big5, gender, personalityKey, sixPersonalities}
+ * @return {Promise<Object>} - {big5, gender, personalityKey, sixPersonalities, details}
  */
 async function getCharacterData(userId, characterId) {
   try {
@@ -425,6 +447,7 @@ async function getCharacterData(userId, characterId) {
       gender: data.gender,
       personalityKey: data.personalityKey,
       sixPersonalities: data.sixPersonalities || null, // 保存済みがあれば取得
+      details: data, // 夢・長所・苦手などの属性（今の自分・本音の自分に渡す）
     };
   } catch (error) {
     logger.error("Failed to get character data", {error: error.message});
@@ -588,6 +611,7 @@ async function generateConversation(
     personalities,
     statsData,
     isPremium,
+    selfProfile = "",
 ) {
   logger.info("Generating conversation with AI (100% AI mode)");
   return await generateConversationWithAI(
@@ -595,6 +619,7 @@ async function generateConversation(
       category,
       personalities,
       statsData,
+      selfProfile,
   );
 }
 
@@ -604,6 +629,7 @@ async function generateConversation(
  * @param {string} category - カテゴリ
  * @param {Array<Object>} personalities - 6人のキャラクター
  * @param {Object} statsData - 統計データ
+ * @param {string} selfProfile - 今の自分・本音の自分にだけ渡す自己像（夢・長所・苦手など）
  * @return {Promise<Object>} - 会話データ
  */
 async function generateConversationWithAI(
@@ -611,6 +637,7 @@ async function generateConversationWithAI(
     category,
     personalities,
     statsData,
+    selfProfile = "",
 ) {
   const apiKey = OPENAI_API_KEY.value().trim();
   if (!apiKey) {
@@ -618,7 +645,7 @@ async function generateConversationWithAI(
   }
 
   const openai = getOpenAIClient(apiKey);
-  const prompt = createMeetingPrompt(concern, category, personalities, statsData);
+  const prompt = createMeetingPrompt(concern, category, personalities, statsData, selfProfile);
 
   const completion = await safeOpenAICall(
       openai.chat.completions.create.bind(openai.chat.completions),

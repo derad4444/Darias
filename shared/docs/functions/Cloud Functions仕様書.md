@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-09-24
+**最終更新日**: 2026-10-02
 **ランタイム**: Node.js 22
 **関数数**: 27
 
@@ -447,7 +447,7 @@
 #### 17. `askAboutFriend`
 - **ソース**: `const/askAboutFriend.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: フレンドについての質問（誕生日プレゼント、好み等）を受け取り、双方のキャラクターがBIG5性格データをもとに会話し、具体的なおすすめを返す。結果は `askHistory` に保存される（エフェメラルではない）
+- **概要**: フレンドについての質問（誕生日プレゼント、好み等）を受け取り、双方のキャラクターがBIG5性格データと相手の好み・苦手（趣味・嫌いなこと等7項目。`characterTraits.js` の `FRIEND_TRAIT_KEYS`）をもとに会話し、具体的なおすすめを返す。結果は `askHistory` に保存される（エフェメラルではない）
 - **リソース**: memory `512MiB` / timeout `90秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`

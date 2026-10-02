@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../../core/constants/character_traits.dart';
+
 /// BIG5診断関連のリモートデータソース（リセット機能のみ）
 class Big5Datasource {
   final FirebaseFirestore _firestore;
@@ -38,15 +40,8 @@ class Big5Datasource {
       'personalityKey': FieldValue.delete(),
       'analysis_level': FieldValue.delete(),
       'sixPersonalities': FieldValue.delete(),
-      'favorite_color': FieldValue.delete(),
-      'favorite_place': FieldValue.delete(),
-      'favorite_word': FieldValue.delete(),
-      'word_tendency': FieldValue.delete(),
-      'strength': FieldValue.delete(),
-      'weakness': FieldValue.delete(),
-      'skill': FieldValue.delete(),
-      'hobby': FieldValue.delete(),
-      'aptitude': FieldValue.delete(),
+      // 得意・好き／苦手・注意の属性と、その理由
+      for (final field in kCharacterTraitFieldsToReset) field: FieldValue.delete(),
       'dream': FieldValue.delete(),
       'favorite_entertainment_genre': FieldValue.delete(),
       'axisScores': FieldValue.delete(),

@@ -186,6 +186,34 @@ function stripQuotes(text) {
   return t;
 }
 
+/**
+ * 既存テンプレートを作り直すときに、変えてはいけない既存の値を示すブロック
+ *
+ * ユーザーが見慣れた口癖・長所・夢の候補が作り直しで急に変わらないよう、
+ * 既存の値はそのまま value に入れさせ、理由と足りない項目だけを作らせる。
+ *
+ * @param {Object|null} existing - {attributes, dreams}
+ * @return {string} - ブロック（既存の値が無ければ空文字）
+ */
+function buildExistingDetailsBlock(existing) {
+  if (!existing) return "";
+  const {TRAIT_KEYS, oneLine} = require("../utils/characterTraits");
+  const attributes = existing.attributes || {};
+  const lines = [];
+  for (const key of TRAIT_KEYS) {
+    const value = oneLine(attributes[key]);
+    if (value) lines.push(`- ${key}: ${value}`);
+  }
+  const dreams = Array.isArray(existing.dreams) ? existing.dreams.map((d) => oneLine(d)).filter(Boolean) : [];
+  if (dreams.length > 0) lines.push(`- dreams: ${dreams.join(" / ")}`);
+  if (lines.length === 0) return "";
+  return `
+【既存の値（valueは一字一句変えずにそのまま使い、reasonだけを書く。dreamsも同じ順番で使う）】
+${lines.join("\n")}
+ここに無い項目は新しく作る。
+`;
+}
+
 const OPTIMIZED_PROMPTS = {
   /**
    * Character Reply Generation - GPT-4o-mini optimized
@@ -193,7 +221,7 @@ const OPTIMIZED_PROMPTS = {
    * phase 2: 150文字, 受け止め+性格仮説+質問（あたってるかも体験）
    * phase 3: 220文字, 受け止め+性格言語化+質問任意（なるほど体験）
    */
-  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null) => {
+  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null) => {
     const traits = traitsOverride || buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
@@ -237,6 +265,7 @@ const OPTIMIZED_PROMPTS = {
 性格特性: ${traits}
 性別: ${genderText}
 ${dream}
+${traitContext || ""}
 ${meeting}
 ${memory}
 ${opener}
@@ -252,7 +281,7 @@ ${instruction}`;
    * Activity-based Diary Generation
    * Summarizes user's in-app activities as facts + character's encouraging comment
    */
-  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, favoriteWord, wordTendency, dream, strength, memorySummary = "") => {
+  activityDiary: (characterType, big5, gender, chatSummary, meetingSummary, dailyMissionSummary, favoriteWord, wordTendency, dream, strength, memorySummary = "", traitContext = "") => {
     const parts = [];
     // デイリーミッションの達成が一番の成果なので先頭に置く
     if (dailyMissionSummary) parts.push(`デイリーミッション: ${dailyMissionSummary}`);
@@ -285,7 +314,7 @@ ${instruction}`;
 性別: ${genderText}
 ${personalityText}
 口調: ${toneGuide}
-
+${traitContext ? `\n${traitContext}\n` : ""}
 【今日の活動】
 ${activitiesText}
 
@@ -303,6 +332,7 @@ ai_commentは以下のルールで250〜350文字で作成:
 - 口癖は「そのまま貼り付ける言葉」ではなく語り口の参考。相手への相づち（「面白いね！」など）や単語だけのことが多く、独白である日記に差し込むと不自然になる。文章に自然に収まるときだけ1回まで使い、収まらなければ使わなくてよい
 - 口癖や性格特性を鉤括弧で引用して本文に埋め込まない（例:「安定」を保ちながら…、のような書き方はしない）
 - 今日の活動に具体的に触れ、夢や強みを絡めて前向きに締める
+- 【性格の参考情報】は今日の活動に直接関係するときだけ踏まえる。苦手なことに取り組んだ日はその頑張りを認める。関係がなければ触れない
 - 活動がない場合は性格特性に基づいた温かい声がけを250〜350文字で書く
 
 memoriesは「明日以降もあなたが覚えておく価値のあること」を0〜3件:
@@ -326,17 +356,50 @@ openerは「明日ユーザーがアプリを開いたとき、あなたから�
   },
 
   /**
-   * Character Details Generation - GPT-4o-mini optimized
-   * Enhanced for consistent character generation
+   * キャラクター詳細（得意・好き／苦手・注意の各項目と、その理由）の生成
+   *
+   * 項目ごとに {"value","reason"} で返させ、保存時に `strength` と
+   * `strength_reason` のように平らにする（generateCharacterDetails.js の pickAttributes）。
+   *
+   * @param {Object} big5Scores - Big5スコア
+   * @param {string} gender - 性別
+   * @param {Object|null} existing - 既存の値（{attributes, dreams}）。渡した項目は値を変えず、
+   *   理由と足りない項目だけを作らせる（既存テンプレートの作り直し用）
+   * @return {string} - プロンプト
    */
-  characterDetails: (big5Scores, gender) => {
+  characterDetails: (big5Scores, gender, existing = null) => {
+    const keep = buildExistingDetailsBlock(existing);
     return `性格:${formatBig5ShortWithTraits(big5Scores)} 性別:${getGenderCode(gender)}
 
-以下の項目でキャラクター詳細を生成:
+この性格の人の「得意・好き」と「苦手・注意」を、自己理解に役立つように生成する。
+${keep}
+各項目は {"value":"内容","reason":"理由"} で書く。
+- value: 20文字以内。具体的な行動・場面・物で書く。「人間関係」「仕事」「新しいこと」のような抽象語だけの値は不可
+  （良い例: 「予定を直前に変えられること」 悪い例: 「変化」）
+- reason: 30文字以内の1文。その人が何を大事にしているか・どう感じるかを「〜から」「〜ため」で終える
+  性格用語（外向的・内向的・几帳面・協調性・好奇心旺盛・神経症・〜な性格・〜型 など）は使わない
+  （良い例: 「段取りを立ててから動きたいから」「自分の考えを否定された気がするから」
+    悪い例: 「外向的な性格だから」「几帳面で真面目なため」）
+- 苦手・注意の項目は人格を否定しない。「〜な人」ではなく「〜な場面」「〜なこと」で書く
 
-dreamsは必ず5個。この性格に合う夢を、方向性を変えて挙げること（仕事/学び/人との関わり/暮らし/自己表現 など）。各20文字以内。
+項目の意味:
+- favorite_color 好きな色 / favorite_place 好きな場所 / word_tendency 話し方の特徴
+- strength 長所 / skill 特技 / hobby 趣味 / aptitude 適性（向いている仕事・役割）
+- energizer 元気が出ること（気分が上がる・回復する行動）
+- uneasy_place 落ち着かない場所
+- trigger_word 言われるとモヤっとする言葉（valueは実際のセリフ。鉤括弧は付けない）
+- disliked_approach 苦手な接し方（他人からされると困る関わり方）
+- weakness 短所
+- weak_task 苦手な作業
+- uninterested 興味が湧きにくいこと
+- unsuited_environment 向いていない環境・役割
+- feared_self なりたくない自分（避けたい将来の姿）
+- dislike 嫌いなこと（価値観に反すること）
+- stress_trigger ストレスを感じる瞬間
 
-favorite_wordはこのキャラクターの口癖。次の条件を守ること:
+dreamsは必ず5個。この性格に合う夢を、方向性を変えて挙げること（仕事/学び/人との関わり/暮らし/自己表現 など）。valueは各20文字以内。
+
+favorite_wordはこのキャラクターの口癖。valueは次の条件を守ること:
 - 12文字以内
 - 独り言としても会話の中でも自然に使える言い回しにする
 - 相手の発言への相づち（「面白いね！」「それいいね！」「うん、わかる！」など、会話相手がいないと成立しない言葉）は不可
@@ -345,8 +408,8 @@ favorite_wordはこのキャラクターの口癖。次の条件を守ること:
 - 迷い・不安の調子（「どうしよう」「また考えすぎた」）は、神経症傾向が高い性格のときだけ使う
 - 鉤括弧（「」）や引用符を含めない
 
-出力形式:
-{"favorite_color":"好きな色","favorite_place":"好きな場所","favorite_word":"口癖","word_tendency":"話し方の特徴","strength":"長所","weakness":"短所","skill":"特技","hobby":"趣味","aptitude":"適性","dreams":["夢1","夢2","夢3","夢4","夢5"],"favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
+出力形式（JSONのみ）:
+{"favorite_color":{"value":"","reason":""},"favorite_place":{"value":"","reason":""},"favorite_word":{"value":"","reason":""},"word_tendency":{"value":"","reason":""},"strength":{"value":"","reason":""},"skill":{"value":"","reason":""},"hobby":{"value":"","reason":""},"aptitude":{"value":"","reason":""},"energizer":{"value":"","reason":""},"uneasy_place":{"value":"","reason":""},"trigger_word":{"value":"","reason":""},"disliked_approach":{"value":"","reason":""},"weakness":{"value":"","reason":""},"weak_task":{"value":"","reason":""},"uninterested":{"value":"","reason":""},"unsuited_environment":{"value":"","reason":""},"feared_self":{"value":"","reason":""},"dislike":{"value":"","reason":""},"stress_trigger":{"value":"","reason":""},"dreams":[{"value":"","reason":""},{"value":"","reason":""},{"value":"","reason":""},{"value":"","reason":""},{"value":"","reason":""}],"favorite_entertainment_genre":"好きな娯楽ジャンル"}`;
   },
 
   /**

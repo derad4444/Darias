@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-09-26
+**最終更新日**: 2026-10-02（キャラクター属性に苦手・注意の項目と理由を追加）
 **トップレベルコレクション**: 11
 
 ---
@@ -95,6 +95,17 @@
 - **favorite_word**: `string` - 口癖。鉤括弧・引用符を含まない素のフレーズで保存する（12文字以内・独り言としても自然に使える言い切りの形）
 - **favorite_entertainment_genre**: `string` - 好きなエンターテイメントジャンル
 - **word_tendency**: `string` - 話し方の特徴
+- **energizer**: `string` - 元気が出ること
+- **uneasy_place**: `string` - 落ち着かない場所
+- **trigger_word**: `string` - 言われるとモヤっとする言葉（鉤括弧・引用符を含まない）
+- **disliked_approach**: `string` - 苦手な接し方
+- **weak_task**: `string` - 苦手な作業
+- **uninterested**: `string` - 興味が湧きにくいこと
+- **unsuited_environment**: `string` - 向いていない環境・役割
+- **feared_self**: `string` - なりたくない自分
+- **dislike**: `string` - 嫌いなこと
+- **stress_trigger**: `string` - ストレスを感じる瞬間
+- **`<属性キー>_reason`**: `string` - 各属性の理由（30文字以内の1文。例 `strength_reason`）。`favorite_entertainment_genre` 以外の全属性に付く。2026-10-02 より前に作られたデータには無い
 
 > 上記のキャラクター属性は `CharacterDetailsTemplate/{personalityKey}` から複製される（同じ性格キーのユーザー間で同一の値になる）。
 >
@@ -138,6 +149,7 @@
 
 - **dream**: `string` - 現在採用中の夢（最大40文字）
 - **dreamOptions**: `array<string>` - AIが性格から生成した候補5個
+- **dreamOptionReasons**: `array<string>` - 候補ごとの理由（`dreamOptions` と同じ並び。理由が無い候補は空文字）
 - **dreamSource**: `string` - 夢の由来（`"user"` = ユーザーが選択・入力 / `"ai"` = 候補から暫定採用）
 - **pendingDreamProposal**: `boolean` - 性格が変わって新しい候補ができたことを示すフラグ。進化ダイアログで提案し、確認後に `false` にする
 - **dreamOptionsUpdatedAt**: `timestamp` - 候補の最終更新日時
@@ -560,8 +572,9 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 **フィールド:**
 
 - **personality_key**: `string` - 性格タイプのキー
-- **attributes**: `map` - キャラクター属性10項目（`favorite_color` / `favorite_place` / `favorite_word` / `word_tendency` / `strength` / `weakness` / `skill` / `hobby` / `aptitude` / `favorite_entertainment_genre`）
+- **attributes**: `map` - キャラクター属性20項目（得意・好き9項目・苦手・注意10項目・`favorite_entertainment_genre`）と、各属性の理由 `<キー>_reason`。項目の一覧は `details/current` を参照
 - **dreams**: `array<string>` - 夢の候補5個
+- **dream_reasons**: `array<string>` - 夢の候補ごとの理由（`dreams` と同じ並び）
 - **model**: `string` - 生成に使用したモデル（`gpt-4o-2024-11-20`）
 - **updated_at**: `timestamp` - 更新日時
 

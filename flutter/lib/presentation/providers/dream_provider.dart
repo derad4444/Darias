@@ -28,12 +28,19 @@ class DreamState {
   /// 性格が変わって新しい候補ができたことを示すフラグ
   final bool pendingProposal;
 
+  /// AIが作った候補ごとの理由（候補 → 理由）。ユーザーが自分で入力した夢には無い
+  final Map<String, String> optionReasons;
+
   const DreamState({
     this.dream = '',
     this.dreamOptions = const [],
     this.dreamSource = '',
     this.pendingProposal = false,
+    this.optionReasons = const {},
   });
+
+  /// 現在の夢の理由（AIの候補から選んだ場合だけ。無ければ空文字）
+  String get dreamReason => optionReasons[dream] ?? '';
 
   /// ユーザー自身が選択・入力した夢かどうか
   bool get isChosenByUser => dreamSource == 'user';
@@ -46,7 +53,20 @@ class DreamState {
 
   factory DreamState.fromMap(Map<String, dynamic> data) {
     final rawOptions = data['dreamOptions'] as List<dynamic>?;
+    // 理由は dreamOptions と同じ並びで保存されている（dreamOptionReasons）
+    final rawReasons = data['dreamOptionReasons'] as List<dynamic>?;
+    final reasons = <String, String>{};
+    if (rawOptions != null && rawReasons != null) {
+      for (var i = 0; i < rawOptions.length && i < rawReasons.length; i++) {
+        final option = rawOptions[i];
+        final reason = rawReasons[i];
+        if (option is String && reason is String && reason.trim().isNotEmpty) {
+          reasons[option.trim()] = reason.trim();
+        }
+      }
+    }
     return DreamState(
+      optionReasons: reasons,
       dream: (data['dream'] as String?)?.trim() ?? '',
       dreamOptions: rawOptions
               ?.whereType<String>()
