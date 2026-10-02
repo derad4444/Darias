@@ -545,10 +545,11 @@ class _TraitTabsSectionState extends State<_TraitTabsSection> {
             value: detail.traitValues[trait.key]!,
             reason: detail.traitReasons[trait.key] ?? '',
             textColor: widget.textColor,
+            dark: _tab == TraitTab.caution,
           ),
         // 苦手・注意の項目は 2026-10 の拡張で増えたため、作り直し前のデータには無い
         if (_tab == TraitTab.caution && traits.isEmpty)
-          _TraitPlaceholder(textColor: widget.textColor),
+          const _TraitPlaceholder(),
         if (_tab == TraitTab.positive)
           _DreamRow(
             textColor: widget.textColor,
@@ -559,6 +560,9 @@ class _TraitTabsSectionState extends State<_TraitTabsSection> {
     );
   }
 }
+
+/// 「苦手・注意」タブの色（得意・好きと見分けがつくよう暗いスレート色にする）
+const Color _kCautionColor = Color(0xFF3A3D52);
 
 /// 「得意・好き」「苦手・注意」の切り替え
 class _TraitTabSwitcher extends StatelessWidget {
@@ -586,7 +590,9 @@ class _TraitTabSwitcher extends StatelessWidget {
             duration: const Duration(milliseconds: 200),
             padding: const EdgeInsets.symmetric(vertical: 10),
             decoration: BoxDecoration(
-              color: isSelected ? accentColor : Colors.transparent,
+              color: isSelected
+                  ? (value == TraitTab.caution ? _kCautionColor : accentColor)
+                  : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
             ),
             alignment: Alignment.center,
@@ -636,6 +642,9 @@ class _TraitCard extends StatefulWidget {
   /// 右端に置くボタンなど
   final Widget? trailing;
 
+  /// 暗い背景で表示する（苦手・注意タブ）
+  final bool dark;
+
   const _TraitCard({
     super.key,
     required this.label,
@@ -645,6 +654,7 @@ class _TraitCard extends StatefulWidget {
     this.valueColor,
     this.borderColor,
     this.trailing,
+    this.dark = false,
   });
 
   @override
@@ -657,16 +667,20 @@ class _TraitCardState extends State<_TraitCard> {
   @override
   Widget build(BuildContext context) {
     final hasReason = widget.reason.isNotEmpty;
-    final textColor = widget.textColor;
+    // 暗い背景（苦手・注意）では背景の明度に関係なく白い文字にする
+    final textColor = widget.dark ? Colors.white : widget.textColor;
 
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.15),
+        color: widget.dark
+            ? _kCautionColor.withValues(alpha: 0.88)
+            : Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: widget.borderColor ?? Colors.white.withValues(alpha: 0.3),
+          color: widget.borderColor ??
+              Colors.white.withValues(alpha: widget.dark ? 0.12 : 0.3),
         ),
       ),
       child: Material(
@@ -706,36 +720,23 @@ class _TraitCardState extends State<_TraitCard> {
                       ),
                     ),
                     if (widget.trailing != null) widget.trailing!,
-                    // 閉じていても開けることが分かるよう、矢印だけでなく「理由」のラベルを出す
+                    // 閉じていても開けることが分かるよう、丸い背景の付いた矢印を出す
                     if (hasReason)
                       Container(
                         margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.only(left: 8, right: 2, top: 2, bottom: 2),
+                        padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: _expanded ? 0.3 : 0.2),
-                          borderRadius: BorderRadius.circular(12),
+                          shape: BoxShape.circle,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              '理由',
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: textColor.withValues(alpha: 0.75),
-                              ),
-                            ),
-                            AnimatedRotation(
-                              turns: _expanded ? 0.5 : 0,
-                              duration: const Duration(milliseconds: 200),
-                              child: Icon(
-                                Icons.expand_more,
-                                size: 18,
-                                color: textColor.withValues(alpha: 0.75),
-                              ),
-                            ),
-                          ],
+                        child: AnimatedRotation(
+                          turns: _expanded ? 0.5 : 0,
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            Icons.expand_more,
+                            size: 18,
+                            color: textColor.withValues(alpha: 0.8),
+                          ),
                         ),
                       ),
                   ],
@@ -751,7 +752,7 @@ class _TraitCardState extends State<_TraitCard> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
+                              color: Colors.white.withValues(alpha: widget.dark ? 0.1 : 0.12),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -790,9 +791,7 @@ class _TraitCardState extends State<_TraitCard> {
 
 /// 苦手・注意の項目がまだ無いときの案内
 class _TraitPlaceholder extends StatelessWidget {
-  final Color textColor;
-
-  const _TraitPlaceholder({required this.textColor});
+  const _TraitPlaceholder();
 
   @override
   Widget build(BuildContext context) {
@@ -800,13 +799,13 @@ class _TraitPlaceholder extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.1),
+        color: _kCautionColor.withValues(alpha: 0.88),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Text(
         '性格が更新されると表示されます',
         textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 13, color: textColor.withValues(alpha: 0.7)),
+        style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.75)),
       ),
     );
   }
