@@ -706,14 +706,36 @@ class _TraitCardState extends State<_TraitCard> {
                       ),
                     ),
                     if (widget.trailing != null) widget.trailing!,
+                    // 閉じていても開けることが分かるよう、矢印だけでなく「理由」のラベルを出す
                     if (hasReason)
-                      AnimatedRotation(
-                        turns: _expanded ? 0.5 : 0,
-                        duration: const Duration(milliseconds: 200),
-                        child: Icon(
-                          Icons.expand_more,
-                          size: 22,
-                          color: textColor.withValues(alpha: 0.6),
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.only(left: 8, right: 2, top: 2, bottom: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: _expanded ? 0.3 : 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '理由',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: textColor.withValues(alpha: 0.75),
+                              ),
+                            ),
+                            AnimatedRotation(
+                              turns: _expanded ? 0.5 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: Icon(
+                                Icons.expand_more,
+                                size: 18,
+                                color: textColor.withValues(alpha: 0.75),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                   ],
