@@ -539,13 +539,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
                     const SizedBox(height: 6),
 
-                    // バッジの集まり具合（タップでバッジ一覧）
+                    // バッジの集まり具合（タップでバッジ一覧）。1行にまとめてチャット欄と見分けやすくする
                     BadgeProgressCard(
                       accentColor: accentColor,
                       onTap: _openBadgeSheet,
+                      compact: true,
                     ),
 
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 12),
 
                     // チャット入力
                     _ChatInputArea(
@@ -570,48 +571,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
               ),
 
               // 吹き出し（キャラクター画像の前面に表示）
+              // キャラクターの頭の上に置き、しっぽで頭を指す。新しいメッセージは1文字ずつ出す
               if (_displayedMessage.isNotEmpty)
                 Positioned(
-                  left: 20,
-                  right: 20,
-                  top: size.height * 0.08,
+                  left: 16,
+                  right: 16,
+                  top: size.height * 0.1,
                   child: Dismissible(
                     key: ValueKey(_displayedMessage),
                     direction: DismissDirection.up,
                     onDismissed: (_) => setState(() => _displayedMessage = ''),
-                    child: Column(
-                      children: [
-                        _SpeechBubble(
-                          message: _displayedMessage,
-                          maxWidth: size.width * 0.8,
-                        ),
-                        if (_isCharacterReply) ...[
-                          const SizedBox(height: 6),
-                          GestureDetector(
-                            onTap: _isPlayingVoice ? null : () {
-                              if (isPremium) {
-                                _playVoice();
-                              } else {
-                                context.push('/premium?source=voice');
-                              }
-                            },
-                            child: _isPlayingVoice
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white70,
+                    child: _SpeechBubble(
+                      message: _displayedMessage,
+                      maxWidth: size.width * 0.86,
+                      accentColor: accentColor,
+                      animate: _isCharacterReply,
+                      trailing: _isCharacterReply
+                          ? GestureDetector(
+                              onTap: _isPlayingVoice ? null : () {
+                                if (isPremium) {
+                                  _playVoice();
+                                } else {
+                                  context.push('/premium?source=voice');
+                                }
+                              },
+                              child: _isPlayingVoice
+                                  ? SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: accentColor,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.volume_up_rounded,
+                                      size: 20,
+                                      color: accentColor.withValues(alpha: 0.8),
                                     ),
-                                  )
-                                : const Icon(
-                                    Icons.volume_up_outlined,
-                                    size: 22,
-                                    color: Colors.white70,
-                                  ),
-                          ),
-                        ],
-                      ],
+                            )
+                          : null,
                     ),
                   ),
                 ),
@@ -1141,41 +1140,173 @@ class _CharacterDisplay extends StatelessWidget {
 }
 
 /// 吹き出し
-class _SpeechBubble extends StatelessWidget {
+///
+/// 目に入りやすいよう、アクセントカラーの縁取り・影・キャラクターを指すしっぽを付ける。
+/// [animate] が true のとき、新しいメッセージを1文字ずつ表示する（返答が来たことに気づきやすくするため）。
+class _SpeechBubble extends StatefulWidget {
   final String message;
   final double maxWidth;
+  final Color accentColor;
+  final bool animate;
 
-  const _SpeechBubble({required this.message, required this.maxWidth});
+  /// 吹き出しの右下に置くもの（音声再生ボタン）
+  final Widget? trailing;
+
+  const _SpeechBubble({
+    required this.message,
+    required this.maxWidth,
+    required this.accentColor,
+    this.animate = false,
+    this.trailing,
+  });
+
+  @override
+  State<_SpeechBubble> createState() => _SpeechBubbleState();
+}
+
+class _SpeechBubbleState extends State<_SpeechBubble> with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this);
+    _start();
+  }
+
+  @override
+  void didUpdateWidget(_SpeechBubble old) {
+    super.didUpdateWidget(old);
+    if (old.message != widget.message) _start();
+  }
+
+  void _start() {
+    if (!widget.animate) {
+      _controller.value = 1;
+      return;
+    }
+    // 1文字30ms、長い文でも1.8秒で出し切る
+    final ms = (widget.message.length * 30).clamp(300, 1800);
+    _controller
+      ..duration = Duration(milliseconds: ms)
+      ..forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    const textStyle = TextStyle(
+      fontSize: 17,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textPrimary,
+      height: 1.5,
+    );
     return Center(
-      child: Container(
-        constraints: BoxConstraints(maxWidth: maxWidth),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.9),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            constraints: BoxConstraints(maxWidth: widget.maxWidth),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: widget.accentColor.withValues(alpha: 0.7), width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: widget.accentColor.withValues(alpha: 0.25),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
-        ),
-        child: SelectableText(
-          message,
-          style: const TextStyle(
-            fontSize: 15,
-            color: AppColors.textPrimary,
-            height: 1.4,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, _) {
+                    final done = _controller.value >= 1;
+                    if (done) {
+                      return SelectableText(widget.message, style: textStyle, textAlign: TextAlign.center);
+                    }
+                    final count = (widget.message.length * _controller.value).ceil();
+                    // 表示し終えたときの大きさを先に確保し、文字が増えても吹き出しが揺れないようにする
+                    return Stack(
+                      children: [
+                        Opacity(
+                          opacity: 0,
+                          child: Text(widget.message, style: textStyle, textAlign: TextAlign.center),
+                        ),
+                        Positioned.fill(
+                          child: Text(
+                            widget.message.substring(0, count),
+                            style: textStyle,
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+                if (widget.trailing != null)
+                  Align(alignment: Alignment.centerRight, child: widget.trailing!),
+              ],
+            ),
           ),
-          textAlign: TextAlign.center,
-        ),
+          // キャラクターを指すしっぽ
+          CustomPaint(
+            size: const Size(26, 14),
+            painter: _BubbleTailPainter(
+              fill: Colors.white,
+              border: widget.accentColor.withValues(alpha: 0.7),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+/// 吹き出しの下に付けるしっぽ（下向きの三角）
+class _BubbleTailPainter extends CustomPainter {
+  final Color fill;
+  final Color border;
+
+  _BubbleTailPainter({required this.fill, required this.border});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 吹き出しの縁（2px）と重ねて、縁が途切れて見えないようにする
+    final path = Path()
+      ..moveTo(0, -2)
+      ..lineTo(size.width / 2, size.height)
+      ..lineTo(size.width, -2);
+    canvas.drawPath(path, Paint()..color = fill);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = border
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    // 吹き出しとの境目の縁を白で消す
+    canvas.drawLine(
+      const Offset(2, -2),
+      Offset(size.width - 2, -2),
+      Paint()
+        ..color = fill
+        ..strokeWidth = 4,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_BubbleTailPainter old) => old.fill != fill || old.border != border;
 }
 
 /// アクションボタン（自分会議・履歴）
@@ -1329,13 +1460,22 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                 children: [
                   // テキスト入力
                   Expanded(
+                    // チャット欄はアクセントカラーの縁取りと影で、上のバッジのバーと見分けられるようにする
                     child: Container(
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: widget.isWaitingForReply ? 0.5 : 0.85),
-                        borderRadius: BorderRadius.circular(16),
+                        color: Colors.white.withValues(alpha: widget.isWaitingForReply ? 0.7 : 1),
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.4),
+                          color: widget.accentColor.withValues(alpha: 0.55),
+                          width: 1.5,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
                       ),
                       child: Row(
                         children: [
@@ -1348,11 +1488,16 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                               minLines: 1,
                               maxLength: 100,
                               decoration: InputDecoration(
-                                hintText: widget.isWaitingForReply ? '返答を待っています...' : 'メッセージを入力...',
+                                hintText: widget.isWaitingForReply ? '返答を待っています...' : 'キャラクターに話しかける…',
                                 hintStyle: const TextStyle(color: Colors.grey),
                                 border: InputBorder.none,
+                                prefixIcon: Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                  size: 20,
+                                  color: widget.accentColor.withValues(alpha: 0.7),
+                                ),
                                 contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                  horizontal: 4,
                                   vertical: 12,
                                 ),
                                 counterText: '',
@@ -1391,9 +1536,10 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
+                        // 入力前もアクセントカラー（薄め）にして、送信ボタンだと分かるようにする
                         color: !widget.isWaitingForReply && hasText
-                            ? widget.accentColor.withValues(alpha: 0.85)
-                            : Colors.grey.withValues(alpha: 0.5),
+                            ? widget.accentColor
+                            : widget.accentColor.withValues(alpha: 0.4),
                         shape: BoxShape.circle,
                         boxShadow: !widget.isWaitingForReply && hasText
                             ? [

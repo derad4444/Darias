@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/constants/badges.dart';
 import '../providers/badge_provider.dart';
+import '../providers/theme_provider.dart';
 
 /// 成長段階の表示名
 String growthStageLabel(int stage) {
@@ -23,12 +24,17 @@ class BadgeProgressCard extends ConsumerWidget {
   final bool solidBackground;
   final Color textColor;
 
+  /// true のとき1行にまとめる（ホーム用。下のチャット欄と見分けやすくするため、
+  /// 入力欄とは違う細長いバーにする）
+  final bool compact;
+
   const BadgeProgressCard({
     super.key,
     required this.accentColor,
     required this.onTap,
     this.solidBackground = true,
     this.textColor = const Color(0xFF333333),
+    this.compact = false,
   });
 
   @override
@@ -47,6 +53,61 @@ class BadgeProgressCard extends ConsumerWidget {
       label = stage >= 1 ? '第1弾バッジ' : '第1弾バッジで元素が決まる';
     } else {
       label = '第2弾バッジで大人へ';
+    }
+
+    if (compact) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(8, 6, 6, 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(30),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accentColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    growthStageLabel(stage),
+                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      for (final badge in badgesOfRound(round))
+                        _BadgeMedal(
+                          badge: badge,
+                          progress: state.progressOf(badge.key),
+                          accentColor: accentColor,
+                          textColor: textColor,
+                          size: 28,
+                          showName: false,
+                        ),
+                    ],
+                  ),
+                ),
+                if (!allDone)
+                  Text(
+                    '$answered/$total',
+                    style: TextStyle(fontSize: 12, color: textColor.withValues(alpha: 0.75)),
+                  ),
+                Icon(Icons.chevron_right, size: 18, color: textColor.withValues(alpha: 0.5)),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     return Padding(
@@ -176,8 +237,8 @@ class _BadgeMedal extends StatelessWidget {
           children: [
             for (int i = 0; i < kQuestionsPerBadge; i++)
               Container(
-                width: 6,
-                height: 6,
+                width: size < 32 ? 4 : 6,
+                height: size < 32 ? 4 : 6,
                 margin: const EdgeInsets.symmetric(horizontal: 1.5),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -222,17 +283,22 @@ class _BadgeSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(badgeStateProvider).valueOrNull ?? const BadgeState();
     final round1Done = state.isRoundComplete(1);
-    const textColor = Color(0xFF333333);
+    // ほかの画面と同じ背景グラデーションと文字色にする
+    final gradient = ref.watch(backgroundGradientProvider);
+    final textColor = ref.watch(colorSettingsProvider).textColor;
 
+    // 中途半端な高さで止まらないよう、最初から画面上部まで開く
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      minChildSize: 0.4,
-      maxChildSize: 0.92,
+      initialChildSize: 0.93,
+      minChildSize: 0.5,
+      maxChildSize: 0.93,
+      snap: true,
       expand: false,
       builder: (ctx, scroll) => Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          gradient: gradient,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: ListView(
           controller: scroll,
@@ -243,13 +309,13 @@ class _BadgeSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withValues(alpha: 0.4),
+                  color: textColor.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'バッジ',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
@@ -262,17 +328,18 @@ class _BadgeSheet extends ConsumerWidget {
               style: TextStyle(fontSize: 12, color: textColor.withValues(alpha: 0.7), height: 1.5),
             ),
             const SizedBox(height: 16),
-            _RoundHeader(title: '第1弾', done: state.answeredCountOfRound(1)),
+            _RoundHeader(title: '第1弾', done: state.answeredCountOfRound(1), textColor: textColor),
             for (final b in badgesOfRound(1))
-              _BadgeRow(badge: b, state: state, accentColor: accentColor, enabled: true),
+              _BadgeRow(badge: b, state: state, accentColor: accentColor, enabled: true, textColor: textColor),
             const SizedBox(height: 16),
             _RoundHeader(
               title: '第2弾',
               done: state.answeredCountOfRound(2),
               note: round1Done ? null : '第1弾がそろうと挑戦できます',
+              textColor: textColor,
             ),
             for (final b in badgesOfRound(2))
-              _BadgeRow(badge: b, state: state, accentColor: accentColor, enabled: round1Done),
+              _BadgeRow(badge: b, state: state, accentColor: accentColor, enabled: round1Done, textColor: textColor),
           ],
         ),
       ),
@@ -284,8 +351,9 @@ class _RoundHeader extends StatelessWidget {
   final String title;
   final int done;
   final String? note;
+  final Color textColor;
 
-  const _RoundHeader({required this.title, required this.done, this.note});
+  const _RoundHeader({required this.title, required this.done, this.note, required this.textColor});
 
   @override
   Widget build(BuildContext context) {
@@ -294,11 +362,12 @@ class _RoundHeader extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: textColor)),
           const SizedBox(width: 8),
-          Text('$done / $total', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+          Text('$done / $total', style: TextStyle(fontSize: 13, color: textColor.withValues(alpha: 0.6))),
           const Spacer(),
-          if (note != null) Text(note!, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          if (note != null)
+            Text(note!, style: TextStyle(fontSize: 11, color: textColor.withValues(alpha: 0.6))),
         ],
       ),
     );
@@ -310,12 +379,14 @@ class _BadgeRow extends StatelessWidget {
   final BadgeState state;
   final Color accentColor;
   final bool enabled;
+  final Color textColor;
 
   const _BadgeRow({
     required this.badge,
     required this.state,
     required this.accentColor,
     required this.enabled,
+    required this.textColor,
   });
 
   @override
@@ -335,45 +406,55 @@ class _BadgeRow extends StatelessWidget {
       status = '$progress / $kQuestionsPerBadge';
     }
 
+    // 背景のグラデーションの上でも読めるよう、1行ずつ半透明の白いカードに載せる
     return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: enabled ? () => Navigator.pop(context, badge.key) : null,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-          child: Row(
-            children: [
-              _BadgeMedal(
-                badge: badge,
-                progress: progress,
-                accentColor: accentColor,
-                textColor: const Color(0xFF333333),
-                size: 44,
-                showName: false,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(badge.label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(badge.description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ),
-              if (status.isNotEmpty)
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: complete && !retaking ? accentColor : const Color(0xFF555555),
-                    fontWeight: complete && !retaking ? FontWeight.w600 : FontWeight.normal,
+      opacity: enabled ? 1 : 0.5,
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.7),
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: enabled ? () => Navigator.pop(context, badge.key) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+              child: Row(
+                children: [
+                  _BadgeMedal(
+                    badge: badge,
+                    progress: progress,
+                    accentColor: accentColor,
+                    textColor: textColor,
+                    size: 44,
+                    showName: false,
                   ),
-                ),
-              if (enabled) const Icon(Icons.chevron_right, color: Colors.grey),
-            ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(badge.label,
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: textColor)),
+                        const SizedBox(height: 2),
+                        Text(badge.description,
+                            style: TextStyle(fontSize: 12, color: textColor.withValues(alpha: 0.6))),
+                      ],
+                    ),
+                  ),
+                  if (status.isNotEmpty)
+                    Text(
+                      status,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: complete && !retaking ? accentColor : textColor.withValues(alpha: 0.75),
+                        fontWeight: complete && !retaking ? FontWeight.w600 : FontWeight.normal,
+                      ),
+                    ),
+                  if (enabled) Icon(Icons.chevron_right, color: textColor.withValues(alpha: 0.4)),
+                ],
+              ),
+            ),
           ),
         ),
       ),
