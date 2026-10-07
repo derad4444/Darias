@@ -189,6 +189,22 @@ class DariasApp extends ConsumerWidget {
           fontSize: 10,
         ),
       ),
+      // スナックバー：黒い帯ではなく、白地にアクセントカラーの縁取りの角丸カードにする
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.white,
+        elevation: 4,
+        contentTextStyle: const TextStyle(
+          fontFamily: 'Hiragino Sans',
+          fontSize: 14,
+          color: AppColors.textPrimary,
+        ),
+        actionTextColor: colorSeed,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: colorSeed.withValues(alpha: 0.5), width: 1.5),
+        ),
+      ),
       // Card設定
       cardTheme: CardThemeData(
         color: AppColors.cardBackground,
@@ -276,6 +292,22 @@ class DariasApp extends ConsumerWidget {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      // スナックバー：ライトテーマと同じ角丸カード（暗い地にアクセントカラーの縁取り）
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: const Color(0xFF2A2A35),
+        elevation: 4,
+        contentTextStyle: const TextStyle(
+          fontFamily: 'Hiragino Sans',
+          fontSize: 14,
+          color: Colors.white,
+        ),
+        actionTextColor: colorSeed,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: colorSeed.withValues(alpha: 0.5), width: 1.5),
+        ),
+      ),
       colorScheme: ColorScheme.fromSeed(
         seedColor: colorSeed,
         brightness: Brightness.dark,

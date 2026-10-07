@@ -66,7 +66,6 @@ class _CharacterSelectScreenState extends ConsumerState<CharacterSelectScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('エラーが発生しました: $e'),
-            backgroundColor: Colors.red,
           ),
         );
       }

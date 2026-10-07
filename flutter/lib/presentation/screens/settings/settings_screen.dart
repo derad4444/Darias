@@ -269,7 +269,6 @@ class SettingsScreen extends ConsumerWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('性格診断をリセットしました'),
-              backgroundColor: Colors.green,
             ),
           );
         }
