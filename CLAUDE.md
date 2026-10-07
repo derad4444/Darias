@@ -84,6 +84,7 @@
 | 仕様書（各リポジトリ） | DARIAS 本体の `shared/docs/`・LP の `~/dev/DARIASLP/docs/LP仕様書.md`・リール制作ツールの `~/dev/リール制作ツール/アプリ/自動投稿/docs/` | 変えたリポジトリの仕様書を同じコミットで更新する。直したのに仕様書が古いと、次に直す人が古い前提で作業する |
 | アプリ内の説明 | 使い方ガイド（`help_guide_screen.dart`）・オンボーディング（`onboarding_screen.dart`）・ヒント（`hint_service.dart`） | コードを直してアプリを再起動して確認する |
 | アプリ内の法務の写し | `terms_of_service_screen.dart`・`privacy_policy_screen.dart` | 正本（`shared/docs/public/`）と必ず対で直す |
+| アプリの使い方に答えるAIの知識 | `shared/functions/const/answerAppQuestion.js` の `APP_GUIDE`（チャットで「〇〇はどうやるの？」と聞いたときの回答のもと） | 機能・画面の場所・ボタン名・回数制限・料金プランの内容が変わったら、ここも同じ作業の中で直してデプロイする（`firebase deploy --only functions:answerAppQuestion`）。古いままだとAIが存在しない機能や間違った手順を案内する（実例: バッジ診断に変えたあとも「30回チャットで元素が決まる」と案内していた） |
 
 さらに、**見た目や説明が変わる変更をしたら、`shared/docs/release/リリース手順書.md` の「次のリリースで確認すること」に1行足す**
 （何を変えたか・どの画像や説明に影響しそうか）。リリースのときにこの一覧を見て B を行う。
