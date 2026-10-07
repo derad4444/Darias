@@ -58,8 +58,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final isSplash = state.matchedLocation == '/splash';
+      // パスワード再設定はログアウト中に使う画面なので、ログイン前の画面として扱う
       final isAuthRoute = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/register';
+          state.matchedLocation == '/register' ||
+          state.matchedLocation == '/forgot-password';
 
       // スプラッシュ・オンボーディング画面は常に通す
       if (isSplash) return null;

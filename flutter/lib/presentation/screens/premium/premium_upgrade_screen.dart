@@ -11,8 +11,7 @@ enum PremiumFeature {
   adFree,
   selfMeeting,
   voice,
-  characterAnalysis,
-  unlimitedHistory;
+  aiQuality;
 
   String get title {
     switch (this) {
@@ -22,10 +21,8 @@ enum PremiumFeature {
         return '自分会議';
       case PremiumFeature.voice:
         return 'キャラクターの声';
-      case PremiumFeature.characterAnalysis:
-        return 'キャラクター分析';
-      case PremiumFeature.unlimitedHistory:
-        return 'チャット履歴';
+      case PremiumFeature.aiQuality:
+        return '返答と日記のAI';
     }
   }
 
@@ -34,13 +31,13 @@ enum PremiumFeature {
       case PremiumFeature.adFree:
         return 'チャット中のバナー広告、フレンドへの質問の動画広告、すべて消えます。フレンドへの質問も広告なしで何度でも。';
       case PremiumFeature.selfMeeting:
-        return '6人の自分が集まって悩みを議論する「自分会議」が無制限に。無料は生涯1回のみ。';
+        return '6人の自分が集まって悩みを議論する「自分会議」が無制限に。無料は1回のみ。';
       case PremiumFeature.voice:
         return 'キャラクターの返答を声で聞けます。プレミアム専用の没入感ある体験です。';
-      case PremiumFeature.characterAnalysis:
-        return '口癖・好きな場所・得意なことなどのキャラクター詳細が最高品質AIで生成され、より「自分らしい」キャラクターになります。';
-      case PremiumFeature.unlimitedHistory:
-        return '無料版では最新50メッセージまでですが、プレミアムなら全てのチャット履歴を無制限に保存・閲覧できます。';
+      // チャットの返答（generateCharacterReply）と日記（generateDiary）は
+      // プレミアムだけ gpt-4o、無料は gpt-4o-mini。性格の分析は全員 gpt-4o なので差ではない
+      case PremiumFeature.aiQuality:
+        return 'キャラクターの返答と毎日の日記が、より高性能なAIで作られます。話の受け止め方や言葉選びがより細やかになります。';
     }
   }
 
@@ -52,10 +49,8 @@ enum PremiumFeature {
         return Icons.groups;
       case PremiumFeature.voice:
         return Icons.record_voice_over;
-      case PremiumFeature.characterAnalysis:
-        return Icons.person_search;
-      case PremiumFeature.unlimitedHistory:
-        return Icons.history;
+      case PremiumFeature.aiQuality:
+        return Icons.auto_awesome;
     }
   }
 
@@ -64,13 +59,11 @@ enum PremiumFeature {
       case PremiumFeature.adFree:
         return 'バナー・動画広告あり';
       case PremiumFeature.selfMeeting:
-        return '生涯1回';
+        return '1回';
       case PremiumFeature.voice:
         return 'なし';
-      case PremiumFeature.characterAnalysis:
+      case PremiumFeature.aiQuality:
         return '標準AI';
-      case PremiumFeature.unlimitedHistory:
-        return '50件まで';
     }
   }
 
@@ -82,10 +75,8 @@ enum PremiumFeature {
         return '無制限';
       case PremiumFeature.voice:
         return 'あり';
-      case PremiumFeature.characterAnalysis:
-        return '最高品質AI';
-      case PremiumFeature.unlimitedHistory:
-        return '無制限';
+      case PremiumFeature.aiQuality:
+        return '高性能AI';
     }
   }
 }

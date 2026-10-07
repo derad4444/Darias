@@ -1,16 +1,22 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../providers/theme_provider.dart';
+
+/// ログイン画面のボタンと同じ色
+const _kButtonColor = Color(0xFFA084CA);
+
 /// パスワードリセット画面
-class ForgotPasswordScreen extends StatefulWidget {
+class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
+  ConsumerState<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
@@ -33,6 +39,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
 
     try {
+      // 再設定メールを日本語にする（指定しないとプロジェクト既定の英語で届く）
+      await FirebaseAuth.instance.setLanguageCode('ja');
       await FirebaseAuth.instance.sendPasswordResetEmail(
         email: _emailController.text.trim(),
       );
@@ -70,20 +78,30 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    // ログイン画面と同じ背景にする
+    final backgroundGradient = ref.watch(backgroundGradientProvider);
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/login'),
         ),
-        title: const Text('パスワードをリセット'),
-        backgroundColor: colorScheme.inversePrimary,
+        title: const Text('パスワードの再設定'),
+        backgroundColor: Colors.transparent,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: _emailSent ? _buildSuccessView() : _buildFormView(),
+      body: Container(
+        // 中身が短くても画面の下まで背景を塗る
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: _emailSent ? _buildSuccessView() : _buildFormView(),
+          ),
+        ),
       ),
     );
   }
@@ -101,7 +119,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Icon(
             Icons.lock_reset,
             size: 80,
-            color: colorScheme.primary,
+            color: _kButtonColor,
           ),
           const SizedBox(height: 24),
           Text(
@@ -113,7 +131,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '登録したメールアドレスを入力してください。\nパスワードリセット用のリンクをお送りします。',
+            '登録したメールアドレスを入力してください。\nパスワード再設定用のリンクをお送りします。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -150,10 +168,20 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'メールアドレス',
-              prefixIcon: Icon(Icons.email),
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              hintText: 'メールアドレス',
+              hintStyle: TextStyle(color: Colors.grey.shade400),
+              prefixIcon: const Icon(Icons.email_outlined),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -171,7 +199,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           FilledButton(
             onPressed: _isLoading ? null : _sendResetEmail,
             style: FilledButton.styleFrom(
+              backgroundColor: _kButtonColor,
               padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
             child: _isLoading
                 ? const SizedBox(
@@ -182,7 +212,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       color: Colors.white,
                     ),
                   )
-                : const Text('リセットリンクを送信'),
+                : const Text('再設定用のリンクを送る'),
           ),
 
           const SizedBox(height: 16),
@@ -190,6 +220,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           // ログインに戻る
           TextButton(
             onPressed: () => context.go('/login'),
+            style: TextButton.styleFrom(foregroundColor: _kButtonColor),
             child: const Text('ログイン画面に戻る'),
           ),
         ],
@@ -228,13 +259,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   _emailController.text,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
+                        color: _kButtonColor,
                       ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '上記のメールアドレスにパスワードリセット用のリンクを送信しました。',
+                  '上記のメールアドレスがメールとパスワードで登録されていれば、パスワード再設定用のリンクが届きます。',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -259,7 +290,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'メールが届かない場合は、迷惑メールフォルダをご確認ください。',
+                  'メールが届かない場合は、迷惑メールフォルダをご確認ください。GoogleやAppleでログインしている場合はパスワードがないため、ログイン画面のGoogle・Appleのボタンからログインしてください。',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Colors.amber.shade900,
                       ),
@@ -278,7 +309,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             });
           },
           style: OutlinedButton.styleFrom(
+            foregroundColor: _kButtonColor,
+            side: const BorderSide(color: _kButtonColor),
             padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: const Text('別のメールアドレスで試す'),
         ),
@@ -288,7 +322,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         FilledButton(
           onPressed: () => context.go('/login'),
           style: FilledButton.styleFrom(
+            backgroundColor: _kButtonColor,
             padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
           child: const Text('ログイン画面に戻る'),
         ),

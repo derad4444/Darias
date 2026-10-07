@@ -172,7 +172,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => context.push('/forgot-password'),
+                        child: const Text(
+                          'パスワードをお忘れの方',
+                          style: TextStyle(fontSize: 13, color: Colors.blue),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
 
                     // エラーメッセージ
                     if (_errorMessage.isNotEmpty)
