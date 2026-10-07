@@ -1,4 +1,4 @@
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,40 +39,28 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     });
 
     try {
-      // 再設定メールを日本語にする（指定しないとプロジェクト既定の英語で届く）
-      await FirebaseAuth.instance.setLanguageCode('ja');
-      await FirebaseAuth.instance.sendPasswordResetEmail(
-        email: _emailController.text.trim(),
-      );
-
+      // Firebase 標準の再設定メールは文面を変えられないため、DARIAS の文面で
+      // 送る Cloud Function を使う（登録の有無にかかわらず成功が返る）
+      await FirebaseFunctions.instanceFor(region: 'asia-northeast1')
+          .httpsCallable('sendPasswordResetMail')
+          .call<Map<String, dynamic>>({'email': _emailController.text.trim()});
       setState(() {
         _emailSent = true;
       });
-    } on FirebaseAuthException catch (e) {
+    } on FirebaseFunctionsException catch (e) {
       setState(() {
-        _errorMessage = _getErrorMessage(e.code);
+        _errorMessage = e.code == 'invalid-argument'
+            ? 'メールアドレスの形式が正しくありません'
+            : '送信できませんでした。通信状況を確認して、もう一度お試しください';
       });
     } catch (e) {
       setState(() {
-        _errorMessage = 'エラーが発生しました: $e';
+        _errorMessage = '送信できませんでした。通信状況を確認して、もう一度お試しください';
       });
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
-    }
-  }
-
-  String _getErrorMessage(String code) {
-    switch (code) {
-      case 'user-not-found':
-        return 'このメールアドレスは登録されていません';
-      case 'invalid-email':
-        return 'メールアドレスの形式が正しくありません';
-      case 'too-many-requests':
-        return 'リクエストが多すぎます。しばらくしてからお試しください';
-      default:
-        return 'エラーが発生しました ($code)';
     }
   }
 

@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-07（バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
+**最終更新日**: 2026-10-08（パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
 **ランタイム**: Node.js 22
 **関数数**: 28
 
@@ -215,6 +215,21 @@
 **エラー**: 未認証は `unauthenticated`、内部エラーは `internal`（「質問を用意できませんでした」）
 
 ---
+
+#### 2-3. `sendPasswordResetMail`
+- **ソース**: `const/sendPasswordResetMail.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: パスワード再設定メールを DARIAS の文面で送る。Firebase 標準の再設定メールはテンプレートを変更できないため、`generatePasswordResetLink` で作ったコードを DARIAS の再設定ページ（`https://dariasapp.web.app/auth/action/`）のリンクにして、お問い合わせと同じ Gmail から送る
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **その他**: `minInstances: 0`, `enforceAppCheck: true`。ログアウト中に使うので認証は求めない
+- **AI呼び出し**: なし
+
+**入力パラメータ:** `{ email: string }`
+
+**返却値:** `{ ok: true }`（登録の無いアドレス・パスワードの無いアカウント・送信回数の上限を超えた場合も同じ。形式が不正なら `invalid-argument`）
+
+**副作用:** `passwordResetRequests/{メールアドレスのSHA-256}` に送信時刻を記録（60秒に1通・24時間で5通まで）。詳細は [認証仕様書](../architecture/認証仕様書.md#パスワードの再設定)
 
 #### 3. `answerAppQuestion`
 - **ソース**: `const/answerAppQuestion.js`

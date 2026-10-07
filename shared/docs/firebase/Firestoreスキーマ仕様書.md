@@ -908,3 +908,11 @@ Big5Analysis/{personalityKey}
 **前回更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  
 **前々回更新**: 2026-04-17（フレンド予定共有機能追加: `users/{userId}/friends`・`incomingRequests`・`outgoingRequests` サブコレクション、`settings/calendarSettings` 追加、`schedules`/`tags` に `isPublic` フィールド追加；相性診断機能追加: `users/{userId}/compatibilityResults` サブコレクション、トップレベル `compatibilityCache` コレクション追加）
 **作成者**: Claude Code
+
+#### `passwordResetRequests/{メールアドレスのSHA-256}`（トップレベル）
+
+**用途**: パスワード再設定メール（Cloud Function `sendPasswordResetMail`）の送信回数の制限。同じアドレスへ60秒に1通・24時間で5通まで
+
+- **sentAt**: `array<number>` - 直近24時間の送信時刻（ミリ秒）
+- 読み書きは Cloud Function（Admin SDK）だけ。クライアントからは `firestore.rules` の既定の拒否でアクセスできない
+- メールアドレスそのものは保存しない（ハッシュをキーにする）

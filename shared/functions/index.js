@@ -18,6 +18,11 @@ Object.defineProperty(exports, "startBadgeQuestion", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "sendPasswordResetMail", {
+  get: () => require("./const/sendPasswordResetMail").sendPasswordResetMail,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "generateVoice", {
   get: () => require("./const/generateVoice").generateVoice,
   enumerable: true,
