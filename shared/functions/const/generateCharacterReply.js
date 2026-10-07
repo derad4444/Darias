@@ -7,6 +7,7 @@ const firestoreCache = require("../src/utils/firestoreCache");
 const {getDream} = require("../src/utils/dreamStore");
 const {buildTraitReferenceBlock, CHAT_TRAIT_KEYS} = require("../src/utils/characterTraits");
 const {getMemory, formatMemoriesForPrompt} = require("../src/utils/memoryStore");
+const {handleAnswer} = require("../src/personality/badgeStore");
 
 // 感情判定関数
 async function detectEmotion(openai, messageText) {
@@ -85,7 +86,7 @@ function getMaxTokensForPhase(phase) {
 }
 
 // 最適化されたプロンプト生成関数（BIG5詳細形式を使用）
-function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null) {
+function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null, badgeContext = null) {
   // Android度計算（将来的な利用のため残す）
   const androidScore = (6 - big5.agreeableness) + (6 - big5.extraversion) +
       (6 - big5.neuroticism);
@@ -111,7 +112,7 @@ function buildCharacterPrompt(big5, gender, dreamText, userMessage, meetingConte
   }
 
   // BIG5詳細形式を使用した新しいプロンプト（5軸スコアがある場合はtraitsOverrideを優先）
-  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext, memoryContext, traitContext);
+  return OPTIMIZED_PROMPTS.characterReply(type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride, phase, openerContext, memoryContext, traitContext, badgeContext);
 }
 
 // 無意味な入力を検出する関数
@@ -179,8 +180,15 @@ exports.generateCharacterReply = onCall(
           return {reply: "一時的なエラーが発生しました。再起動してみてください。", voiceUrl: "", error: true};
         }
 
+        const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
+
+        // バッジ診断の質問に答えてもらっている間は、返答の前に採点する。
+        // 結果（深掘りする・会話を続ける・締める）を返答の生成に渡すため。
+        // 回答中は「うん」などの短い返事も締めの判断に使うので、無意味な入力の判定より先に行う
+        const badge = await handleAnswer(userId, trimMessage(userMessage), openai);
+
         // 無意味な入力を検出してフォールバック返答を返す
-        if (isMeaninglessInput(userMessage)) {
+        if (!badge && isMeaninglessInput(userMessage)) {
           console.log(`🚫 Meaningless input detected: "${userMessage}"`);
 
           // キャラクター情報を取得（genderのみ必要・キャッシュ利用）
@@ -267,11 +275,10 @@ exports.generateCharacterReply = onCall(
         const traitContext = buildTraitReferenceBlock(charData, CHAT_TRAIT_KEYS);
 
         // Android度を計算し、プロンプトを生成（5軸スコアがある場合は5軸特性を優先）
+        const badgeContext = badge ? badge.badgeContext : null;
         const prompt = buildCharacterPrompt(
             big5, gender, dreamText, userMessage, meetingContext, axisTraitsOverride, phase, openerContext,
-            memoryContext || null, traitContext || null);
-
-        const openai = getOpenAIClient(OPENAI_API_KEY.value().trim());
+            memoryContext || null, traitContext || null, badgeContext);
 
         // サブスクリプション状態に基づくモデル選択（有料ユーザーは最新モデル）
         const model = isPremium ? "gpt-4o-2024-11-20" : "gpt-4o-mini";
@@ -304,7 +311,8 @@ exports.generateCharacterReply = onCall(
             {
               model: model,
               messages: messages,
-              max_completion_tokens: getMaxTokensForPhase(phase),
+              // バッジの質問中は短く返す（phase 1 と同じ長さ）
+              max_completion_tokens: getMaxTokensForPhase(badgeContext ? 1 : phase),
             },
         );
 
@@ -317,13 +325,18 @@ exports.generateCharacterReply = onCall(
         if (!reply) {
           console.warn(`⚠️ Empty reply from OpenAI: finish_reason=${finishReason} refusal=${refusal} content=${JSON.stringify(content)}`);
           const fallback = charData.gender === "female" ? "ごめん、うまく言葉が出てこなかったみたい。もう一度話しかけてみて？" : "ごめん、うまく言葉が出てこなかった。もう一度話しかけてみて？";
-          return {reply: fallback, voiceUrl: ""};
+          const badgeResult = badge ? await badge.commit(fallback) : null;
+          return {reply: fallback, voiceUrl: "", badge: badgeResult};
         }
         console.log(`✅ generateCharacterReply success: reply="${reply.substring(0, 50)}" finish=${finishReason}`);
+
+        // バッジの状態を保存する（採点できたバッジ・次の質問・診断の結果を返す）
+        const badgeResult = badge ? await badge.commit(reply) : null;
 
         return {
           reply,
           voiceUrl: "",
+          badge: badgeResult,
         };
       } catch (e) {
         console.error("🔥 Error in generateCharacterReply:", e);

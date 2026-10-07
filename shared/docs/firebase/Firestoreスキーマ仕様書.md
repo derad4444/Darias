@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-10-02（キャラクター属性に苦手・注意の項目と理由を追加）
+**最終更新日**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
 **トップレベルコレクション**: 11
 
 ---
@@ -38,7 +38,7 @@
 - **hasCompletedOnboarding**: `boolean` - キャラクター作成完了フラグ（アカウント登録時の初期セットアップ完了を示す。オンボーディングスライドの表示制御には使用しない）
 - **hasSeenOnboardingSlides**: `boolean` - オンボーディングスライド視聴済みフラグ。`false` またはフィールドなしの場合、次回ログイン時にスライドを表示する。スキップ or 「始める！」ボタン押下時に `true` へ更新
 - **characterGender**: `string` - キャラクター性別
-- **growthStage**: `number` - キャラクター成長ステージ（0=赤ちゃん/1=幼少期/2=大人）。`calculateAndSaveAxisScores` が10シグナルごとに書き込む。フレンドアバター表示に使用
+- **growthStage**: `number` - キャラクター成長ステージ（0=赤ちゃん/1=幼少期/2=大人）。バッジ診断の第1弾がそろうと1、第2弾もそろうと2になる。`diagnoseFromAxisScores` が書き込み、今の値より下げない（性格のリセット時だけクライアントが0に戻す）。Flutter は `growthStageProvider` で購読し、元素の表示・自分会議の解放・アバター画像に使う。フレンドアバター表示にも使用
 - **usage_tracking**: `map` - 会議機能の利用回数追跡（プレミアムユーザーのみ書き込み）
   - **meeting_count_this_month**: `number` - 今月の会議利用回数
   - **last_meeting_month**: `string` - 最後に会議を利用した月（YYYY-MM形式）。現在月と異なる場合はカウントをリセット
@@ -123,7 +123,7 @@
   - **completedAt**: `timestamp` - 完了日時
   - **failedAt**: `timestamp` - 失敗日時
   - **updatedAt**: `timestamp` - 更新日時
-- **axisScores**: `map` - チャットシグナルから算出した5軸スコア（-1.0〜+1.0）。`calculateAndSaveAxisScores` が10シグナルごとに書き込む
+- **axisScores**: `map` - バッジ診断の回答の点数から算出した5軸スコア（-1.0〜+1.0）。`diagnoseFromAxisScores` が第1弾がそろったとき・第2弾がそろったとき・答え直しが終わったときに書き込む
   - **energy**: `number` - エネルギー軸（正=外向・負=内向）
   - **lifestyle**: `number` - ライフスタイル軸（正=計画的・負=自発的）
   - **relationship**: `number` - 対人関係軸（正=協調・負=独立）
@@ -133,10 +133,10 @@
 - **typeName**: `string` - タイプ名（例: "場を沸かす炎タイプ"）。element と relationship/lifestyle 軸で決定
 - **convertedBig5Scores**: `map` - 軸スコアから変換したBIG5スコア（1.0〜5.0）。`confirmedBig5Scores`（質問形式の診断結果）とは別フィールド
 - **axisUpdatedAt**: `timestamp` - 軸スコア最終更新日時
-- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。30シグナル到達時に1回だけ設定され、初回生成の重複を防ぐガードとして機能する（以降は性格タイプの変化、または性格キーがはっきり変わったときに再生成される）
+- **axisGeneratedAt**: `timestamp` - `generateCharacterDetails` を初回実行した日時。初めて診断したとき（このフィールドが無いとき）に `diagnoseFromAxisScores` が詳細を生成して1回だけ設定し、初回生成の重複を防ぐガードとして機能する（以降は性格タイプの変化、または性格キーがはっきり変わったときに再生成される）
 - **personalityKey**: `string` - 丸めたBig5 5値＋性別（例 `O5_C3_E4_A2_N5_女性`）。`CharacterDetailsTemplate` と `Big5Analysis` の参照キーになる
 
-> **保存されているキーとスコアはずれることがある**: `convertedBig5Scores` は10シグナルごとに更新されるが、`personalityKey` は再生成時にしか書き換わらない。ずれが一定以上になった時点で再生成される（判定は `hasDecisiveKeyChange()`。詳細は [性格解析仕様書](../functions/性格解析仕様書.md#性格キーの変化による再生成ヒステリシス付き)）。
+> **保存されているキーとスコアはずれることがある**: `convertedBig5Scores` は診断のたびに更新されるが、`personalityKey` は再生成時にしか書き換わらない。ずれが一定以上になった時点で再生成される（判定は `hasDecisiveKeyChange()`。詳細は [性格解析仕様書](../functions/性格解析仕様書.md#性格キーの変化による再生成ヒステリシス付き)）。
 >
 > 2026-08-14 のバックフィル以前は、丸めずに保存された小数キー（`O4.77…_C2.46…_男性`）が混在していた。現在は解消済みだが、`parsePersonalityKey()` は互換のため小数キーと旧並び順（`O3_C3_A3_E3_N3`）も読める。
 
@@ -156,7 +156,7 @@
 - **dreamUpdatedAt**: `timestamp` - ユーザーが夢を選択・入力した日時
 - **updated_at**: `timestamp` - 更新日時
 
-**なぜ `details` と分けているか**: `details` は firestore.rules でフレンドのアバター表示のため認証済みユーザーの単体取得が許可されている。夢はユーザーが自由入力でき、かつ他ユーザーが参照する必要がないため、本人限定ルール（`users/{userId}/{subcollection=**}`）が適用されるこのサブコレクションに置く。
+**なぜ `details` と分けているか**: `details` は firestore.rules でフレンドのアバター表示のため認証済みユーザーの単体取得が許可されている。夢はユーザーが自由入力でき、かつ他ユーザーが参照する必要がないため、本人限定ルール（`users/{userId}/{collection}/{rest=**}`）が適用されるこのサブコレクションに置く。
 
 **`dream` は再生成で上書きされない**: 性格タイプが変わって候補が作り直されても、ユーザーが選んだ夢はそのまま維持される。詳細は [性格解析仕様書の夢の選択フロー](../functions/性格解析仕様書.md#夢の選択フロー) を参照。
 
@@ -176,69 +176,73 @@
 
 **誰が書くか**: `generateDiary`（毎晩23:50 JST）のみ。日記と同じ1回のAI呼び出しで `ai_comment`・`memories`・`opener` を生成するため、**AI呼び出しは増えていない**。クライアントは読み取りのみ。
 
-**なぜ `details` と分けているか**: 夢と同じ理由。`details` は認証済みユーザーの単体取得が許可されているが、記憶はユーザーの発言から作られる私的な内容のため、本人限定ルール（`users/{userId}/{subcollection=**}`）が適用されるサブコレクションに置く。`firestore.rules` の変更は不要。
+**なぜ `details` と分けているか**: 夢と同じ理由。`details` は認証済みユーザーの単体取得が許可されているが、記憶はユーザーの発言から作られる私的な内容のため、本人限定ルール（`users/{userId}/{collection}/{rest=**}`）が適用されるサブコレクションに置く。`firestore.rules` の変更は不要。
 
 **件数が固定である理由**: 記憶はチャットのプロンプトに毎回載る（最大5件）。無制限に貯めるとプロンプトが伸び続けてコストが肥大化するため、保持10件・プロンプト5件で頭打ちにしている。詳細は [チャット機能仕様書のキャラクターの記憶](../functions/チャット機能仕様書.md#キャラクターの記憶) を参照。
 
 #### `users/{userId}/characters/{characterId}/personalityHistory`
 
-**用途**: 性格タイプの変動履歴。初回元素決定時、およびタイプ変化のたびに `calculateAndSaveAxisScores` が追記する。Flutter の `PersonalityHistoryScreen` で表示される
+**用途**: 性格タイプの変動履歴。初回元素決定時、およびタイプ変化のたびに `diagnoseFromAxisScores` が追記する。Flutter の `PersonalityHistoryScreen` で表示される
 
 **フィールド（各ドキュメント）:**
 
 - **element**: `string` - 変化後の元素タイプ（"炎"/"風" など）
 - **typeName**: `string` - 変化後のタイプ名（例: "場を沸かす炎タイプ"）
-- **signalCount**: `number` - 記録時のシグナル数（成長段階判定に使用）
+- **gender**: `string` - 記録時のキャラクター性別（`details/current.gender`）
+- **growthStage**: `number` - 記録時の成長段階（0=赤ちゃん/1=幼少期/2=大人）。`users/{userId}.growthStage` と同じ値
 - **recordedAt**: `timestamp` - 記録日時（UIでは `recordedAt` 降順で表示）
 
+既存ユーザーの古い記録には `growthStage` が無く、代わりに `signalCount`（`number`）がある。Flutter の `PersonalityHistoryRecord._stageOf()` は `growthStage` が無いとき `signalCount` から段階を求める（100以上=2、30以上=1、それ未満=0）。
+
 **記録タイミング:**
-1. 初回元素決定時（`prevElement === undefined` かつ `signalCount >= 30`）
+1. 初回元素決定時（`details/current` に `element` がまだ無いとき。`prevElement === undefined`）
 2. element または typeName が変化したとき（`typeChanged && prevElement !== undefined`）
 
-**成長段階の判定（`signalCount` から）:**
-- `signalCount < 30` → 赤ちゃん期（`assets/images/character_growth/赤ちゃん.png`）
-- `30 ≤ signalCount < 100` → 幼少期（`assets/images/character_growth/幼少期_{element}.png`）
-- `signalCount >= 100` → 成人（`assets/images/character_growth/成人_{gender}_{element}.png`）
+**成長段階と画像（`characterGrowthAssetPath()`）:**
+- `growthStage` 0（または元素未確定） → 赤ちゃん期（`assets/images/character_growth/赤ちゃん.png`）
+- `growthStage` 1 → 幼少期（`assets/images/character_growth/幼少期_{element}.png`）
+- `growthStage` 2 → 成人（`assets/images/character_growth/成人_{gender}_{element}.png`）
+
+---
+
+#### `users/{userId}/personalityBadges`
+
+**ドキュメントID**: `current` (固定)
+**用途**: バッジ診断の状態（採点できた回答の点数、出した質問、答え直し中のバッジ、回答中のやり取り、各弾がそろった日時）
+
+**フィールド:** `slots` / `assigned` / `askedQuestionIds` / `retake` / `active` / `round1CompletedAt` / `round2CompletedAt`。各フィールドの形と意味は [性格解析仕様書の `personalityBadges/current`](../functions/性格解析仕様書.md#usersuseridpersonalitybadgescurrent) を参照。日時はすべてミリ秒の数値。
+
+**備考:**
+- 書き込みは Cloud Function（`startBadgeQuestion`・`generateCharacterReply`。`src/personality/badgeStore.js` 経由）だけ。本人は読み取りと削除（性格のリセット）だけできる（`firestore.rules`）
+- 回答の本文は回答中だけ `active.turns` に持ち、回答中が終わると消える。残るのは点数と日時だけ
+- Flutter は `badgeStateProvider`（`lib/presentation/providers/badge_provider.dart`）で購読し、バッジのカード・バッジ一覧・自分会議のロック画面の進捗表示に使う
+- 仕組みは [性格解析仕様書のバッジ診断](../functions/性格解析仕様書.md#バッジ診断) を参照
 
 ---
 
 #### `users/{userId}/personalitySignals`
 
-**用途**: チャットメッセージから抽出したパーソナリティタグを蓄積。`classifyAndExtract` がタグを含むメッセージを処理するたびに追記される
-**ドキュメントID**: 自動生成
-
-**フィールド:**
-
-- **tags**: `array<string>` - 抽出されたパーソナリティタグ（最大3件）。有効タグ16種から選択
-- **messageType**: `string` - メッセージタイプ（"chat" / "memo" / "task" 等）
-- **timestamp**: `timestamp` - シグナル記録日時
-
-**備考:**
-- `calculateAndSaveAxisScores` は累積件数が10の倍数になるたびにこのコレクションを読み取って軸スコアを再計算する
-- 過去90日・最大200件を使用（時間減衰あり）
-- `Cloud Function (classifyAndExtract)` のみが書き込む
+**用途**: 既存ユーザーの文書にだけ残っているコレクション（フィールド `tags` / `messageType` / `timestamp`）。どこからも書き込まれず、読み取られない。性格のリセット時に Flutter（`big5_datasource.dart`）が全件削除する
 
 ---
 
 #### `users/{userId}/personalityMeta`
 
 **ドキュメントID**: `current` (固定)
-**用途**: パーソナリティシグナルのメタ情報（累積カウント・タイプ変化通知）を管理
+**用途**: 性格タイプの変化通知と初回の夢選択のフラグを管理
 
 **フィールド:**
 
-- **signalCount**: `number` - 累積シグナル数。`savePersonalitySignal` がトランザクションでインクリメント
-- **lastSignalAt**: `timestamp` - 最終シグナル記録日時
 - **pendingTypeChangeNotification**: `boolean` - 元素タイプが変化した際に立つフラグ（変化時のみ存在）
 - **newElement**: `string` - 変化後の元素（変化時のみ）
 - **newTypeName**: `string` - 変化後のタイプ名（変化時のみ）
 - **typeChangedAt**: `timestamp` - タイプ変化日時（変化時のみ）
-- **pendingFirstDreamSelection**: `boolean` - 初回のキャラクター詳細生成に成功したとき `calculateAndSaveAxisScores` が立てるフラグ。ホーム画面が検知して夢の選択ダイアログを表示し、選択または「あとで選ぶ」で `false` にする
+- **pendingFirstDreamSelection**: `boolean` - 初回のキャラクター詳細生成に成功したとき `diagnoseFromAxisScores` が立てるフラグ。ホーム画面が検知して夢の選択ダイアログを表示し、選択または「あとで選ぶ」で `false` にする
 - **firstDreamReadyAt**: `timestamp` - 上記フラグを立てた日時
 
 **備考:**
-- Flutter `signalCountProvider` がこのドキュメントをリアルタイム購読し、キャラクター詳細画面の進捗表示に使用
-- `_Big5AnalysisSection`（✨人格解析欄）は `signalCount >= 30` のときのみ表示される
+- 既存ユーザーの文書には `signalCount` / `lastSignalAt` が残っているが、書き込みも読み取りもしない
+- 成長段階は `users/{userId}.growthStage`、バッジの進捗は `personalityBadges/current` で持つ。`_Big5AnalysisSection`（✨人格解析欄）は `growthStage >= 1` かつ `element` があるときのみ表示される
 
 ---
 
@@ -436,7 +440,7 @@
 - **nickname**: `string`（任意） - 自分がそのフレンドに付けたあだ名。未設定ならフィールド自体が無い
 
 **あだ名（nickname）は本人だけの情報:**
-- このサブコレクションは `firestore.rules` の `users/{userId}/{subcollection=**}` により本人しか読み書きできない。相手の画面は相手自身の `users/{相手}/friends/{自分}` を読むので、自分が付けたあだ名は相手にも他のユーザーにも見えない
+- このサブコレクションは `firestore.rules` の `users/{userId}/{collection}/{rest=**}` により本人しか読み書きできない。相手の画面は相手自身の `users/{相手}/friends/{自分}` を読むので、自分が付けたあだ名は相手にも他のユーザーにも見えない
 - クライアント（`FriendController.setFriendNickname`）が自分のドキュメントだけを `update` する。空文字で保存すると `FieldValue.delete()` でフィールドを消す
 - Cloud Functions は `acceptFriendRequest` でドキュメントを作るときに1度書くだけで、あとから上書きしない（フレンド削除でドキュメントごと消えるため、削除して再登録するとあだ名も消える）
 - サーバーには送らない。AI の生成文や、相手にも保存される相性診断の結果に混ざらないよう、画面の表示にだけ使う
@@ -808,12 +812,12 @@ users/{userId}
 │   │   ├── confirmedBig5Scores
 │   │   ├── personalityKey → Big5Analysis/{key} 参照
 │   │   ├── sixPersonalities[]
-│   │   ├── axisScores {}          ← チャットシグナル由来（10シグナルごと更新）
+│   │   ├── axisScores {}          ← バッジ診断の点数から計算（各弾がそろったとき・答え直し後に更新）
 │   │   ├── element                ← 元素タイプ
 │   │   ├── typeName               ← タイプ名
 │   │   ├── convertedBig5Scores {} ← 軸スコアから変換したBIG5
 │   │   ├── axisUpdatedAt
-│   │   ├── axisGeneratedAt        ← 30シグナル時に generateCharacterDetails を初回実行
+│   │   ├── axisGeneratedAt        ← 初回診断時に generateCharacterDetails を実行
 │   │   └── （属性10項目）         ← CharacterDetailsTemplate/{key} から複製
 │   ├── dream/current              ← 夢（本人限定。details と違い他ユーザーは読めない）
 │   │   ├── dream                  ← 現在採用中の夢（再生成で上書きしない）
@@ -828,16 +832,16 @@ users/{userId}
 │   ├── posts/{docId}
 │   ├── meeting_history/{docId}
 │   │   └── sharedMeetingId → shared_meetings/{id} 参照
+│   ├── personalityHistory/{docId} ← 性格タイプの変動履歴（element / typeName / gender / growthStage）
 │   └── diary/{docId}
 │       ├── [従来型] content
 │       └── [アクティビティ型] diary_type / facts[] / ai_comment
-├── personalitySignals/{docId}      ← チャットシグナル蓄積（新規）
-│   ├── tags []
-│   ├── messageType
-│   └── timestamp
-├── personalityMeta/current         ← シグナル集計メタ（新規）
-│   ├── signalCount
-│   ├── lastSignalAt
+├── personalityBadges/current       ← バッジ診断の状態（書き込みは Cloud Function だけ）
+│   ├── slots {} / assigned {} / askedQuestionIds []
+│   ├── retake / active
+│   └── round1CompletedAt / round2CompletedAt
+├── personalitySignals/{docId}      ← 既存ユーザーにだけ残る。性格のリセットで削除する以外は使わない
+├── personalityMeta/current         ← タイプ変化通知・初回夢選択のフラグ
 │   ├── （タイプ変化時のみ）pendingTypeChangeNotification / newElement / newTypeName
 │   └── （初回詳細生成時）pendingFirstDreamSelection / firstDreamReadyAt
 ├── subscription/current
@@ -884,7 +888,10 @@ Big5Analysis/{personalityKey}
 
 | コレクション | 読み取り | 書き込み |
 |-------------|---------|---------|
-| `users/{userId}/**` | 本人のみ | 本人のみ |
+| `users/{userId}` | 認証ユーザー（単体取得のみ） | 本人のみ |
+| `users/{userId}/characters/{characterId}/details/{detailId}` | 認証ユーザー（単体取得のみ） | 本人のみ |
+| `users/{userId}/personalityBadges/**` | 本人のみ | 本人は削除のみ。作成・更新は Cloud Functionのみ |
+| 上記以外の `users/{userId}/**` | 本人のみ | 本人のみ |
 | `Big5Analysis` | 認証ユーザー | Cloud Functionのみ |
 | `PersonalityStatsMetadata` | 認証ユーザー | Cloud Functionのみ |
 | `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
@@ -894,7 +901,8 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
+**最終更新**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
+**前回更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
 **前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
 **前回更新**: 2026-05-02（`users/{userId}.lastLoginAt` フィールド追加；`posts.analysis_result` の max_tokens 記述を削除）  
 **前回更新**: 2026-04-19（オンボーディングスライド機能追加: `users/{userId}.hasSeenOnboardingSlides` フィールド追加；`hasCompletedOnboarding` の用途を明確化）  

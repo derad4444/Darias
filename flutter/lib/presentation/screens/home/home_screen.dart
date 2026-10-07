@@ -22,6 +22,9 @@ import '../main/main_shell_screen.dart';
 import '../../../data/services/ad_service.dart';
 import '../../providers/ad_provider.dart';
 import '../../providers/character_provider.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_sheet.dart';
+import '../../../core/constants/badges.dart';
 import '../../providers/diary_provider.dart';
 import '../../providers/dream_provider.dart';
 import '../../widgets/dream_select_sheet.dart';
@@ -71,7 +74,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   /// 初期メッセージリスト
   static const List<String> _initialMessages = [
     // 機能案内
-    'チャットを続けると性格タイプが解析されてキャラクターが変わるよ！',
+    '私の質問に答えてバッジを集めると、あなたの元素が決まるよ！',
     'キャラクター詳細画面でどんな性格か確認してみてね',
     'アプリの使い方がわからないことがあったら何でも話しかけてみて！できる限り答えるよ',
     '日記は毎日自動で書かれるよ。履歴ボタンから確認してみてね！',
@@ -173,6 +176,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final opener = await computeChatOpener(
       userId: userId,
       characterId: characterId,
+      fetchBadgeQuestion: () =>
+          ref.read(badgeServiceProvider).startQuestion(source: 'opener'),
     );
     if (mounted) {
       setState(() {
@@ -281,11 +286,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     try {
       final characterId = ref.read(userDocProvider).valueOrNull?.characterId ?? '';
       debugPrint('🔄 _triggerMeetingFollowup: characterId=$characterId, conclusion=${conclusion.length}chars');
-      final signalCount = ref.read(signalCountProvider).valueOrNull ?? 0;
+      final growthStage = ref.read(growthStageProvider).valueOrNull ?? 0;
       final result = await ref.read(chatControllerProvider.notifier).sendMessage(
         characterId: characterId,
         message: '【自分会議の結論】$conclusion',
-        phase: _calcPhase(signalCount, ref.read(sessionChatCountProvider)),
+        phase: _calcPhase(growthStage, ref.read(sessionChatCountProvider)),
       );
       // 返答が20文字未満でも例外にならないよう長さを見てから切る
       final reply = result?.reply ?? '';
@@ -328,6 +333,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           ),
         );
       }
+    });
+
+    // キャラクター詳細などでバッジが選ばれたら、ここで質問を出す
+    ref.listen<String?>(requestedBadgeKeyProvider, (prev, next) {
+      if (next == null) return;
+      ref.read(requestedBadgeKeyProvider.notifier).state = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _askBadgeQuestion(next));
     });
 
     // 会議後フォローアップの監視
@@ -381,7 +393,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     final characterDetailsAsync = ref.watch(characterDetailsProvider);
     final shouldShowBannerAd = ref.watch(shouldShowBannerAdProvider);
     final isPremium = ref.watch(effectiveIsPremiumProvider);
-    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
     // 未読の日記の件数を履歴ボタンの右上にバッジ表示する
     final unreadDiaryCount = ref.watch(unreadDiaryCountProvider).valueOrNull ?? 0;
     final size = MediaQuery.of(context).size;
@@ -417,10 +429,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                       );
                     }
                     return _CharacterDisplay(
-                      key: ValueKey('$signalCount-${details.element}-${details.gender}'),
+                      key: ValueKey('$growthStage-${details.element}-${details.gender}'),
                       width: charW,
                       height: charH,
-                      signalCount: signalCount,
+                      growthStage: growthStage,
                       element: details.element,
                       gender: details.gender,
                     );
@@ -430,7 +442,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
                   error: (err, stack) => _CharacterDisplay(
                     width: charW,
                     height: charH,
-                    signalCount: 0,
+                    growthStage: 0,
                     gender: userAsync.valueOrNull?.characterGender,
                   ),
                 ),
@@ -527,8 +539,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
                     const SizedBox(height: 6),
 
-                    // 成長ゲージ
-                    _GrowthGauge(signalCount: signalCount, accentColor: accentColor),
+                    // バッジの集まり具合（タップでバッジ一覧）
+                    BadgeProgressCard(
+                      accentColor: accentColor,
+                      onTap: _openBadgeSheet,
+                    ),
 
                     const SizedBox(height: 6),
 
@@ -609,6 +624,84 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     );
   }
 
+  /// バッジ一覧を開き、選んだバッジの質問に話題を変える
+  Future<void> _openBadgeSheet() async {
+    if (_isWaitingForReply) return;
+    final accentColor = ref.read(accentColorProvider);
+    final badgeKey = await showBadgeSheet(context, accentColor: accentColor);
+    if (badgeKey == null || !mounted) return;
+    await _askBadgeQuestion(badgeKey);
+  }
+
+  /// 選ばれたバッジの質問に、確認してから話題を変える
+  Future<void> _askBadgeQuestion(String badgeKey) async {
+    if (_isWaitingForReply || !mounted) return;
+    final badge = kBadges[badgeKey];
+    if (badge == null) return;
+
+    final state = ref.read(badgeStateProvider).valueOrNull ?? const BadgeState();
+    final ok = await confirmBadgeTopicChange(context, badge,
+        isRetake: state.isBadgeComplete(badgeKey));
+    if (!ok || !mounted) return;
+
+    setState(() {
+      _isWaitingForReply = true;
+      _displayedMessage = '・';
+      _isCharacterReply = false;
+    });
+    _startLoadingDots();
+    final question = await ref
+        .read(badgeServiceProvider)
+        .startQuestion(source: 'badge', badgeKey: badgeKey);
+    _stopLoadingDots();
+    if (!mounted) return;
+    setState(() {
+      _isWaitingForReply = false;
+      _isCharacterReply = true;
+      _displayedMessage = question?.displayText ?? 'ごめん、質問をうまく用意できなかった。もう一度試してみて？';
+      if (question != null) _openerContext = question.displayText;
+    });
+    if (question == null) return;
+    final characterId = await _waitForCharacterId();
+    if (characterId.isEmpty) return;
+    try {
+      await ref.read(chatControllerProvider.notifier).saveOpener(
+            characterId: characterId,
+            openerText: question.displayText,
+          );
+    } catch (e) {
+      debugPrint('⚠️ バッジ質問の保存に失敗: $e');
+    }
+  }
+
+  /// バッジの質問に答えられたことを小さく知らせる
+  void _showBadgeEarned(BadgeTurnResult badge) {
+    final def = kBadges[badge.earnedBadgeKey];
+    if (def == null || !mounted) return;
+    final String text;
+    if (badge.earnedIsRetake) {
+      text = '${def.label}を答え直しました';
+    } else if (badge.earnedProgress >= kQuestionsPerBadge) {
+      text = '${def.label}をゲット！';
+    } else {
+      text = '${def.label} ${badge.earnedProgress} / $kQuestionsPerBadge';
+    }
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        content: Row(
+          children: [
+            Icon(def.icon, color: def.round == 2 ? const Color(0xFFFFB300) : Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(text)),
+          ],
+        ),
+      ));
+  }
+
   Future<void> _playVoice() async {
     if (_isPlayingVoice || _displayedMessage.isEmpty) return;
     final gender = ref.read(characterDetailsProvider).valueOrNull?.gender ?? '女性';
@@ -657,7 +750,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
     if (message.contains('性格診断') || message.contains('性格解析')) {
       setState(() {
-        _displayedMessage = '性格解析はチャットを通じて自動的に行われるよ！普通に話しかけてくれれば少しずつ性格タイプが分析されていくから、いつも通り話しかけてね！';
+        _displayedMessage = '性格は、私の質問に答えてバッジを集めると分かるよ！下のバッジをタップすると、好きなバッジの質問から答えられるよ。';
         _isCharacterReply = true;
         _chatController.clear();
       });
@@ -665,8 +758,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     }
 
     ref.read(sessionChatCountProvider.notifier).state += 1;
-    final signalCount = ref.read(signalCountProvider).valueOrNull ?? 0;
-    final phase = _calcPhase(signalCount, ref.read(sessionChatCountProvider));
+    final growthStage = ref.read(growthStageProvider).valueOrNull ?? 0;
+    final phase = _calcPhase(growthStage, ref.read(sessionChatCountProvider));
+    final badgeAnswered =
+        ref.read(badgeStateProvider).valueOrNull?.answeredSlots.length ?? 0;
 
     setState(() {
       _isWaitingForReply = true;
@@ -687,15 +782,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       );
       if (mounted) {
         _stopLoadingDots();
+        final badge = result?.badge;
+        final nextQuestion = badge?.nextQuestion;
         setState(() {
           final reply = result?.reply ?? '';
-          _displayedMessage = reply.isNotEmpty ? reply : 'お返事がありませんでした';
+          final shown = reply.isNotEmpty ? reply : 'お返事がありませんでした';
+          // 話が落ち着いたら、締めの返答に続けて次のバッジ質問を出す
+          _displayedMessage =
+              nextQuestion == null ? shown : '$shown\n\n${nextQuestion.displayText}';
+          if (nextQuestion != null) _openerContext = nextQuestion.displayText;
           _isWaitingForReply = false;
           _isCharacterReply = true;
-          final isMeetingUnlocked = (ref.read(signalCountProvider).valueOrNull ?? 0) >= 30;
+          final isMeetingUnlocked = (ref.read(growthStageProvider).valueOrNull ?? 0) >= 1;
           _showMeetingBanner = (result?.meetingSuggested ?? false) && isMeetingUnlocked;
         });
-        if (result != null) saveLastQuestion(result.reply, ref.read(currentUserIdProvider) ?? '');
+        if (badge?.earnedBadgeKey != null) _showBadgeEarned(badge!);
+        // バッジの質問に答えている間の深掘りの問いは、次回の「前回の問い」にしない
+        if (result != null && badge == null) {
+          saveLastQuestion(result.reply, ref.read(currentUserIdProvider) ?? '');
+        }
         // チャットミッション進捗を更新
         if (result != null) {
           await ref.read(dailyMissionProvider.notifier).incrementChat();
@@ -703,7 +808,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
           // 自分会議の結論を自動送信する _triggerMeetingFollowup では送らない
           // （ユーザーの発話ではないため）。
           await AnalyticsService.instance
-              .logChatMessageSent(signalCount: signalCount, phase: phase);
+              .logChatMessageSent(badgeAnswered: badgeAnswered, phase: phase);
         }
       }
       // チャット消費 & リワード広告チェック（5回ごと、非プレミアムのみ）
@@ -756,13 +861,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
     ).whenComplete(() => _isShowingDialog = false);
   }
 
-  /// signalCountとセッション内ターン数からフェーズを算出
-  /// signalCount <  10: Phase 1固定（性格データ未確定）
-  /// signalCount 10-29: Phase 2固定（初回解析済み・完全確定前）
-  /// signalCount >= 30: turn1=P1, turn2-4=P2, turn5+=P3
-  int _calcPhase(int signalCount, int sessionTurn) {
-    if (signalCount < 10) return 1;
-    if (signalCount < 30) return 2;
+  /// 成長段階とセッション内ターン数からフェーズを算出
+  /// 元素が決まる前（赤ちゃん）: Phase 1固定（性格データがないため言及しない）
+  /// 元素が決まった後: turn1=P1, turn2-4=P2, turn5+=P3
+  int _calcPhase(int growthStage, int sessionTurn) {
+    if (growthStage < 1) return 1;
     if (sessionTurn <= 1) return 1;
     if (sessionTurn <= 4) return 2;
     return 3;
@@ -770,7 +873,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
 
   Future<void> _showEvolutionDialog(TypeChangeData data) async {
-    final signalCount = ref.read(signalCountProvider).valueOrNull ?? 30;
+    final growthStage = ref.read(growthStageProvider).valueOrNull ?? 1;
     final details = ref.read(characterDetailsProvider).valueOrNull;
     final gender = details?.gender;
     final userId = ref.read(currentUserIdProvider);
@@ -782,7 +885,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
       pageBuilder: (ctx, anim, secAnim) => _TypeEvolutionDialog(
         newElement: data.newElement,
         newTypeName: data.newTypeName,
-        signalCount: signalCount,
+        growthStage: growthStage,
         gender: gender,
         onConfirm: () async {
           if (userId != null) {
@@ -985,7 +1088,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 class _CharacterDisplay extends StatelessWidget {
   final double width;
   final double height;
-  final int signalCount;
+  final int growthStage;
   final String? element;
   final String? gender;
 
@@ -993,7 +1096,7 @@ class _CharacterDisplay extends StatelessWidget {
     super.key,
     required this.width,
     required this.height,
-    required this.signalCount,
+    required this.growthStage,
     this.element,
     this.gender,
   });
@@ -1001,11 +1104,11 @@ class _CharacterDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assetPath = characterGrowthAssetPath(
-      signalCount: signalCount,
+      growthStage: growthStage,
       element: element,
       gender: gender,
     );
-    final elementType = signalCount >= 30 ? elementTypeFromString(element) : null;
+    final elementType = growthStage >= 1 ? elementTypeFromString(element) : null;
 
     return SizedBox(
       width: width,
@@ -1343,102 +1446,6 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
   }
 }
 
-/// 成長ゲージ（参考画像スタイル: バッジ + ラベル + カウント + プログレスバー）
-class _GrowthGauge extends StatelessWidget {
-  final int signalCount;
-  final Color accentColor;
-
-  const _GrowthGauge({required this.signalCount, required this.accentColor});
-
-  @override
-  Widget build(BuildContext context) {
-    final String badge;
-    final String label;
-    final double progress;
-    final String countText;
-
-    if (signalCount >= 100) {
-      final cycle = signalCount % 10;
-      badge = '大人';
-      label = '性格解析';
-      progress = cycle / 10.0;
-      countText = '$cycle / 10';
-    } else if (signalCount >= 30) {
-      badge = '幼少期';
-      label = '大人まで';
-      progress = signalCount / 100.0;
-      countText = '$signalCount / 100';
-    } else {
-      badge = '赤ちゃん';
-      label = '幼少期まで';
-      progress = signalCount / 30.0;
-      countText = '$signalCount / 30';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.88),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: accentColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF333333),
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  countText,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF555555),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: accentColor.withValues(alpha: 0.18),
-                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                minHeight: 7,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ─────────────────────────────────────────────
 // 自分会議提案バナー
 // ─────────────────────────────────────────────
@@ -1510,14 +1517,14 @@ class _MeetingSuggestionBanner extends StatelessWidget {
 class _TypeEvolutionDialog extends ConsumerStatefulWidget {
   final String newElement;
   final String newTypeName;
-  final int signalCount;
+  final int growthStage;
   final String? gender;
   final Future<void> Function() onConfirm;
 
   const _TypeEvolutionDialog({
     required this.newElement,
     required this.newTypeName,
-    required this.signalCount,
+    required this.growthStage,
     required this.gender,
     required this.onConfirm,
   });

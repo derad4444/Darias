@@ -5,6 +5,7 @@ import '../../data/datasources/remote/character_datasource.dart';
 import '../../data/models/character_model.dart';
 import '../../data/services/firebase_image_service.dart' as firebase_image;
 import 'auth_provider.dart';
+import 'badge_provider.dart';
 
 /// CharacterDatasourceのプロバイダー
 final characterDatasourceProvider = Provider<CharacterDatasource>((ref) {
@@ -275,30 +276,15 @@ final userCharacterDetailsProvider =
   }
 });
 
-/// リアルタイムsignalCountプロバイダー（性格解析の進捗表示用）
-final signalCountProvider = StreamProvider<int>((ref) {
-  final userId = ref.watch(currentUserIdProvider);
-  if (userId == null) return Stream.value(0);
-
-  final firestore = ref.watch(firestoreProvider);
-  return firestore
-      .collection('users')
-      .doc(userId)
-      .collection('personalityMeta')
-      .doc('current')
-      .snapshots()
-      .map((doc) => (doc.data()?['signalCount'] as num?)?.toInt() ?? 0);
-});
-
 /// キャラクター画像URLのプロバイダー
 final characterImageProvider = FutureProvider<String?>((ref) async {
   final details = ref.watch(characterDetailsProvider).valueOrNull;
   if (details == null) return null;
 
-  // BIG5未診断かつシグナル30未満の場合は画像を変更しない
+  // BIG5未診断かつ元素が決まる前（赤ちゃん）の場合は画像を変更しない
   if (details.analysisLevel == 0) {
-    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
-    if (signalCount < 30) return null;
+    final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
+    if (growthStage < 1) return null;
   }
 
   // 性別を取得

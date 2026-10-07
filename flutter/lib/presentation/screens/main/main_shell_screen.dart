@@ -21,6 +21,7 @@ import '../../providers/diary_provider.dart';
 import '../../providers/character_provider.dart';
 import '../../providers/subscription_provider.dart';
 import '../../../data/services/analytics_service.dart';
+import '../../providers/badge_provider.dart';
 
 /// タブのインデックス。IndexedStack の children の並びと、
 /// タブバーに並べる _TabItem の順序をこの順に揃えること。
@@ -125,7 +126,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
   void _syncAnalyticsSegment() {
     AnalyticsService.instance.setUserSegment(
       element: ref.read(characterDetailsProvider).valueOrNull?.element,
-      signalCount: ref.read(signalCountProvider).valueOrNull,
+      growthStage: ref.read(growthStageProvider).valueOrNull,
+      badgeAnswered: ref.read(badgeStateProvider).valueOrNull?.answeredSlots.length,
       isPremium: ref.read(effectiveIsPremiumProvider),
     );
   }
@@ -137,7 +139,8 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
 
     // 元素の確定・成長段階の変化・課金状態の変化に追従してセグメントを更新する
-    ref.listen(signalCountProvider, (_, __) => _syncAnalyticsSegment());
+    ref.listen(growthStageProvider, (_, __) => _syncAnalyticsSegment());
+    ref.listen(badgeStateProvider, (_, __) => _syncAnalyticsSegment());
     ref.listen(characterDetailsProvider, (_, __) => _syncAnalyticsSegment());
     ref.listen(effectiveIsPremiumProvider, (_, __) => _syncAnalyticsSegment());
 

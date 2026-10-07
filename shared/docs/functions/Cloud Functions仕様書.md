@@ -2,9 +2,9 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-02
+**最終更新日**: 2026-10-07（バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記）
 **ランタイム**: Node.js 22
-**関数数**: 27
+**関数数**: 28
 
 ---
 
@@ -62,7 +62,7 @@
 
 ## 関数一覧（詳細）
 
-### HTTP Callable (`onCall`) - 17 関数
+### HTTP Callable (`onCall`) - 18 関数
 
 クライアントから Firebase SDK 経由で呼び出す。認証コンテキスト付き。
 
@@ -73,11 +73,11 @@
 #### 1. `generateCharacterReply`
 - **ソース**: `const/generateCharacterReply.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: チャットメッセージを受け取り、内容に応じて複数の処理を振り分けてAI返答を生成する
+- **概要**: チャットメッセージを受け取り、内容に応じて複数の処理を振り分けてAI返答を生成する。バッジ診断の質問に答えている間は、返答を作る前に回答を採点する
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **その他**: `minInstances: 0`, `enforceAppCheck: true`
 
 **入力パラメータ:**
 
@@ -97,20 +97,22 @@
 | `reply` | `string` | AI返答テキスト |
 | `voiceUrl` | `string` | 常に `""`（音声はユーザーがスピーカーボタンを押した際に `generateVoice` で別途生成） |
 | `emotion` | `string` | 通常チャットのみ感情値を返す。`"" / "_smile" / "_angry" / "_cry" / "_sleep"` |
+| `badge` | `map \| null` | バッジ診断の質問に答えている間だけ返す（それ以外は `null`）。`{earned, nextQuestion, diagnosed}`。形は [チャット機能仕様書のバッジの質問中の返答](チャット機能仕様書.md#バッジの質問中の返答) を参照 |
 | `isBig5Question` | `boolean` | **レガシー** BIG5回答モード中かどうか |
 | `questionId` / `questionText` / `progress` | `string` | **レガシー** BIG5質問モード時のみ。`questionText` は質問文のみ（選択肢テキストは含まない） |
 | `big5Completed` / `newScores` | - | **レガシー** 100問完了時のみ |
 
 **処理の振り分けロジック（優先順）:**
 
-1. **無意味な入力検出** → フォールバック返答を返す（3文字未満・記号のみ・繰り返し文字等）
-2. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
+1. **バッジ診断の回答中**（`personalityBadges/current.active` がある）→ 返答の前に `badgeStore.js` の `handleAnswer` が回答を採点し（`badgeScoring.js`、gpt-4o-mini）、深掘り・会話を続ける・締めるの指示を返答のプロンプトに渡す。回答中は無意味な入力の判定より先に行う
+2. **無意味な入力検出** → フォールバック返答を返す（3文字未満・記号のみ・繰り返し文字等）
+3. **通常チャット** → OpenAI でキャラクター返答を生成し `posts` コレクションに保存
 
 > **レガシーBIG5 100問診断（後方互換性のため維持）:**
 > - BIG5診断トリガー (`性格診断して` / `性格解析して`) → 次の質問を `questionText` フィールドで返し `big5Progress` を更新
 > - BIG5回答 (1-5の数字 かつ `currentQuestion` が存在) → 回答を記録し段階完了処理（OpenAI呼び出しなし）
 >
-> ※ 現在の主要な性格解析は `classifyAndExtract` が自動抽出するパーソナリティタグ（チャットシグナル方式）で行われる。
+> ※ 現在の性格解析はバッジ診断（質問への回答をAIが軸ごとに採点する方式）で行う。普段のチャットは診断に使わない。仕組みは [性格解析仕様書のバッジ診断](性格解析仕様書.md#バッジ診断) を参照。
 
 > **Flutter側の振り分け（Cloud Function呼び出し前）:**
 > - `classifyAndExtract` が `app_qa` と判定 → `answerAppQuestion` へ
@@ -122,6 +124,8 @@
 
 **副作用（Firestore書き込み）:**
 - `posts/{docId}` へチャット履歴を保存（通常チャット時のみ）
+- `personalityBadges/current` を更新（バッジ診断の回答中のみ。採点できた点数・やり取り・次の質問）
+- 第1弾・第2弾がそろったとき、または答え直しが終わったとき `axisCalculator.js` の `diagnoseFromAxisScores` を実行（`details/current` の軸スコア・元素・タイプ・`convertedBig5Scores`、`users/{uid}.growthStage`、`personalityHistory`、初回は `generateCharacterDetails` と `personalityMeta/current.pendingFirstDreamSelection`）
 - `big5Progress/current` を更新（レガシーBIG5回答・トリガー時）
 - `details/current` の `confirmedBig5Scores`, `analysis_level`, `sixPersonalities` を更新（レガシーBIG5 100問完了時）
 - `PersonalityStatsMetadata` を更新（レガシーBIG5 100問完了時・バックグラウンド）
@@ -129,12 +133,12 @@
 #### 2. `classifyAndExtract`
 - **ソース**: `const/classifyAndExtract.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: チャット入力メッセージを AI（gpt-4o-mini）で `app_qa` / `chat` に分類し、あわせて性格シグナルタグを抽出する。全チャット送信時に必ず呼び出される振り分けゲートウェイ
+- **概要**: チャット入力メッセージを AI（gpt-4o-mini）で `app_qa` / `chat` に分類する。全チャット送信時に必ず呼び出される振り分けゲートウェイ。性格の判定には関わらない
 - **リソース**: memory `256MiB` / timeout `60秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **その他**: `minInstances: 0`, `enforceAppCheck: false`
-- **モデル**: `gpt-4o-mini` / temperature `0`（確定的分類）
+- **その他**: `minInstances: 0`, `enforceAppCheck: true`
+- **モデル**: `gpt-4o-mini`（temperature は指定せず既定値）
 
 **入力パラメータ:**
 
@@ -159,11 +163,56 @@
 | `app_qa` | アプリの使い方・機能に関する質問 |
 | `chat` | 上記以外の会話・相談・雑談 |
 
-**エラー時フォールバック**: `{ "type": "chat" }` を返してキャラクター返答を継続
+**エラー時フォールバック**: `{ "type": "chat" }` を返してキャラクター返答を継続（`userMessage` が空のときは `{ "error": "Missing userMessage" }`）
 
 **プロンプト**: `OPTIMIZED_PROMPTS.classifyAndExtract(currentDate, currentTime, userMessage)` を使用
 
-**副作用**: 抽出した性格シグナルタグを `personalitySignals` に保存し、10件ごとに軸スコアを再計算する
+**副作用**: なし（Firestore への書き込みはしない）
+
+---
+
+#### 2-2. `startBadgeQuestion`
+- **ソース**: `const/startBadgeQuestion.js`
+- **API バージョン**: v2 (`firebase-functions/v2/https`)
+- **概要**: バッジ診断の質問を1つ選んで出し、回答中の状態にする（ホームの最初の話題・バッジ一覧から選んだとき）
+- **リソース**: memory `256MiB` / timeout `30秒`
+- **リージョン**: `asia-northeast1`
+- **secrets**: なし
+- **その他**: `minInstances: 0`, `enforceAppCheck: true`
+- **AI呼び出し**: なし
+
+**入力パラメータ:**
+
+| パラメータ | 型 | 説明 |
+|-----------|-----|------|
+| `source` | `string` | `"opener"`（ホームの最初の話題）または `"badge"`（バッジ一覧から選んだ）。それ以外は `invalid-argument` |
+| `badgeKey` | `string` (optional) | `source: "badge"` のとき必須。バッジのキー（例 `r1_energy`）。`badgeQuestions.js` の `BADGES` に無ければ `invalid-argument` |
+
+**返却値:**
+
+```javascript
+{
+  question: {
+    questionId,   // 例 "r1_energy_03"
+    text,         // 質問文
+    prefix,       // 前置き（出し直し・答え直しのとき。無ければ ""）
+    badgeKey,
+    badgeName,
+    round,        // 1 = 第1弾 / 2 = 第2弾
+    isRetake,     // 答え直しか
+  } | null        // 出す質問が無いとき
+}
+```
+
+**処理内容**（`src/personality/badgeStore.js` の `startQuestion`。トランザクション内）:
+1. `source: "opener"` で、まだ新しい回答中の状態（`active`）があれば、その質問をそのまま返す（同じ日にアプリを開き直したとき）
+2. それ以外は `badgeState.js` の `planQuestion` で質問を選び、`personalityBadges/current` に回答中の状態として保存して返す
+
+質問の選び方・前置き・答え直しは [性格解析仕様書のバッジ診断](性格解析仕様書.md#バッジ診断) を参照。
+
+**副作用（Firestore書き込み）**: `users/{uid}/personalityBadges/current`（`assigned`・`askedQuestionIds`・`active` など）
+
+**エラー**: 未認証は `unauthenticated`、内部エラーは `internal`（「質問を用意できませんでした」）
 
 ---
 
@@ -273,8 +322,8 @@
 | `scores` | `map` | 全カテゴリのスコア（決定論的算出）`{friendship, romance, work, trust, overall}` |
 
 **スコア取得ロジック:**
-- `confirmedBig5Scores`（旧BIG5 100問スコア）を優先して取得
-- 存在しない場合は `convertedBig5Scores`（チャットシグナルから変換されたBIG5互換スコア）にフォールバック
+- `confirmedBig5Scores`（質問形式のBIG5診断（100問）のスコア。`analysis_level > 0` のときだけ使う）を優先して取得
+- 存在しない場合は `convertedBig5Scores`（バッジ診断の5軸スコアから変換したBIG5互換スコア）にフォールバック
 - いずれも存在しない場合はエラーを返す
 
 **スコア算出アルゴリズム（決定論的）:**
@@ -809,7 +858,8 @@ shared/functions/
 │
 ├── const/                            # callable 関数の実装
 │   ├── generateCharacterReply.js     # キャラクター返信生成
-│   ├── classifyAndExtract.js         # メッセージ分類・抽出（振り分けゲートウェイ）＋シグナル保存
+│   ├── classifyAndExtract.js         # メッセージ分類（app_qa / chat の振り分けゲートウェイ）
+│   ├── startBadgeQuestion.js         # バッジ診断の質問を出す
 │   ├── answerAppQuestion.js          # アプリ Q&A 回答
 │   ├── generateVoice.js              # 音声合成
 │   ├── generateDiary.js              # アクティビティ型日記生成
@@ -833,8 +883,11 @@ shared/functions/
     │   ├── generateSixPersonMeeting.js # 6人会議
     │   └── sendRegistrationEmail.js  # 登録メール
     ├── personality/
-    │   ├── axisCalculator.js         # 5軸スコア計算・元素判定・詳細生成トリガー
-    │   └── tagAxisMap.js             # タグ→軸のマッピング
+    │   ├── axisCalculator.js         # 5軸スコアから元素・タイプ・BIG5を決めて保存（diagnoseFromAxisScores）・詳細生成トリガー
+    │   ├── badgeQuestions.js         # バッジと質問（100問）の定義
+    │   ├── badgeScoring.js           # 回答の採点（gpt-4o-mini）
+    │   ├── badgeState.js             # 質問の選び方・点数の反映・5軸スコアの計算
+    │   └── badgeStore.js             # personalityBadges/current の読み書き（startQuestion / handleAnswer）
     ├── prompts/
     │   ├── templates.js              # プロンプト（characterReply / activityDiary /
     │   │                             #   characterDetails / classifyAndExtract / emotionDetect）
@@ -955,4 +1008,4 @@ Object.defineProperty(exports, "functionName", {
 
 ---
 
-*最終更新: 2026-08-05（キャラクター属性を personalityKey で共有化。夢の保存先を本人限定サブコレクションに変更）*
+*最終更新: 2026-10-07（バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記）*

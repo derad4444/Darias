@@ -38,8 +38,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     ),
     _OnboardingPage(
       icon: Icons.chat_bubble_outline,
-      title: '話すだけでいい',
-      body: '性格テストはありません。\n質問に答える必要もありません。\n\nただ話しかけるだけで、\n言葉の選び方から、\nAIがあなたを読み取っていきます。',
+      title: '質問に答えるだけでいい',
+      body: '堅苦しい性格テストはありません。\n\nAIがときどき、\nあなたに身近な質問をします。\n答えると話がふくらんで、\nAIがあなたを読み取っていきます。',
     ),
     _OnboardingPage(
       icon: Icons.local_fire_department,
@@ -47,9 +47,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       clipImageToCircle: true,
       // 本文が5枚の中で一番長く、既定の配置では下が切れるため詰めて上へ寄せる
       compactLayout: true,
-      title: '30回話すと、\nあなたの元素が決まる',
+      title: 'バッジがそろうと、\nあなたの元素が決まる',
       body:
-          '言葉が30回分たまると、\nあなたの性格が9つの元素のどれかに宿ります。\n\n炎、水、風、雷、光、土、氷、闇、そして無。\n\nこのときAIも、\n赤ちゃんから幼少期へ育ちます。\nあなたを知るほど、あなたに似ていく。',
+          '質問に答えるとバッジが集まります。\n5つのバッジがそろうと、\nあなたの性格が9つの元素のどれかに宿ります。\n\n炎、水、風、雷、光、土、氷、闇、そして無。\n\nこのときAIも、\n赤ちゃんから幼少期へ育ちます。\nあなたを知るほど、あなたに似ていく。',
     ),
     _OnboardingPage(
       icon: Icons.groups,

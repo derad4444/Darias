@@ -1,7 +1,6 @@
-// 5軸スコア計算・元素判定・BIG5変換・Firestore保存
+// 5軸スコアから元素・タイプ・BIG5を決めて保存する
 
 const {admin} = require('../utils/firebaseInit');
-const {TAG_AXIS_MAP, AXES} = require('./tagAxisMap');
 const {generateCharacterDetails} = require('../../const/generateCharacterDetails');
 const {hasDecisiveKeyChange} = require('../../const/generatePersonalityKey');
 const {OPENAI_API_KEY} = require('../config/config');
@@ -84,58 +83,18 @@ async function markCompatibilityStale(db, userId) {
 }
 
 // ── メイン処理 ────────────────────────────────────────
-async function calculateAndSaveAxisScores(userId, signalCount = 0) {
+/**
+ * 5軸スコアから元素・タイプ・BIG5を決めて保存し、キャラクター詳細の生成などにつなぐ
+ *
+ * スコアはバッジ質問の回答から計算したもの（badgeState.computeAxisScores）。
+ * 過去の元素は計算に使わない（変化の検知と通知にだけ使う）。
+ *
+ * @param {string} userId ユーザーID
+ * @param {object} axisScores 5軸スコア（-1.0〜+1.0）
+ * @param {number} badgeGrowthStage バッジから決まる成長段階（第1弾=1・第2弾=2）
+ */
+async function diagnoseFromAxisScores(userId, axisScores, badgeGrowthStage) {
   const db = admin.firestore();
-
-  // 直近90日・最大200件のシグナルを取得
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
-
-  const signalsSnap = await db
-      .collection('users').doc(userId)
-      .collection('personalitySignals')
-      .where('timestamp', '>=', admin.firestore.Timestamp.fromDate(ninetyDaysAgo))
-      .orderBy('timestamp', 'desc')
-      .limit(200)
-      .get();
-
-  if (signalsSnap.empty) {
-    console.log(`ℹ️ personalitySignals なし user=${userId}`);
-    return;
-  }
-
-  const now = Date.now();
-
-  // 軸ごとの重み集計
-  const posSum = Object.fromEntries(AXES.map((a) => [a, 0]));
-  const negSum = Object.fromEntries(AXES.map((a) => [a, 0]));
-  const totSum = Object.fromEntries(AXES.map((a) => [a, 0]));
-
-  for (const doc of signalsSnap.docs) {
-    const data = doc.data();
-    const ts = data.timestamp?.toDate?.() || new Date();
-    const daysAgo = (now - ts.getTime()) / (1000 * 60 * 60 * 24);
-    const decay = Math.pow(0.95, daysAgo);
-
-    for (const tag of (data.tags || [])) {
-      const contributions = TAG_AXIS_MAP[tag];
-      if (!contributions) continue;
-      for (const [axis, direction] of Object.entries(contributions)) {
-        const w = Math.abs(direction) * decay;
-        if (direction > 0) posSum[axis] += w;
-        else negSum[axis] += w;
-        totSum[axis] += w;
-      }
-    }
-  }
-
-  // 軸スコア算出（-1.0〜+1.0）
-  const axisScores = {};
-  for (const axis of AXES) {
-    axisScores[axis] = totSum[axis] > 0
-      ? (posSum[axis] - negSum[axis]) / totSum[axis]
-      : 0;
-  }
 
   const element = determineElement(axisScores);
   const typeName = determineTypeName(element, axisScores);
@@ -175,14 +134,16 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
   }, {merge: true});
 
   // 成長ステージを users/{userId} に保存（フレンドが参照できるよう上位ドキュメントに保存）
-  // 0=赤ちゃん(<30), 1=幼少期(30-99), 2=成人(100+)
-  const growthStage = signalCount >= 100 ? 2 : signalCount >= 30 ? 1 : 0;
+  // 0=赤ちゃん 1=幼少期（第1弾のバッジがそろった） 2=大人（第2弾もそろった）
+  // 回数制の頃に進んだ段階は下げない
+  const prevStage = (await db.collection('users').doc(userId).get()).data()?.growthStage || 0;
+  const growthStage = Math.max(prevStage, badgeGrowthStage);
   await db.collection('users').doc(userId).set({growthStage}, {merge: true});
 
   console.log(`✅ 軸スコア保存完了 charId=${charId} user=${userId} growthStage=${growthStage}`);
 
   // 初回元素決定時（元素が初めてセットされた瞬間）の履歴記録
-  if (prevElement === undefined && signalCount >= 30) {
+  if (prevElement === undefined) {
     await db
         .collection('users').doc(userId)
         .collection('characters').doc(charId)
@@ -191,17 +152,17 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
           element,
           typeName,
           gender,
-          signalCount,
+          growthStage,
           recordedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-    console.log(`📖 初回性格履歴記録: ${typeName} signalCount=${signalCount}`);
+    console.log(`📖 初回性格履歴記録: ${typeName} growthStage=${growthStage}`);
   }
 
-  // 30シグナル到達時に初回キャラクター詳細を生成（axisGeneratedAt がなければ1回だけ実行）
-  if (signalCount >= 30) {
+  // 初めて診断したときにキャラクター詳細を生成（axisGeneratedAt がなければ1回だけ実行）
+  {
     const prevAxisGeneratedAt = prevSnap.data()?.axisGeneratedAt;
     if (!prevAxisGeneratedAt) {
-      console.log(`🎭 初回キャラクター詳細生成トリガー: signalCount=${signalCount} user=${userId}`);
+      console.log(`🎭 初回キャラクター詳細生成トリガー: user=${userId}`);
       try {
         await generateCharacterDetails(charId, userId, OPENAI_API_KEY.value().trim());
         await detailsRef.set({
@@ -247,10 +208,10 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
           element,
           typeName,
           gender,
-          signalCount,
+          growthStage,
           recordedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-    console.log(`📖 性格履歴記録: ${typeName} signalCount=${signalCount}`);
+    console.log(`📖 性格履歴記録: ${typeName} growthStage=${growthStage}`);
 
     // フレンドの相性診断をstale化
     await markCompatibilityStale(db, userId);
@@ -270,8 +231,8 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
 
   // タイプ名も元素も変わらないまま Big5スコアだけが動くケースの救済。
   //
-  // スコアは10シグナルごとに更新されるが、属性・夢の候補はタイプ変化時にしか
-  // 作り直されないため、放置すると古い性格の口癖・長所・夢がそのまま残る
+  // 属性・夢の候補はタイプ変化時にしか作り直されないため、
+  // 放置すると古い性格の口癖・長所・夢がそのまま残る
   // （2026-08-14 に既存10ユーザーで実際に発生していたのを確認しバックフィル済み）。
   // 丸め境界での往復による無駄な再生成を避けるため、判定にはヒステリシスを入れている。
   const prevAxisGeneratedAt = prevSnap.data()?.axisGeneratedAt;
@@ -288,4 +249,4 @@ async function calculateAndSaveAxisScores(userId, signalCount = 0) {
   }
 }
 
-module.exports = {calculateAndSaveAxisScores};
+module.exports = {diagnoseFromAxisScores, determineElement, determineTypeName, convertToBig5};

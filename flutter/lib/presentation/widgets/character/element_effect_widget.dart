@@ -39,16 +39,16 @@ ElementType? elementTypeFromString(String? element) {
   }
 }
 
-/// signalCount・element・gender から成長段階のローカルアセットパスを返す
+/// 成長段階（0=赤ちゃん 1=幼少期 2=大人）・element・gender から画像のローカルアセットパスを返す
 String characterGrowthAssetPath({
-  required int signalCount,
+  required int growthStage,
   required String? element,
   required String? gender,
 }) {
-  if (signalCount < 30 || element == null) {
+  if (growthStage < 1 || element == null) {
     return 'assets/images/character_growth/赤ちゃん.png';
   }
-  if (signalCount < 100) {
+  if (growthStage < 2) {
     return 'assets/images/character_growth/幼少期_$element.png';
   }
   final g = gender == '男性' ? '男性' : '女性';

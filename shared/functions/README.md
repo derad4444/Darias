@@ -17,8 +17,11 @@ functions/
 │   │   ├── scheduledTasks.js            # 定期実行タスク
 │   │   └── sendRegistrationEmail.js     # 登録確認メール
 │   ├── personality/
-│   │   ├── axisCalculator.js            # 5軸スコア計算・元素判定
-│   │   └── tagAxisMap.js                # タグ→軸のマッピング
+│   │   ├── axisCalculator.js            # 5軸スコアから元素判定・保存
+│   │   ├── badgeQuestions.js            # バッジ診断の質問100問
+│   │   ├── badgeScoring.js              # 回答の採点
+│   │   ├── badgeState.js                # バッジの状態（出題・保存・計算）
+│   │   └── badgeStore.js                # バッジの状態の読み書き（Firestore）
 │   ├── prompts/
 │   │   ├── templates.js                 # プロンプトテンプレート集
 │   │   └── sixPersonMeetingTemplates.js

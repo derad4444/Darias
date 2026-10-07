@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
+import '../../models/badge_model.dart';
 import '../../models/post_model.dart';
 
 /// 悩み系キーワード（会議への誘導トリガー）
@@ -28,9 +29,13 @@ class SendMessageResult {
   final String reply;
   final bool meetingSuggested;
 
+  /// バッジ診断の質問に答えている間だけ入る（採点できたバッジ・次の質問など）
+  final BadgeTurnResult? badge;
+
   SendMessageResult({
     required this.reply,
     this.meetingSuggested = false,
+    this.badge,
   });
 }
 
@@ -178,6 +183,7 @@ class ChatDatasource {
 
     final data = result.data;
     final reply = data['reply'] as String? ?? '';
+    final badge = BadgeTurnResult.fromMap(data['badge']);
 
     await _savePost(
       userId: userId,
@@ -186,9 +192,20 @@ class ChatDatasource {
       reply: reply,
     );
 
+    // 続けて出す次のバッジ質問は、キャラクターの発話として別に残す
+    final nextQuestion = badge?.nextQuestion;
+    if (nextQuestion != null) {
+      await saveOpenerPost(
+        userId: userId,
+        characterId: characterId,
+        openerText: nextQuestion.displayText,
+      );
+    }
+
     return SendMessageResult(
       reply: reply,
       meetingSuggested: meetingSuggested,
+      badge: badge,
     );
   }
 

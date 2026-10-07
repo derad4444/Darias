@@ -214,6 +214,34 @@ ${lines.join("\n")}
 `;
 }
 
+/**
+ * バッジ診断の質問に答えてもらっている間の返答指示
+ * 設計: shared/docs/functions/バッジ診断_設計書.md「質問中の会話」
+ * @param {{mode: 'deepen'|'continue'|'closing'}} badgeContext
+ * @return {string} 指示
+ */
+function buildBadgeInstruction(badgeContext) {
+  const common = `- 性格の言い当てや評価をしない（「外向的だね」「〇〇タイプっぽい」などは言わない）
+- 診断・バッジ・採点のことには触れない
+- 自分から別の質問や別の話題を出さない`;
+  if (badgeContext.mode === 'deepen') {
+    return `120文字以内で返答してください：
+① ユーザーの答えの中身に具体的に反応して、共感する（1〜2文）
+② 具体的な場面・理由・その後どうなったかのどれか1つだけを、自然に聞いて深掘りする
+${common}`;
+  }
+  if (badgeContext.mode === 'closing') {
+    return `100文字以内で返答してください：
+① ユーザーの話を受け止めて、短く共感する
+② 話してくれたことへのお礼で締める。質問はしない
+${common}`;
+  }
+  return `120文字以内で返答してください：
+- ユーザーの話に付き合って、普通に会話を続ける。話題を切り上げない
+- 深掘りの質問を重ねない（聞くとしても、話の流れで自然なときだけ1つ）
+${common}`;
+}
+
 const OPTIMIZED_PROMPTS = {
   /**
    * Character Reply Generation - GPT-4o-mini optimized
@@ -221,21 +249,26 @@ const OPTIMIZED_PROMPTS = {
    * phase 2: 150文字, 受け止め+性格仮説+質問（あたってるかも体験）
    * phase 3: 220文字, 受け止め+性格言語化+質問任意（なるほど体験）
    */
-  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null) => {
+  characterReply: (type, gender, big5, dreamText, userMessage, style, question, meetingContext, traitsOverride = null, phase = 1, openerContext = null, memoryContext = null, traitContext = null, badgeContext = null) => {
     const traits = traitsOverride || buildPersonalityTraits(big5);
     const genderText = gender === "female" ? "女性" : gender === "male" ? "男性" : "中性";
     const dream = dreamText ? `夢: ${dreamText.replace(/なお、このキャラクターの夢は「|」です。/g, "")}` : "";
     const meeting = meetingContext
       ? `【過去の自分会議】${meetingContext}\n（会話に関連する場合はこの文脈を踏まえてください）`
       : "";
-    const opener = openerContext ? `会話のきっかけ: ${openerContext}` : "";
+    const opener = badgeContext
+      ? `【あなたがした質問】「${badgeContext.question}」（ユーザーの${badgeContext.userTurn}回目の返事）`
+      : openerContext ? `会話のきっかけ: ${openerContext}` : "";
     // 過去の会話から覚えていること（日記生成時に抽出したもの）
     const memory = memoryContext
       ? `【覚えていること】\n${memoryContext}\n（今の話題に関係するときだけ自然に触れる。関係ないときは持ち出さない。覚えている内容を並べ立てない）`
       : "";
 
     let instruction;
-    if (phase === 2) {
+    if (badgeContext) {
+      // バッジ診断の質問に答えてもらっている間は、性格の言い当て（Phase 2・3）をしない
+      instruction = buildBadgeInstruction(badgeContext);
+    } else if (phase === 2) {
       instruction = `以下の順序で150文字以内で返答してください：
 ① ユーザーの言葉を1文で受け止める
 ② 性格特性を踏まえた"仮説"を返す：「〜な面が出てる気がする」「あなたらしい選択だと思う」など（1〜2文）
@@ -421,28 +454,14 @@ favorite_wordはこのキャラクターの口癖。valueは次の条件を守�
 
 ユーザーメッセージ:"${userMessage}"
 
-以下の2種類に分類し、性格シグナルタグを付けてJSONで返答せよ。
+以下の2種類に分類し、JSONで返答せよ。
 
 ## 分類ルール
 1. **app_qa** - アプリの使い方・機能に関する質問（例:「日記はどこで見れる？」「自分会議って何？」）
 2. **chat** - 上記以外の会話・相談・雑談
 
-## 性格シグナルタグ
-発言から読み取れる性格の傾向を0〜3個のタグで付与すること。
-
-使用可能なタグ:
-social_reference/solo_preference/group_activity/initiating/quiet_environment/
-planning_language/spontaneous_language/goal_oriented/emotional_expression/
-logical_reasoning/intuitive_decision/data_driven/cooperative_language/
-independent_stance/self_paced/change_seeking/worry_anxiety
-
-タグの判定基準（抜粋）:
-- self_paced: 自分のペースや方法を優先する発言（「自分でやった方が早い」「合わせるのが苦手」「マイペースに」「人に頼まずに」）
-
 ## 出力形式（JSONのみ。説明不要）
-タグなし例:{"type":"chat","tags":[]}
-タグあり例:{"type":"chat","tags":["emotional_expression","social_reference"]}
-アプリの質問:{"type":"app_qa","tags":[]}
+{"type":"chat"} または {"type":"app_qa"}
 
 JSONのみ出力。`;
   },

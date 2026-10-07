@@ -91,22 +91,21 @@ class AnalyticsService {
 
   /// チャット送信の成功。
   ///
-  /// [signalCount] は送信時点の解析シグナル数（`personalityMeta/current.signalCount`）。
-  /// クライアントに「通算送信回数」は存在せず、これが唯一の通算進捗値のため採用している。
-  /// 生の数値ではなく区分に丸めて送る（初回到達と「30回の壁」の手前・直後を
+  /// [badgeAnswered] は送信時点でバッジ診断の質問に答えた数（0〜20。答え直しは数えない）。
+  /// 生の数値ではなく区分に丸めて送る（元素が決まる前後・大人になる前後を
   /// 比較できれば足りるため）。
   ///
-  /// 同名のユーザープロパティ `signal_bucket` は「現在値」を表すのに対し、
+  /// ユーザープロパティ `badge_bucket` は「現在値」を表すのに対し、
   /// こちらは「そのイベントが起きた時点の値」を表す。用途が違うため両方持つ。
   Future<void> logChatMessageSent({
-    required int signalCount,
+    required int badgeAnswered,
     required int phase,
   }) =>
       _guard(
         () => _analytics.logEvent(
           name: 'chat_message_sent',
           parameters: {
-            'progress_bucket': signalBucket(signalCount),
+            'progress_bucket': badgeBucket(badgeAnswered),
             'phase': phase,
           },
         ),
@@ -170,16 +169,18 @@ class AnalyticsService {
   /// 元素・成長段階・課金状態のセグメントを更新する。
   ///
   /// [element] は「炎」「水」などの元素名。未確定なら null を渡す。
-  /// [signalCount] はチャットの解析シグナル数（成長段階の判定に使う）。
+  /// [growthStage] は成長段階（0=赤ちゃん 1=幼少期 2=大人）。
+  /// [badgeAnswered] はバッジ診断の質問に答えた数（0〜20）。
   Future<void> setUserSegment({
     String? element,
-    int? signalCount,
+    int? growthStage,
+    int? badgeAnswered,
     bool? isPremium,
   }) async {
     await _guard(() async {
-      if (element != null || signalCount != null) {
-        // 元素は 30 シグナル未満では未確定なので unknown 扱いにする
-        final decided = (signalCount == null || signalCount >= 30);
+      if (element != null || growthStage != null) {
+        // 元素は赤ちゃんのうちは未確定なので unknown 扱いにする
+        final decided = (growthStage == null || growthStage >= 1);
         await _analytics.setUserProperty(
           name: 'element',
           value: (decided && element != null && element.isNotEmpty)
@@ -187,14 +188,16 @@ class AnalyticsService {
               : 'unknown',
         );
       }
-      if (signalCount != null) {
+      if (growthStage != null) {
         await _analytics.setUserProperty(
           name: 'growth_stage',
-          value: growthStage(signalCount),
+          value: growthStageName(growthStage),
         );
+      }
+      if (badgeAnswered != null) {
         await _analytics.setUserProperty(
-          name: 'signal_bucket',
-          value: signalBucket(signalCount),
+          name: 'badge_bucket',
+          value: badgeBucket(badgeAnswered),
         );
       }
       if (isPremium != null) {
@@ -210,21 +213,20 @@ class AnalyticsService {
   // 区分（バケット）の定義
   // ---------------------------------------------------------------------------
 
-  /// シグナル数の区分。成長段階の境界（30 / 100）と揃えている。
+  /// バッジ診断で答えた数の区分。第1弾（10問）・第2弾（20問）の境界と揃えている。
   @visibleForTesting
-  static String signalBucket(int count) {
+  static String badgeBucket(int count) {
     if (count <= 0) return '0';
     if (count < 10) return '1-9';
-    if (count < 30) return '10-29';
-    if (count < 100) return '30-99';
-    return '100+';
+    if (count < 20) return '10-19';
+    return '20';
   }
 
-  /// 成長段階。`element_effect_widget.dart` の表示条件（30 / 100）と一致させる。
+  /// 成長段階の名前。`users/{uid}.growthStage` の 0 / 1 / 2 に対応する。
   @visibleForTesting
-  static String growthStage(int signalCount) {
-    if (signalCount < 30) return 'baby';
-    if (signalCount < 100) return 'child';
+  static String growthStageName(int growthStage) {
+    if (growthStage < 1) return 'baby';
+    if (growthStage < 2) return 'child';
     return 'adult';
   }
 

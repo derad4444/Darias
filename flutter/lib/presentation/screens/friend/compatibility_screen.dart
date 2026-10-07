@@ -442,7 +442,7 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
     final friendDetailsAsync = ref.watch(userCharacterDetailsProvider(widget.friend.id));
 
     // confirmedBig5Scores は analysis_level > 0 の場合のみ有効（signup時のデフォルト値と区別）
-    // convertedBig5Scores はチャットシグナル10件以上で生成される
+    // convertedBig5Scores は第1弾のバッジがそろって性格が決まると生成される
     final myBig5Done = ((myDetails?.analysisLevel ?? 0) > 0 && (myDetails?.confirmedBig5Scores?.isNotEmpty ?? false)) ||
         (myDetails?.convertedBig5Scores?.isNotEmpty ?? false);
     final friendDetails = friendDetailsAsync.valueOrNull;
@@ -580,9 +580,9 @@ class _CompatibilityScreenState extends ConsumerState<CompatibilityScreen>
                             Expanded(
                               child: Text(
                                 (!myBig5Done && !friendBig5Done)
-                                    ? '診断には自分と${friend.displayName}さん双方の性格解析が必要です。チャットを30回以上続けてください'
+                                    ? '診断には自分と${friend.displayName}さん双方の性格解析が必要です。ホーム画面のバッジの質問に答えて、第1弾のバッジを集めてください'
                                     : !myBig5Done
-                                        ? '診断にはあなたの性格解析が必要です。チャットを30回以上続けてください'
+                                        ? '診断にはあなたの性格解析が必要です。ホーム画面のバッジの質問に答えて、第1弾のバッジを集めてください'
                                         : '診断には${friend.displayName}さんの性格解析完了が必要です',
                                 style: const TextStyle(fontSize: 12),
                               ),

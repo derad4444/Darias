@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/character_traits.dart';
 import '../../widgets/character/element_effect_widget.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/character_provider.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_sheet.dart';
+import '../main/main_shell_screen.dart';
 import '../../providers/dream_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/dream_select_sheet.dart';
@@ -357,7 +359,7 @@ class _CharacterDetailBody extends ConsumerWidget {
     final big5AnalysisAsync = detail.personalityKey != null
         ? ref.watch(big5AnalysisDataProvider(detail.personalityKey!))
         : const AsyncValue<Big5AnalysisData?>.data(null);
-    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
 
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -382,24 +384,30 @@ class _CharacterDetailBody extends ConsumerWidget {
 
               // キャラクター画像（成長段階）
               _CharacterImage(
-                signalCount: signalCount,
+                growthStage: growthStage,
                 element: detail.element,
                 gender: detail.gender,
               ),
 
               const SizedBox(height: 8),
 
-              // 成長ゲージ
-              _GrowthGaugeCard(
-                signalCount: signalCount,
-                textColor: textColor,
+              // バッジの集まり具合（タップでバッジ一覧。選んだらホームで質問する）
+              BadgeProgressCard(
                 accentColor: accentColor,
+                solidBackground: false,
+                textColor: textColor,
+                onTap: () async {
+                  final badgeKey = await showBadgeSheet(context, accentColor: accentColor);
+                  if (badgeKey == null) return;
+                  ref.read(selectedTabProvider.notifier).state = homeTabIndex;
+                  ref.read(requestedBadgeKeyProvider.notifier).state = badgeKey;
+                },
               ),
 
               const SizedBox(height: 16),
 
-              // Big5解析セクション（30シグナル到達後に表示）
-              if (signalCount >= 30 && detail.element != null)
+              // Big5解析セクション（元素が決まってから表示）
+              if (growthStage >= 1 && detail.element != null)
                 big5AnalysisAsync.when(
                   data: (analysisData) => _Big5AnalysisSection(
                     textColor: textColor,
@@ -446,12 +454,12 @@ class _CharacterDetailBody extends ConsumerWidget {
 /// キャラクター画像ウィジェット
 /// キャラクター成長段階画像ウィジェット
 class _CharacterImage extends StatelessWidget {
-  final int signalCount;
+  final int growthStage;
   final String? element;
   final String? gender;
 
   const _CharacterImage({
-    required this.signalCount,
+    required this.growthStage,
     required this.element,
     required this.gender,
   });
@@ -459,11 +467,11 @@ class _CharacterImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final assetPath = characterGrowthAssetPath(
-      signalCount: signalCount,
+      growthStage: growthStage,
       element: element,
       gender: gender,
     );
-    final elementType = signalCount >= 30 ? elementTypeFromString(element) : null;
+    final elementType = growthStage >= 1 ? elementTypeFromString(element) : null;
 
     return SizedBox(
       width: 220,
@@ -1322,102 +1330,7 @@ class _AnalysisDetailSheet extends ConsumerWidget {
   }
 }
 
-/// 成長ゲージカード（0→30: 幼少期まで / 30→100: 大人まで / 100+: 10サイクル）
-class _GrowthGaugeCard extends StatelessWidget {
-  final int signalCount;
-  final Color textColor;
-  final Color accentColor;
-
-  const _GrowthGaugeCard({
-    required this.signalCount,
-    required this.textColor,
-    required this.accentColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final String label;
-    final double progress;
-    final String countText;
-    final String description;
-
-    if (signalCount >= 100) {
-      final cycle = signalCount % 10;
-      progress = cycle / 10.0;
-      label = '性格解析';
-      countText = '$cycle / 10';
-      description = 'チャットを続けると性格解析が深まります';
-    } else if (signalCount >= 30) {
-      progress = signalCount / 100.0;
-      label = '大人まで';
-      countText = '$signalCount / 100';
-      description = 'チャットを続けるとキャラが大人へ成長します';
-    } else {
-      progress = signalCount / 30.0;
-      label = '幼少期まで';
-      countText = '$signalCount / 30';
-      description = 'チャットを続けると属性が決まり幼少期へ成長します';
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: textColor,
-                  ),
-                ),
-                const Spacer(),
-                Text(
-                  countText,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textColor.withValues(alpha: 0.8),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: Colors.white.withValues(alpha: 0.2),
-                valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                minHeight: 7,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 11,
-                color: textColor.withValues(alpha: 0.7),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 性格タイプカード（signalCount >= 30 でタイプ表示、未満でプログレスバー）
+/// 性格タイプカード（元素が決まったらタイプ表示、決まる前はバッジの進み具合）
 class _PersonalityTypeCard extends ConsumerWidget {
   final CharacterDetailData detail;
   final Color textColor;
@@ -1484,12 +1397,13 @@ class _PersonalityTypeCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
-    final hasType = signalCount >= 30 && detail.element != null && detail.typeName != null;
+    final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
+    final hasType = growthStage >= 1 && detail.element != null && detail.typeName != null;
+    final answered = ref.watch(badgeStateProvider).valueOrNull?.answeredCountOfRound(1) ?? 0;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: hasType ? _buildTypeCard() : _buildProgressCard(signalCount),
+      child: hasType ? _buildTypeCard() : _buildProgressCard(answered),
     );
   }
 
@@ -1564,7 +1478,8 @@ class _PersonalityTypeCard extends ConsumerWidget {
     );
   }
 
-  Widget _buildProgressCard(int signalCount) {
+  Widget _buildProgressCard(int answered) {
+    const total = 10;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1589,7 +1504,7 @@ class _PersonalityTypeCard extends ConsumerWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: signalCount / 30,
+              value: answered / total,
               backgroundColor: Colors.white.withValues(alpha: 0.2),
               valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF9E9E9E)),
               minHeight: 8,
@@ -1597,7 +1512,7 @@ class _PersonalityTypeCard extends ConsumerWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '$signalCount / 30',
+            '$answered / $total',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
@@ -1606,7 +1521,7 @@ class _PersonalityTypeCard extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'チャットや会議を続けると、あなたの性格タイプが判定されます',
+            '下のバッジをタップして質問に答えると、あなたの性格タイプが決まります',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,

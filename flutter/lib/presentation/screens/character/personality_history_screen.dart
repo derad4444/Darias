@@ -13,7 +13,9 @@ class PersonalityHistoryRecord {
   final String? element;
   final String? typeName;
   final String? gender;
-  final int signalCount;
+
+  /// 記録した時点の成長段階（0=赤ちゃん 1=幼少期 2=大人）
+  final int growthStage;
   final DateTime recordedAt;
 
   const PersonalityHistoryRecord({
@@ -21,11 +23,21 @@ class PersonalityHistoryRecord {
     this.element,
     this.typeName,
     this.gender,
-    required this.signalCount,
+    required this.growthStage,
     required this.recordedAt,
   });
 
-  bool get isBabyStage => signalCount < 30;
+  bool get isBabyStage => growthStage < 1;
+
+  /// 回数制の頃の記録は growthStage を持たず signalCount だけなので、そこから求める
+  static int _stageOf(Map<String, dynamic> data) {
+    final stage = (data['growthStage'] as num?)?.toInt();
+    if (stage != null) return stage;
+    final signalCount = (data['signalCount'] as num?)?.toInt() ?? 0;
+    if (signalCount >= 100) return 2;
+    if (signalCount >= 30) return 1;
+    return 0;
+  }
 
   factory PersonalityHistoryRecord.fromDoc(QueryDocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -35,7 +47,7 @@ class PersonalityHistoryRecord {
       element: data['element'] as String?,
       typeName: data['typeName'] as String?,
       gender: data['gender'] as String?,
-      signalCount: (data['signalCount'] as num?)?.toInt() ?? 0,
+      growthStage: _stageOf(data),
       recordedAt: ts?.toDate() ?? DateTime.now(),
     );
   }
@@ -78,8 +90,8 @@ class _PersonalityHistoryScreenState
   bool _migrationAttempted = false;
 
   /// 既存ユーザー向け移行処理
-  /// - 赤ちゃん期（< 30）: element なしの赤ちゃんレコードを書く
-  /// - 通常期（>= 30）: 現在の element/typeName を書く
+  /// - 赤ちゃん期: element なしの赤ちゃんレコードを書く
+  /// - 幼少期以降: 現在の element/typeName を書く
   Future<void> _migrateIfNeeded(String userId) async {
     if (_migrationAttempted) return;
     _migrationAttempted = true;
@@ -98,17 +110,11 @@ class _PersonalityHistoryScreenState
 
     if (existingSnap.docs.isNotEmpty) return;
 
-    // signalCount を取得
-    final metaSnap = await db
-        .collection('users')
-        .doc(userId)
-        .collection('personalityMeta')
-        .doc('current')
-        .get();
-    final signalCount =
-        (metaSnap.data()?['signalCount'] as num?)?.toInt() ?? 0;
+    // 成長段階を取得
+    final userSnap = await db.collection('users').doc(userId).get();
+    final growthStage = (userSnap.data()?['growthStage'] as num?)?.toInt() ?? 0;
 
-    if (signalCount < 30) {
+    if (growthStage < 1) {
       // 赤ちゃん期：element/typeName なしで書き込む
       await db
           .collection('users')
@@ -117,13 +123,13 @@ class _PersonalityHistoryScreenState
           .doc(widget.characterId)
           .collection('personalityHistory')
           .add({
-        'signalCount': signalCount,
+        'growthStage': growthStage,
         'recordedAt': FieldValue.serverTimestamp(),
       });
       return;
     }
 
-    // 30シグナル以上：現在の性格データを読んで書き込む
+    // 元素が決まっている：現在の性格データを読んで書き込む
     final detailsSnap = await db
         .collection('users')
         .doc(userId)
@@ -154,7 +160,7 @@ class _PersonalityHistoryScreenState
       'element': element,
       'typeName': typeName,
       'gender': gender,
-      'signalCount': signalCount,
+      'growthStage': growthStage,
       'recordedAt': axisUpdatedAt ?? FieldValue.serverTimestamp(),
     });
   }
@@ -248,7 +254,7 @@ class _HistoryCard extends StatelessWidget {
     final displayTypeName = isBaby ? '赤ちゃん期' : (record.typeName ?? '');
 
     final assetPath = characterGrowthAssetPath(
-      signalCount: record.signalCount,
+      growthStage: record.growthStage,
       element: record.element,
       gender: record.gender,
     );
@@ -325,7 +331,7 @@ class _HistoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _growthLabel(record.signalCount),
+                  _growthLabel(record.growthStage),
                   style: TextStyle(
                     color: textColor.withAlpha(120),
                     fontSize: 11,
@@ -339,9 +345,9 @@ class _HistoryCard extends StatelessWidget {
     );
   }
 
-  String _growthLabel(int signalCount) {
-    if (signalCount >= 100) return '大人期 (チャット数 $signalCount)';
-    if (signalCount >= 30) return '幼少期 (チャット数 $signalCount)';
-    return '赤ちゃん期 (チャット数 $signalCount)';
+  String _growthLabel(int growthStage) {
+    if (growthStage >= 2) return '大人期';
+    if (growthStage >= 1) return '幼少期';
+    return '赤ちゃん期';
   }
 }

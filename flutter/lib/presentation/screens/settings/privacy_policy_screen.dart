@@ -33,7 +33,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 '• 登録日時\n\n'
                 '【1.2 利用情報】\n'
                 '• チャット履歴\n'
-                '• BIG5性格診断の回答\n'
+                '• 性格診断の回答（BIG5性格診断の回答、バッジ診断の質問への回答の点数）\n'
                 '• 日記データ\n'
                 '• キャラクター設定\n\n'
                 '【1.3 技術情報】\n'
@@ -48,7 +48,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
                 '収集する内容は次のとおりです：\n'
                 '• 画面の表示（どの画面が表示されたか）\n'
                 '• 機能の利用（新規登録、ログイン、チュートリアルの閲覧、チャットの送信、日記・自分会議などの機能の利用、課金画面の表示、購入手続きの開始・完了）\n'
-                '• 利用状況の区分（チャットの解析進捗の区分、キャラクターの成長段階、元素、有料プランかどうか）\n'
+                '• 利用状況の区分（バッジ診断の進み具合の区分、キャラクターの成長段階、元素、有料プランかどうか）\n'
                 '• アプリの利用回数・利用時間などの統計情報\n'
                 '• 端末ごとに自動発行される識別子\n\n'
                 '収集しない情報：本アプリは、チャットの本文、日記の本文、自分会議で入力した悩みの内容、フレンドに関する情報、氏名、メールアドレス、ユーザーIDをFirebase Analyticsに送信しません。入力内容の文字数も送信しません。',
@@ -132,7 +132,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           ),
           SizedBox(height: 24),
           Text(
-            '最終更新日：2026年9月16日',
+            '最終更新日：2026年10月7日',
             style: TextStyle(fontSize: 12, color: AppColors.textLight),
           ),
           SizedBox(height: 40),

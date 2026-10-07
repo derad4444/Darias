@@ -69,7 +69,7 @@ async function fetchCharacterInfo(userId) {
     if (!detail) return null;
 
     // confirmedBig5Scores は analysis_level > 0 の場合のみ有効（signup時のデフォルト値と区別）
-    // convertedBig5Scores はチャットシグナル10件以上で生成される実測値
+    // convertedBig5Scores はバッジ診断の第1弾がそろうと生成される実測値
     const analysisLevel = detail["analysis_level"] ?? 0;
     const scores = (analysisLevel > 0 ? detail["confirmedBig5Scores"] : null) ?? detail["convertedBig5Scores"];
     if (!scores) return null;

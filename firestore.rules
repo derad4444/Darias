@@ -27,8 +27,12 @@ service cloud.firestore {
       }
 
       // ユーザーのサブコレクション（予定、日記、夢など）はユーザー自身のみ
-      match /{subcollection=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+      // personalityBadges（バッジ診断の回答と点数）は、本人も読み取りと削除（性格のリセット）だけ。
+      // 点数で性格が決まるため、作成・更新は Cloud Function（Admin SDK）だけにする
+      match /{collection}/{rest=**} {
+        allow read, delete: if request.auth != null && request.auth.uid == userId;
+        allow create, update: if request.auth != null && request.auth.uid == userId
+                              && collection != 'personalityBadges';
       }
     }
 

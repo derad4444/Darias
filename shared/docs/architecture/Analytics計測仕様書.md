@@ -1,7 +1,7 @@
 # Analytics計測仕様書
 
 **作成日**: 2026-08-19
-**最終更新日**: 2026-09-16
+**最終更新日**: 2026-10-07（成長段階・進捗の区分をバッジ診断の回答数と `users/{uid}.growthStage` に合わせた）
 **対象プラットフォーム**: Flutter（iOS / Android / Web）
 
 ---
@@ -42,7 +42,7 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 |------|-------------|
 | どこで離脱しているか | `screen_view` / `sign_up` / `login` / `tutorial_begin` / `onboarding_slide_view` / `tutorial_complete` / `chat_message_sent` / `paywall_view` / `begin_checkout` / `purchase` |
 | 継続して使われているか | `feature_used` ＋ 自動収集の `first_open` / `session_start` |
-| セグメント別の差 | ユーザープロパティ（`element` / `growth_stage` / `signal_bucket` / `is_premium`） |
+| セグメント別の差 | ユーザープロパティ（`element` / `growth_stage` / `badge_bucket` / `is_premium`） |
 
 ---
 
@@ -58,7 +58,7 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 
 - uid、メールアドレス、氏名
 - チャット本文、日記本文、自分会議の悩みの内容
-- タグ名、フレンドID・フレンド名
+- バッジ質問への回答内容、フレンドID・フレンド名
 - **上記の文字数**（内容推定の手掛かりになるため）
 
 この方針に基づき **`setUserId()` は呼ばない**（Firebase Auth の UID を Analytics に渡さない）。
@@ -97,9 +97,8 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 
 - **自動送信では発火しない。** `home_screen.dart` の `_triggerMeetingFollowup()`（自分会議の結論を
   自動でチャットに流す処理）はユーザーの発話ではないため計測対象外。
-- `progress_bucket` は送信時点の `personalityMeta/current.signalCount` を区分に丸めた値。
-  クライアントに「通算送信回数」は存在せず、これが唯一の通算進捗値のため採用している。
-  ユーザープロパティ `signal_bucket` が「現在値」であるのに対し、こちらは「イベント発生時点の値」を表す。
+- `progress_bucket` は送信時点でバッジ診断の質問に答えた数（`badgeStateProvider` の `answeredSlots` の数。0〜20。答え直しは数えない）を `badgeBucket()` で区分に丸めた値。
+  ユーザープロパティ `badge_bucket` が「現在値」であるのに対し、こちらは「イベント発生時点の値」を表す。
 
 #### `paywall_view` の `source`
 
@@ -132,14 +131,14 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 ## ユーザープロパティ
 
 `main_shell_screen.dart` の `_syncAnalyticsSegment()` が設定する。
-初回はポストフレームで1度、以降は `signalCountProvider` / `characterDetailsProvider` /
-`effectiveIsPremiumProvider` の変化に `ref.listen` で追従する。
+初回はポストフレームで1度、以降は `growthStageProvider` / `badgeStateProvider` /
+`characterDetailsProvider` / `effectiveIsPremiumProvider` の変化に `ref.listen` で追従する。
 
 | プロパティ | 値 | 由来 |
 |-----------|-----|------|
-| `element` | 炎 / 風 / 雷 / 光 / 水 / 土 / 氷 / 闇 / 無 / `unknown` | `characterDetailsProvider` の `element`。シグナル30未満は未確定のため `unknown` |
-| `growth_stage` | `baby` / `child` / `adult` | signalCount（30未満 / 30〜99 / 100以上） |
-| `signal_bucket` | `0` / `1-9` / `10-29` / `30-99` / `100+` | signalCount |
+| `element` | 炎 / 風 / 雷 / 光 / 水 / 土 / 氷 / 闇 / 無 / `unknown` | `characterDetailsProvider` の `element`。`growthStage` が 0（赤ちゃん）のあいだは未確定のため `unknown` |
+| `growth_stage` | `baby` / `child` / `adult` | `growthStageProvider`（`users/{uid}.growthStage` の 0 / 1 / 2） |
+| `badge_bucket` | `0` / `1-9` / `10-19` / `20` | バッジ診断で答えた質問の数（`badgeStateProvider` の `answeredSlots` の数） |
 | `is_premium` | `true` / `false` | `effectiveIsPremiumProvider` |
 
 ---
@@ -150,12 +149,13 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 
 | メソッド | 区分 |
 |---------|------|
-| `signalBucket(int)` | `0` / `1-9` / `10-29` / `30-99` / `100+` |
-| `growthStage(int)` | `baby`(<30) / `child`(30〜99) / `adult`(100〜) |
+| `badgeBucket(int)` | `0` / `1-9` / `10-19` / `20` |
+| `growthStageName(int)` | `baby`(0) / `child`(1) / `adult`(2) |
 
-境界の 30 / 100 は `presentation/widgets/character/element_effect_widget.dart` の
-`characterGrowthAssetPath()`（赤ちゃん / 幼少期 / 成人の切り替え条件）と一致させている。
-**片方を変更したら必ずもう片方も合わせること。**
+`badgeBucket` の境界 10 / 20 は、バッジ診断の第1弾（10問）・第2弾（20問）がそろう数と揃えている
+（[性格解析仕様書のバッジ診断](../functions/性格解析仕様書.md#バッジ診断)）。
+`growthStageName` は `users/{uid}.growthStage` の値をそのまま名前にしたもので、
+`presentation/widgets/character/element_effect_widget.dart` の `characterGrowthAssetPath()`（赤ちゃん / 幼少期 / 成人の切り替え）と同じ段階を表す。
 
 ---
 

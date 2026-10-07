@@ -71,7 +71,15 @@ class Big5Datasource {
         .doc('current')
         .delete();
 
-    // personalitySignals サブコレクションを全削除
+    // バッジ診断の回答を削除（ルールで本人に許可しているのは読み取りと削除だけ）
+    await _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('personalityBadges')
+        .doc('current')
+        .delete();
+
+    // personalitySignals サブコレクションを全削除（回数制の頃に作られたもの）
     final signalsQuery = await _firestore
         .collection('users')
         .doc(userId)

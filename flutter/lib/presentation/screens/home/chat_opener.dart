@@ -2,9 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../providers/badge_provider.dart';
 
-
-enum OpenerType { memory, previousQuestion, daily }
+enum OpenerType { memory, badge, previousQuestion, daily }
 
 class ChatOpener {
   final String text;
@@ -75,13 +75,15 @@ const List<String> dailyPrompts = [
   '最近、誰かの言葉で心に残ったものある？',
 ];
 
-/// 優先度 M → F → A でオープナーを決定する
+/// 優先度 M → B → F → A でオープナーを決定する
 ///
 /// [characterId] を渡すと、前夜の日記生成で用意された「昨日の続き」の問いかけ
-/// （M）を最優先で使う。取得できない場合は従来の F → A にフォールバックする。
+/// （M）を最優先で使う。次に、まだ答えていないバッジ診断の質問（B）を
+/// [fetchBadgeQuestion] から取る。どちらも無ければ F → A にフォールバックする。
 Future<ChatOpener> computeChatOpener({
   required String userId,
   String? characterId,
+  Future<BadgeQuestion?> Function()? fetchBadgeQuestion,
 }) async {
   final today = DateTime.now();
 
@@ -90,6 +92,14 @@ Future<ChatOpener> computeChatOpener({
     final memoryOpener = await _fetchMemoryOpener(userId, characterId);
     if (memoryOpener != null) {
       return ChatOpener(type: OpenerType.memory, text: memoryOpener);
+    }
+  }
+
+  // B: まだ答えていないバッジ診断の質問（全部答えた人には半年ごとの答え直し）
+  if (fetchBadgeQuestion != null) {
+    final question = await fetchBadgeQuestion();
+    if (question != null) {
+      return ChatOpener(type: OpenerType.badge, text: question.displayText);
     }
   }
 

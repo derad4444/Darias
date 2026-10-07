@@ -18,7 +18,8 @@ import '../main/main_shell_screen.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/services/hint_service.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/character_provider.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_sheet.dart';
 import '../../widgets/share/meeting_share_card.dart';
 import '../../widgets/share/share_card_capture.dart';
 import '../../widgets/app_review_dialog.dart';
@@ -33,8 +34,6 @@ class MeetingScreen extends ConsumerStatefulWidget {
 }
 
 class _MeetingScreenState extends ConsumerState<MeetingScreen> {
-  /// 自分会議が解放されるのに必要なシグナル数（性格タイプの確定ライン）
-  static const int _requiredSignalCount = 30;
 
   final _topicController = TextEditingController();
   final _scrollController = ScrollController();
@@ -142,7 +141,7 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   Widget build(BuildContext context) {
     final backgroundGradient = ref.watch(backgroundGradientProvider);
     final accentColor = ref.watch(accentColorProvider);
-    final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+    final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
 
     // タブの中身は起動時にまとめて作られるため、初回ヘルプと使用回数の更新は
     // 「自分会議タブが開かれた瞬間」に行う。
@@ -176,8 +175,8 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
                   ? _buildLoading()
                   : _meetingResponse != null
                       ? _buildMeetingRoom(accentColor)
-                      : signalCount < _requiredSignalCount
-                          ? _buildLocked(accentColor, signalCount)
+                      : growthStage < 1
+                          ? _buildLocked(accentColor)
                           : _buildTopicInput(accentColor),
 
               // 画面外に静的シェアカードを配置してキャプチャする
@@ -206,7 +205,9 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
   // ============================================================
 
   /// 性格タイプが確定していないうちはトピック入力を出さず、進捗を案内する。
-  Widget _buildLocked(Color accentColor, int signalCount) {
+  Widget _buildLocked(Color accentColor) {
+    const total = 10;
+    final answered = ref.watch(badgeStateProvider).valueOrNull?.answeredCountOfRound(1) ?? 0;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
@@ -221,20 +222,31 @@ class _MeetingScreenState extends ConsumerState<MeetingScreen> {
             ),
             const SizedBox(height: 12),
             const Text(
-              '「自分会議」を利用するには、チャットをもう少し続けて性格タイプを確定させる必要があります。',
+              '「自分会議」を利用するには、第1弾のバッジを集めて性格タイプを決める必要があります。',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, height: 1.6),
             ),
             const SizedBox(height: 24),
-            Text('現在の進捗: $signalCount / $_requiredSignalCount'),
+            Text('第1弾バッジ: $answered / $total'),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: signalCount / _requiredSignalCount,
+                value: answered / total,
                 backgroundColor: Colors.grey.withValues(alpha: 0.3),
                 valueColor: AlwaysStoppedAnimation(accentColor),
               ),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: () async {
+                final badgeKey = await showBadgeSheet(context, accentColor: accentColor);
+                if (badgeKey == null) return;
+                ref.read(selectedTabProvider.notifier).state = homeTabIndex;
+                ref.read(requestedBadgeKeyProvider.notifier).state = badgeKey;
+              },
+              icon: const Icon(Icons.military_tech_rounded),
+              label: const Text('バッジの質問に答える'),
             ),
           ],
         ),

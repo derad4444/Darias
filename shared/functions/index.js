@@ -13,6 +13,11 @@ Object.defineProperty(exports, "classifyAndExtract", {
   enumerable: true,
 });
 
+Object.defineProperty(exports, "startBadgeQuestion", {
+  get: () => require("./const/startBadgeQuestion").startBadgeQuestion,
+  enumerable: true,
+});
+
 Object.defineProperty(exports, "generateVoice", {
   get: () => require("./const/generateVoice").generateVoice,
   enumerable: true,

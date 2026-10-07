@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/badge_provider.dart';
 import '../providers/character_provider.dart';
 import 'character/element_effect_widget.dart' show characterGrowthAssetPath;
 
@@ -26,9 +27,9 @@ class CharacterAvatarWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUserId = ref.watch(currentUserIdProvider);
 
-    // 自分のアバター: signalCount をリアルタイム取得
+    // 自分のアバター: 成長段階をリアルタイム取得
     if (userId == currentUserId) {
-      final signalCount = ref.watch(signalCountProvider).valueOrNull ?? 0;
+      final growthStage = ref.watch(growthStageProvider).valueOrNull ?? 0;
       final detailsAsync = ref.watch(characterDetailsProvider);
       return detailsAsync.when(
         loading: () => _FallbackAvatar(
@@ -45,7 +46,7 @@ class CharacterAvatarWidget extends ConsumerWidget {
         ),
         data: (details) {
           final assetPath = characterGrowthAssetPath(
-            signalCount: signalCount,
+            growthStage: growthStage,
             element: details?.element,
             gender: details?.gender,
           );
@@ -73,9 +74,8 @@ class CharacterAvatarWidget extends ConsumerWidget {
         // growthStage が未設定(0)でも element があれば幼少期以上として扱う
         int stage = details?.growthStage ?? 0;
         if (stage == 0 && details?.element != null) stage = 1;
-        final stageSignalCount = stage >= 2 ? 100 : stage >= 1 ? 30 : 0;
         final assetPath = characterGrowthAssetPath(
-          signalCount: stageSignalCount,
+          growthStage: stage,
           element: details?.element,
           gender: details?.gender,
         );
