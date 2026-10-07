@@ -63,6 +63,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   bool _isCharacterReply = false;
   bool _showMeetingBanner = false;
   bool _openerLoaded = false;
+  // バッジの質問に答えられたときの知らせ（バッジのバーの上に少しの間だけ出す）
+  BadgeTurnResult? _badgeNotice;
+  Timer? _badgeNoticeTimer;
   // オープナーをロードした日付（日付をまたいだ再ロード判定用）
   String _openerLoadedDate = '';
   // 会話のきっかけテキスト（AIに文脈として渡す）
@@ -249,6 +252,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   @override
   void dispose() {
     _loadingDotsTimer?.cancel();
+    _badgeNoticeTimer?.cancel();
     NotificationService.tappedNotificationType
         .removeListener(_notificationListener);
     WidgetsBinding.instance.removeObserver(this);
@@ -539,6 +543,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
 
                     const SizedBox(height: 6),
 
+                    // バッジの質問に答えられたときの知らせ
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      transitionBuilder: (child, anim) => FadeTransition(
+                        opacity: anim,
+                        child: ScaleTransition(scale: anim, child: child),
+                      ),
+                      child: _badgeNotice == null
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              key: ValueKey(_badgeNotice),
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: _BadgeEarnedNotice(
+                                result: _badgeNotice!,
+                                accentColor: accentColor,
+                              ),
+                            ),
+                    ),
+
                     // バッジの集まり具合（タップでバッジ一覧）。1行にまとめてチャット欄と見分けやすくする
                     BadgeProgressCard(
                       accentColor: accentColor,
@@ -674,31 +697,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObse
   }
 
   /// バッジの質問に答えられたことを小さく知らせる
+  ///
+  /// スナックバーはタブバーの裏に隠れて見えないため、バッジのバーの上に重ねて出す。
   void _showBadgeEarned(BadgeTurnResult badge) {
-    final def = kBadges[badge.earnedBadgeKey];
-    if (def == null || !mounted) return;
-    final String text;
-    if (badge.earnedIsRetake) {
-      text = '${def.label}を答え直しました';
-    } else if (badge.earnedProgress >= kQuestionsPerBadge) {
-      text = '${def.label}をゲット！';
-    } else {
-      text = '${def.label} ${badge.earnedProgress} / $kQuestionsPerBadge';
-    }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Row(
-          children: [
-            Icon(def.icon, color: def.round == 2 ? const Color(0xFFFFB300) : Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(child: Text(text)),
-          ],
-        ),
-      ));
+    if (kBadges[badge.earnedBadgeKey] == null || !mounted) return;
+    _badgeNoticeTimer?.cancel();
+    setState(() => _badgeNotice = badge);
+    _badgeNoticeTimer = Timer(const Duration(milliseconds: 2800), () {
+      if (mounted) setState(() => _badgeNotice = null);
+    });
   }
 
   Future<void> _playVoice() async {
@@ -1307,6 +1314,44 @@ class _BubbleTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_BubbleTailPainter old) => old.fill != fill || old.border != border;
+}
+
+/// バッジの質問に答えられたことを知らせる小さなピル
+class _BadgeEarnedNotice extends StatelessWidget {
+  final BadgeTurnResult result;
+  final Color accentColor;
+
+  const _BadgeEarnedNotice({required this.result, required this.accentColor});
+
+  @override
+  Widget build(BuildContext context) {
+    final def = kBadges[result.earnedBadgeKey]!;
+    final String text;
+    if (result.earnedIsRetake) {
+      text = '${def.label}を答え直しました';
+    } else if (result.earnedProgress >= kQuestionsPerBadge) {
+      text = '${def.label}をゲット！';
+    } else {
+      text = '${def.label}  ${result.earnedProgress} / $kQuestionsPerBadge';
+    }
+    final color = def.round == 2 ? const Color(0xFFFFB300) : accentColor;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 10)],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(def.icon, color: Colors.white, size: 18),
+          const SizedBox(width: 6),
+          Text(text, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
 }
 
 /// アクションボタン（自分会議・履歴）
