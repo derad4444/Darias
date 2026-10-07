@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DARIAS アカウント</title>
+    <!-- メールのリンクから開くページなので検索結果には出さない -->
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="https://my-character-app.web.app/favicon.ico" />
+    <!--
+      Firebase Authentication のメールのリンク（パスワード再設定など）を受けるページ。
+      Firebase コンソールの「アクション URL」にこのページを設定している。
+      アプリのログイン画面と同じ背景・ボタンの色にしている。
+    -->
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px 16px;
+        background: linear-gradient(180deg, #fff1f6 0%, #f1f7ff 100%);
+        color: #2d2d2d;
+        font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      }
+      .card {
+        width: 100%;
+        max-width: 400px;
+        text-align: center;
+      }
+      .logo { width: 72px; height: 72px; border-radius: 18px; }
+      h1 { font-size: 22px; margin: 20px 0 8px; }
+      .lead { font-size: 14px; color: #666; line-height: 1.7; margin: 0 0 24px; }
+      .email { font-weight: 700; color: #7c64ad; word-break: break-all; }
+      label { display: block; text-align: left; font-size: 13px; color: #666; margin: 0 0 6px 4px; }
+      .field { position: relative; margin-bottom: 16px; }
+      input[type="password"], input[type="text"] {
+        width: 100%;
+        padding: 14px 48px 14px 14px;
+        font-size: 16px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: #fff;
+        outline: none;
+      }
+      input:focus { border-color: #a084ca; }
+      .toggle {
+        position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+        border: none; background: none; color: #a084ca; font-size: 13px; padding: 8px; cursor: pointer;
+      }
+      .button {
+        display: block; width: 100%;
+        padding: 16px; margin-top: 8px;
+        border: none; border-radius: 12px;
+        background: #a084ca; color: #fff;
+        font-size: 16px; font-weight: 600;
+        cursor: pointer;
+      }
+      .button:disabled { opacity: 0.5; cursor: default; }
+      .error {
+        display: none;
+        text-align: left; font-size: 13px; line-height: 1.6;
+        color: #c62828; background: #fdecea; border-radius: 8px;
+        padding: 10px 12px; margin-bottom: 16px;
+      }
+      .note { font-size: 12px; color: #888; line-height: 1.7; margin-top: 20px; }
+      .icon { font-size: 44px; margin-top: 8px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <img class="logo" src="https://my-character-app.web.app/images/logo.png" alt="DARIAS" />
+
+      <!-- 読み込み中 -->
+      <section id="loading">
+        <h1>確認しています…</h1>
+      </section>
+
+      <!-- パスワード再設定の入力 -->
+      <section id="reset" hidden>
+        <h1>パスワードの再設定</h1>
+        <p class="lead">
+          <span class="email" id="reset-email"></span><br />
+          のDARIASアカウントの新しいパスワードを入力してください。
+        </p>
+        <div class="error" id="reset-error"></div>
+        <form id="reset-form" novalidate>
+          <label for="password">新しいパスワード（6文字以上）</label>
+          <div class="field">
+            <input id="password" type="password" autocomplete="new-password" minlength="6" required />
+            <button class="toggle" type="button" data-target="password">表示</button>
+          </div>
+          <label for="password2">もう一度入力</label>
+          <div class="field">
+            <input id="password2" type="password" autocomplete="new-password" minlength="6" required />
+            <button class="toggle" type="button" data-target="password2">表示</button>
+          </div>
+          <button class="button" id="reset-submit" type="submit">パスワードを変更する</button>
+        </form>
+      </section>
+
+      <!-- 完了 -->
+      <section id="done" hidden>
+        <div class="icon">✅</div>
+        <h1 id="done-title">パスワードを変更しました</h1>
+        <p class="lead" id="done-text">
+          DARIASのアプリに戻り、メールアドレスと新しいパスワードでログインしてください。
+        </p>
+      </section>
+
+      <!-- リンクが使えない -->
+      <section id="failed" hidden>
+        <div class="icon">⚠️</div>
+        <h1>このリンクは使えません</h1>
+        <p class="lead" id="failed-text"></p>
+      </section>
+
+      <p class="note">
+        このページは、DARIASから届いたメールのリンクから開くページです。<br />
+        心当たりがない場合は、このページを閉じてください。
+      </p>
+    </main>
+
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+      import {
+        getAuth, verifyPasswordResetCode, confirmPasswordReset, applyActionCode, checkActionCode,
+      } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+      const params = new URLSearchParams(location.search);
+      const mode = params.get("mode");
+      const code = params.get("oobCode");
+      const apiKey = params.get("apiKey");
+
+      const $ = (id) => document.getElementById(id);
+      const show = (id) => {
+        for (const s of ["loading", "reset", "done", "failed"]) $(s).hidden = s !== id;
+      };
+
+      const LINK_ERRORS = {
+        "auth/expired-action-code": "リンクの有効期限が切れています。アプリのログイン画面の「パスワードをお忘れの方」から、もう一度メールを送ってください。",
+        "auth/invalid-action-code": "このリンクはすでに使われたか、正しくありません。アプリのログイン画面の「パスワードをお忘れの方」から、もう一度メールを送ってください。",
+        "auth/user-disabled": "このアカウントは利用できなくなっています。",
+        "auth/user-not-found": "このアカウントは見つかりませんでした。",
+      };
+      const failed = (e) => {
+        $("failed-text").textContent =
+          LINK_ERRORS[e && e.code] || "もう一度メールのリンクから開くか、アプリのログイン画面からやり直してください。";
+        show("failed");
+      };
+
+      if (!mode || !code || !apiKey) {
+        failed();
+      } else {
+        const auth = getAuth(initializeApp({ apiKey }));
+        auth.languageCode = "ja";
+
+        if (mode === "resetPassword") {
+          verifyPasswordResetCode(auth, code).then((email) => {
+            $("reset-email").textContent = email;
+            show("reset");
+          }).catch(failed);
+        } else if (mode === "verifyEmail") {
+          applyActionCode(auth, code).then(() => {
+            $("done-title").textContent = "メールアドレスを確認しました";
+            $("done-text").textContent = "DARIASのアプリに戻ってください。";
+            show("done");
+          }).catch(failed);
+        } else if (mode === "recoverEmail") {
+          checkActionCode(auth, code)
+            .then(() => applyActionCode(auth, code))
+            .then(() => {
+              $("done-title").textContent = "メールアドレスを元に戻しました";
+              $("done-text").textContent = "念のため、アプリのログイン画面の「パスワードをお忘れの方」からパスワードも変更してください。";
+              show("done");
+            }).catch(failed);
+        } else {
+          failed();
+        }
+
+        // 表示／非表示の切り替え
+        for (const b of document.querySelectorAll(".toggle")) {
+          b.addEventListener("click", () => {
+            const input = $(b.dataset.target);
+            const hidden = input.type === "password";
+            input.type = hidden ? "text" : "password";
+            b.textContent = hidden ? "隠す" : "表示";
+          });
+        }
+
+        $("reset-form").addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          const p1 = $("password").value;
+          const p2 = $("password2").value;
+          const err = $("reset-error");
+          const setError = (msg) => { err.textContent = msg; err.style.display = msg ? "block" : "none"; };
+          if (p1.length < 6) return setError("パスワードは6文字以上にしてください。");
+          if (p1 !== p2) return setError("2つのパスワードが一致しません。");
+          setError("");
+          $("reset-submit").disabled = true;
+          confirmPasswordReset(auth, code, p1).then(() => {
+            show("done");
+          }).catch((e) => {
+            $("reset-submit").disabled = false;
+            if (e.code === "auth/weak-password") setError("パスワードが簡単すぎます。もう少し長く・複雑にしてください。");
+            else if (LINK_ERRORS[e.code]) failed(e);
+            else setError("変更できませんでした。通信状況を確認して、もう一度お試しください。");
+          });
+        });
+      }
+    </script>
+  </body>
+</html>
