@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-07（バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記）
+**最終更新日**: 2026-10-07（バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
 **ランタイム**: Node.js 22
 **関数数**: 28
 
@@ -223,7 +223,7 @@
 - **リソース**: memory `256MiB` / timeout `60秒`
 - **リージョン**: `asia-northeast1`
 - **secrets**: `OPENAI_API_KEY`
-- **その他**: `minInstances: 0`, `enforceAppCheck: false`
+- **その他**: `minInstances: 0`, `enforceAppCheck: true`
 
 **入力パラメータ:**
 
@@ -239,8 +239,9 @@
 | `reply` | `string` | 回答テキスト（100文字以内） |
 
 **処理内容:**
-1. アプリガイドをシステムプロンプトに組み込んで `gpt-4o-mini` で回答生成
-2. Firestore へのアクセスは行わない
+1. アプリガイド（`APP_GUIDE`。画面の構成・各機能の操作手順・回数制限・プレミアムの内容をまとめた文章）をシステムプロンプトに組み込んで `gpt-4o-mini` で回答生成
+2. ガイドに無いことは推測で答えず、設定画面のお問い合わせを案内するよう指示している
+3. Firestore へのアクセスは行わない
 
 **モデル:** `gpt-4o-mini`（固定。質問応答はプレミアム/フリー問わず同一モデル）
 
