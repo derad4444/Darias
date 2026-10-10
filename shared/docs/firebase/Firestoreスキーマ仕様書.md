@@ -918,7 +918,7 @@ Big5Analysis/{personalityKey}
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
 | `system` | 全員 | 不可 |
 | `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
-| `admin_metrics/**` | 運営者のアカウント（`kaosud@gmail.com`・メール確認済み）だけ | 不可（reels-bot の collector が Admin SDK で書く） |
+| `admin_metrics/**` | 運営者のアカウント（`kaosud@gmail.com` の UID）だけ | 不可（reels-bot の collector が Admin SDK で書く） |
 
 ---
 

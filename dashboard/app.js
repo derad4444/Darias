@@ -15,7 +15,8 @@ const firebaseConfig = {
   projectId: "my-character-app",
   appId: "1:881831618841:web:78d64a34cb486160f67d88",
 };
-const ADMIN_EMAIL = "kaosud@gmail.com";
+// 運営者のアカウント（kaosud@gmail.com）の UID。firestore.rules の admin_metrics と同じ
+const ADMIN_UID = "l5M6D7XvjwSvC15HJYHFdKZo0bz1";
 const COLLECT_URL = "https://reels-bot-oh2poc3uba-an.a.run.app/collect-metrics-now";
 const DAYS = 90;
 
@@ -41,7 +42,7 @@ onAuthStateChanged(auth, async (user) => {
     $("app").hidden = true;
     return;
   }
-  if (user.email !== ADMIN_EMAIL) {
+  if (user.uid !== ADMIN_UID) {
     $("login").hidden = false;
     $("app").hidden = true;
     $("login-error").textContent = "このアカウントには閲覧の権限がありません。";

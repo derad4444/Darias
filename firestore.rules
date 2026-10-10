@@ -79,11 +79,11 @@ service cloud.firestore {
     }
 
     // 運営ダッシュボードの集計（人数・回数のみ。個人を特定する情報は入れない）
-    // 読めるのは運営者のアカウント（メール確認済み）だけ。書き込みは reels-bot の collector（Admin SDK）だけ
+    // 読めるのは運営者のアカウント（kaosud@gmail.com の UID）だけ。書き込みは reels-bot の collector（Admin SDK）だけ。
+    // メールで判定しないのは、このアカウントがメール・パスワード登録のため email_verified が false のままだから
     match /admin_metrics/{rest=**} {
       allow read: if request.auth != null
-                  && request.auth.token.email == 'kaosud@gmail.com'
-                  && request.auth.token.email_verified == true;
+                  && request.auth.uid == 'l5M6D7XvjwSvC15HJYHFdKZo0bz1';
       allow write: if false;
     }
 
