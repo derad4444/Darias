@@ -49,6 +49,10 @@ const HELP = {
   kpiEcpm: ["eCPM", "広告が1000回表示されたときの収益（円）です。", "広告の単価です。表示回数が少ない期間はぶれやすいので、長めの期間で見ます。"],
   kpiIgFollowers: ["Instagram のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
   kpiThFollowers: ["Threads のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
+  playStatus: ["Google Play の公開状況", "製品版（一般公開）のトラックにリリースがあるかどうかです。", "「公開前」のあいだは、Google Play のインストールや評価は増えません。テスト版の配信状況は下の表で見られます。"],
+  playTracks: ["Google Play の配信状況", "製品版・オープンテスト・クローズドテスト・内部テストのそれぞれに、いまどのバージョンを配信しているかです。", "審査に出したバージョンがどこまで進んでいるかの確認に使います。"],
+  playInstalls: ["Google Play のインストール", "その日に新しくインストールした人の数です（Play Console が Cloud Storage に毎日置く統計レポートから読みます）。", "App Store の初回ダウンロードと合わせて、全体の新規の数を見ます。レポートは1〜2日遅れて届きます。"],
+  playVitals: ["クラッシュ率", "その日にアプリを使った人のうち、アプリが落ちた人の割合です（Google Play の品質データ）。", "1%を超えると Google Play での表示が下がることがあります。アップデートの直後に上がっていないかを見ます。集計に数日かかります。"],
   kpiMeetings: ["自分会議の実施", "期間内に実際に作られた自分会議の数です（運営者自身の分は除く）。Firestore の会議の記録から数えています。", "目玉機能が使われているかを直接見る数字です。ファネルの「自分会議」は画面を開いた人数なので、こちらと合わせて見ます。"],
   kpiMeetingReady: ["自分会議を使える人", "性格タイプが決まり（成長段階が幼少期以上）、自分会議のロックが外れている人の数です。性格の集計と同じく最新の状態を表示します。", "ここが少ないと、自分会議まで届く人も少なくなります。バッジ診断の第1弾をそろえてもらえているかの目安にもなります。"],
   kpiIgLinkTaps: ["プロフィールのリンクのタップ", "Instagram のプロフィールに置いたリンク（App Store など）がタップされた回数です（毎朝、前日1日分を記録しています）。", "リールを見た人が「アプリを入れてみよう」と動いた数です。プロフィールの1行目や投稿の締めを変えたら、ここが増えたかで効果を見ます（2026-10-10 にプロフィールの1行目を変更）。"],
@@ -223,7 +227,7 @@ function renderAll() {
 }
 
 const SOURCE_LABELS = {
-  appStore: "App Store", ga4: "アプリ内（GA4）", admob: "AdMob", instagram: "Instagram", meetings: "自分会議の実施",
+  appStore: "App Store", googlePlay: "Google Play", ga4: "アプリ内（GA4）", admob: "AdMob", instagram: "Instagram", meetings: "自分会議の実施",
   threads: "Threads", signups: "登録数", personality: "性格",
 };
 
@@ -253,6 +257,9 @@ const V = {
   adClicks: (r) => r.admob?.clicks,
   igFollowers: (r) => r.instagram?.followers,
   igLinkTaps: (r) => r.instagram?.yesterday?.profile_links_taps,
+  playInstalls: (r) => r.googlePlay?.userInstalls,
+  playCrash: (r) => (r.googlePlay?.crashRate != null ? r.googlePlay.crashRate * 100 : undefined),
+  playAnr: (r) => (r.googlePlay?.anrRate != null ? r.googlePlay.anrRate * 100 : undefined),
   meetings: (r) => r.meetings?.count ?? (r.date >= MEETINGS_START ? 0 : undefined),
   thFollowers: (r) => r.threads?.followers,
 };
@@ -421,13 +428,41 @@ function renderStore(ctx) {
   rows.forEach((r) => Object.entries(r.appStore?.engagement?.bySource || {}).forEach(([k, v]) => { src[k] = (src[k] || 0) + v; }));
   barChart("st-sources", Object.entries(src).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k, value: v })), { unit: "回" });
   barChart("st-rating", [5, 4, 3, 2, 1].map((n) => ({ label: "★" + n, value: reviews.filter((r) => r.rating === n).length })), { unit: "件" });
+  renderGooglePlay(ctx);
   renderReviews();
 }
 
-const reviewState = { star: "all", sort: "new" };
+const TRACK_LABELS = { production: "製品版（一般公開）", beta: "オープンテスト", alpha: "クローズドテスト", internal: "内部テスト" };
+const TRACK_ORDER = ["production", "beta", "alpha", "internal"];
+const RELEASE_STATUS = { completed: "配信中", inProgress: "段階的に配信中", halted: "停止中", draft: "下書き" };
+function renderGooglePlay(ctx) {
+  const { rows, prevRows } = ctx;
+  const avgOf = (rs, f) => { const xs = rs.map(f).filter((v) => v != null); return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined; };
+  const tracks = state.S.playTracks || [];
+  const published = tracks.some((t) => t.track === "production");
+  renderKpis("gp-kpis", [
+    kpi({ help: "playStatus", label: "Google Play", value: published ? 1 : 0, format: () => (published ? "公開中" : "公開前"), tone: published ? "" : "", sub: published ? "" : "製品版にはまだ出ていません" }),
+    kpi({ help: "playInstalls", label: "インストール（Google Play）", value: total(rows, V.playInstalls), prev: total(prevRows, V.playInstalls), spark: series(ctx, V.playInstalls), why: published ? "レポートの置き場所が未設定" : "公開後に表示されます" }),
+    kpi({ help: "playVitals", label: "クラッシュ率（平均）", value: avgOf(rows, V.playCrash), format: pctFmt, why: published ? "まだ利用者がいません" : "公開後に表示されます", invert: true }),
+  ]);
+  sortableTable("gp-tracks", [
+    { key: "order", label: "トラック", num: true, html: (r) => esc(TRACK_LABELS[r.track] || r.track) },
+    { key: "name", label: "バージョン" },
+    { key: "status", label: "状態", format: (v) => RELEASE_STATUS[v] || v },
+  ], tracks.map((t) => ({ ...t, order: TRACK_ORDER.indexOf(t.track) })), { key: "order", dir: "asc" }, "配信しているバージョンはありません");
+  lineChart("gp-installs", [{ name: "インストール", points: series(ctx, V.playInstalls) }], { area: true });
+  lineChart("gp-crash", [{ name: "クラッシュ率（%）", points: series(ctx, V.playCrash) }]);
+}
+
+const reviewState = { star: "all", sort: "new", store: "all" };
 $("rv-sort").onchange = (e) => { reviewState.sort = e.target.value; renderReviews(); };
+$("rv-store").onchange = (e) => { reviewState.store = e.target.value; renderReviews(); };
 function renderReviews() {
-  const all = state.S.reviews || [];
+  // App Store と Google Play のレビューをまとめる（どちらのストアかを添える）
+  const all = [
+    ...(state.S.reviews || []).map((r) => ({ ...r, store: "App Store" })),
+    ...(state.S.playReviews || []).map((r) => ({ ...r, store: "Google Play", territory: r.language })),
+  ].filter((r) => reviewState.store === "all" || r.store === reviewState.store);
   $("rv-stars").innerHTML = ["all", 5, 4, 3, 2, 1].map((s) => {
     const n = s === "all" ? all.length : all.filter((r) => r.rating === s).length;
     return `<button data-star="${s}" aria-pressed="${String(reviewState.star) === String(s)}">${s === "all" ? "すべて" : "★" + s}（${n}）</button>`;
@@ -442,7 +477,7 @@ function renderReviews() {
   };
   const list = all.filter((r) => reviewState.star === "all" || String(r.rating) === reviewState.star).sort(sorters[reviewState.sort]);
   $("st-reviews").innerHTML = list.length
-    ? `<p class="count-note">${list.length}件（期間に関係なくすべて表示）</p><div class="reviews">${list.map((r) => `<div class="review"><div><span class="stars" aria-label="星${r.rating}">${"★".repeat(r.rating || 0)}${"☆".repeat(5 - (r.rating || 0))}</span> <strong>${esc(r.title)}</strong></div><div class="meta">${esc((r.createdDate || "").slice(0, 10))}・${esc(r.territory)}</div><p>${esc(r.body)}</p></div>`).join("")}</div>`
+    ? `<p class="count-note">${list.length}件（期間に関係なくすべて表示）</p><div class="reviews">${list.map((r) => `<div class="review"><div><span class="stars" aria-label="星${r.rating}">${"★".repeat(r.rating || 0)}${"☆".repeat(5 - (r.rating || 0))}</span> <strong>${esc(r.title)}</strong></div><div class="meta">${esc(r.store)}・${esc((r.createdDate || "").slice(0, 10))}・${esc(r.territory || "")}${r.appVersion ? "・ver " + esc(r.appVersion) : ""}</div><p>${esc(r.body)}</p></div>`).join("")}</div>`
     : `<p class="empty">該当するレビューはありません</p>`;
 }
 

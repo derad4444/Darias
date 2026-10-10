@@ -75,14 +75,21 @@
 
       <section id="tab-store" class="tab" hidden>
         <div class="kpis" id="st-kpis"></div>
+        <div class="kpis" id="gp-kpis"></div>
         <div class="grid">
           <div class="card"><div class="card-head"><h3>ストアでの表示回数</h3><button class="help" data-help="storeImpressions" aria-label="説明">?</button></div><div id="st-impressions"></div></div>
           <div class="card"><div class="card-head"><h3>初回ダウンロード</h3><button class="help" data-help="storeDownloads" aria-label="説明">?</button></div><div id="st-downloads"></div></div>
           <div class="card"><div class="card-head"><h3>ページ閲覧の流入元</h3><button class="help" data-help="storeSources" aria-label="説明">?</button></div><div id="st-sources"></div></div>
           <div class="card"><div class="card-head"><h3>評価の内訳</h3><button class="help" data-help="ratingDist" aria-label="説明">?</button></div><div id="st-rating"></div></div>
+          <div class="card wide"><div class="card-head"><h3>Google Play の配信状況</h3><button class="help" data-help="playTracks" aria-label="説明">?</button></div><div id="gp-tracks"></div></div>
+          <div class="card"><div class="card-head"><h3>Google Play のインストール（日別）</h3><button class="help" data-help="playInstalls" aria-label="説明">?</button></div><div id="gp-installs"></div></div>
+          <div class="card"><div class="card-head"><h3>Google Play のクラッシュ率（日別）</h3><button class="help" data-help="playVitals" aria-label="説明">?</button></div><div id="gp-crash"></div></div>
           <div class="card wide"><div class="card-head"><h3>レビュー一覧</h3><button class="help" data-help="reviews" aria-label="説明">?</button></div>
             <div class="list-controls">
               <div class="chips" id="rv-stars" role="group" aria-label="星で絞り込む"></div>
+              <select id="rv-store" aria-label="ストア">
+                <option value="all">両方のストア</option><option value="App Store">App Store</option><option value="Google Play">Google Play</option>
+              </select>
               <select id="rv-sort" aria-label="並べ替え">
                 <option value="new">新しい順</option><option value="old">古い順</option>
                 <option value="high">評価が高い順</option><option value="low">評価が低い順</option>
