@@ -28,10 +28,33 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   /// 読み込みに失敗したとき、読み込み直すまでの時間
   static const _retryDelay = Duration(seconds: 60);
 
+  /// この広告が画面に見えているか（TickerMode が有効か）
+  bool _active = false;
+
+  // 見えていないあいだは読み込まない。IndexedStack の裏のタブや、上に別の画面が重なっている画面では
+  // TickerMode が無効になる。そこで読み込むと表示されないまま「リクエスト」だけが数えられ、表示率が下がる。
+  // 見えなくなったら広告を破棄し、見えるようになったら読み込み直す
   @override
-  void initState() {
-    super.initState();
-    _loadAd();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.of(context);
+    if (active == _active) return;
+    _active = active;
+    if (active) {
+      if (_bannerAd == null) _loadAd();
+    } else {
+      _unloadAd();
+    }
+  }
+
+  /// 広告を破棄して「読み込み前」に戻す
+  void _unloadAd() {
+    _retryTimer?.cancel();
+    final ad = _bannerAd;
+    _bannerAd = null;
+    _isLoaded = false;
+    // AdWidget が画面から外れるのは次の描画なので、破棄はそのあとにする
+    if (ad != null) WidgetsBinding.instance.addPostFrameCallback((_) => ad.dispose());
   }
 
   @override
@@ -53,6 +76,11 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
+          // 読み込み中に見えなくなって破棄済みの広告は表示しない
+          if (!identical(ad, _bannerAd)) {
+            ad.dispose();
+            return;
+          }
           if (mounted) {
             setState(() {
               _isLoaded = true;
@@ -78,7 +106,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
           }
           _retryTimer?.cancel();
           _retryTimer = Timer(_retryDelay, () {
-            if (mounted) _loadAd();
+            if (mounted && _active) _loadAd();
           });
         },
         onAdOpened: (ad) {

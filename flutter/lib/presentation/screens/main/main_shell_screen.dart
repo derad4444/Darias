@@ -50,6 +50,14 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       List.generate(5, (_) => GlobalKey<NavigatorState>());
 
   /// タブの中身を、そのタブ専用の Navigator の最初のルートとして表示する。
+  /// タブ1つ分。選ばれているタブだけ TickerMode を有効にする
+  Widget _tab(int selectedTab, int index, Widget child) {
+    return TickerMode(
+      enabled: selectedTab == index,
+      child: _tabNavigator(index, child),
+    );
+  }
+
   Widget _tabNavigator(int index, Widget child) {
     return Navigator(
       key: _tabNavigatorKeys[index],
@@ -159,17 +167,19 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
       child: Scaffold(
       body: IndexedStack(
         index: selectedTab,
+        // 見えていないタブは TickerMode を切る。IndexedStack は全タブを作ったまま保持するため、
+        // 切らないと見えていないタブのバナー広告まで読み込まれる（BannerAdWidget が TickerMode を見て読み込みを止める）
         children: [
           // homeTabIndex: ホーム
-          _tabNavigator(homeTabIndex, const HomeScreen()),
+          _tab(selectedTab, homeTabIndex, const HomeScreen()),
           // characterTabIndex: 詳細（キャラクター詳細）
-          _tabNavigator(characterTabIndex, const _CharacterTabRoot()),
+          _tab(selectedTab, characterTabIndex, const _CharacterTabRoot()),
           // friendTabIndex: フレンド
-          _tabNavigator(friendTabIndex, const FriendScreen()),
+          _tab(selectedTab, friendTabIndex, const FriendScreen()),
           // meetingTabIndex: 自分会議
-          _tabNavigator(meetingTabIndex, const MeetingScreen()),
+          _tab(selectedTab, meetingTabIndex, const MeetingScreen()),
           // settingsTabIndex: 設定
-          _tabNavigator(settingsTabIndex, const SettingsScreen()),
+          _tab(selectedTab, settingsTabIndex, const SettingsScreen()),
         ],
       ),
       // iOS風の半透明タブバー

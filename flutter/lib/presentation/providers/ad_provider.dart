@@ -23,9 +23,21 @@ final rewardedAdManagerProvider = Provider<RewardedAdManager>((ref) {
 /// 今日のチャット回数のプロバイダー
 final chatCountTodayProvider = StateProvider<int>((ref) => 0);
 
+/// 購読状態が読み込み済みか（テストモードでは常に読み込み済みとみなす）
+///
+/// 読み込み中の購読状態は無料扱いになる（`currentSubscriptionProvider`）。そのまま広告の判定に
+/// 使うと、プレミアムの人にも起動直後に広告をリクエストし、読み込みが終わった時点で消える。
+/// プレミアムの人に一瞬広告が見えるうえ、AdMob には「表示0のリクエスト」として数えられ集計も汚れる。
+final _subscriptionResolvedProvider = Provider<bool>((ref) {
+  if (ref.watch(testModeProvider)) return true;
+  final sub = ref.watch(subscriptionStreamProvider);
+  return sub.hasValue || sub.hasError;
+});
+
 /// バナー広告を表示すべきかのプロバイダー
-/// プレミアムユーザーは広告非表示
+/// プレミアムユーザーと、購読状態の読み込みが終わる前は広告非表示
 final shouldShowBannerAdProvider = Provider<bool>((ref) {
+  if (!ref.watch(_subscriptionResolvedProvider)) return false;
   final isPremium = ref.watch(effectiveIsPremiumProvider);
   return !isPremium;
 });
@@ -33,6 +45,7 @@ final shouldShowBannerAdProvider = Provider<bool>((ref) {
 /// 動画広告を表示すべきかのプロバイダー
 /// チャット回数が5の倍数かつ非プレミアムの場合にtrue
 final shouldShowVideoAdProvider = Provider<bool>((ref) {
+  if (!ref.watch(_subscriptionResolvedProvider)) return false;
   final isPremium = ref.watch(effectiveIsPremiumProvider);
   if (isPremium) return false;
 
