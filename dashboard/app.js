@@ -18,6 +18,8 @@ const firebaseConfig = {
 // 運営者のアカウント（kaosud@gmail.com）の UID。firestore.rules の admin_metrics と同じ
 const ADMIN_UID = "l5M6D7XvjwSvC15HJYHFdKZo0bz1";
 const COLLECT_URL = "https://reels-bot-oh2poc3uba-an.a.run.app/collect-metrics-now";
+// Firebase Analytics（GA4）の計測を始めた日。これより前のアプリ内の数字は無い
+const GA4_START = "2026-08-19";
 // 日別の文書を読む上限（全期間の表示に足りる日数）
 const MAX_DAYS = 800;
 
@@ -38,7 +40,7 @@ const HELP = {
   kpiDl: ["初回ダウンロード", "その期間に初めて DARIAS をダウンロードした数です（再ダウンロードは含みません）。", "新しく来てくれた人の数です。ページ閲覧に対する割合（転換率）とあわせて見ます。"],
   kpiConv: ["ストアの転換率", "ページ閲覧のうち、初回ダウンロードにつながった割合です。", "ストアのページ（スクショ・説明文・評価）の説得力を表します。評価のリセットやスクショの変更の効果はここに出ます。"],
   kpiNew: ["新規ユーザー（日本）", "アプリを初めて起動した端末の数です。審査用やテスト用の端末を除くため、日本のユーザーだけを数えています。", "ダウンロードしたあと実際に開いてくれた人の数です。初回ダウンロードより大きく少ないなら、入れたまま開かれていません。"],
-  kpiActive: ["アクティブ（日の合計）", "毎日アプリを開いた人の数を、期間内で足し合わせた値です（日本のみ）。同じ人が3日開けば3と数えます。", "新規が少なくても、ここが保たれていれば使い続けてもらえています。"],
+  kpiActive: ["使った人（重複なし）", "期間内に一度でもアプリを開いた人の数です（日本のみ）。同じ人が何日開いても1人と数えます。プレミアムの人・Web版の人・開発用の端末も含みます。", "新規が少なくても、ここが保たれていれば使い続けてもらえています。広告が出るのはこのうち iPhone 版の無料ユーザーだけなので、広告の表示人数はこれより少なくなります。"],
   kpiAd: ["広告の推定収益", "AdMob の推定収益（円）です。確定額は月末に少し変わることがあります。", "無料ユーザーの数と、広告が実際に表示された回数で決まります。"],
   kpiAdImp: ["広告の表示回数", "広告が実際に画面に表示された回数です。", "読み込んだのに表示されない広告が多いと、ここがリクエスト数より大きく下回ります。"],
   kpiCtr: ["広告のクリック率", "表示された広告のうち、タップされた割合です。", "1%前後が目安です。極端に高い場合は誤タップを誘う配置になっていないか確認します。"],
@@ -263,7 +265,8 @@ function renderKpis(id, items) {
   $(id).innerHTML = items.map((k, i) => {
     const has = k.value != null && Number.isFinite(k.value);
     const d = has && k.prev != null ? deltaBadge(k.value, k.prev, k.format) : "";
-    return `<div class="kpi" style="animation-delay:${i * 40}ms">
+    const tone = toneOf(k);
+    return `<div class="kpi ${tone}" style="animation-delay:${i * 40}ms">
       <div class="kpi-head"><span class="label">${esc(k.label)}</span><button class="help" data-help="${k.help}" aria-label="${esc(k.label)}の説明">?</button></div>
       <div class="value" data-i="${i}">${has ? esc(k.format(k.value)) : "–"}</div>
       <div class="sub">${has ? d + (k.sub ? esc(k.sub) : "") : esc(k.why || "データなし")}</div>
@@ -275,6 +278,16 @@ function renderKpis(id, items) {
     const k = items[Number(el.dataset.i)];
     if (k.value != null && Number.isFinite(k.value)) countUp(el, k.value, k.format);
   });
+}
+// 前の期間より良くなったら good、悪くなったら bad（数字が増えるほど良いものばかりなので、増減で決める）。
+// 変化が小さい（±5%未満）ときは色を付けない。色だけに頼らないよう、▲▼と%も必ず出す
+const TONE_THRESHOLD = 0.05;
+function toneOf(k) {
+  if (k.tone) return k.tone;
+  if (k.value == null || k.prev == null || !Number.isFinite(k.value)) return "";
+  if (k.prev === 0) return k.value > 0 ? "good" : "";
+  const r = (k.value - k.prev) / k.prev;
+  return r >= TONE_THRESHOLD ? "good" : r <= -TONE_THRESHOLD ? "bad" : "";
 }
 function deltaBadge(v, p, format) {
   const diff = v - p;
@@ -334,8 +347,8 @@ function renderHighlights(ctx) {
   if (moved.length) {
     const best = moved.reduce((a, b) => (b.r > a.r ? b : a));
     const worst = moved.reduce((a, b) => (b.r < a.r ? b : a));
-    if (best.r > 0) items.push({ emoji: "📈", title: "いちばん伸びた数字", main: `${best.name} +${Math.round(best.r * 100)}%`, sub: `前の期間 ${best.format(best.p)} → ${best.format(best.v)}` });
-    if (worst.r < 0) items.push({ emoji: "📉", title: "いちばん落ちた数字", main: `${worst.name} −${Math.round(-worst.r * 100)}%`, sub: `前の期間 ${worst.format(worst.p)} → ${worst.format(worst.v)}` });
+    if (best.r > 0) items.push({ tone: "good", emoji: "📈", title: "いちばん伸びた数字", main: `${best.name} +${Math.round(best.r * 100)}%`, sub: `前の期間 ${best.format(best.p)} → ${best.format(best.v)}` });
+    if (worst.r < 0) items.push({ tone: "bad", emoji: "📉", title: "いちばん落ちた数字", main: `${worst.name} −${Math.round(-worst.r * 100)}%`, sub: `前の期間 ${worst.format(worst.p)} → ${worst.format(worst.v)}` });
   }
   const ig = postsIn(state.S.instagramPosts, cur).sort((a, b) => (b.views || 0) - (a.views || 0))[0];
   if (ig) items.push({ emoji: "🎬", title: "いちばん見られた Instagram", html: link(clip(ig.title || "（本文なし）", 26), ig.permalink), sub: `再生 ${fmt(ig.views)}・保存 ${fmt(ig.saved)}・シェア ${fmt(ig.shares)}` });
@@ -344,13 +357,15 @@ function renderHighlights(ctx) {
   const igF = last(rows, V.igFollowers), thF = last(rows, V.thFollowers);
   if (igF != null || thF != null) {
     const g = (f) => { const a = first(rows, f), b = last(rows, f); return a != null && b != null ? b - a : 0; };
-    items.push({ emoji: "🌱", title: "フォロワー", main: `Instagram ${fmt(igF)}・Threads ${fmt(thF)}`, sub: `期間内の増減 Instagram ${signed(g(V.igFollowers))}・Threads ${signed(g(V.thFollowers))}` });
+    const net = g(V.igFollowers) + g(V.thFollowers);
+    items.push({ tone: net > 0 ? "good" : net < 0 ? "bad" : "", emoji: "🌱", title: "フォロワー", main: `Instagram ${fmt(igF)}・Threads ${fmt(thF)}`, sub: `期間内の増減 Instagram ${signed(g(V.igFollowers))}・Threads ${signed(g(V.thFollowers))}` });
   }
   const reviews = (state.S.reviews || []).filter((r) => inRange((r.createdDate || "").slice(0, 10), cur));
   items.push(reviews.length
-    ? { emoji: "⭐", title: "期間内のレビュー", main: `${reviews.length}件・平均 ★${avg(reviews.map((r) => r.rating)).toFixed(1)}`, sub: clip(reviews[0].title || reviews[0].body, 30) }
+    ? { tone: avg(reviews.map((r) => r.rating)) >= 4 ? "good" : avg(reviews.map((r) => r.rating)) <= 2.5 ? "bad" : "", emoji: "⭐", title: "期間内のレビュー", main: `${reviews.length}件・平均 ★${avg(reviews.map((r) => r.rating)).toFixed(1)}`, sub: clip(reviews[0].title || reviews[0].body, 30) }
     : { emoji: "💬", title: "期間内のレビュー", main: "新しいレビューはありません", sub: `これまでの合計 ${fmt((state.S.reviews || []).length)} 件` });
-  $("ov-highlights").innerHTML = items.slice(0, 6).map((h, i) => `<div class="highlight" style="animation-delay:${i * 50}ms"><div class="emoji" aria-hidden="true">${h.emoji}</div><div><div class="h-title">${esc(h.title)}</div><div class="h-main">${h.html || esc(h.main)}</div><div class="h-sub">${esc(h.sub)}</div></div></div>`).join("");
+  const TONE_TEXT = { good: "良い", bad: "要注意" };
+  $("ov-highlights").innerHTML = items.slice(0, 6).map((h, i) => `<div class="highlight ${h.tone || ""}" style="animation-delay:${i * 50}ms"><div class="emoji" aria-hidden="true">${h.emoji}</div><div><div class="h-title">${esc(h.title)}${h.tone ? `<span class="tone-label">${TONE_TEXT[h.tone]}</span>` : ""}</div><div class="h-main">${h.html || esc(h.main)}</div><div class="h-sub">${esc(h.sub)}</div></div></div>`).join("");
 }
 
 // ファネルは人数（重複を除いた数）なので日別を足せない。期間の選択肢ごとに collector が取った値を使う
@@ -423,7 +438,7 @@ function renderAppUsage(ctx) {
   const { rows, prevRows } = ctx;
   renderKpis("au-kpis", [
     kpi({ help: "kpiNew", label: "新規ユーザー（日本）", value: total(rows, V.newUsers), prev: total(prevRows, V.newUsers), spark: series(ctx, V.newUsers) }),
-    kpi({ help: "kpiActive", label: "アクティブ（日の合計）", value: total(rows, V.activeUsers), prev: total(prevRows, V.activeUsers), spark: series(ctx, V.activeUsers) }),
+    kpi({ help: "kpiActive", label: "使った人（重複なし）", ...activeUnique(), spark: series(ctx, V.activeUsers) }),
   ]);
   lineChart("au-new", [{ name: "新規ユーザー", points: series(ctx, V.newUsers) }], { area: true });
   lineChart("au-active", [{ name: "アクティブユーザー", points: series(ctx, V.activeUsers) }], { area: true });
@@ -433,6 +448,16 @@ function renderAppUsage(ctx) {
     { key: "newUsers", label: "新規", num: true },
     { key: "activeUsers", label: "アクティブ", num: true },
   ], state.S.weekly || [], { key: "week", dir: "desc" });
+}
+
+// 期間内に使った人数（重複なし）。日別を足すと同じ人を何度も数えるので、collector が期間の選択肢ごとに取った値を使う
+function activeUnique() {
+  const a = state.S.activeUnique || {};
+  if (state.period === "custom") return { value: undefined, why: "期間を指定したときは出せません（7日・30日・90日・全期間で見てください）" };
+  // 前の期間が計測開始（GA4_START）より前にかかるときは、0人ではなく「比較なし」にする
+  const { prev } = ranges();
+  const comparable = prev && prev.from >= GA4_START;
+  return { value: a[state.period], prev: comparable ? a[state.period + "prev"] : undefined, why: "次の集計から表示されます" };
 }
 
 // ───────── 広告 ─────────

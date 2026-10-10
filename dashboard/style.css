@@ -16,6 +16,11 @@
   --warn-bg: #fff6e0;
   --warn-text: #7a5300;
   --error: #d03b3b;
+  /* 良い結果・悪い結果の背景（色だけに頼らず、▲▼と文言も必ず添える） */
+  --good-bg: #ecf7ec;
+  --good-border: #b9e0b9;
+  --bad-bg: #fdeeee;
+  --bad-border: #f1c4c4;
   /* 見出しの帯（DARIAS のアプリのグラデーションに寄せた装飾。データの色には使わない） */
   --hero-a: #ff8fb8;
   --hero-b: #9b7cf0;
@@ -40,6 +45,10 @@
     --down: #ff8a80;
     --warn-bg: #3a2e10;
     --warn-text: #f5d58a;
+    --good-bg: #13261a;
+    --good-border: #24492f;
+    --bad-bg: #2c1515;
+    --bad-border: #5a2a2a;
     --hero-a: #b4487a;
     --hero-b: #5b45b0;
     --hero-c: #2c6aa8;
@@ -63,6 +72,10 @@
   --down: #ff8a80;
   --warn-bg: #3a2e10;
   --warn-text: #f5d58a;
+  --good-bg: #13261a;
+  --good-border: #24492f;
+  --bad-bg: #2c1515;
+  --bad-border: #5a2a2a;
   --hero-a: #b4487a;
   --hero-b: #5b45b0;
   --hero-c: #2c6aa8;
@@ -153,6 +166,14 @@ main { padding: 14px 16px 56px; max-width: 1200px; margin: 0 auto; }
 .highlight .h-main { font-size: 15px; font-weight: 600; margin: 2px 0; }
 .highlight .h-sub { font-size: 12px; color: var(--muted); }
 .highlight a { color: inherit; }
+
+/* 良い結果・悪い結果 */
+.highlight.good, .kpi.good { background: var(--good-bg); border-color: var(--good-border); }
+.highlight.bad, .kpi.bad { background: var(--bad-bg); border-color: var(--bad-border); }
+.highlight.good .emoji, .highlight.bad .emoji { background: var(--surface); }
+.tone-label { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.good .tone-label { color: var(--up); background: var(--surface); }
+.bad .tone-label { color: var(--down); background: var(--surface); }
 
 /* 大きな数字のカード */
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 12px; margin-bottom: 14px; }
