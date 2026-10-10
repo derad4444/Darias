@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-10（`recalculatePersonalityStats` の呼び出し元を運営ダッシュボードの collector だけに制限。2026-10-08: パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
+**最終更新日**: 2026-10-10（性格タイプ統計 `PersonalityStatsMetadata` の集計は運営ダッシュボードの collector が行う。2026-10-08: パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
 **ランタイム**: Node.js 22
 **関数数**: 28
 
@@ -776,52 +776,6 @@ REST API として直接アクセス可能。
 - **リージョン**: `asia-northeast1`
 - **その他**: `minInstances: 0`, `maxInstances: 1`
 
-#### 29. `recalculatePersonalityStats`
-- **ソース**: `const/recalculatePersonalityStats.js`
-- **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。運営ダッシュボードの collector（reels-bot）が毎朝6時と「今すぐ集計」のときに `dryRun=false` で呼ぶ（[運営ダッシュボード仕様書](../architecture/運営ダッシュボード仕様書.md#性格の分布)）
-- **リソース**: memory `1GiB` / timeout `300秒`
-- **リージョン**: `asia-northeast1`
-- **認証**: `invoker` を reels-bot のサービスアカウント（`firebase-adminsdk-fbsvc@my-character-app.iam.gserviceaccount.com`）だけにしている。呼び出し側は Google の ID トークン（audience = 関数の URL）を `Authorization: Bearer` で付ける。全ユーザーの details を読む重い処理なので、誰でも呼べる状態にしない
-
-**クエリパラメータ:**
-
-| パラメータ | 値 | 説明 |
-|-----------|-----|------|
-| `dryRun` | `true` / `false`（省略時は `false`） | `true` の場合は Firestore への書き込みをスキップし、集計結果のみ返す |
-
-**返却値:**
-
-```json
-{
-  "success": true,
-  "dryRun": false,
-  "debug": { "details_count": 113 },
-  "stats": {
-    "total_completed_users": 113,
-    "unique_personality_types": 57,
-    "gender_distribution": { "female": 77, "male": 32, "neutral": 4 },
-    "element_counts": { "炎": 12, "風": 8, ... },
-    "type_name_counts": { "場を沸かす炎タイプ": 7, "独り燃える炎タイプ": 5, ... },
-    "personality_details": {
-      "O3_C4_E2_A5_N1_女性": { "element": "炎", "typeName": "場を沸かす炎タイプ", "count": 3 },
-      ...
-    }
-  }
-}
-```
-
-**集計ロジック:**
-- `collectionGroup("details")` で全ユーザーの `details/current` を一括取得
-- パスが `/characters/` を含み、ドキュメントIDが `current` のもののみ対象
-- `personalityKey` が未設定のドキュメントはスキップ
-- `element` / `typeName` が Firestore に保存されていない場合は `axisScores` から計算して補完（`axisCalculator.js` と同一ロジック）
-
-**`total_completed_users` について**: 性格診断完了（`personalityKey` 設定済み）の性格数を示す。Firebase Authentication の全ユーザー数とは異なる。
-
-**副作用（`dryRun=false` 時）:**
-- `PersonalityStatsMetadata/summary` に集計結果を上書き保存
-
 ---
 
 ## 通知タップ時の遷移
@@ -883,7 +837,6 @@ shared/functions/
 │   ├── generateBig5Analysis.js       # BIG5 解析テキスト生成（性格ごとに共有）
 │   ├── generatePersonalityKey.js     # personalityKey 生成（Math.round で整数化）
 │   ├── generatePersonalityNarrative.js # 週次ナラティブ生成
-│   ├── recalculatePersonalityStats.js  # 性格タイプ統計の再集計
 │   ├── diagnoseCompatibility.js      # カテゴリ別相性診断
 │   ├── askAboutFriend.js             # フレンドの好みをキャラクター会話で回答
 │   ├── searchUsers.js                # フレンド追加用ユーザー検索

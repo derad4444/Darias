@@ -655,9 +655,9 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
     - **typeName**: `string` - タイプ名（例: `"場を沸かす炎タイプ"`）
     - **count**: `number` - 人数
 
-**データソース**: `recalculatePersonalityStats` Cloud Function が `collectionGroup("details")` で全ユーザーの `details/current` を走査して集計。`element`/`typeName` が Firestore 未保存の場合は `axisScores` から計算して補完。運営ダッシュボードの collector が毎朝この関数を呼ぶので、毎朝更新される。
+**データソース**: 運営ダッシュボードの collector（reels-bot の `src/metrics/sources/darias_users.py` の `personality()`）が、毎朝6時と「今すぐ集計」のときに `collectionGroup("details")` で全キャラクターの `details/current` を走査して上書きする。`element`/`typeName` が保存されていない文書は `axisScores` から計算して補完（`axisCalculator.js` と同じ境界）。
 
-**アクセス権限**: クライアントからは読み書きとも不可（`firestore.rules` に個別のルールが無く、末尾の全拒否に当たる）。読むのは Cloud Function（`generateSixPersonMeeting` の `calculateStatsFromAnalysis`）だけ
+**アクセス権限**: クライアントからは読み書きとも不可（`firestore.rules` に個別のルールが無く、末尾の全拒否に当たる）。読むのは Cloud Function（`generateSixPersonMeeting` の `calculateStatsFromAnalysis`。`total_completed_users` と `personality_counts` を使う）だけ
 
 ---
 
@@ -913,7 +913,7 @@ Big5Analysis/{personalityKey}
 | `users/{userId}/personalityBadges/**` | 本人のみ | 本人は削除のみ。作成・更新は Cloud Functionのみ |
 | 上記以外の `users/{userId}/**` | 本人のみ | 本人のみ |
 | `Big5Analysis` | 認証ユーザー | Cloud Functionのみ |
-| `PersonalityStatsMetadata` | 不可（CF経由のみ） | Cloud Functionのみ |
+| `PersonalityStatsMetadata` | 不可（CF経由のみ） | 運営ダッシュボードの collector（Admin SDK）のみ |
 | `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
 | `system` | 全員 | 不可 |
@@ -922,7 +922,7 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。`PersonalityStatsMetadata` のアクセス権限を rules の実態（クライアント不可）に合わせた）
+**最終更新**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。`PersonalityStatsMetadata` を collector が書くようにした。`PersonalityStatsMetadata` のアクセス権限を rules の実態（クライアント不可）に合わせた）
 **前回更新**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
 **前回更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
 **前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
