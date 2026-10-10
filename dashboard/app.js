@@ -67,6 +67,8 @@ const HELP = {
   adImpressions: ["表示回数（日別）", "広告が実際に表示された回数の日別推移です。", "リクエストはあるのに表示が0の日が続くときは、表示される前に広告が消えていないか確認します。"],
   igFollowers: ["Instagram フォロワー数", "毎朝記録したフォロワー数の推移です。", "投稿の型を変えた日と重ねて、伸びたきっかけを探します。"],
   thFollowers: ["Threads フォロワー数", "毎朝記録したフォロワー数の推移です。", "1日8回の自動投稿がファンにつながっているかを見ます。"],
+  igTiming: ["Instagram 曜日・時間帯ごとの成績", "期間内に投稿したリール・投稿を、投稿した曜日と時間帯（日本時間）ごとにまとめたものです。再生の中央値（真ん中の値）と平均、本数を出します。", "投稿の曜日や時間を変えたら、2〜4週間たってからここで比べます。本数が少ない枠は1本の当たり外れで大きく動くので、中央値と本数をあわせて見てください。"],
+  thTiming: ["Threads 曜日・時間帯ごとの成績", "期間内に投稿した Threads を、投稿した曜日と時間帯（日本時間）ごとにまとめたものです。表示の中央値と平均、本数を出します。", "通勤・昼休み・寝る前など、狙った時間に見られているかを確かめます。本数が少ない枠は中央値と本数をあわせて見てください。"],
   igPosts: ["Instagram 投稿の成績", "期間内に投稿したリール・投稿ごとの成績です。列名を押すと並べ替えられます。", "保存とシェアは「次の人にも配信されるか」を決める大事な数字です。平均視聴が1〜2秒なら冒頭で離脱されています。"],
   thPosts: ["Threads 投稿の成績", "期間内に投稿した Threads ごとの成績です。列名を押すと並べ替えられます。", "表示で並べ替えると、どんな話題や書き出しが見られているかが分かります。"],
   elements: ["元素ごとの人数", "9つの元素それぞれに決まったキャラクターの数と、元素が決まった人のなかでの割合です。「未確定」はまだ元素が決まっていない（赤ちゃん段階の）キャラクターです。", "特定の元素に偏りすぎていないかを見ます。極端な偏りは、診断の質問や採点の傾きが原因のことがあります。"],
@@ -489,6 +491,8 @@ function renderSns(ctx) {
     kpi({ help: "kpiIgViews", label: "Instagram 投稿の再生", value: sumOf(igPosts, "views"), prev: prev ? sumOf(postsIn(state.S.instagramPosts, prev), "views") : undefined, sub: `${igPosts.length}本`, why: "期間内の投稿がありません" }),
     kpi({ help: "kpiThViews", label: "Threads 投稿の表示", value: sumOf(thPosts, "views"), prev: prev ? sumOf(postsIn(state.S.threadsPosts, prev), "views") : undefined, sub: `${thPosts.length}本`, why: "期間内の投稿がありません" }),
   ]);
+  timingTables("sn-ig-timing", igPosts, "views", "再生");
+  timingTables("sn-th-timing", thPosts, "views", "表示");
   lineChart("sn-ig-followers", [{ name: "フォロワー", points: series(ctx, V.igFollowers) }]);
   lineChart("sn-th-followers", [{ name: "フォロワー", points: series(ctx, V.thFollowers) }]);
   sortableTable("sn-ig-posts", [
@@ -507,6 +511,44 @@ function renderSns(ctx) {
     { key: "replies", label: "返信", num: true }, { key: "reposts", label: "再投稿", num: true },
     { key: "quotes", label: "引用", num: true }, { key: "shares", label: "シェア", num: true },
   ], thPosts, { key: "timestamp", dir: "desc" }, "期間内の投稿がありません");
+}
+
+// 曜日ごと・時間帯ごとの成績（投稿日時を日本時間に直してまとめる）
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+const timingMode = {};
+function timingTables(id, posts, key, label) {
+  const mode = timingMode[id] || "weekday";
+  const groups = new Map();
+  posts.forEach((p) => {
+    const t = new Date(p.timestamp);
+    if (Number.isNaN(t.getTime())) return;
+    const jst = new Date(t.getTime() + (9 * 60 + t.getTimezoneOffset()) * 60000);
+    const k = mode === "weekday" ? jst.getDay() : jst.getHours();
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p[key] || 0);
+  });
+  const rows = [...groups.entries()].map(([k, vs]) => ({
+    slot: k, slotLabel: mode === "weekday" ? WEEKDAYS[k] + "曜" : `${k}時台`,
+    count: vs.length, median: median(vs), mean: vs.reduce((a, b) => a + b, 0) / vs.length,
+  }));
+  const el = $(id);
+  const head = `<div class="chips" role="group" aria-label="まとめ方"><button data-m="weekday" aria-pressed="${mode === "weekday"}">曜日ごと</button><button data-m="hour" aria-pressed="${mode === "hour"}">時間帯ごと</button></div>`;
+  const box = document.createElement("div");
+  box.id = id + "-t";
+  el.innerHTML = head;
+  el.appendChild(box);
+  sortableTable(box.id, [
+    { key: "slot", label: mode === "weekday" ? "曜日" : "時間帯", num: true, format: (_v) => "", html: (r) => esc(r.slotLabel) },
+    { key: "median", label: `${label}（中央値）`, num: true },
+    { key: "mean", label: `${label}（平均）`, num: true, format: (v) => fmt(Math.round(v * 10) / 10) },
+    { key: "count", label: "本数", num: true },
+  ], rows, { key: "slot", dir: "asc" }, "期間内の投稿がありません");
+  el.querySelectorAll(".chips button").forEach((b) => { b.onclick = () => { timingMode[id] = b.dataset.m; timingTables(id, posts, key, label); }; });
+}
+function median(xs) {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
 // ───────── 性格 ─────────
