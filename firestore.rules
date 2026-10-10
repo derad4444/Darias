@@ -62,9 +62,13 @@ service cloud.firestore {
       allow read, update, delete: if false; // 読み取り・更新・削除は不可（Cloud Functionとコンソールのみ）
     }
 
-    // 共有会議データ - 認証済みユーザーは読み取り可能、書き込みは不可（Cloud Functionのみ）
+    // 自分会議の本体 - ID を指定した単体取得だけ許可、書き込みは不可（Cloud Functionのみ）
+    // アプリは本人の meeting_history にある sharedMeetingId で1件ずつ読むだけなので、list は不要。
+    // 許可すると、ログインした誰でも全員の会議（相談の言葉・夢・苦手なこと）を一覧で取れてしまい、
+    // フレンドの personalityKey（details は単体取得できる）で絞り込めば誰の相談かも特定できる
     match /shared_meetings/{meetingId} {
-      allow read: if request.auth != null;
+      allow get: if request.auth != null;
+      allow list: if false;
       allow write: if false;
     }
 

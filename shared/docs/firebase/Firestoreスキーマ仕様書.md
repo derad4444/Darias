@@ -12,7 +12,7 @@
 1. [users](#users) - ユーザーデータ
 2. [Big5Analysis](#big5analysis) - BIG5性格解析マスターデータ
 3. [PersonalityStatsMetadata](#personalitystatsmetadata) - 性格統計メタデータ
-4. [shared_meetings](#shared_meetings) - 6人会議キャッシュ
+4. [shared_meetings](#shared_meetings) - 自分会議の本体
 5. [contacts](#contacts) - お問い合わせデータ
 6. [system](#system) - システム設定
 7. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
@@ -663,7 +663,7 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 
 ## `shared_meetings`
 
-**用途**: 6人会議の共有・再利用データ（キャッシュ）
+**用途**: 自分会議の本体。会議を作るたびに1件追加する（他のユーザーとの共有・再利用はしない）。本人の `users/{userId}/characters/{characterId}/meeting_history` が `sharedMeetingId` でこの文書を指す
 **ドキュメントID**: 自動生成UUID
 
 **フィールド:**
@@ -700,7 +700,7 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 **インデックス:**
 - `personalityKey` (ASC) + `concernCategory` (ASC) + `usageCount` (DESC)
 
-**アクセス権限**: 認証済みユーザーは読み取り可、書き込みは不可（Cloud Functionのみ）
+**アクセス権限**: 認証済みユーザーは ID を指定した単体取得のみ可（一覧取得は不可）。アプリは本人の `meeting_history` にある `sharedMeetingId` で1件ずつ読む。一覧を許可すると、全員の会議を取得でき、フレンドの `personalityKey`（`details/current` は単体取得できる）で絞り込めば誰の相談かも特定できてしまうため。書き込みは不可（Cloud Functionのみ）
 
 ---
 
@@ -914,7 +914,7 @@ Big5Analysis/{personalityKey}
 | 上記以外の `users/{userId}/**` | 本人のみ | 本人のみ |
 | `Big5Analysis` | 認証ユーザー | Cloud Functionのみ |
 | `PersonalityStatsMetadata` | 不可（CF経由のみ） | 運営ダッシュボードの collector（Admin SDK）のみ |
-| `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
+| `shared_meetings` | 認証ユーザー（単体取得のみ） | Cloud Functionのみ |
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
 | `system` | 全員 | 不可 |
 | `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
@@ -922,7 +922,7 @@ Big5Analysis/{personalityKey}
 
 ---
 
-**最終更新**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。`PersonalityStatsMetadata` を collector が書くようにした。`PersonalityStatsMetadata` のアクセス権限を rules の実態（クライアント不可）に合わせた）
+**最終更新**: 2026-10-10（`shared_meetings` を単体取得のみにした。運営ダッシュボードの `admin_metrics` を追加。`PersonalityStatsMetadata` を collector が書くようにした。`PersonalityStatsMetadata` のアクセス権限を rules の実態（クライアント不可）に合わせた）
 **前回更新**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
 **前回更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
 **前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
