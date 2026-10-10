@@ -894,7 +894,7 @@ Big5Analysis/{personalityKey}
 |---|---|
 | `latest` | `startedAt` / `finishedAt`: `timestamp`、`status`: `"running"` / `"done"`、`trigger`: `"schedule"` / `"manual"`、`sources`: `map`（収集元 → `"ok"` / `"error"`）、`errors`: `map`（収集元 → エラー文） |
 | `summary` | `funnel7` / `funnel30` / `funnel90` / `funnelAll`: `array<{label, users}>`、`activeUnique`: `map`（`7` / `7prev` / `30` / `30prev` / `90` / `90prev` / `all` → 期間内に使った人数・重複なし）、`weekly`: `array<{week, newUsers, activeUsers}>`、`paywallSources`: `map`、`reviews`: `array<{rating, title, body, createdDate, territory}>`（新しい順に最大300件）、`instagramPosts` / `threadsPosts`: `array`（新しい60件／120件の成績）、`signupsByMonth`: `map`（`YYYY-MM` → 件数）、`updatedAt` |
-| `daily/days/{YYYY-MM-DD}` | `date`、`appStore`: `{engagement, downloads, purchases}`（それぞれ `{total, byType, bySource}`）、`ga4`: `{newUsers, activeUsers, sessions}`（日本のみ）、`admob`: `{earningsJPY, impressions, clicks, adRequests, matchedRequests}`、`instagram`: `{followers, mediaCount, yesterday}`、`threads`: `{followers, yesterday}` |
+| `daily/days/{YYYY-MM-DD}` | `date`、`appStore`: `{engagement, downloads, purchases}`（それぞれ `{total, byType, bySource}`）、`ga4`: `{newUsers, activeUsers, sessions}`（日本のみ）、`admob`: `{earningsJPY, impressions, clicks, adRequests, matchedRequests}`、`instagram`: `{followers, mediaCount, yesterday}`、`threads`: `{followers, yesterday}`、`meetings`: `{count, users}`（その日に作られた自分会議の件数と人数・運営者を除く） |
 | `personality/days/{YYYY-MM-DD}` | `date`、`totalCharacters`、`uniqueTypes`、`elements`（「未確定」を含む）、`typeNames`、`gender`、`growthStages`（`baby` / `child` / `adult`）、`badgeBuckets`（`0` / `1-9` / `10-19` / `20`） |
 | `state` | `ascProcessed`: `array<string>`（読み込み済みの App Store レポート `キー:処理日`）、`admobBackfilled`: `bool` |
 

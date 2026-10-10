@@ -128,6 +128,26 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     super.dispose();
   }
 
+  /// タブを開いたことを Analytics に送る。
+  ///
+  /// 自分会議はロック中（性格タイプが決まる前）かどうかで画面名を分ける。
+  /// ロック画面で止まっている人と、実際に会議を始められる人を別々に数えるため。
+  void _logTabView(int index) {
+    const names = {
+      homeTabIndex: 'home',
+      characterTabIndex: 'character',
+      friendTabIndex: 'friend',
+      meetingTabIndex: 'meeting',
+      settingsTabIndex: 'settings',
+    };
+    var name = names[index];
+    if (name == null) return;
+    if (index == meetingTabIndex && (ref.read(growthStageProvider).valueOrNull ?? 0) < 1) {
+      name = 'meeting_locked';
+    }
+    AnalyticsService.instance.logTabView(name);
+  }
+
   /// Analyticsのユーザープロパティ（元素・成長段階・課金状態）を最新化する。
   ///
   /// 送るのは区分値のみで、uid や本文などの個人・内容に関わる情報は含めない。
@@ -145,6 +165,11 @@ class _MainShellScreenState extends ConsumerState<MainShellScreen> {
     final selectedTab = ref.watch(selectedTabProvider);
     final accentColor = ref.watch(accentColorProvider);
     final pendingFriendCount = ref.watch(friendTabBadgeCountProvider);
+
+    // タブを開いたら screen_view を送る（タブの切り替えはルート遷移ではないため自動では記録されない）
+    ref.listen<int>(selectedTabProvider, (prev, next) {
+      if (prev != next) _logTabView(next);
+    });
 
     // 元素の確定・成長段階の変化・課金状態の変化に追従してセグメントを更新する
     ref.listen(growthStageProvider, (_, __) => _syncAnalyticsSegment());

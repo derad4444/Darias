@@ -1,7 +1,7 @@
 # Analytics計測仕様書
 
 **作成日**: 2026-08-19
-**最終更新日**: 2026-10-07（成長段階・進捗の区分をバッジ診断の回答数と `users/{uid}.growthStage` に合わせた）
+**最終更新日**: 2026-10-11（タブを開いたときの `screen_view` を追加。自分会議はロック中を `meeting_locked` で分ける。2026-10-07: 成長段階・進捗の区分をバッジ診断の回答数と `users/{uid}.growthStage` に合わせた）
 **対象プラットフォーム**: Flutter（iOS / Android / Web）
 
 ---
@@ -82,6 +82,7 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 | イベント名 | 種別 | 発火点 | パラメータ |
 |-----------|------|--------|-----------|
 | `screen_view` | 標準 | `app_router.dart` の `observers` に `FirebaseAnalyticsObserver` を登録 | `screen_name`（各 `GoRoute` の `name`） |
+| `screen_view`（タブ） | 標準 | `main_shell_screen.dart` の `_logTabView()`（`selectedTabProvider` が変わったとき）→ `AnalyticsService.logTabView()` | `screen_name`（`home` / `character` / `friend` / `meeting` / `meeting_locked` / `settings`）、`screen_class`=`MainShellTab` |
 | `sign_up` | 標準 | `auth_provider.dart` の初回サインイン成功時 | `method`（`email` / `google` / `apple`） |
 | `login` | 標準 | `auth_provider.dart` のサインイン成功時 | `method`（`email` / `google` / `apple`） |
 | `tutorial_begin` | 標準 | `onboarding_screen.dart` `initState()` | なし |
@@ -92,6 +93,11 @@ Firebase Analytics を用いて、ユーザーの**離脱箇所**と**継続利�
 | `begin_checkout` | 標準 | `premium_upgrade_screen.dart` 購入ボタン押下時 | `value`, `currency`, `items` |
 | `purchase` | 標準 | `purchase_service.dart` `PurchaseStatus.purchased` 時 | `value`, `currency`, `items` |
 | `feature_used` | カスタム | 各機能の確定操作の直後 | `feature` |
+
+#### タブの `screen_view` の補足
+- 下のタブは `IndexedStack` で切り替えていてルート遷移にならないため、`FirebaseAnalyticsObserver` では記録されない。タブが変わったときに `logTabView()` で送る
+- **自分会議のタブは、性格タイプが決まる前（`growthStage < 1`）のロック中は `meeting_locked`、ロックが外れていれば `meeting`** として送る。ロック画面で止まっている人と、会議を始められる人を分けて数えるため
+- 起動直後のホームはルート `main` の `screen_view` で数えるので、タブの `home` は他のタブから戻ったときだけ送られる
 
 #### `chat_message_sent` の補足
 

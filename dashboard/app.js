@@ -18,6 +18,8 @@ const firebaseConfig = {
 // 運営者のアカウント（kaosud@gmail.com）の UID。firestore.rules の admin_metrics と同じ
 const ADMIN_UID = "l5M6D7XvjwSvC15HJYHFdKZo0bz1";
 const COLLECT_URL = "https://reels-bot-oh2poc3uba-an.a.run.app/collect-metrics-now";
+// 自分会議の実施数は Firestore の記録から全期間を数えているので、記録の無い日は0件として扱う（アプリの公開日から）
+const MEETINGS_START = "2025-10-01";
 // Firebase Analytics（GA4）の計測を始めた日。これより前のアプリ内の数字は無い
 const GA4_START = "2026-08-19";
 // 日別の文書を読む上限（全期間の表示に足りる日数）
@@ -47,6 +49,8 @@ const HELP = {
   kpiEcpm: ["eCPM", "広告が1000回表示されたときの収益（円）です。", "広告の単価です。表示回数が少ない期間はぶれやすいので、長めの期間で見ます。"],
   kpiIgFollowers: ["Instagram のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
   kpiThFollowers: ["Threads のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
+  kpiMeetings: ["自分会議の実施", "期間内に実際に作られた自分会議の数です（運営者自身の分は除く）。Firestore の会議の記録から数えています。", "目玉機能が使われているかを直接見る数字です。ファネルの「自分会議」は画面を開いた人数なので、こちらと合わせて見ます。"],
+  kpiMeetingReady: ["自分会議を使える人", "性格タイプが決まり（成長段階が幼少期以上）、自分会議のロックが外れている人の数です。性格の集計と同じく最新の状態を表示します。", "ここが少ないと、自分会議まで届く人も少なくなります。バッジ診断の第1弾をそろえてもらえているかの目安にもなります。"],
   kpiIgLinkTaps: ["プロフィールのリンクのタップ", "Instagram のプロフィールに置いたリンク（App Store など）がタップされた回数です（毎朝、前日1日分を記録しています）。", "リールを見た人が「アプリを入れてみよう」と動いた数です。プロフィールの1行目や投稿の締めを変えたら、ここが増えたかで効果を見ます（2026-10-10 にプロフィールの1行目を変更）。"],
   kpiIgViews: ["Instagram 投稿の再生", "期間内に投稿したリール・投稿の再生（表示）回数の合計です。", "1本あたりの再生が伸びない場合は、冒頭の1〜2秒で離脱されていないか（平均視聴）も確認します。"],
   kpiThViews: ["Threads 投稿の表示", "期間内に投稿した Threads の表示回数の合計です。", "どんな内容が見られているかは、下の表を「表示」で並べ替えると分かります。"],
@@ -54,7 +58,7 @@ const HELP = {
   kpiDecided: ["元素が決まった数", "バッジ診断などで元素まで決まったキャラクターの数です。", "ここが少ないなら、元素が決まるところまで続けてもらえていません。"],
   kpiTypes: ["タイプ名の種類", "決まったタイプ名（例: 場を沸かす炎タイプ）の種類の数です。", "18種類のうちいくつに散らばっているかを見ます。偏りが大きいなら診断の傾きを疑います。"],
   kpiRating: ["平均評価（本文付き）", "本文付きレビューの星の平均です（星だけの評価は含みません）。", "ストアで表示される平均とは別物です。不満の中身は下のレビュー一覧で確認します。"],
-  funnel: ["ファネル", "アプリを初めて開いた人が、ホーム→チャット→自分会議→課金画面→購入とどこまで進んだかの人数です（日本のユーザーのみ）。", "段と段のあいだの割合が急に落ちるところが、離脱しているところです。期間内に各段階へ来た人数なので、期間より前に初めて開いた人も数え、上の段より多くなることがあります。"],
+  funnel: ["ファネル", "アプリを初めて開いた人が、ホーム→チャット→自分会議→課金画面→購入とどこまで進んだかの人数です（日本のユーザーのみ）。「自分会議」はロックが外れた状態で自分会議のタブを開いた人数で、ロック中に開いた人は下に別に出します。", "段と段のあいだの割合が急に落ちるところが、離脱しているところです。期間内に各段階へ来た人数なので、期間より前に初めて開いた人も数え、上の段より多くなることがあります。自分会議のタブを開いた記録はアプリ 3.14 より後の版から取っているため、それより前の版の人は「自分会議」に数えられていません。"],
   signups: ["新規アカウント数（月別）", "Firebase のアカウントが作られた数を月ごとに数えたものです。", "ダウンロードからアカウント登録まで進んだ人の推移です。期間の切り替えとは関係なく全期間を表示します。"],
   storeImpressions: ["ストアでの表示回数", "App Store で DARIAS が表示された回数の日別推移です。", "検索の順位やおすすめに載ったかどうかで大きく動きます。急に増えた日は何があったか（投稿・更新）を振り返ります。"],
   storeDownloads: ["初回ダウンロード", "初めてダウンロードした数の日別推移です。", "SNSの投稿やアップデートの日と重ねて、効いた施策を探します。"],
@@ -219,7 +223,7 @@ function renderAll() {
 }
 
 const SOURCE_LABELS = {
-  appStore: "App Store", ga4: "アプリ内（GA4）", admob: "AdMob", instagram: "Instagram",
+  appStore: "App Store", ga4: "アプリ内（GA4）", admob: "AdMob", instagram: "Instagram", meetings: "自分会議の実施",
   threads: "Threads", signups: "登録数", personality: "性格",
 };
 
@@ -249,6 +253,7 @@ const V = {
   adClicks: (r) => r.admob?.clicks,
   igFollowers: (r) => r.instagram?.followers,
   igLinkTaps: (r) => r.instagram?.yesterday?.profile_links_taps,
+  meetings: (r) => r.meetings?.count ?? (r.date >= MEETINGS_START ? 0 : undefined),
   thFollowers: (r) => r.threads?.followers,
 };
 function sumKeys(t, prefix) { if (!t) return undefined; return Object.entries(t).filter(([k]) => k.toLowerCase().startsWith(prefix)).reduce((a, [, v]) => a + v, 0); }
@@ -260,7 +265,7 @@ function first(rows, f) { for (const r of rows) { const v = f(r); if (v != null)
 function dateList(r) { const out = []; for (let d = r.from; d <= r.to; d = addDays(d, 1)) out.push(d); return out; }
 function series(ctx, f) {
   const byDate = new Map(state.daily.map((r) => [r.date, r]));
-  return dateList(ctx.cur).map((d) => [d, f(byDate.get(d) || {})]);
+  return dateList(ctx.cur).map((d) => [d, f(byDate.get(d) || { date: d })]);
 }
 
 // ───────── 大きな数字のカード ─────────
@@ -380,10 +385,13 @@ function funnelFor() {
   return { data: S.funnel30 || S.funnelAll || [], note: state.period === "custom" ? "期間を指定したときは直近30日の値です（人数は日ごとに足し合わせられないため）" : "直近30日" };
 }
 function renderFunnel(id, noteId) {
-  const { data, note } = funnelFor();
+  let { data, note } = funnelFor();
   $(noteId).textContent = note;
   const el = $(id);
   if (!data.length) { el.innerHTML = `<p class="empty">データがありません</p>`; return; }
+  // 段に入れない補足（自分会議のロック画面を開いた人など）は下に添える
+  const side = data.filter((s) => s.side);
+  data = data.filter((s) => !s.side);
   const max = Math.max(...data.map((s) => s.users), 1);
   el.innerHTML = `<div class="funnel">${data.map((s, i) => {
     const conv = i > 0 && data[i - 1].users ? Math.round(s.users / data[i - 1].users * 100) : null;
@@ -391,7 +399,8 @@ function renderFunnel(id, noteId) {
     const convText = conv == null ? "–" : conv > 100 ? "–（期間より前に始めた人を含むため比べられません）" : conv + "%";
     return `${i > 0 ? `<div class="f-conv">↓ 前の段から <strong>${convText}</strong></div>` : ""}
       <div class="f-step"><span class="f-label">${esc(s.label)}</span><div class="f-track"><div class="f-bar" style="width:${s.users / max * 100}%"></div></div><span class="f-num">${fmt(s.users)}人</span></div>`;
-  }).join("")}</div>` + tableView(data.map((s) => [s.label, fmt(s.users) + "人"]), ["段階", "人数"]);
+  }).join("")}</div>` + side.map((s) => `<p class="card-note" style="margin:8px 0 0">🔒 ${esc(s.label)}を開いた人: <strong>${fmt(s.users)}人</strong>（アプリ 3.14 より後の版から記録）</p>`).join("")
+    + tableView([...data, ...side].map((s) => [s.label, fmt(s.users) + "人"]), ["段階", "人数"]);
 }
 
 // ───────── ストア ─────────
@@ -443,6 +452,8 @@ function renderAppUsage(ctx) {
   renderKpis("au-kpis", [
     kpi({ help: "kpiNew", label: "新規ユーザー（日本）", value: total(rows, V.newUsers), prev: total(prevRows, V.newUsers), spark: series(ctx, V.newUsers) }),
     kpi({ help: "kpiActive", label: "使った人（重複なし）", ...activeUnique(), spark: series(ctx, V.activeUsers) }),
+    kpi({ help: "kpiMeetings", label: "自分会議の実施", value: total(rows, V.meetings), prev: total(prevRows, V.meetings), spark: series(ctx, V.meetings), sub: "件" }),
+    kpi({ help: "kpiMeetingReady", label: "自分会議を使える人", value: meetingReady(), sub: meetingReadySub(), why: "性格の集計待ち" }),
   ]);
   lineChart("au-new", [{ name: "新規ユーザー", points: series(ctx, V.newUsers) }], { area: true });
   lineChart("au-active", [{ name: "アクティブユーザー", points: series(ctx, V.activeUsers) }], { area: true });
@@ -462,6 +473,18 @@ function activeUnique() {
   const { prev } = ranges();
   const comparable = prev && prev.from >= GA4_START;
   return { value: a[state.period], prev: comparable ? a[state.period + "prev"] : undefined, why: "次の集計から表示されます" };
+}
+
+// 自分会議を使える（性格タイプが決まった＝成長段階が幼少期以上の）人数
+function meetingReady() {
+  const g = state.persona?.growthStages;
+  return g ? (g.child || 0) + (g.adult || 0) : undefined;
+}
+function meetingReadySub() {
+  const g = state.persona?.growthStages;
+  if (!g) return "";
+  const all = (g.baby || 0) + (g.child || 0) + (g.adult || 0);
+  return all ? `全体の ${Math.round(meetingReady() / all * 100)}%（まだロック中 ${fmt(g.baby || 0)}人）` : "";
 }
 
 // ───────── 広告 ─────────

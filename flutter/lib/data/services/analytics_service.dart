@@ -150,6 +150,15 @@ class AnalyticsService {
         ),
       );
 
+  /// 下のタブを開いたときに送る（screen_view）。
+  ///
+  /// タブは IndexedStack で切り替えていて画面遷移（ルート）にならないため、
+  /// `navigatorObserver` では記録されない。[screenName] はタブごとの画面名
+  /// （`home` / `character` / `friend` / `meeting` / `meeting_locked` / `settings`）。
+  Future<void> logTabView(String screenName) => _guard(
+        () => _analytics.logScreenView(screenName: screenName, screenClass: 'MainShellTab'),
+      );
+
   // ---------------------------------------------------------------------------
   // 継続利用（どの機能が使われ続けているか）
   // ---------------------------------------------------------------------------
