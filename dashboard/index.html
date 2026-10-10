@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>DARIAS 運営ダッシュボード</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- ログイン前 -->
+  <section id="login" class="center" hidden>
+    <h1>DARIAS 運営ダッシュボード</h1>
+    <p class="muted">運営者のアカウントでログインしてください。</p>
+    <button id="login-btn" class="btn primary">Google でログイン</button>
+    <p id="login-error" class="error"></p>
+  </section>
+
+  <!-- ログイン後 -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="title">
+        <strong>DARIAS 運営ダッシュボード</strong>
+        <span id="updated" class="muted"></span>
+      </div>
+      <div class="actions">
+        <button id="collect-btn" class="btn">今すぐ集計</button>
+        <button id="logout-btn" class="btn ghost">ログアウト</button>
+      </div>
+    </header>
+    <p id="collect-status" class="status" hidden></p>
+    <p id="source-errors" class="status warn" hidden></p>
+
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="overview" aria-selected="true">全体</button>
+      <button role="tab" data-tab="store">ストア</button>
+      <button role="tab" data-tab="app-usage">アプリ内</button>
+      <button role="tab" data-tab="ads">広告</button>
+      <button role="tab" data-tab="sns">SNS</button>
+      <button role="tab" data-tab="personality">性格</button>
+    </nav>
+
+    <main>
+      <section id="tab-overview" class="tab">
+        <div class="tiles" id="overview-tiles"></div>
+        <div class="grid">
+          <div class="card"><h2>ファネル（日本のユーザー・2026-08-19 以降）</h2><div id="ov-funnel"></div></div>
+          <div class="card"><h2>新規アカウント数（月別）</h2><div id="ov-signups"></div></div>
+        </div>
+      </section>
+
+      <section id="tab-store" class="tab" hidden>
+        <p class="note">App Store Connect のアナリティクスレポート。Apple が日次で作るため、前日〜数日前までの数字です。</p>
+        <div class="grid">
+          <div class="card"><h2>ストアでの表示回数（日別）</h2><div id="st-impressions"></div></div>
+          <div class="card"><h2>初回ダウンロード（日別）</h2><div id="st-downloads"></div></div>
+          <div class="card"><h2>ページ閲覧の流入元（期間合計）</h2><div id="st-sources"></div></div>
+          <div class="card"><h2>最新のレビュー</h2><div id="st-reviews"></div></div>
+        </div>
+      </section>
+
+      <section id="tab-app-usage" class="tab" hidden>
+        <p class="note">Firebase Analytics（GA4）。審査端末・テスト端末を除くため、日本のユーザーだけを数えています。</p>
+        <div class="grid">
+          <div class="card"><h2>新規ユーザー（日別）</h2><div id="au-new"></div></div>
+          <div class="card"><h2>アクティブユーザー（日別）</h2><div id="au-active"></div></div>
+          <div class="card"><h2>直近30日に各段階へ来た人数</h2><p class="note">30日より前に初回起動した人も数えるため、上の段より多くなることがあります。</p><div id="au-funnel"></div></div>
+          <div class="card"><h2>週ごとの新規とアクティブ</h2><div id="au-weekly"></div></div>
+        </div>
+      </section>
+
+      <section id="tab-ads" class="tab" hidden>
+        <div class="tiles" id="ads-tiles"></div>
+        <div class="grid">
+          <div class="card"><h2>推定収益（日別・円）</h2><div id="ad-earnings"></div></div>
+          <div class="card"><h2>表示回数（日別）</h2><div id="ad-impressions"></div></div>
+        </div>
+      </section>
+
+      <section id="tab-sns" class="tab" hidden>
+        <div class="tiles" id="sns-tiles"></div>
+        <div class="grid">
+          <div class="card"><h2>Instagram フォロワー数</h2><div id="sn-ig-followers"></div></div>
+          <div class="card"><h2>Threads フォロワー数</h2><div id="sn-th-followers"></div></div>
+          <div class="card wide"><h2>Instagram 投稿の成績（新しい30件）</h2><div id="sn-ig-posts"></div></div>
+          <div class="card wide"><h2>Threads 投稿の成績（新しい30件）</h2><div id="sn-th-posts"></div></div>
+        </div>
+      </section>
+
+      <section id="tab-personality" class="tab" hidden>
+        <p class="note">DARIAS のキャラクター全体の集計（テスト用や削除済みアカウントのキャラクターを含みます）。「未確定」はまだ元素が決まっていない赤ちゃん段階のキャラクターです。</p>
+        <div class="tiles" id="ps-tiles"></div>
+        <div class="grid">
+          <div class="card"><h2>元素ごとの人数</h2><div id="ps-elements"></div></div>
+          <div class="card"><h2>タイプ名（上位15）</h2><div id="ps-types"></div></div>
+          <div class="card"><h2>成長段階</h2><div id="ps-stages"></div></div>
+          <div class="card"><h2>バッジ診断で答えた数</h2><div id="ps-badges"></div></div>
+          <div class="card"><h2>性別</h2><div id="ps-gender"></div></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="tooltip" class="tooltip" role="status" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

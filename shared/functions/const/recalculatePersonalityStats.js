@@ -45,6 +45,9 @@ const recalculatePersonalityStats = onRequest(
       region: "asia-northeast1",
       memory: "1GiB",
       timeoutSeconds: 300,
+      // 呼べるのは運営ダッシュボードの collector（reels-bot のサービスアカウント）だけ。
+      // 全ユーザーの details を読む重い処理なので、誰でも叩ける状態にしない
+      invoker: "firebase-adminsdk-fbsvc@my-character-app.iam.gserviceaccount.com",
     },
     async (req, res) => {
       res.set("Access-Control-Allow-Origin", "*");

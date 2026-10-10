@@ -74,6 +74,15 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // 運営ダッシュボードの集計（人数・回数のみ。個人を特定する情報は入れない）
+    // 読めるのは運営者のアカウント（メール確認済み）だけ。書き込みは reels-bot の collector（Admin SDK）だけ
+    match /admin_metrics/{rest=**} {
+      allow read: if request.auth != null
+                  && request.auth.token.email == 'kaosud@gmail.com'
+                  && request.auth.token.email_verified == true;
+      allow write: if false;
+    }
+
     // 全ての他のドキュメントはアクセス拒否
     match /{document=**} {
       allow read, write: if false;

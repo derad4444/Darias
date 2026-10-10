@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-08（パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
+**最終更新日**: 2026-10-10（`recalculatePersonalityStats` の呼び出し元を運営ダッシュボードの collector だけに制限。2026-10-08: パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
 **ランタイム**: Node.js 22
 **関数数**: 28
 
@@ -779,10 +779,10 @@ REST API として直接アクセス可能。
 #### 29. `recalculatePersonalityStats`
 - **ソース**: `const/recalculatePersonalityStats.js`
 - **API バージョン**: v2 (`firebase-functions/v2/https`)
-- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。定期実行はなく、必要なときに管理者がエンドポイントを直接呼び出す
+- **概要**: `PersonalityStatsMetadata/summary` を全ユーザーデータから再集計する管理者用 HTTP エンドポイント。運営ダッシュボードの collector（reels-bot）が毎朝6時と「今すぐ集計」のときに `dryRun=false` で呼ぶ（[運営ダッシュボード仕様書](../architecture/運営ダッシュボード仕様書.md#性格の分布)）
 - **リソース**: memory `1GiB` / timeout `300秒`
 - **リージョン**: `asia-northeast1`
-- **認証**: なし（集計データのみ・機密情報なし）
+- **認証**: `invoker` を reels-bot のサービスアカウント（`firebase-adminsdk-fbsvc@my-character-app.iam.gserviceaccount.com`）だけにしている。呼び出し側は Google の ID トークン（audience = 関数の URL）を `Authorization: Bearer` で付ける。全ユーザーの details を読む重い処理なので、誰でも呼べる状態にしない
 
 **クエリパラメータ:**
 

@@ -2,8 +2,8 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
-**トップレベルコレクション**: 11
+**最終更新日**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。2026-10-07: 性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
+**トップレベルコレクション**: 12
 
 ---
 
@@ -16,6 +16,7 @@
 5. [contacts](#contacts) - お問い合わせデータ
 6. [system](#system) - システム設定
 7. [compatibilityCache](#compatibilitycache) - 相性診断カテゴリ別キャッシュ
+8. [admin_metrics](#admin_metrics) - 運営ダッシュボードの集計
 
 ---
 
@@ -654,9 +655,9 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
     - **typeName**: `string` - タイプ名（例: `"場を沸かす炎タイプ"`）
     - **count**: `number` - 人数
 
-**データソース**: `recalculatePersonalityStats` Cloud Function が `collectionGroup("details")` で全ユーザーの `details/current` を走査して集計。`element`/`typeName` が Firestore 未保存の場合は `axisScores` から計算して補完。
+**データソース**: `recalculatePersonalityStats` Cloud Function が `collectionGroup("details")` で全ユーザーの `details/current` を走査して集計。`element`/`typeName` が Firestore 未保存の場合は `axisScores` から計算して補完。運営ダッシュボードの collector が毎朝この関数を呼ぶので、毎朝更新される。
 
-**アクセス権限**: 認証ユーザー読み取り可、書き込みは不可（Cloud Functionのみ）
+**アクセス権限**: クライアントからは読み書きとも不可（`firestore.rules` に個別のルールが無く、末尾の全拒否に当たる）。読むのは Cloud Function（`generateSixPersonMeeting` の `calculateStatsFromAnalysis`）だけ
 
 ---
 
@@ -884,6 +885,25 @@ Big5Analysis/{personalityKey}
 
 ---
 
+## `admin_metrics`
+
+**用途**: 運営ダッシュボード（https://darias-dashboard.web.app）に出す数字。reels-bot の collector が毎朝6時と「今すぐ集計」のときに書く。仕様は [運営ダッシュボード仕様書](../architecture/運営ダッシュボード仕様書.md)
+**保存するもの**: 人数・回数・投稿の成績だけ。メールアドレス・名前・会話や日記の中身は入れない
+
+| ドキュメント | 内容 |
+|---|---|
+| `latest` | `startedAt` / `finishedAt`: `timestamp`、`status`: `"running"` / `"done"`、`trigger`: `"schedule"` / `"manual"`、`sources`: `map`（収集元 → `"ok"` / `"error"`）、`errors`: `map`（収集元 → エラー文） |
+| `summary` | `funnel30` / `funnelAll`: `array<{label, users}>`、`weekly`: `array<{week, newUsers, activeUsers}>`、`paywallSources`: `map`、`reviews`: `array<{rating, title, body, createdDate, territory}>`（最大50件）、`instagramPosts` / `threadsPosts`: `array`（新しい30件の成績）、`signupsByMonth`: `map`（`YYYY-MM` → 件数）、`updatedAt` |
+| `daily/days/{YYYY-MM-DD}` | `date`、`appStore`: `{engagement, downloads, purchases}`（それぞれ `{total, byType, bySource}`）、`ga4`: `{newUsers, activeUsers, sessions}`（日本のみ）、`admob`: `{earningsJPY, impressions, clicks, adRequests, matchedRequests}`、`instagram`: `{followers, mediaCount, yesterday}`、`threads`: `{followers, yesterday}` |
+| `personality/days/{YYYY-MM-DD}` | `date`、`totalCharacters`、`uniqueTypes`、`elements`（「未確定」を含む）、`typeNames`、`gender`、`growthStages`（`baby` / `child` / `adult`）、`badgeBuckets`（`0` / `1-9` / `10-19` / `20`） |
+| `state` | `ascProcessed`: `array<string>`（読み込み済みの App Store レポート `キー:処理日`）、`admobBackfilled`: `bool` |
+
+日別の文書は収集元ごとに merge で書く（ある日に取得に失敗した収集元の過去の値は消えない）。
+
+**アクセス権限**: 読み取りは運営者のアカウントだけ。書き込みはクライアントから不可
+
+---
+
 ## セキュリティルール要約
 
 | コレクション | 読み取り | 書き込み |
@@ -893,15 +913,17 @@ Big5Analysis/{personalityKey}
 | `users/{userId}/personalityBadges/**` | 本人のみ | 本人は削除のみ。作成・更新は Cloud Functionのみ |
 | 上記以外の `users/{userId}/**` | 本人のみ | 本人のみ |
 | `Big5Analysis` | 認証ユーザー | Cloud Functionのみ |
-| `PersonalityStatsMetadata` | 認証ユーザー | Cloud Functionのみ |
+| `PersonalityStatsMetadata` | 不可（CF経由のみ） | Cloud Functionのみ |
 | `shared_meetings` | 認証ユーザー | Cloud Functionのみ |
 | `contacts` | 不可 | 認証ユーザー（作成のみ） |
 | `system` | 全員 | 不可 |
 | `compatibilityCache` | 不可（CF経由のみ） | Cloud Functionのみ |
+| `admin_metrics/**` | 運営者のアカウント（`kaosud@gmail.com`・メール確認済み）だけ | 不可（reels-bot の collector が Admin SDK で書く） |
 
 ---
 
-**最終更新**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
+**最終更新**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。`PersonalityStatsMetadata` のアクセス権限を rules の実態（クライアント不可）に合わせた）
+**前回更新**: 2026-10-07（性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
 **前回更新**: 2026-05-30（`ad_analytics` コレクション削除（デッドコード）；`PersonalityStatsMetadata` に `element_counts`・`type_name_counts`・`personality_details` フィールドを追加；`total_completed_users` の意味を明記）
 **前回更新**: 2026-05-10（`askHistory` サブコレクション追加（「フレンドのことを聞く」履歴）；`friendNotifications` サブコレクションのスキーマ記載追加；データモデル図を更新）
 **前回更新**: 2026-05-02（`users/{userId}.lastLoginAt` フィールド追加；`posts.analysis_result` の max_tokens 記述を削除）  
