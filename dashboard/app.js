@@ -47,6 +47,7 @@ const HELP = {
   kpiEcpm: ["eCPM", "広告が1000回表示されたときの収益（円）です。", "広告の単価です。表示回数が少ない期間はぶれやすいので、長めの期間で見ます。"],
   kpiIgFollowers: ["Instagram のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
   kpiThFollowers: ["Threads のフォロワー", "期間の最後の日のフォロワー数と、期間のはじめからの増減です。", "投稿を続けてファンが増えているかを見ます。"],
+  kpiIgLinkTaps: ["プロフィールのリンクのタップ", "Instagram のプロフィールに置いたリンク（App Store など）がタップされた回数です（毎朝、前日1日分を記録しています）。", "リールを見た人が「アプリを入れてみよう」と動いた数です。プロフィールの1行目や投稿の締めを変えたら、ここが増えたかで効果を見ます（2026-10-10 にプロフィールの1行目を変更）。"],
   kpiIgViews: ["Instagram 投稿の再生", "期間内に投稿したリール・投稿の再生（表示）回数の合計です。", "1本あたりの再生が伸びない場合は、冒頭の1〜2秒で離脱されていないか（平均視聴）も確認します。"],
   kpiThViews: ["Threads 投稿の表示", "期間内に投稿した Threads の表示回数の合計です。", "どんな内容が見られているかは、下の表を「表示」で並べ替えると分かります。"],
   kpiCharacters: ["キャラクター数", "性格の解析が始まっているキャラクターの数です（テスト用や削除済みアカウントのものを含みます）。", "アプリで遊んだことのある人のおおよその数です。"],
@@ -247,6 +248,7 @@ const V = {
   adImp: (r) => r.admob?.impressions,
   adClicks: (r) => r.admob?.clicks,
   igFollowers: (r) => r.instagram?.followers,
+  igLinkTaps: (r) => r.instagram?.yesterday?.profile_links_taps,
   thFollowers: (r) => r.threads?.followers,
 };
 function sumKeys(t, prefix) { if (!t) return undefined; return Object.entries(t).filter(([k]) => k.toLowerCase().startsWith(prefix)).reduce((a, [, v]) => a + v, 0); }
@@ -480,7 +482,7 @@ function renderAds(ctx) {
 // ───────── SNS ─────────
 function postsIn(posts, r) { return (posts || []).filter((p) => inRange((p.timestamp || "").slice(0, 10), r)); }
 function renderSns(ctx) {
-  const { rows, cur, prev } = ctx;
+  const { rows, prevRows, cur, prev } = ctx;
   const igPosts = postsIn(state.S.instagramPosts, cur), thPosts = postsIn(state.S.threadsPosts, cur);
   const sumOf = (ps, k) => (ps.length ? ps.reduce((a, p) => a + (p[k] || 0), 0) : undefined);
   const growth = (f) => { const a = first(rows, f), b = last(rows, f); return a != null && b != null ? b - a : undefined; };
@@ -488,6 +490,7 @@ function renderSns(ctx) {
   renderKpis("sn-kpis", [
     kpi({ help: "kpiIgFollowers", label: "Instagram フォロワー", value: last(rows, V.igFollowers), spark: series(ctx, V.igFollowers), sub: growthText(V.igFollowers) }),
     kpi({ help: "kpiThFollowers", label: "Threads フォロワー", value: last(rows, V.thFollowers), spark: series(ctx, V.thFollowers), sub: growthText(V.thFollowers) }),
+    kpi({ help: "kpiIgLinkTaps", label: "プロフィールのリンクのタップ", value: total(rows, V.igLinkTaps), prev: total(prevRows, V.igLinkTaps), spark: series(ctx, V.igLinkTaps), why: "記録は10/10から" }),
     kpi({ help: "kpiIgViews", label: "Instagram 投稿の再生", value: sumOf(igPosts, "views"), prev: prev ? sumOf(postsIn(state.S.instagramPosts, prev), "views") : undefined, sub: `${igPosts.length}本`, why: "期間内の投稿がありません" }),
     kpi({ help: "kpiThViews", label: "Threads 投稿の表示", value: sumOf(thPosts, "views"), prev: prev ? sumOf(postsIn(state.S.threadsPosts, prev), "views") : undefined, sub: `${thPosts.length}本`, why: "期間内の投稿がありません" }),
   ]);
