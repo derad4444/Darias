@@ -6,23 +6,25 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 /// 広告設定（iOS版Config.swiftと対応）
 class AdConfig {
   // ─── テスト用広告ユニットID ───────────────────────────────
-  static const String _testBannerAndroid = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _testBannerAndroid =
+      'ca-app-pub-3940256099942544/6300978111';
   static const String _testBannerIos = 'ca-app-pub-3940256099942544/2934735716';
-  static const String _testRewardedAndroid = 'ca-app-pub-3940256099942544/5224354917';
-  static const String _testRewardedIos = 'ca-app-pub-3940256099942544/1712485313';
+  static const String _testRewardedAndroid =
+      'ca-app-pub-3940256099942544/5224354917';
+  static const String _testRewardedIos =
+      'ca-app-pub-3940256099942544/1712485313';
 
   // デバッグビルドはテスト広告、リリースビルドは本番広告を自動使用
   static const bool isTestMode = kDebugMode;
 
   // ─── 内部ヘルパー ─────────────────────────────────────────
-  /// iOS本番IDを返す。テストモード時はGoogle提供のテストIDを返す。
-  /// Android本番IDは別途AdMobコンソールで取得してください。
-  static String _banner({required String iosId, String? androidId}) {
+  /// 本番IDを返す。テストモード時はGoogle提供のテストIDを返す。
+  static String _banner({required String iosId, required String androidId}) {
     if (kIsWeb) return '';
     if (isTestMode) {
       return Platform.isAndroid ? _testBannerAndroid : _testBannerIos;
     }
-    if (Platform.isAndroid) return androidId ?? 'YOUR_ANDROID_BANNER_AD_UNIT_ID';
+    if (Platform.isAndroid) return androidId;
     return iosId;
   }
 
@@ -30,86 +32,118 @@ class AdConfig {
   // iOS本番IDはConfig.swiftと同一値を使用
 
   /// ホーム画面バナー
-  static String get homeScreenBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/8287132245');
+  static String get homeScreenBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/8287132245',
+    androidId: 'ca-app-pub-5851550594315289/2190614219',
+  );
 
   /// 設定画面上部バナー
-  static String get settingsTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/5497209577');
+  static String get settingsTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/5497209577',
+    androidId: 'ca-app-pub-5851550594315289/9772670891',
+  );
 
   /// 設定画面下部バナー
-  static String get settingsBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/3362000823');
-
-
-
-
+  static String get settingsBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/3362000823',
+    androidId: 'ca-app-pub-5851550594315289/5766897145',
+  );
 
   /// チャット履歴画面バナー
-  static String get chatHistoryBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/3683889865');
+  static String get chatHistoryBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/3683889865',
+    androidId: 'ca-app-pub-5851550594315289/7146507559',
+  );
 
   /// キャラクター詳細画面上部バナー
-  static String get characterDetailTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/2370808193');
+  static String get characterDetailTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/2370808193',
+    androidId: 'ca-app-pub-5851550594315289/5589883308',
+  );
 
   /// キャラクター詳細画面下部バナー
-  static String get characterDetailBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/5501186800');
+  static String get characterDetailBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/5501186800',
+    androidId: 'ca-app-pub-5851550594315289/3147552796',
+  );
 
   /// 日記詳細画面上部バナー
-  static String get diaryDetailTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/1226792077');
+  static String get diaryDetailTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/1226792077',
+    androidId: 'ca-app-pub-5851550594315289/3751107898',
+  );
 
   /// 日記詳細画面下部バナー
-  static String get diaryDetailBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/1046936476');
+  static String get diaryDetailBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/1046936476',
+    androidId: 'ca-app-pub-5851550594315289/3207262547',
+  );
 
   /// タスク画面上部バナー
-  static String get taskTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/4442437769');
+  static String get taskTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/4442437769',
+    androidId: 'ca-app-pub-5851550594315289/8024474959',
+  );
 
   /// タスク画面下部バナー
-  static String get taskBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/9412511653');
+  static String get taskBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/9412511653',
+    androidId: 'ca-app-pub-5851550594315289/6763364176',
+  );
 
   /// メモ追加画面上部バナー
-  static String get memoAddTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/5138116921');
+  static String get memoAddTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/5138116921',
+    androidId: 'ca-app-pub-5851550594315289/3067661749',
+  );
 
   /// メモ追加画面下部バナー
-  static String get memoAddBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/6754558720');
+  static String get memoAddBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/6754558720',
+    androidId: 'ca-app-pub-5851550594315289/8323857850',
+  );
 
   /// タスク追加画面上部バナー
-  static String get taskAddTopBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/5441477059');
+  static String get taskAddTopBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/5441477059',
+    androidId: 'ca-app-pub-5851550594315289/1459066601',
+  );
 
   /// タスク追加画面下部バナー
-  static String get taskAddBottomBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/7106968080');
+  static String get taskAddBottomBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/7106968080',
+    androidId: 'ca-app-pub-5851550594315289/2948417252',
+  );
 
   /// 会議画面バナー
-  static String get meetingScreenBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/4592485389');
-
+  static String get meetingScreenBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/4592485389',
+    androidId: 'ca-app-pub-5851550594315289/9197955823',
+  );
 
   /// 会議履歴画面バナー
-  static String get meetingHistoryBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/1850771972');
+  static String get meetingHistoryBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/1850771972',
+    androidId: 'ca-app-pub-5851550594315289/5697694511',
+  );
 
   /// 日記履歴画面バナー
-  static String get diaryHistoryBannerAdUnitId =>
-      _banner(iosId: 'ca-app-pub-5851550594315289/6680293379');
+  static String get diaryHistoryBannerAdUnitId => _banner(
+    iosId: 'ca-app-pub-5851550594315289/6680293379',
+    androidId: 'ca-app-pub-5851550594315289/4384612847',
+  );
 
   // ─── フレンド・相性診断 画面バナー ─────────────────────────
   // 各画面で上/下は別ユニット（同一画面で上下が同時表示されるため）。
   static String get friendScreenTopBannerAdUnitId => taskTopBannerAdUnitId;
-  static String get friendScreenBottomBannerAdUnitId => taskBottomBannerAdUnitId;
+  static String get friendScreenBottomBannerAdUnitId =>
+      taskBottomBannerAdUnitId;
   static String get friendDetailTopBannerAdUnitId => memoAddTopBannerAdUnitId;
-  static String get friendDetailBottomBannerAdUnitId => memoAddBottomBannerAdUnitId;
+  static String get friendDetailBottomBannerAdUnitId =>
+      memoAddBottomBannerAdUnitId;
   static String get compatibilityTopBannerAdUnitId => taskAddTopBannerAdUnitId;
-  static String get compatibilityBottomBannerAdUnitId => taskAddBottomBannerAdUnitId;
+  static String get compatibilityBottomBannerAdUnitId =>
+      taskAddBottomBannerAdUnitId;
 
   // ─── リワード広告ユニットID ───────────────────────────────
   /// リワード動画広告
@@ -118,7 +152,7 @@ class AdConfig {
     if (isTestMode) {
       return Platform.isAndroid ? _testRewardedAndroid : _testRewardedIos;
     }
-    if (Platform.isAndroid) return 'YOUR_ANDROID_REWARDED_AD_UNIT_ID';
+    if (Platform.isAndroid) return 'ca-app-pub-5851550594315289/8756022566';
     return 'ca-app-pub-5851550594315289/8397160491';
   }
 }
