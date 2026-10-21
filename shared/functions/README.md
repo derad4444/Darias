@@ -88,7 +88,6 @@ if (cached === undefined) firestoreCache.set(key, value);
 - `generateBig5Analysis` - Big5性格解析生成（`Big5Analysis` にキャッシュ）
 - `generatePersonalityNarrative` - 性格ナラティブ生成
 - `recalculatePersonalityStats` - 性格タイプ統計の再集計
-- `backfillSixPersonalities` - 6人分身データのバックフィル
 
 ### フレンド
 - `searchUsers` - ユーザー検索

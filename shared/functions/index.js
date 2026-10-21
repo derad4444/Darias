@@ -78,11 +78,6 @@ Object.defineProperty(exports, "generateOrReuseMeeting", {
   enumerable: true,
 });
 
-Object.defineProperty(exports, "backfillSixPersonalities", {
-  get: () => require("./src/functions/generateSixPersonMeeting").backfillSixPersonalities,
-  enumerable: true,
-});
-
 Object.defineProperty(exports, "answerAppQuestion", {
   get: () => require("./const/answerAppQuestion").answerAppQuestion,
   enumerable: true,

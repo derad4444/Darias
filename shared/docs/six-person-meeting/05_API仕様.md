@@ -278,31 +278,6 @@ logger.info("Meeting generation completed", {
 
 ---
 
-## 🔁 8. backfillSixPersonalities（スケジュール関数）
-
-`details/current` に `sixPersonalities` が無いユーザーを補完する保険処理。
-
-```javascript
-exports.backfillSixPersonalities = onSchedule(
-  {
-    schedule: "0 3 * * *",   // 毎日午前3時
-    timeZone: "Asia/Tokyo",
-    region: "asia-northeast1",
-    timeoutSeconds: 540,
-    memory: "512MiB",
-  },
-  async (event) => { ... }
-);
-```
-
-処理内容:
-- `collectionGroup("details")` を `analysis_level == 100` で検索
-- `sixPersonalities` が既にある、または `confirmedBig5Scores` が無いドキュメントはスキップ
-- `generateSixPersonalities(confirmedBig5Scores, gender || "male")` を書き込む
-- 500件ごとにバッチコミット
-
----
-
 ## 📝 まとめ
 
 ### 実装済み機能
@@ -316,7 +291,6 @@ exports.backfillSixPersonalities = onSchedule(
 ✅ meeting_history にユーザー別履歴を保存
 ✅ 無料ユーザー: 生涯1回制限
 ✅ プレミアムユーザー: 無制限
-✅ 毎日3時のバックフィルスケジューラ（sixPersonalities補完）
 ```
 
 ---

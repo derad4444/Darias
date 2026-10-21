@@ -45,6 +45,20 @@
           "order": "DESCENDING"
         }
       ]
+    },
+    {
+      "collectionGroup": "subscription",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "end_date",
+          "order": "ASCENDING"
+        }
+      ]
     }
   ],
   "fieldOverrides": [

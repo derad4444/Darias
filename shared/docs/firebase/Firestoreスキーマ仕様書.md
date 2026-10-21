@@ -567,6 +567,9 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 
 > レシート検証（`shared/functions/validateReceipt.js`）を経由せずクライアントがフォールバック更新した場合は、`end_date` を含む上記の一部が書き込まれない。詳細は [サブスクリプション仕様書](../architecture/サブスクリプション仕様書.md) を参照。
 
+**インデックス:**
+- コレクショングループ `subscription`: `status` (ASC) + `end_date` (ASC)（`checkSubscriptionStatus` が期限切れの有効なサブスクを探す）
+
 ---
 
 ## `CharacterDetailsTemplate`

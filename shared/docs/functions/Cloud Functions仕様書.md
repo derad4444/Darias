@@ -30,7 +30,7 @@
 │           Cloud Functions (Node.js 22)        │
 │                                               │
 │  ┌─────────────┐  ┌────────────────────────┐ │
-│  │ onCall (14)  │  │ onSchedule (5)         │ │
+│  │ onCall (14)  │  │ onSchedule (3)         │ │
 │  │ クライアント  │  │ 定期バッチ処理          │ │
 │  │ から直接呼出  │  │ (日次/月次/年次)        │ │
 │  └──────┬──────┘  └───────────┬────────────┘ │
@@ -586,7 +586,7 @@
 
 ---
 
-### Scheduled Tasks (`onSchedule`) - 4 関数
+### Scheduled Tasks (`onSchedule`) - 3 関数
 
 Cloud Scheduler による定期実行バッチ。
 
@@ -682,16 +682,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リソース**: 未指定（v1 デフォルト）
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし
-- **クエリ**: `collectionGroup('subscription').where('status','==','active').where('end_date','<', now)` — 期限切れのもののみ取得（有効期間中は読み取らない）
-
-#### 13. `backfillSixPersonalities`
-- **ソース**: `src/functions/generateSixPersonMeeting.js`
-- **API バージョン**: v2 (`firebase-functions/v2/scheduler`)
-- **概要**: 6性格バリアントが未生成のユーザーを補完
-- **スケジュール**: `0 3 * * *` (毎日 03:00 JST)
-- **リソース**: memory `512MiB` / timeout `540秒`
-- **リージョン**: `asia-northeast1`
-- **secrets**: なし
+- **クエリ**: `collectionGroup('subscription').where('status','==','active').where('end_date','<', now)` — 期限切れのもののみ取得（有効期間中は読み取らない）。コレクショングループの複合インデックス（`subscription`: `status` 昇順 + `end_date` 昇順、`firestore.indexes.json`）が必要
 
 ---
 
