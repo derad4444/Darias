@@ -2,7 +2,7 @@
 
 > DARIAS バックエンドの Cloud Functions 一覧と構成
 
-**最終更新日**: 2026-10-10（性格タイプ統計 `PersonalityStatsMetadata` の集計は運営ダッシュボードの collector が行う。2026-10-08: パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
+**最終更新日**: 2026-10-26（`checkSubscriptionStatus` はユーザー文書がない場合にサブスクリプション側だけ更新する。2026-10-10: 性格タイプ統計 `PersonalityStatsMetadata` の集計は運営ダッシュボードの collector が行う。2026-10-08: パスワード再設定メールを送る `sendPasswordResetMail` を追加。2026-10-07: バッジ診断の `startBadgeQuestion` を追加。`classifyAndExtract` を分類だけにし、`generateCharacterReply` の採点と `badge` を追記。`answerAppQuestion` のアプリガイドを現在の画面・バッジ診断に合わせた）
 **ランタイム**: Node.js 22
 **関数数**: 28
 
@@ -683,6 +683,7 @@ Cloud Scheduler による定期実行バッチ。
 - **リージョン**: 未指定（v1 デフォルト）
 - **secrets**: なし
 - **クエリ**: `collectionGroup('subscription').where('status','==','active').where('end_date','<', now)` — 期限切れのもののみ取得（有効期間中は読み取らない）。コレクショングループの複合インデックス（`subscription`: `status` 昇順 + `end_date` 昇順、`firestore.indexes.json`）が必要
+- **更新内容**: サブスクリプションを `status: expired`・`plan: free` にし、`users/{userId}.subscriptionStatus` を `free` にする。退会済みでユーザー文書がない場合はサブスクリプション側だけ更新する
 
 ---
 

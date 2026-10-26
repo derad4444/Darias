@@ -213,12 +213,14 @@ exports.checkSubscriptionStatus = onSchedule(
             updated_at: now,
           });
 
-          const userId = doc.ref.parent.parent.id;
-          const userRef = db.collection('users').doc(userId);
-          batch.update(userRef, {
-            subscriptionStatus: 'free',
-            updated_at: now,
-          });
+          // 退会済みでユーザー文書がない場合は、サブスクリプション側だけ更新する
+          const userRef = doc.ref.parent.parent;
+          if ((await userRef.get()).exists) {
+            batch.update(userRef, {
+              subscriptionStatus: 'free',
+              updated_at: now,
+            });
+          }
 
           updateCount++;
         }
