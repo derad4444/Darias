@@ -17,6 +17,7 @@ import '../../providers/friend_provider.dart';
 import '../../providers/meeting_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/ai_content_report_sheet.dart';
 import '../../widgets/share/meeting_share_card.dart';
 import '../../widgets/share/share_card_capture.dart';
 import '../diary/diary_detail_screen.dart';
@@ -293,6 +294,8 @@ class _ChatHistoryTabState extends ConsumerState<_ChatHistoryTab> {
                             isUser: false,
                             timestamp: message.timestamp,
                             accentColor: widget.accentColor,
+                            sourceText: message.content,
+                            refId: message.id,
                           ),
                       ]),
                     ],
@@ -376,12 +379,17 @@ class _ChatBubble extends StatelessWidget {
   final bool isUser;
   final DateTime timestamp;
   final Color accentColor;
+  /// キャラの返信のときの、元になったユーザーの発言（報告に添える）
+  final String? sourceText;
+  final String? refId;
 
   const _ChatBubble({
     required this.content,
     required this.isUser,
     required this.timestamp,
     required this.accentColor,
+    this.sourceText,
+    this.refId,
   });
 
   @override
@@ -425,9 +433,27 @@ class _ChatBubble extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                    // キャラの返信はAIが作った文章なので、その場で報告できるようにする
+                    if (!isUser)
+                      SizedBox(
+                        width: 28,
+                        height: 20,
+                        child: AiContentReportButton(
+                          type: AiContentType.chat,
+                          content: content,
+                          sourceText: sourceText,
+                          refId: refId,
+                          size: 15,
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -859,6 +885,18 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
     }
   }
 
+  /// 報告に添える会議の文章（各発言と結論）
+  String _meetingReportText(SixPersonMeetingModel data) {
+    final lines = <String>[
+      for (final round in data.conversation.rounds)
+        for (final m in round.messages) '${m.characterName}: ${m.text}',
+      '',
+      '結論: ${data.conversation.conclusion.summary}',
+      ...data.conversation.conclusion.recommendations.map((r) => '・$r'),
+    ];
+    return lines.join('\n');
+  }
+
   Future<void> _loadMeetingDetail() async {
     try {
       final meetingData = await ref
@@ -933,6 +971,14 @@ class _MeetingDetailSheetState extends ConsumerState<_MeetingDetailSheet> {
                       ),
                     ),
                     const Spacer(),
+                    // 会議の会話と結論はAIが作った文章なので報告できるようにする
+                    if (_meetingData != null)
+                      AiContentReportButton(
+                        type: AiContentType.meeting,
+                        content: _meetingReportText(_meetingData!),
+                        sourceText: widget.meeting.userConcern,
+                        refId: widget.meeting.sharedMeetingId,
+                      ),
                     // 会議データを読み込めているときだけ共有できる
                     if (_meetingData != null)
                       IconButton(

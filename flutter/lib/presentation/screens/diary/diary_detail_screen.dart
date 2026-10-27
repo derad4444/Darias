@@ -5,6 +5,7 @@ import '../../providers/diary_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../providers/daily_mission_provider.dart';
 import '../../widgets/ads/banner_ad_widget.dart';
+import '../../widgets/ai_content_report_sheet.dart';
 import '../../providers/ad_provider.dart';
 import '../../../data/services/ad_service.dart';
 import '../../widgets/share/diary_share_card.dart';
@@ -133,6 +134,12 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
                       ),
                     ),
                     const Spacer(),
+                    // 日記の本文とひとことはAIが作った文章なので報告できるようにする
+                    AiContentReportButton(
+                      type: AiContentType.diary,
+                      content: _diaryReportText(),
+                      refId: widget.diary.id,
+                    ),
                     IconButton(
                       key: _shareButtonKey,
                       icon: _isSharing
@@ -186,6 +193,15 @@ class _DiaryDetailSheetState extends ConsumerState<DiaryDetailSheet> {
         );
       },
     );
+  }
+
+  /// 報告に添える日記の文章（AIが書いた部分）
+  String _diaryReportText() {
+    final diary = widget.diary;
+    return [
+      if (diary.isActivityType) ...(diary.facts ?? []).map((f) => '・$f') else diary.content,
+      if ((diary.aiComment ?? '').isNotEmpty) ...['', 'ひとこと: ${diary.aiComment}'],
+    ].join('\n');
   }
 
   /// アクティビティ型日記の表示（新方式）

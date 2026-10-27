@@ -2,7 +2,7 @@
 
 > このドキュメントはFirestoreデータベースの完全なコレクション構造とフィールド定義を示しています。
 
-**最終更新日**: 2026-10-10（運営ダッシュボードの `admin_metrics` を追加。2026-10-07: 性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
+**最終更新日**: 2026-10-27（`contacts` にAIの内容の報告を追加。2026-10-10: 運営ダッシュボードの `admin_metrics` を追加。2026-10-07: 性格の判定をバッジ診断に合わせ、`personalityBadges/current` を追加。`growthStage`・軸スコア・性格履歴・`personalityMeta` の記述と rules を更新）
 **トップレベルコレクション**: 12
 
 ---
@@ -709,19 +709,22 @@ Android（`validateGooglePlayReceipt`）のみ書き込むフィールド:
 
 ## `contacts`
 
-**用途**: ユーザーからのお問い合わせを保存
-**ドキュメントID**: UUID（クライアント生成）
+**用途**: ユーザーからのお問い合わせと、AIの内容の報告を保存
+**ドキュメントID**: お問い合わせはクライアントが作る時刻の文字列、AIの内容の報告は自動ID
 
 **フィールド:**
 
 - **userId**: `string` - ユーザーID
 - **userName**: `string` - ユーザー名
 - **userEmail**: `string` - ユーザーメールアドレス
-- **category**: `string` - カテゴリ（"bug", "feature", "other"など）
+- **category**: `string` - カテゴリ（"bug", "feature", "other"など。AIの内容の報告は "aiContentReport"）
 - **categoryDisplay**: `string` - カテゴリ表示名
 - **subject**: `string` - 件名
 - **message**: `string` - メッセージ本文
-- **deviceInfo**: `map` - デバイス情報
+- **reportType**: `string` - AIの内容の報告のみ。対象（"chat" / "meeting" / "diary"）
+- **reportReason**: `string` - AIの内容の報告のみ。理由（"offensive" / "sexual" / "harmful" / "inaccurate" / "other"）
+- **reportRefId**: `string` - AIの内容の報告のみ。対象の post・`sharedMeetingId`・日記の ID
+- **deviceInfo**: `map` - デバイス情報（AIの内容の報告は `appVersion` と `platform` のみ）
   - **appVersion**: `string` - アプリバージョン
   - **deviceModel**: `string` - デバイスモデル
   - **deviceName**: `string` - デバイス名
