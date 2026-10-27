@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 
 /// 報告するAIの内容の種類
 enum AiContentType {
@@ -184,8 +185,9 @@ class _AiContentReportSheetState extends ConsumerState<_AiContentReportSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: Container(
+        // 背景は他のシート（会議・日記の詳細など）と同じテーマのグラデーション
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          gradient: ref.watch(backgroundGradientProvider),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: SafeArea(
